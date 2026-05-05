@@ -1,0 +1,119 @@
+/*
+ * mkimg - Build raw disk image (replaces dd for os-image.bin).
+ * Creates 2880-sector floppy image: boot at sector 0, kernel at sector 1.
+ *
+ * Usage: mkimg -o os-image.bin -b boot/boot.bin -k kernel/kernel.bosx
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
+#define SECTOR_SIZE 512
+#define SECTOR_COUNT 2880
+#define IMAGE_SIZE ((size_t)SECTOR_SIZE * SECTOR_COUNT)
+
+static int read_file(const char* path, unsigned char** buf, size_t* len)
+{
+    FILE* f = fopen(path, "rb");
+    if (!f) return -1;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0 || sz > (long)IMAGE_SIZE) {
+        fclose(f);
+        return -1;
+    }
+    *buf = (unsigned char*)malloc((size_t)sz);
+    if (!*buf) {
+        fclose(f);
+        return -1;
+    }
+    size_t n = fread(*buf, 1, (size_t)sz, f);
+    fclose(f);
+    if (n != (size_t)sz) {
+        free(*buf);
+        return -1;
+    }
+    *len = (size_t)sz;
+    return 0;
+}
+
+int main(int argc, char** argv)
+{
+    const char* out_path = 0;
+    const char* boot_path = 0;
+    const char* kernel_path = 0;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            out_path = argv[++i];
+        } else if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {
+            boot_path = argv[++i];
+        } else if (strcmp(argv[i], "-k") == 0 && i + 1 < argc) {
+            kernel_path = argv[++i];
+        }
+    }
+
+    if (!out_path || !boot_path || !kernel_path) {
+        fprintf(stderr, "Usage: mkimg -o <image.bin> -b <boot.bin> -k <kernel.bosx>\n");
+        return 1;
+    }
+
+    unsigned char* boot_buf = 0;
+    unsigned char* kernel_buf = 0;
+    size_t boot_len = 0, kernel_len = 0;
+
+    if (read_file(boot_path, &boot_buf, &boot_len) != 0) {
+        fprintf(stderr, "mkimg: cannot read %s\n", boot_path);
+        return 1;
+    }
+    if (boot_len > SECTOR_SIZE) {
+        fprintf(stderr, "mkimg: boot larger than one sector (%zu bytes)\n", boot_len);
+        free(boot_buf);
+        return 1;
+    }
+
+    if (read_file(kernel_path, &kernel_buf, &kernel_len) != 0) {
+        fprintf(stderr, "mkimg: cannot read %s\n", kernel_path);
+        free(boot_buf);
+        return 1;
+    }
+    if (kernel_len > (SECTOR_COUNT - 1) * (size_t)SECTOR_SIZE) {
+        fprintf(stderr, "mkimg: kernel too large\n");
+        free(boot_buf);
+        free(kernel_buf);
+        return 1;
+    }
+
+    unsigned char* img = (unsigned char*)calloc(1, IMAGE_SIZE);
+    if (!img) {
+        fprintf(stderr, "mkimg: out of memory\n");
+        free(boot_buf);
+        free(kernel_buf);
+        return 1;
+    }
+
+    memcpy(img, boot_buf, boot_len);
+    memcpy(img + SECTOR_SIZE, kernel_buf, kernel_len);
+
+    FILE* f = fopen(out_path, "wb");
+    if (!f) {
+        fprintf(stderr, "mkimg: cannot write %s\n", out_path);
+        free(img);
+        free(boot_buf);
+        free(kernel_buf);
+        return 1;
+    }
+    size_t written = fwrite(img, 1, IMAGE_SIZE, f);
+    fclose(f);
+    free(img);
+    free(boot_buf);
+    free(kernel_buf);
+
+    if (written != IMAGE_SIZE) {
+        fprintf(stderr, "mkimg: write failed\n");
+        return 1;
+    }
+    return 0;
+}

@@ -1,0 +1,5 @@
+<!-- LardOS sample config -->
+<config>
+  <setting name="boot_delay" value="3"/>
+  <setting name="resolution" w="320" h="200"/>
+</config>

@@ -1,0 +1,4 @@
+int main() {
+  putint(40 + 2);
+  return 0;
+}

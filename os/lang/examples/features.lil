@@ -1,0 +1,12 @@
+; cond, min/max, while, defun, for
+(begin
+  (print (cond ((lt 1 2) 100) (else 0)))
+  (print (min 9 5 12))
+  (print (max -3 7 2))
+  (print (while 0 42))
+  (defun add1 (x) (+ x 1))
+  (print (add1 41))
+  (defun fac (n) (if (eq n 0) 1 (* n (fac (- n 1)))))
+  (print (fac 5))
+  (for i 0 5 (begin (printn i) (emit 32)))
+  (emit 10))

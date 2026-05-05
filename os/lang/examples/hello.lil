@@ -1,0 +1,2 @@
+; LIL example — same idea as the built-in kernel demo
+(print (+ 40 2))

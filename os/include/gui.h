@@ -1,0 +1,31 @@
+#pragma once
+
+int gui_init(void);
+void gui_handle_mouse(int dx, int dy, int buttons);
+void gui_handle_key(char ch);
+void gui_handle_key_nav(int kind);
+void gui_tick(void);
+void gui_render(void);
+void gui_activity(void);  /* reset idle timer (call on mouse/key) */
+int gui_screensaver_active(void);  /* 1 if screensaver is showing */
+void gui_demo(void);
+
+// GUI -> kernel integration for "fetch" demo
+int gui_take_submit(char* out_url, unsigned out_cap); // returns 1 if got submit
+void gui_set_response(const char* text);
+void gui_set_loading(int on);
+
+// Lafillo tab: set extracted + raw content (for View Source)
+void gui_lafillo_set_content(const char* extracted, const char* raw);
+
+// LARSH: load and play .larsh file (switches to Gallery tab)
+void gui_larsh_play(const char* path);
+
+// GUI syscalls (for user programs via LDLL)
+void gui_syscall_put_pixel(uint16_t x, uint16_t y, uint32_t argb);
+void gui_syscall_fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t argb);
+void gui_syscall_draw_text(uint16_t x, uint16_t y, const char* s, uint32_t fg, uint32_t bg);
+void gui_syscall_clear(uint32_t argb);
+uint16_t gui_syscall_get_width(void);
+uint16_t gui_syscall_get_height(void);
+

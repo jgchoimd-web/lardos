@@ -1,0 +1,45 @@
+; stdio.boslib - BOSL standard I/O routines
+; Include with: include "lib/stdio.boslib" or -I lang lib/stdio.boslib
+
+; print_hex: (n --) print top of stack as 2-digit hex
+print_hex:
+    dup
+    pushi 4
+    ushr
+    pushi 0xF
+    and
+    pushi 0x30
+    add
+    dup
+    pushi 0x39
+    gt
+    jz print_hex_1
+    pushi 7
+    add
+print_hex_1:
+    emit
+    pushi 0xF
+    and
+    pushi 0x30
+    add
+    dup
+    pushi 0x39
+    gt
+    jz print_hex_2
+    pushi 7
+    add
+print_hex_2:
+    emit
+    ret
+
+; print_space: ( -- ) print a space
+print_space:
+    pushi 32
+    emit
+    ret
+
+; print_newline: ( -- ) print newline
+print_newline:
+    pushi 10
+    emit
+    ret

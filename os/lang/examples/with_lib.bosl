@@ -1,0 +1,15 @@
+; Example: using boslib libraries (like C #include)
+; Path relative to this file: ../lib/stdio.boslib
+; Or: bosla with_lib.bosl -o out.bosli -I ..
+include "../lib/stdio.boslib"
+
+pushc "Hello from lib! 0x"
+printn
+pushi 42
+call print_hex
+call print_newline
+
+pushi 255
+call print_hex
+call print_newline
+halt

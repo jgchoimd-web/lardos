@@ -1,0 +1,8 @@
+<!-- Sample UI layout -->
+<screen id="main">
+  <title>LardOS</title>
+  <menu>
+    <item action="demo">Run Demo</item>
+    <item action="shell">Shell</item>
+  </menu>
+</screen>

@@ -13,7 +13,6 @@ SCRIPTS_DIR := scripts
 # Host tools (run on build machine, no Python)
 MKLDLL    := $(SCRIPTS_DIR)/mkldll
 MKARDX    := $(SCRIPTS_DIR)/mkardx
-EMBED_CA  := $(SCRIPTS_DIR)/embed_ca_pem
 MKLFS     := $(SCRIPTS_DIR)/mklfs
 MK_SSAV   := $(SCRIPTS_DIR)/mk_default_ssav
 MKEXE     := $(SCRIPTS_DIR)/mkexe
@@ -21,7 +20,6 @@ MKIMG     := $(SCRIPTS_DIR)/mkimg
 BOSLA     := lang/bosla
 SEEDC     := lang/seed/seedc
 LIL       := tools/lil
-HTTPS_BR  := $(SCRIPTS_DIR)/host_https_bridge
 BIN2INC   := $(SCRIPTS_DIR)/bin2inc
 
 LANG_EX   := lang/examples
@@ -39,11 +37,7 @@ include deps.mk
 KERNEL_LIB_OBJS := $(addprefix $(KERNEL_DIR)/,$(addsuffix .o,$(KERNEL_LIBS)))
 LDLL_INC_DEPS   := $(addprefix $(KERNEL_DIR)/ldll_lib,$(addsuffix .inc,$(LDLL_LIBS)))
 
-MBEDTLS_DIR := third_party/mbedtls
-MBEDTLS_SRCS := $(filter-out $(MBEDTLS_DIR)/library/net_sockets.c,$(wildcard $(MBEDTLS_DIR)/library/*.c))
-MBEDTLS_OBJS := $(patsubst $(MBEDTLS_DIR)/library/%.c,$(KERNEL_DIR)/mbedtls_%.o,$(MBEDTLS_SRCS))
-
-CFLAGS    := -ffreestanding -O2 -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -nostdlib -fno-builtin -I$(INCLUDE) -DMBEDTLS_USER_CONFIG_FILE=\"lard_mbedtls_user.h\" -I$(MBEDTLS_DIR)/include -include stdio.h
+CFLAGS    := -ffreestanding -O2 -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h
 
 LDFLAGS   := -T linker.ld -nostdlib -m elf_x86_64
 
@@ -52,16 +46,10 @@ all: $(ISO_IMAGE)
 $(BOOT_BIN): $(BOOT_DIR)/boot.s
 	$(NASM) -f bin $< -o $@
 
-$(KERNEL_ELF): $(KERNEL_DIR)/entry64.o $(KERNEL_DIR)/isr64.o $(KERNEL_DIR)/kernel64.o $(KERNEL_DIR)/smp.o $(KERNEL_DIR)/ap_trampoline.o $(KERNEL_DIR)/aux_kernel.o $(KERNEL_DIR)/pci.o $(KERNEL_DIR)/rtl8139.o $(KERNEL_DIR)/net.o $(MBEDTLS_OBJS) $(KERNEL_DIR)/mbedtls_lard.o $(KERNEL_DIR)/ca_bundle.o $(KERNEL_DIR)/rtc.o $(KERNEL_DIR)/string.o $(KERNEL_DIR)/stdlib_min.o $(KERNEL_DIR)/lard_stdio.o $(KERNEL_DIR)/printf_mpaland.o $(KERNEL_DIR)/fs.o $(KERNEL_DIR)/bmp.o $(KERNEL_DIR)/lard_inflate.o $(KERNEL_DIR)/lafillo.o $(KERNEL_DIR)/ldi.o $(KERNEL_DIR)/lda.o $(KERNEL_DIR)/ldll.o $(KERNEL_DIR)/img_glyph.o $(KERNEL_DIR)/drfl.o $(KERNEL_DIR)/ssav.o $(KERNEL_DIR)/lss.o $(KERNEL_DIR)/lfs.o $(KERNEL_DIR)/lsh.o $(KERNEL_DIR)/larsh.o $(KERNEL_DIR)/kr_basic.o $(KERNEL_LIB_OBJS) $(KERNEL_DIR)/lardx_load.o $(KERNEL_DIR)/gui.o $(KERNEL_DIR)/ps2.o $(KERNEL_DIR)/idt64.o $(KERNEL_DIR)/panic.o $(KERNEL_DIR)/mmu.o $(KERNEL_DIR)/mem.o $(KERNEL_DIR)/gc.o $(KERNEL_DIR)/gc_demo.o $(KERNEL_DIR)/lib3d.o $(KERNEL_DIR)/lib3d_demo.o $(KERNEL_DIR)/unicode.o $(KERNEL_DIR)/console.o $(KERNEL_DIR)/bosl_vm.o $(KERNEL_DIR)/bosl_jit.o $(KERNEL_DIR)/bosl_demo.o $(KERNEL_DIR)/bosl_asm.o $(KERNEL_DIR)/lil.o $(KERNEL_DIR)/lil_demo.o $(KERNEL_DIR)/lml.o $(KERNEL_DIR)/lml_demo.o $(KERNEL_DIR)/gasm_vm.o $(KERNEL_DIR)/gasm_demo.o $(KERNEL_DIR)/lafillo_vm.o $(KERNEL_DIR)/lafillo_demo.o $(KERNEL_DIR)/os_vm.o $(KERNEL_DIR)/os_demo.o $(KERNEL_DIR)/gdt64.o $(KERNEL_DIR)/gdt64_asm.o $(KERNEL_DIR)/lipc.o $(KERNEL_DIR)/syscall.o $(KERNEL_DIR)/usermode.o $(KERNEL_DIR)/usermode_asm.o
+$(KERNEL_ELF): $(KERNEL_DIR)/entry64.o $(KERNEL_DIR)/isr64.o $(KERNEL_DIR)/kernel64.o $(KERNEL_DIR)/smp.o $(KERNEL_DIR)/ap_trampoline.o $(KERNEL_DIR)/aux_kernel.o $(KERNEL_DIR)/pci.o $(KERNEL_DIR)/rtl8139.o $(KERNEL_DIR)/net.o $(KERNEL_DIR)/lard_tls.o $(KERNEL_DIR)/rtc.o $(KERNEL_DIR)/string.o $(KERNEL_DIR)/stdlib_min.o $(KERNEL_DIR)/lard_stdio.o $(KERNEL_DIR)/printf_mpaland.o $(KERNEL_DIR)/fs.o $(KERNEL_DIR)/bmp.o $(KERNEL_DIR)/lard_inflate.o $(KERNEL_DIR)/lafillo.o $(KERNEL_DIR)/ldi.o $(KERNEL_DIR)/lda.o $(KERNEL_DIR)/ldll.o $(KERNEL_DIR)/img_glyph.o $(KERNEL_DIR)/drfl.o $(KERNEL_DIR)/ssav.o $(KERNEL_DIR)/lss.o $(KERNEL_DIR)/lfs.o $(KERNEL_DIR)/lsh.o $(KERNEL_DIR)/larsh.o $(KERNEL_DIR)/kr_basic.o $(KERNEL_LIB_OBJS) $(KERNEL_DIR)/lardx_load.o $(KERNEL_DIR)/gui.o $(KERNEL_DIR)/ps2.o $(KERNEL_DIR)/idt64.o $(KERNEL_DIR)/panic.o $(KERNEL_DIR)/mmu.o $(KERNEL_DIR)/mem.o $(KERNEL_DIR)/gc.o $(KERNEL_DIR)/gc_demo.o $(KERNEL_DIR)/lib3d.o $(KERNEL_DIR)/lib3d_demo.o $(KERNEL_DIR)/unicode.o $(KERNEL_DIR)/console.o $(KERNEL_DIR)/bosl_vm.o $(KERNEL_DIR)/bosl_jit.o $(KERNEL_DIR)/bosl_demo.o $(KERNEL_DIR)/bosl_asm.o $(KERNEL_DIR)/lil.o $(KERNEL_DIR)/lil_demo.o $(KERNEL_DIR)/lml.o $(KERNEL_DIR)/lml_demo.o $(KERNEL_DIR)/gasm_vm.o $(KERNEL_DIR)/gasm_demo.o $(KERNEL_DIR)/lafillo_vm.o $(KERNEL_DIR)/lafillo_demo.o $(KERNEL_DIR)/os_vm.o $(KERNEL_DIR)/os_demo.o $(KERNEL_DIR)/gdt64.o $(KERNEL_DIR)/gdt64_asm.o $(KERNEL_DIR)/lipc.o $(KERNEL_DIR)/syscall.o $(KERNEL_DIR)/usermode.o $(KERNEL_DIR)/usermode_asm.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
-$(KERNEL_DIR)/mbedtls_%.o: $(MBEDTLS_DIR)/library/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(KERNEL_DIR)/mbedtls_lard.o: $(KERNEL_DIR)/mbedtls_lard.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(KERNEL_DIR)/ca_bundle.o: $(KERNEL_DIR)/ca_bundle.c
+$(KERNEL_DIR)/lard_tls.o: $(KERNEL_DIR)/lard_tls.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/rtc.o: $(KERNEL_DIR)/rtc.c
@@ -153,9 +141,6 @@ $(SEEDC): lang/seed/seedc.c
 	$(CC) -O2 -Wall -o $@ $<
 
 $(LIL): tools/lil.c
-	$(CC) -O2 -Wall -o $@ $<
-
-$(HTTPS_BR): $(SCRIPTS_DIR)/host_https_bridge.c
 	$(CC) -O2 -Wall -o $@ $<
 
 define ldll_rule
@@ -265,39 +250,6 @@ $(KERNEL_DIR)/lib3d.o: $(KERNEL_DIR)/lib3d.c
 $(KERNEL_DIR)/lib3d_demo.o: $(KERNEL_DIR)/lib3d_demo.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/gdt.o: $(KERNEL_DIR)/gdt.c $(KERNEL_DIR)/gdt.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(KERNEL_DIR)/gdt_asm.o: $(KERNEL_DIR)/gdt_asm.s
-	$(NASM) -f elf32 $< -o $@
-
-$(KERNEL_DIR)/idt.o: $(KERNEL_DIR)/idt.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(KERNEL_DIR)/idt_asm.o: $(KERNEL_DIR)/idt_asm.s
-	$(NASM) -f elf32 $< -o $@
-
-$(KERNEL_DIR)/isr.o: $(KERNEL_DIR)/isr.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(KERNEL_DIR)/isr_asm.o: $(KERNEL_DIR)/isr_asm.s
-	$(NASM) -f elf32 $< -o $@
-
-$(KERNEL_DIR)/pic.o: $(KERNEL_DIR)/pic.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(KERNEL_DIR)/irq.o: $(KERNEL_DIR)/irq.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(KERNEL_DIR)/irq_asm.o: $(KERNEL_DIR)/irq_asm.s
-	$(NASM) -f elf32 $< -o $@
-
-$(KERNEL_DIR)/timer.o: $(KERNEL_DIR)/timer.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(KERNEL_DIR)/keyboard.o: $(KERNEL_DIR)/keyboard.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
 $(KERNEL_DIR)/bosl_vm.o: $(KERNEL_DIR)/bosl_vm.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -350,7 +302,6 @@ run: $(ISO_IMAGE)
 
 clean:
 	rm -f $(BOOT_BIN) $(KERNEL_ELF) $(KERNEL_EXE) $(ISO_IMAGE) \
-	      $(KERNEL_DIR)/*.o $(KERNEL_DIR)/mbedtls_*.o $(KERNEL_DIR)/lafillo_demo_data.inc \
+	      $(KERNEL_DIR)/*.o $(KERNEL_DIR)/lafillo_demo_data.inc \
 	      $(LAFILLO_ELF) $(LAFILLO_BOSX) $(LANG_EX)/lafillo_demo.o \
-	      $(MKLDLL) $(MKARDX) $(EMBED_CA) $(MKLFS) $(MK_SSAV) $(MKEXE) $(MKIMG) $(BIN2INC) $(BOSLA) $(SEEDC) $(LIL) $(HTTPS_BR)
-
+	      $(MKLDLL) $(MKARDX) $(MKLFS) $(MK_SSAV) $(MKEXE) $(MKIMG) $(BIN2INC) $(BOSLA) $(SEEDC) $(LIL)

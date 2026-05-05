@@ -1,6 +1,6 @@
 #pragma once
 
-/* Freestanding time types for mbedTLS X.509 (RTC fills these). */
+/* Freestanding time types for RTC and native TLS work. */
 typedef long long time_t;
 
 struct tm {

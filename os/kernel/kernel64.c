@@ -300,11 +300,12 @@ void kmain(void)
     vga_puts("DNS OK\n", 0x2F);
 
     static char resp[4096];
-    if (net_https_get(&net, ip, 443, "example.com", "/", resp, sizeof(resp)) != 0) {
-        panic("HTTPS failed");
+    if (net_http_get(&net, ip, 80, "example.com", "/", resp, sizeof(resp)) == 0) {
+        vga_puts("HTTP OK\n", 0x2F);
+    } else {
+        vga_puts("HTTP unavailable\n", 0x4F);
     }
-    vga_puts("HTTPS OK\n", 0x2F);
-    vga_puts(resp, 0x0F);
+    vga_puts("Native TLS loaded (external TLS removed)\n", 0x2F);
 
     for (;;) {
         int dx = 0, dy = 0, btn = 0;
@@ -374,10 +375,11 @@ void kmain(void)
                     gui_set_response("DNS failed");
                 }
                 if (have_ip) {
+                    resp[0] = '\0';
                     int r = is_https ? net_https_get(&net, dip, url_port, host_hdr, path, resp, sizeof(resp))
                                      : net_http_get(&net, dip, url_port, host_hdr, path, resp, sizeof(resp));
                     if (r != 0) {
-                        gui_set_response(is_https ? "HTTPS failed" : "HTTP failed");
+                        gui_set_response((is_https && resp[0]) ? resp : (is_https ? "HTTPS failed" : "HTTP failed"));
                     } else {
                         static char html_out[4096];
                         if (lafillo_http_to_text(resp, (uint32_t)strlen(resp), html_out, sizeof(html_out)) == 0) {
@@ -398,4 +400,3 @@ void kmain(void)
         __asm__ __volatile__("pause");
     }
 }
-

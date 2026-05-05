@@ -1,19 +1,16 @@
 ## lard
 
-This is a small educational 32‑bit x86 operating system that boots via BIOS,
-switches to protected mode, and runs a C kernel.
+LardOS is a small educational 64-bit x86 operating system. It boots from BIOS,
+switches through protected mode into long mode, then runs the kernel at
+`entry64.s` / `kernel64.c`.
 
-### Prerequisites (macOS)
+### Prerequisites
 
 - `nasm`
-- `qemu-system-i386`
-- `gcc` and `binutils` (provided by Xcode Command Line Tools or Homebrew)
-
-Example with Homebrew:
-
-```bash
-brew install nasm qemu
-```
+- `qemu-system-x86_64`
+- `gcc`
+- `ld`
+- `make`
 
 ### Build
 
@@ -21,8 +18,8 @@ brew install nasm qemu
 make
 ```
 
-This produces `os-image.bin`, a raw floppy-sized disk image with the boot
-sector and kernel.
+This produces `os-image.bin`, a raw bootable image with the boot sector and
+64-bit kernel payload.
 
 ### Run in QEMU
 
@@ -30,107 +27,36 @@ sector and kernel.
 make run
 ```
 
-You should see the OS boot in a QEMU window. The default `make run` line enables the **RTL8139** NIC with QEMU **user networking** (`-netdev user`).
+The default run target uses `qemu-system-x86_64`, an RTL8139 NIC, QEMU user
+networking, and `-smp 3`.
 
-### Internet, HTTPS, and YouTube
+### Networking And TLS
 
-The kernel implements DHCP, DNS, and **plain HTTP (port 80)** only. There is **no TLS** in the kernel, so `https://` sites (including **YouTube**) cannot be contacted directly from lard. A full **video player / browser** is also out of scope for this project.
+The kernel networking stack owns DHCP, DNS, IPv4, UDP, a small TCP path, and
+plain HTTP.
 
-To still load **HTTPS** pages as text (for example `https://example.com/`):
+TLS is intentionally in-tree now. External TLS libraries, host fetch bridges,
+and generated CA bundles are not linked into the kernel. The native `lard_tls`
+module currently builds a TLS 1.2 ClientHello, sends it over the kernel TCP
+stack, parses ServerHello, and then returns a clear
+`native TLS crypto is not finished` status until the owned crypto pieces are
+implemented.
 
-1. On the **host** machine (where QEMU runs), start the bridge:
+The next TLS work is:
 
-   ```bash
-   ./scripts/host_https_bridge
-   ```
-   (Build with `make` first; or `gcc -O2 -o scripts/host_https_bridge scripts/host_https_bridge.c`.)
+- certificate parsing and validation
+- key exchange
+- transcript hashing and key schedule
+- encrypted record read/write
+- HTTP over completed TLS sessions
 
-2. In the lard URL bar after boot, open:
+### Real Hardware
 
-   ```text
-   http://10.0.2.2:8765/?url=https://example.com/
-   ```
+`os-image.bin` is a raw BIOS-style image. It is meant for QEMU first and for
+legacy BIOS / CSM machines second. UEFI-only machines need a different
+bootloader path.
 
-   In QEMU user networking, **`10.0.2.2`** is the host as seen from the guest.
+### Architecture
 
-3. **YouTube** often returns **403**, very large HTML, or scripts that only work in a real browser — **do not expect video playback** inside lard. To watch YouTube, use a browser on the host OS.
-
-You can also use literal IPv4 addresses and ports in URLs (for example `http://10.0.2.2:8765/...`) without DNS.
-
-### Notes
-
-This project is for learning purposes and intentionally keeps things simple:
-flat binaries, 32‑bit protected mode only, and a minimal kernel.
-
-The kernel console and VGA text output accept **UTF-8** strings and map Unicode to
-**CP437** (VGA font). Characters with no CP437 glyph are shown as `?` (for example
-most CJK code points).
-
-### Run on real hardware (USB)
-
-This project produces `os-image.bin`, a **raw floppy-sized image**. Booting it
-on real hardware works best on machines that support **legacy BIOS / CSM**
-booting. Many modern UEFI-only systems will not boot this image without a
-different (UEFI) bootloader.
-
-#### Write the image to a USB drive (macOS)
-
-1) Build the image:
-
-```bash
-make
-```
-
-2) Insert a USB drive, then find its disk identifier:
-
-```bash
-diskutil list
-```
-
-Look for something like `/dev/disk2` that matches your USB size.
-
-3) Unmount the whole disk (replace `disk2` with yours):
-
-```bash
-diskutil unmountDisk /dev/disk2
-```
-
-4) Write the image (this **erases the USB**; double-check the disk number):
-
-```bash
-sudo dd if=os-image.bin of=/dev/rdisk2 bs=1m conv=sync
-```
-
-5) Eject the USB:
-
-```bash
-diskutil eject /dev/disk2
-```
-
-If `bs=1m` is rejected on your system, use `bs=1048576` instead.
-
-#### Booting steps (BIOS / CSM)
-
-- Enter firmware setup (often `F2`, `Del`, or `Esc` during power-on).
-- **Disable Secure Boot** (required for legacy boot on many systems).
-- **Enable CSM / Legacy Boot** (wording varies by vendor).
-- Put the USB device first in the boot order, or use the one-time boot menu
-  (often `F12`/`F10`/`Esc`) to pick it.
-
-#### Troubleshooting
-
-- **USB doesn’t show up as bootable**: your machine may be UEFI-only, or legacy
-  boot is disabled. Enable CSM/Legacy Boot, or try an older machine.
-- **Boots to a blinking cursor / black screen**: try a different USB port
-  (USB-A vs USB-C adapters can matter), and confirm you wrote to the correct
-  `/dev/diskN`.
-- **Still no boot**: some BIOSes are picky about how they emulate a
-  floppy-sized “superfloppy” image from USB. A more compatible approach is to
-  generate a disk image with an MBR + partition and install a proper boot
-  loader stage there (out of scope for this minimal BIOS image).
-
-### 아키텍처
-
-LardOS의 계층별 구조, 부팅 흐름, 파일시스템, Syscall, VM, GUI 등 전체 아키텍처는
-[ARCHITECTURE.md](ARCHITECTURE.md)를 참고한다.
-
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the 64-bit boot path, kernel pieces,
+network stack, and native TLS layout.

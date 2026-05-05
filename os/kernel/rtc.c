@@ -110,14 +110,14 @@ int64_t rtc_unix_seconds(void)
     return civil_to_unix(full_year, mo, d, h, mi, s);
 }
 
-time_t rtc_mbedtls_time(time_t* tp)
+time_t rtc_time(time_t* tp)
 {
     time_t t = (time_t)rtc_unix_seconds();
     if (tp) *tp = t;
     return t;
 }
 
-struct tm* mbedtls_platform_gmtime_r(const time_t* tt, struct tm* tm_buf)
+struct tm* rtc_gmtime_r(const time_t* tt, struct tm* tm_buf)
 {
     if (!tt || !tm_buf) return NULL;
     int64_t t = (int64_t)*tt;

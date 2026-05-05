@@ -2,16 +2,10 @@
 #include "sock.h"
 #include "rtl8139.h"
 #include "drfl.h"
-
-#include "mbedtls/net_sockets.h"
-#include "mbedtls/ssl.h"
+#include "lard_tls.h"
 
 #include <stddef.h>
 #include <stdint.h>
-
-extern int lard_mbedtls_global_init(void);
-extern int lard_tls_ready(void);
-extern mbedtls_ssl_config* lard_tls_ssl_config(void);
 
 typedef struct __attribute__((packed)) {
     uint8_t dst[6];
@@ -944,30 +938,45 @@ static void tls_sni_hostname(const char* host_hdr, char* out, uint32_t cap)
 typedef struct {
     net_stack_t* n;
     net_sock_t* sock;
-} lard_ssl_bio_t;
+} lard_tls_bio_t;
 
-static int lard_ssl_send(void* ctx, const unsigned char* buf, size_t len)
+static int lard_tls_net_send(void* ctx, const uint8_t* buf, uint32_t len)
 {
-    lard_ssl_bio_t* b = (lard_ssl_bio_t*)ctx;
-    if (len > 0xFFFFFFFFu) len = 0xFFFFFFFFu;
-    int r = net_sock_send(b->n, b->sock, buf, (uint32_t)len);
-    return (r != 0) ? MBEDTLS_ERR_NET_SEND_FAILED : (int)len;
+    lard_tls_bio_t* b = (lard_tls_bio_t*)ctx;
+    return net_sock_send(b->n, b->sock, buf, len);
 }
 
-static int lard_ssl_recv(void* ctx, unsigned char* buf, size_t len)
+static int lard_tls_net_recv(void* ctx, uint8_t* buf, uint32_t cap, uint32_t* out_len)
 {
-    lard_ssl_bio_t* b = (lard_ssl_bio_t*)ctx;
-    if (len == 0) return 0;
-    for (;;) {
-        uint32_t cap = (uint32_t)len;
-        if (cap > 65536u) cap = 65536u;
+    lard_tls_bio_t* b = (lard_tls_bio_t*)ctx;
+    if (!out_len) return -1;
+    *out_len = 0;
+    if (cap == 0) return 0;
+    for (uint32_t tries = 0; tries < 200000u; tries++) {
+        uint32_t n = cap;
         uint8_t flags = 0;
-        int rr = net_sock_recv(b->n, b->sock, (char*)buf, &cap, &flags);
-        if (rr != 0) return MBEDTLS_ERR_NET_RECV_FAILED;
-        if (flags & 0x04) return MBEDTLS_ERR_NET_CONN_RESET;
-        if (cap > 0) return (int)cap;
-        if (flags & 0x01) return MBEDTLS_ERR_SSL_CONNECTION_TERMINATED;
+        int rr = net_sock_recv(b->n, b->sock, (char*)buf, &n, &flags);
+        if (rr == 0 && n > 0) {
+            *out_len = n;
+            return 0;
+        }
+        if (flags & 0x04) return -2;
+        if (flags & 0x01) return -3;
     }
+    return 0;
+}
+
+static void set_tls_status(char* out, uint32_t out_cap, int code)
+{
+    if (!out || out_cap == 0) return;
+    const char* a = "Native TLS is internal now; ";
+    const char* b = lard_tls_status_text(code);
+    const char* c = ". External TLS libraries are not linked.\n";
+    uint32_t p = 0;
+    for (uint32_t i = 0; a[i] && p + 1 < out_cap; i++) out[p++] = a[i];
+    for (uint32_t i = 0; b[i] && p + 1 < out_cap; i++) out[p++] = b[i];
+    for (uint32_t i = 0; c[i] && p + 1 < out_cap; i++) out[p++] = c[i];
+    out[p] = '\0';
 }
 
 static int parse_status_code(const char* hdr, uint32_t hdr_len)
@@ -1083,44 +1092,19 @@ static int parse_location(const char* v, uint32_t vlen, char* out_host, uint32_t
 
 static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap, int* out_status, char* out_loc, uint32_t loc_cap)
 {
-    mbedtls_ssl_config* conf = lard_tls_ssl_config();
-    if (!conf) return -10;
-
     net_sock_t sock;
     if (net_sock_connect(n, dst, port, &sock) != 0) return -2;
 
-    mbedtls_ssl_context ssl;
-    mbedtls_ssl_init(&ssl);
-    if (mbedtls_ssl_setup(&ssl, conf) != 0) {
-        mbedtls_ssl_free(&ssl);
-        net_sock_close(n, &sock);
-        return -11;
-    }
-
     char sni[128];
     tls_sni_hostname(host, sni, sizeof(sni));
-    if (mbedtls_ssl_set_hostname(&ssl, sni) != 0) {
-        mbedtls_ssl_free(&ssl);
+    lard_tls_bio_t bio = { n, &sock };
+    lard_tls_client_t tls;
+    int tr = lard_tls_client_init(&tls, sni, &bio, lard_tls_net_send, lard_tls_net_recv);
+    if (tr == 0) tr = lard_tls_client_handshake(&tls);
+    if (tr != 0) {
+        set_tls_status(out, out_cap, tr);
         net_sock_close(n, &sock);
-        return -12;
-    }
-
-    lard_ssl_bio_t bio = { n, &sock };
-    mbedtls_ssl_set_bio(&ssl, &bio, lard_ssl_send, lard_ssl_recv, NULL);
-
-    int hs;
-    while ((hs = mbedtls_ssl_handshake(&ssl)) != 0) {
-        if (hs != MBEDTLS_ERR_SSL_WANT_READ && hs != MBEDTLS_ERR_SSL_WANT_WRITE) {
-            mbedtls_ssl_free(&ssl);
-            net_sock_close(n, &sock);
-            return hs;
-        }
-    }
-
-    if (mbedtls_ssl_get_verify_result(&ssl) != 0) {
-        mbedtls_ssl_free(&ssl);
-        net_sock_close(n, &sock);
-        return -13;
+        return tr;
     }
 
     char req[1024];
@@ -1136,14 +1120,13 @@ static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const ch
 
     uint32_t sent = 0;
     while (sent < rlen) {
-        int w = mbedtls_ssl_write(&ssl, (unsigned char*)req + sent, (size_t)(rlen - sent));
-        if (w < 0) {
-            if (w == MBEDTLS_ERR_SSL_WANT_READ || w == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
-            mbedtls_ssl_free(&ssl);
+        int w = lard_tls_write(&tls, (const uint8_t*)req + sent, rlen - sent);
+        if (w != 0) {
+            set_tls_status(out, out_cap, w);
             net_sock_close(n, &sock);
             return w;
         }
-        sent += (uint32_t)w;
+        sent = rlen;
     }
 
     uint32_t out_len = 0;
@@ -1159,19 +1142,14 @@ static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const ch
 
     while (out_len + 1 < out_cap && !chunk_done) {
         char buf[512];
-        int sslr;
-        for (;;) {
-            sslr = mbedtls_ssl_read(&ssl, (unsigned char*)buf, sizeof(buf));
-            if (sslr == MBEDTLS_ERR_SSL_WANT_READ || sslr == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
-            if (sslr < 0) {
-                mbedtls_ssl_free(&ssl);
-                net_sock_close(n, &sock);
-                return sslr;
-            }
-            break;
+        uint32_t cap = sizeof(buf);
+        int rr = lard_tls_read(&tls, (uint8_t*)buf, sizeof(buf), &cap);
+        if (rr != 0) {
+            set_tls_status(out, out_cap, rr);
+            net_sock_close(n, &sock);
+            return rr;
         }
-        if (sslr == 0) { saw_fin = 1; break; }
-        uint32_t cap = (uint32_t)sslr;
+        if (cap == 0) { saw_fin = 1; break; }
 
         for (uint32_t bi = 0; bi < cap && out_len + 1 < out_cap && !chunk_done; bi++) {
             char ch = buf[bi];
@@ -1229,7 +1207,6 @@ static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const ch
         if (saw_fin) break;
     }
 
-    mbedtls_ssl_free(&ssl);
     net_sock_close(n, &sock);
     if (out_len < out_cap) out[out_len] = '\0';
     return 0;
@@ -1455,10 +1432,9 @@ int net_http_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, con
 
 int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
 {
-    if (lard_mbedtls_global_init() != 0 || !lard_tls_ready()) return -10;
-
     net_cfg_t cfg;
     if (net_get_cfg(n, &cfg) != 0) cfg.dns = (ip4_t){{10, 0, 2, 3}};
+    if (out && out_cap) out[0] = '\0';
 
     char loc[192];
     int st = -1;
@@ -1495,4 +1471,3 @@ int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, co
     }
     return 0;
 }
-

@@ -37,6 +37,48 @@ static uint8_t g_tls_aes_sbox[256];
 static uint8_t g_tls_aes_inv_sbox[256];
 static int g_tls_aes_ready;
 
+typedef struct {
+    uint8_t modulus[LARD_TLS_RSA_MAX_BYTES];
+    uint16_t modulus_len;
+    uint8_t exponent[8];
+    uint8_t exponent_len;
+} rsa_pubkey_t;
+
+typedef struct {
+    const uint8_t* subject;
+    uint16_t subject_len;
+    const uint8_t* modulus;
+    uint16_t modulus_len;
+    const uint8_t* exponent;
+    uint8_t exponent_len;
+} lard_tls_trust_anchor_t;
+
+#include "lard_tls_roots.inc"
+
+typedef enum {
+    X509_SIG_UNKNOWN = 0,
+    X509_SIG_RSA_SHA1,
+    X509_SIG_RSA_SHA256,
+    X509_SIG_RSA_SHA384
+} x509_sig_alg_t;
+
+typedef struct {
+    const uint8_t* tbs;
+    uint32_t tbs_len;
+    const uint8_t* issuer;
+    uint32_t issuer_len;
+    const uint8_t* subject;
+    uint32_t subject_len;
+    const uint8_t* signature;
+    uint32_t signature_len;
+    x509_sig_alg_t sig_alg;
+    rsa_pubkey_t rsa;
+    int has_rsa;
+    int is_ca;
+    int key_usage_present;
+    int key_cert_sign;
+} x509_cert_t;
+
 static uint16_t load_be16(const uint8_t* p)
 {
     return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
@@ -50,6 +92,13 @@ static uint32_t load_be24(const uint8_t* p)
 static uint32_t load_be32(const uint8_t* p)
 {
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
+}
+
+static uint64_t load_be64(const uint8_t* p)
+{
+    uint64_t hi = load_be32(p);
+    uint64_t lo = load_be32(p + 4);
+    return (hi << 32) | lo;
 }
 
 static void store_be16(uint8_t* p, uint16_t v)
@@ -289,6 +338,110 @@ static void sha256_finish_copy(const lard_tls_sha256_state_t* c, uint8_t out[32]
 {
     lard_tls_sha256_state_t tmp = *c;
     sha256_final_mut(&tmp, out);
+}
+
+typedef struct {
+    uint64_t h[8];
+    uint64_t bytes;
+    uint8_t block[128];
+    uint32_t used;
+} sha384_state_t;
+
+static uint64_t rotr64(uint64_t x, uint32_t n)
+{
+    return (x >> n) | (x << (64u - n));
+}
+
+static const uint64_t k_sha512[80] = {
+    0x428a2f98d728ae22ull,0x7137449123ef65cdull,0xb5c0fbcfec4d3b2full,0xe9b5dba58189dbbcull,
+    0x3956c25bf348b538ull,0x59f111f1b605d019ull,0x923f82a4af194f9bull,0xab1c5ed5da6d8118ull,
+    0xd807aa98a3030242ull,0x12835b0145706fbeull,0x243185be4ee4b28cull,0x550c7dc3d5ffb4e2ull,
+    0x72be5d74f27b896full,0x80deb1fe3b1696b1ull,0x9bdc06a725c71235ull,0xc19bf174cf692694ull,
+    0xe49b69c19ef14ad2ull,0xefbe4786384f25e3ull,0x0fc19dc68b8cd5b5ull,0x240ca1cc77ac9c65ull,
+    0x2de92c6f592b0275ull,0x4a7484aa6ea6e483ull,0x5cb0a9dcbd41fbd4ull,0x76f988da831153b5ull,
+    0x983e5152ee66dfabull,0xa831c66d2db43210ull,0xb00327c898fb213full,0xbf597fc7beef0ee4ull,
+    0xc6e00bf33da88fc2ull,0xd5a79147930aa725ull,0x06ca6351e003826full,0x142929670a0e6e70ull,
+    0x27b70a8546d22ffcull,0x2e1b21385c26c926ull,0x4d2c6dfc5ac42aedull,0x53380d139d95b3dfull,
+    0x650a73548baf63deull,0x766a0abb3c77b2a8ull,0x81c2c92e47edaee6ull,0x92722c851482353bull,
+    0xa2bfe8a14cf10364ull,0xa81a664bbc423001ull,0xc24b8b70d0f89791ull,0xc76c51a30654be30ull,
+    0xd192e819d6ef5218ull,0xd69906245565a910ull,0xf40e35855771202aull,0x106aa07032bbd1b8ull,
+    0x19a4c116b8d2d0c8ull,0x1e376c085141ab53ull,0x2748774cdf8eeb99ull,0x34b0bcb5e19b48a8ull,
+    0x391c0cb3c5c95a63ull,0x4ed8aa4ae3418acbull,0x5b9cca4f7763e373ull,0x682e6ff3d6b2b8a3ull,
+    0x748f82ee5defb2fcull,0x78a5636f43172f60ull,0x84c87814a1f0ab72ull,0x8cc702081a6439ecull,
+    0x90befffa23631e28ull,0xa4506cebde82bde9ull,0xbef9a3f7b2c67915ull,0xc67178f2e372532bull,
+    0xca273eceea26619cull,0xd186b8c721c0c207ull,0xeada7dd6cde0eb1eull,0xf57d4f7fee6ed178ull,
+    0x06f067aa72176fbaull,0x0a637dc5a2c898a6ull,0x113f9804bef90daeull,0x1b710b35131c471bull,
+    0x28db77f523047d84ull,0x32caab7b40c72493ull,0x3c9ebe0a15c9bebcull,0x431d67c49c100d4cull,
+    0x4cc5d4becb3e42b6ull,0x597f299cfc657e2aull,0x5fcb6fab3ad6faecull,0x6c44198c4a475817ull
+};
+
+static void sha384_transform(sha384_state_t* c, const uint8_t block[128])
+{
+    uint64_t w[80];
+    uint64_t a, b, cc, d, e, f, g, h;
+    for (uint32_t i = 0; i < 16u; i++) w[i] = load_be64(block + i * 8u);
+    for (uint32_t i = 16u; i < 80u; i++) {
+        uint64_t s0 = rotr64(w[i - 15u], 1) ^ rotr64(w[i - 15u], 8) ^ (w[i - 15u] >> 7);
+        uint64_t s1 = rotr64(w[i - 2u], 19) ^ rotr64(w[i - 2u], 61) ^ (w[i - 2u] >> 6);
+        w[i] = w[i - 16u] + s0 + w[i - 7u] + s1;
+    }
+    a = c->h[0]; b = c->h[1]; cc = c->h[2]; d = c->h[3];
+    e = c->h[4]; f = c->h[5]; g = c->h[6]; h = c->h[7];
+    for (uint32_t i = 0; i < 80u; i++) {
+        uint64_t s1 = rotr64(e, 14) ^ rotr64(e, 18) ^ rotr64(e, 41);
+        uint64_t ch = (e & f) ^ ((~e) & g);
+        uint64_t t1 = h + s1 + ch + k_sha512[i] + w[i];
+        uint64_t s0 = rotr64(a, 28) ^ rotr64(a, 34) ^ rotr64(a, 39);
+        uint64_t maj = (a & b) ^ (a & cc) ^ (b & cc);
+        uint64_t t2 = s0 + maj;
+        h = g; g = f; f = e; e = d + t1;
+        d = cc; cc = b; b = a; a = t1 + t2;
+    }
+    c->h[0] += a; c->h[1] += b; c->h[2] += cc; c->h[3] += d;
+    c->h[4] += e; c->h[5] += f; c->h[6] += g; c->h[7] += h;
+}
+
+static void sha384_init(sha384_state_t* c)
+{
+    c->h[0] = 0xcbbb9d5dc1059ed8ull; c->h[1] = 0x629a292a367cd507ull;
+    c->h[2] = 0x9159015a3070dd17ull; c->h[3] = 0x152fecd8f70e5939ull;
+    c->h[4] = 0x67332667ffc00b31ull; c->h[5] = 0x8eb44a8768581511ull;
+    c->h[6] = 0xdb0c2e0d64f98fa7ull; c->h[7] = 0x47b5481dbefa4fa4ull;
+    c->bytes = 0;
+    c->used = 0;
+}
+
+static void sha384_update(sha384_state_t* c, const uint8_t* data, uint32_t len)
+{
+    c->bytes += len;
+    while (len) {
+        uint32_t n = 128u - c->used;
+        if (n > len) n = len;
+        memcpy(c->block + c->used, data, n);
+        c->used += n;
+        data += n;
+        len -= n;
+        if (c->used == 128u) {
+            sha384_transform(c, c->block);
+            c->used = 0;
+        }
+    }
+}
+
+static void sha384_final(sha384_state_t* c, uint8_t out[48])
+{
+    uint64_t bits = c->bytes * 8u;
+    c->block[c->used++] = 0x80u;
+    if (c->used > 112u) {
+        while (c->used < 128u) c->block[c->used++] = 0;
+        sha384_transform(c, c->block);
+        c->used = 0;
+    }
+    while (c->used < 112u) c->block[c->used++] = 0;
+    store_be64(c->block + 112, 0);
+    store_be64(c->block + 120, bits);
+    sha384_transform(c, c->block);
+    for (uint32_t i = 0; i < 6u; i++) store_be64(out + i * 8u, c->h[i]);
 }
 
 typedef struct {
@@ -776,7 +929,7 @@ static int oid_eq(const uint8_t* oid, uint32_t len, const uint8_t* want, uint32_
     return len == want_len && memcmp(oid, want, len) == 0;
 }
 
-static int parse_rsa_spki(lard_tls_client_t* c, const uint8_t* spki, uint32_t spki_len)
+static int parse_rsa_spki_key(rsa_pubkey_t* key, const uint8_t* spki, uint32_t spki_len)
 {
     static const uint8_t oid_rsa[] = { 0x2a,0x86,0x48,0x86,0xf7,0x0d,0x01,0x01,0x01 };
     uint8_t tag;
@@ -808,13 +961,13 @@ static int parse_rsa_spki(lard_tls_client_t* c, const uint8_t* spki, uint32_t sp
     while (mod_len > 1u && *mod == 0) { mod++; mod_len--; }
     if (!der_read_tlv(rseq, rseq_len, &rso, &tag, &exp, &exp_len) || tag != 0x02) return LARD_TLS_ERR_UNSUPPORTED_CERT;
     while (exp_len > 1u && *exp == 0) { exp++; exp_len--; }
-    if (mod_len > LARD_TLS_RSA_MAX_BYTES || exp_len > sizeof(c->rsa_exponent) || mod_len < 128u) {
+    if (mod_len > LARD_TLS_RSA_MAX_BYTES || exp_len > sizeof(key->exponent) || mod_len < 128u) {
         return LARD_TLS_ERR_UNSUPPORTED_CERT;
     }
-    memcpy(c->rsa_modulus, mod, mod_len);
-    c->rsa_modulus_len = (uint16_t)mod_len;
-    memcpy(c->rsa_exponent, exp, exp_len);
-    c->rsa_exponent_len = (uint8_t)exp_len;
+    memcpy(key->modulus, mod, mod_len);
+    key->modulus_len = (uint16_t)mod_len;
+    memcpy(key->exponent, exp, exp_len);
+    key->exponent_len = (uint8_t)exp_len;
     return 0;
 }
 
@@ -860,35 +1013,6 @@ static int parse_general_names(const uint8_t* der, uint32_t der_len, const char*
         if (tag == 0x82) {
             *had_dns = 1;
             if (host_match_name(host, der, der_len)) *matched_dns = 1;
-        }
-    }
-    return 1;
-}
-
-static int parse_extensions_for_san(const uint8_t* ext_outer, uint32_t ext_outer_len, const char* host,
-                                    int* had_dns, int* matched_dns)
-{
-    static const uint8_t oid_san[] = { 0x55,0x1d,0x11 };
-    uint32_t off = 0;
-    uint8_t tag;
-    const uint8_t* exts;
-    uint32_t exts_len;
-    if (!der_read_tlv(ext_outer, ext_outer_len, &off, &tag, &exts, &exts_len) || tag != 0x30) return 0;
-    uint32_t eo = 0;
-    while (der_read_tlv(exts, exts_len, &eo, &tag, &ext_outer, &ext_outer_len)) {
-        if (tag != 0x30) continue;
-        uint32_t xo = 0;
-        const uint8_t* oid;
-        uint32_t oid_len;
-        const uint8_t* val;
-        uint32_t val_len;
-        if (!der_read_tlv(ext_outer, ext_outer_len, &xo, &tag, &oid, &oid_len) || tag != 0x06) continue;
-        if (!der_read_tlv(ext_outer, ext_outer_len, &xo, &tag, &val, &val_len)) continue;
-        if (tag == 0x01) {
-            if (!der_read_tlv(ext_outer, ext_outer_len, &xo, &tag, &val, &val_len)) continue;
-        }
-        if (tag == 0x04 && oid_eq(oid, oid_len, oid_san, sizeof(oid_san))) {
-            parse_general_names(val, val_len, host, had_dns, matched_dns);
         }
     }
     return 1;
@@ -977,8 +1101,88 @@ static int parse_validity_window(const uint8_t* validity, uint32_t validity_len)
     return 0;
 }
 
-static int parse_leaf_certificate(lard_tls_client_t* c, const uint8_t* cert, uint32_t cert_len)
+static int parse_sig_alg(const uint8_t* alg, uint32_t alg_len, x509_sig_alg_t* out)
 {
+    static const uint8_t oid_sha1_rsa[] = { 0x2a,0x86,0x48,0x86,0xf7,0x0d,0x01,0x01,0x05 };
+    static const uint8_t oid_sha256_rsa[] = { 0x2a,0x86,0x48,0x86,0xf7,0x0d,0x01,0x01,0x0b };
+    static const uint8_t oid_sha384_rsa[] = { 0x2a,0x86,0x48,0x86,0xf7,0x0d,0x01,0x01,0x0c };
+    uint32_t off = 0;
+    uint8_t tag;
+    const uint8_t* oid;
+    uint32_t oid_len;
+    if (!der_read_tlv(alg, alg_len, &off, &tag, &oid, &oid_len) || tag != 0x06) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    if (oid_eq(oid, oid_len, oid_sha1_rsa, sizeof(oid_sha1_rsa))) *out = X509_SIG_RSA_SHA1;
+    else if (oid_eq(oid, oid_len, oid_sha256_rsa, sizeof(oid_sha256_rsa))) *out = X509_SIG_RSA_SHA256;
+    else if (oid_eq(oid, oid_len, oid_sha384_rsa, sizeof(oid_sha384_rsa))) *out = X509_SIG_RSA_SHA384;
+    else return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    return 0;
+}
+
+static void parse_basic_constraints_value(x509_cert_t* cert, const uint8_t* val, uint32_t val_len)
+{
+    uint32_t off = 0;
+    uint8_t tag;
+    const uint8_t* seq;
+    uint32_t seq_len;
+    if (!der_read_tlv(val, val_len, &off, &tag, &seq, &seq_len) || tag != 0x30) return;
+    uint32_t so = 0;
+    const uint8_t* bv;
+    uint32_t blen;
+    if (der_read_tlv(seq, seq_len, &so, &tag, &bv, &blen) && tag == 0x01 && blen == 1u) {
+        cert->is_ca = bv[0] != 0;
+    }
+}
+
+static void parse_key_usage_value(x509_cert_t* cert, const uint8_t* val, uint32_t val_len)
+{
+    uint32_t off = 0;
+    uint8_t tag;
+    const uint8_t* bits;
+    uint32_t bits_len;
+    if (!der_read_tlv(val, val_len, &off, &tag, &bits, &bits_len) || tag != 0x03 || bits_len < 2u) return;
+    cert->key_usage_present = 1;
+    cert->key_cert_sign = (bits[1] & 0x04u) != 0;
+}
+
+static void parse_x509_extensions(x509_cert_t* cert, const uint8_t* ext_outer, uint32_t ext_outer_len,
+                                  const char* host, int is_leaf, int* had_dns, int* matched_dns)
+{
+    static const uint8_t oid_san[] = { 0x55,0x1d,0x11 };
+    static const uint8_t oid_basic_constraints[] = { 0x55,0x1d,0x13 };
+    static const uint8_t oid_key_usage[] = { 0x55,0x1d,0x0f };
+    uint32_t off = 0;
+    uint8_t tag;
+    const uint8_t* exts;
+    uint32_t exts_len;
+    if (!der_read_tlv(ext_outer, ext_outer_len, &off, &tag, &exts, &exts_len) || tag != 0x30) return;
+    uint32_t eo = 0;
+    while (der_read_tlv(exts, exts_len, &eo, &tag, &ext_outer, &ext_outer_len)) {
+        if (tag != 0x30) continue;
+        uint32_t xo = 0;
+        const uint8_t* oid;
+        uint32_t oid_len;
+        const uint8_t* val;
+        uint32_t val_len;
+        if (!der_read_tlv(ext_outer, ext_outer_len, &xo, &tag, &oid, &oid_len) || tag != 0x06) continue;
+        if (!der_read_tlv(ext_outer, ext_outer_len, &xo, &tag, &val, &val_len)) continue;
+        if (tag == 0x01) {
+            if (!der_read_tlv(ext_outer, ext_outer_len, &xo, &tag, &val, &val_len)) continue;
+        }
+        if (tag != 0x04) continue;
+        if (is_leaf && oid_eq(oid, oid_len, oid_san, sizeof(oid_san))) {
+            parse_general_names(val, val_len, host, had_dns, matched_dns);
+        } else if (oid_eq(oid, oid_len, oid_basic_constraints, sizeof(oid_basic_constraints))) {
+            parse_basic_constraints_value(cert, val, val_len);
+        } else if (oid_eq(oid, oid_len, oid_key_usage, sizeof(oid_key_usage))) {
+            parse_key_usage_value(cert, val, val_len);
+        }
+    }
+}
+
+static int parse_x509_cert(x509_cert_t* out, const uint8_t* cert, uint32_t cert_len,
+                           const char* host, int is_leaf)
+{
+    memset(out, 0, sizeof(*out));
     uint32_t off = 0;
     uint8_t tag;
     const uint8_t* val;
@@ -989,7 +1193,23 @@ static int parse_leaf_certificate(lard_tls_client_t* c, const uint8_t* cert, uin
     uint32_t co = 0;
     const uint8_t* tbs;
     uint32_t tbs_len;
+    uint32_t tbs_start = co;
     if (!der_read_tlv(cert_seq, cert_seq_len, &co, &tag, &tbs, &tbs_len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    out->tbs = cert_seq + tbs_start;
+    out->tbs_len = co - tbs_start;
+    const uint8_t* alg;
+    uint32_t alg_len;
+    if (!der_read_tlv(cert_seq, cert_seq_len, &co, &tag, &alg, &alg_len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    int ar = parse_sig_alg(alg, alg_len, &out->sig_alg);
+    if (ar != 0) return ar;
+    const uint8_t* sig;
+    uint32_t sig_len;
+    if (!der_read_tlv(cert_seq, cert_seq_len, &co, &tag, &sig, &sig_len) || tag != 0x03 || sig_len < 2u || sig[0] != 0) {
+        return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    }
+    out->signature = sig + 1;
+    out->signature_len = sig_len - 1u;
+
     uint32_t to = 0;
     if (to < tbs_len && tbs[to] == 0xa0) {
         if (!der_skip_tlv(tbs, tbs_len, &to)) return LARD_TLS_ERR_UNSUPPORTED_CERT;
@@ -1004,23 +1224,188 @@ static int parse_leaf_certificate(lard_tls_client_t* c, const uint8_t* cert, uin
     if (vr != 0) return vr;
     const uint8_t* subject;
     uint32_t subject_len;
+    uint32_t subject_start = to;
     if (!der_read_tlv(tbs, tbs_len, &to, &tag, &subject, &subject_len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    out->subject = tbs + subject_start;
+    out->subject_len = to - subject_start;
     const uint8_t* spki;
     uint32_t spki_len;
     if (!der_read_tlv(tbs, tbs_len, &to, &tag, &spki, &spki_len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
-    int r = parse_rsa_spki(c, spki, spki_len);
-    if (r != 0) return r;
+    int r = parse_rsa_spki_key(&out->rsa, spki, spki_len);
+    if (r == 0) out->has_rsa = 1;
 
-    int cn_match = parse_name_cn(subject, subject_len, c->server_name);
+    int cn_match = is_leaf ? parse_name_cn(subject, subject_len, host) : 0;
     int had_dns = 0;
     int san_match = 0;
+    uint32_t issuer_start = 0;
+    uint32_t scan = 0;
+    if (scan < tbs_len && tbs[scan] == 0xa0) {
+        if (!der_skip_tlv(tbs, tbs_len, &scan)) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    }
+    for (uint32_t i = 0; i < 2u; i++) {
+        if (!der_skip_tlv(tbs, tbs_len, &scan)) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    }
+    issuer_start = scan;
+    if (!der_read_tlv(tbs, tbs_len, &scan, &tag, &val, &len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    out->issuer = tbs + issuer_start;
+    out->issuer_len = scan - issuer_start;
+
     while (to < tbs_len) {
         if (!der_read_tlv(tbs, tbs_len, &to, &tag, &val, &len)) break;
-        if (tag == 0xa3) parse_extensions_for_san(val, len, c->server_name, &had_dns, &san_match);
+        if (tag == 0xa3) parse_x509_extensions(out, val, len, host, is_leaf, &had_dns, &san_match);
     }
-    if ((had_dns && !san_match) || (!had_dns && !cn_match)) return LARD_TLS_ERR_CERT_VERIFY;
-    c->cert_verified = 1;
+    if (is_leaf && ((had_dns && !san_match) || (!had_dns && !cn_match))) return LARD_TLS_ERR_CERT_VERIFY;
+    if (!out->has_rsa) return LARD_TLS_ERR_UNSUPPORTED_CERT;
     return 0;
+}
+
+static int cert_name_eq(const uint8_t* a, uint32_t alen, const uint8_t* b, uint32_t blen)
+{
+    return alen == blen && memcmp(a, b, alen) == 0;
+}
+
+static int cert_is_usable_ca(const x509_cert_t* cert)
+{
+    if (!cert->is_ca) return 0;
+    if (cert->key_usage_present && !cert->key_cert_sign) return 0;
+    return 1;
+}
+
+static int cert_digest(const x509_cert_t* cert, uint8_t* out, uint32_t* out_len,
+                       const uint8_t** prefix, uint32_t* prefix_len)
+{
+    static const uint8_t sha1_prefix[] = {
+        0x30,0x21,0x30,0x09,0x06,0x05,0x2b,0x0e,0x03,0x02,0x1a,0x05,0x00,0x04,0x14
+    };
+    static const uint8_t sha256_prefix[] = {
+        0x30,0x31,0x30,0x0d,0x06,0x09,0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x02,0x01,0x05,0x00,0x04,0x20
+    };
+    static const uint8_t sha384_prefix[] = {
+        0x30,0x41,0x30,0x0d,0x06,0x09,0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x02,0x02,0x05,0x00,0x04,0x30
+    };
+    if (cert->sig_alg == X509_SIG_RSA_SHA1) {
+        sha1_state_t s;
+        sha1_init(&s);
+        sha1_update(&s, cert->tbs, cert->tbs_len);
+        sha1_final(&s, out);
+        *out_len = 20;
+        *prefix = sha1_prefix;
+        *prefix_len = sizeof(sha1_prefix);
+        return 0;
+    }
+    if (cert->sig_alg == X509_SIG_RSA_SHA256) {
+        lard_tls_sha256_state_t s;
+        sha256_init(&s);
+        sha256_update(&s, cert->tbs, cert->tbs_len);
+        sha256_final_mut(&s, out);
+        *out_len = 32;
+        *prefix = sha256_prefix;
+        *prefix_len = sizeof(sha256_prefix);
+        return 0;
+    }
+    if (cert->sig_alg == X509_SIG_RSA_SHA384) {
+        sha384_state_t s;
+        sha384_init(&s);
+        sha384_update(&s, cert->tbs, cert->tbs_len);
+        sha384_final(&s, out);
+        *out_len = 48;
+        *prefix = sha384_prefix;
+        *prefix_len = sizeof(sha384_prefix);
+        return 0;
+    }
+    return LARD_TLS_ERR_UNSUPPORTED_CERT;
+}
+
+static int rsa_pkcs1_verify_cert(const uint8_t* mod, uint32_t mod_len,
+                                 const uint8_t* exp, uint32_t exp_len,
+                                 const x509_cert_t* cert)
+{
+    if (cert->signature_len > mod_len || mod_len > LARD_TLS_RSA_MAX_BYTES) return LARD_TLS_ERR_BAD_CERT_SIGNATURE;
+    uint8_t sig[LARD_TLS_RSA_MAX_BYTES];
+    uint8_t em[LARD_TLS_RSA_MAX_BYTES];
+    uint8_t digest[48];
+    uint32_t digest_len = 0;
+    const uint8_t* prefix = NULL;
+    uint32_t prefix_len = 0;
+    memset(sig, 0, mod_len);
+    memcpy(sig + (mod_len - cert->signature_len), cert->signature, cert->signature_len);
+    int r = rsa_modexp(mod, mod_len, exp, exp_len, sig, em);
+    if (r != 0) return r;
+    if (em[0] != 0 || em[1] != 1) return LARD_TLS_ERR_BAD_CERT_SIGNATURE;
+    uint32_t p = 2;
+    while (p < mod_len && em[p] == 0xff) p++;
+    if (p < 10u || p >= mod_len || em[p] != 0) return LARD_TLS_ERR_BAD_CERT_SIGNATURE;
+    p++;
+    r = cert_digest(cert, digest, &digest_len, &prefix, &prefix_len);
+    if (r != 0) return r;
+    if (p + prefix_len + digest_len != mod_len) return LARD_TLS_ERR_BAD_CERT_SIGNATURE;
+    if (memcmp(em + p, prefix, prefix_len) != 0) return LARD_TLS_ERR_BAD_CERT_SIGNATURE;
+    if (!ct_memeq(em + p + prefix_len, digest, digest_len)) return LARD_TLS_ERR_BAD_CERT_SIGNATURE;
+    return 0;
+}
+
+static int verify_cert_with_cert(const x509_cert_t* cert, const x509_cert_t* issuer)
+{
+    if (!issuer->has_rsa) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    return rsa_pkcs1_verify_cert(issuer->rsa.modulus, issuer->rsa.modulus_len,
+                                 issuer->rsa.exponent, issuer->rsa.exponent_len, cert);
+}
+
+static int anchor_matches_cert(const lard_tls_trust_anchor_t* a, const x509_cert_t* cert)
+{
+    if (!cert_name_eq(a->subject, a->subject_len, cert->subject, cert->subject_len)) return 0;
+    if (a->modulus_len != cert->rsa.modulus_len || a->exponent_len != cert->rsa.exponent_len) return 0;
+    if (memcmp(a->modulus, cert->rsa.modulus, a->modulus_len) != 0) return 0;
+    if (memcmp(a->exponent, cert->rsa.exponent, a->exponent_len) != 0) return 0;
+    return 1;
+}
+
+static int verify_cert_with_anchor(const x509_cert_t* cert, const lard_tls_trust_anchor_t* a)
+{
+    if (!cert_name_eq(cert->issuer, cert->issuer_len, a->subject, a->subject_len)) return LARD_TLS_ERR_UNTRUSTED_ROOT;
+    return rsa_pkcs1_verify_cert(a->modulus, a->modulus_len, a->exponent, a->exponent_len, cert);
+}
+
+static int verify_x509_chain(lard_tls_client_t* c, x509_cert_t* certs, uint32_t cert_count)
+{
+    if (!cert_count || !certs[0].has_rsa) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    for (uint32_t i = 1; i < cert_count; i++) {
+        if (!cert_is_usable_ca(&certs[i])) return LARD_TLS_ERR_CERT_VERIFY;
+    }
+    for (uint32_t i = 0; i + 1u < cert_count; i++) {
+        if (!cert_name_eq(certs[i].issuer, certs[i].issuer_len, certs[i + 1u].subject, certs[i + 1u].subject_len)) {
+            return LARD_TLS_ERR_CERT_VERIFY;
+        }
+        int r = verify_cert_with_cert(&certs[i], &certs[i + 1u]);
+        if (r != 0) return r;
+    }
+
+    x509_cert_t* last = &certs[cert_count - 1u];
+    if (cert_count > 1u) {
+        for (uint32_t i = 0; i < LARD_TLS_TRUST_ANCHOR_COUNT; i++) {
+            if (anchor_matches_cert(&lard_tls_trust_anchors[i], last)) {
+                memcpy(c->rsa_modulus, certs[0].rsa.modulus, certs[0].rsa.modulus_len);
+                c->rsa_modulus_len = certs[0].rsa.modulus_len;
+                memcpy(c->rsa_exponent, certs[0].rsa.exponent, certs[0].rsa.exponent_len);
+                c->rsa_exponent_len = certs[0].rsa.exponent_len;
+                c->cert_verified = 1;
+                return 0;
+            }
+        }
+    }
+    for (uint32_t i = 0; i < LARD_TLS_TRUST_ANCHOR_COUNT; i++) {
+        int r = verify_cert_with_anchor(last, &lard_tls_trust_anchors[i]);
+        if (r == 0) {
+            memcpy(c->rsa_modulus, certs[0].rsa.modulus, certs[0].rsa.modulus_len);
+            c->rsa_modulus_len = certs[0].rsa.modulus_len;
+            memcpy(c->rsa_exponent, certs[0].rsa.exponent, certs[0].rsa.exponent_len);
+            c->rsa_exponent_len = certs[0].rsa.exponent_len;
+            c->cert_verified = 1;
+            return 0;
+        }
+        if (r != LARD_TLS_ERR_UNTRUSTED_ROOT) return r;
+    }
+    return LARD_TLS_ERR_UNTRUSTED_ROOT;
 }
 
 static uint32_t tls_mac_len(lard_tls_client_t* c)
@@ -1259,14 +1644,25 @@ static int parse_server_hello(lard_tls_client_t* c, const uint8_t* body, uint32_
 
 static int parse_certificate_msg(lard_tls_client_t* c, const uint8_t* body, uint32_t len)
 {
+    x509_cert_t certs[8];
     if (len < 6u) return LARD_TLS_ERR_BAD_RECORD;
     uint32_t list_len = load_be24(body);
     if (list_len + 3u > len || list_len < 3u) return LARD_TLS_ERR_BAD_RECORD;
     uint32_t p = 3;
-    uint32_t cert_len = load_be24(body + p);
-    p += 3;
-    if (cert_len == 0 || p + cert_len > len) return LARD_TLS_ERR_BAD_RECORD;
-    return parse_leaf_certificate(c, body + p, cert_len);
+    uint32_t end = 3u + list_len;
+    uint32_t cert_count = 0;
+    while (p < end) {
+        if (p + 3u > end) return LARD_TLS_ERR_BAD_RECORD;
+        uint32_t cert_len = load_be24(body + p);
+        p += 3;
+        if (cert_len == 0 || p + cert_len > end) return LARD_TLS_ERR_BAD_RECORD;
+        if (cert_count >= sizeof(certs) / sizeof(certs[0])) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+        int r = parse_x509_cert(&certs[cert_count], body + p, cert_len, c->server_name, cert_count == 0);
+        if (r != 0) return r;
+        cert_count++;
+        p += cert_len;
+    }
+    return verify_x509_chain(c, certs, cert_count);
 }
 
 static int build_client_key_exchange(lard_tls_client_t* c, uint8_t* out, uint32_t cap, uint32_t* out_len)
@@ -1546,6 +1942,10 @@ const char* lard_tls_status_text(int code)
         return "TLS record authentication or decryption failed";
     case LARD_TLS_ERR_BAD_FINISHED:
         return "TLS Finished verification failed";
+    case LARD_TLS_ERR_UNTRUSTED_ROOT:
+        return "certificate chain does not end at a native trusted root";
+    case LARD_TLS_ERR_BAD_CERT_SIGNATURE:
+        return "certificate chain signature verification failed";
     default:
         return "unknown TLS error";
     }

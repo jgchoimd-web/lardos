@@ -35,20 +35,22 @@ networking, and `-smp 3`.
 The kernel networking stack owns DHCP, DNS, IPv4, UDP, a small TCP path, and
 plain HTTP.
 
-TLS is intentionally in-tree now. External TLS libraries, host fetch bridges,
-and generated CA bundles are not linked into the kernel. The native `lard_tls`
+TLS is intentionally in-tree now. External TLS libraries and host fetch bridges
+are not linked into the kernel. The native `lard_tls`
 module now completes a constrained TLS 1.2 client path without external TLS
-code: ClientHello with SNI, ServerHello parsing, DER leaf certificate parsing,
+code: ClientHello with SNI, ServerHello parsing, DER certificate-chain parsing,
 RSA SubjectPublicKeyInfo extraction, SAN/CN hostname checks, RTC-based
-certificate validity checks, RSA PKCS#1 v1.5 ClientKeyExchange, SHA-256
-transcript hashing and PRF key schedule, ChangeCipherSpec/Finished verification,
-and AES-128-CBC/HMAC encrypted record read/write for HTTPS requests.
+certificate validity checks, RSA PKCS#1 v1.5 certificate-signature validation
+for SHA-1/SHA-256/SHA-384 signed chains, native RSA trust-anchor matching,
+RSA PKCS#1 v1.5 ClientKeyExchange, SHA-256 transcript hashing and PRF key
+schedule, ChangeCipherSpec/Finished verification, and AES-128-CBC/HMAC
+encrypted record read/write for HTTPS requests.
 
 Supported cipher suites are `TLS_RSA_WITH_AES_128_CBC_SHA` and
 `TLS_RSA_WITH_AES_128_CBC_SHA256`. Modern ECDHE-only servers will correctly fail
-with an unsupported-cipher status. Public CA chain validation still requires a
-native trust-anchor store; the current kernel validates the leaf certificate
-identity and validity window but does not ship a generated CA bundle.
+with an unsupported-cipher status. The native trust store is a compact RSA
+trust-anchor table generated from this machine's Windows Root stores and stored
+as subject DER plus public-key parameters rather than a PEM CA bundle.
 
 ### Real Hardware
 

@@ -14,6 +14,8 @@
 #define LARD_TLS_ERR_CERT_VERIFY        -308
 #define LARD_TLS_ERR_DECRYPT            -309
 #define LARD_TLS_ERR_BAD_FINISHED       -310
+#define LARD_TLS_ERR_UNTRUSTED_ROOT     -311
+#define LARD_TLS_ERR_BAD_CERT_SIGNATURE -312
 
 #define LARD_TLS_RSA_MAX_BYTES 512
 typedef struct {

@@ -111,16 +111,19 @@ flowchart TB
 The HTTPS path does not call an external TLS library or host HTTPS bridge.
 `lard_tls` owns the TLS 1.2 handshake and record layer for a constrained native
 client profile: SNI ClientHello, ServerHello parsing, DER leaf certificate
-parsing, RSA public-key extraction, SAN/CN and RTC validity checks, RSA
-ClientKeyExchange, SHA-256 transcript/PRF key schedule, Finished verification,
-and AES-128-CBC plus HMAC encrypted application records.
+chain parsing, RSA public-key extraction, SAN/CN and RTC validity checks,
+SHA-1/SHA-256/SHA-384 RSA certificate-signature validation, native RSA
+trust-anchor matching, RSA ClientKeyExchange, SHA-256 transcript/PRF key
+schedule, Finished verification, and AES-128-CBC plus HMAC encrypted
+application records.
 
 The implemented cipher suites are `TLS_RSA_WITH_AES_128_CBC_SHA` and
 `TLS_RSA_WITH_AES_128_CBC_SHA256`. This is real encrypted HTTPS traffic for
 servers that still allow RSA key exchange. It deliberately reports
-unsupported-cipher for ECDHE-only sites, and full public CA chain validation is
-left to a future native trust-anchor store rather than a generated external CA
-bundle.
+unsupported-cipher for ECDHE-only sites. Trust anchors live in
+`kernel/lard_tls_roots.inc` as subject DER plus RSA public-key parameters
+generated from Windows Root stores; the verifier walks the presented chain and
+requires the final signature to validate against that native table.
 
 ## Important Files
 

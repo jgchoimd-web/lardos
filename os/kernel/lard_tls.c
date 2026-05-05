@@ -79,6 +79,8 @@ typedef struct {
     int key_cert_sign;
 } x509_cert_t;
 
+static x509_cert_t g_tls_certs[8];
+
 static uint16_t load_be16(const uint8_t* p)
 {
     return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
@@ -1214,9 +1216,18 @@ static int parse_x509_cert(x509_cert_t* out, const uint8_t* cert, uint32_t cert_
     if (to < tbs_len && tbs[to] == 0xa0) {
         if (!der_skip_tlv(tbs, tbs_len, &to)) return LARD_TLS_ERR_UNSUPPORTED_CERT;
     }
-    for (uint32_t i = 0; i < 3u; i++) {
-        if (!der_skip_tlv(tbs, tbs_len, &to)) return LARD_TLS_ERR_UNSUPPORTED_CERT;
-    }
+    if (!der_skip_tlv(tbs, tbs_len, &to)) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    const uint8_t* tbs_alg;
+    uint32_t tbs_alg_len;
+    if (!der_read_tlv(tbs, tbs_len, &to, &tag, &tbs_alg, &tbs_alg_len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    x509_sig_alg_t tbs_sig_alg = X509_SIG_UNKNOWN;
+    int tr = parse_sig_alg(tbs_alg, tbs_alg_len, &tbs_sig_alg);
+    if (tr != 0) return tr;
+    if (tbs_sig_alg != out->sig_alg) return LARD_TLS_ERR_CERT_VERIFY;
+    uint32_t issuer_start = to;
+    if (!der_read_tlv(tbs, tbs_len, &to, &tag, &val, &len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+    out->issuer = tbs + issuer_start;
+    out->issuer_len = to - issuer_start;
     const uint8_t* validity;
     uint32_t validity_len;
     if (!der_read_tlv(tbs, tbs_len, &to, &tag, &validity, &validity_len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
@@ -1237,18 +1248,6 @@ static int parse_x509_cert(x509_cert_t* out, const uint8_t* cert, uint32_t cert_
     int cn_match = is_leaf ? parse_name_cn(subject, subject_len, host) : 0;
     int had_dns = 0;
     int san_match = 0;
-    uint32_t issuer_start = 0;
-    uint32_t scan = 0;
-    if (scan < tbs_len && tbs[scan] == 0xa0) {
-        if (!der_skip_tlv(tbs, tbs_len, &scan)) return LARD_TLS_ERR_UNSUPPORTED_CERT;
-    }
-    for (uint32_t i = 0; i < 2u; i++) {
-        if (!der_skip_tlv(tbs, tbs_len, &scan)) return LARD_TLS_ERR_UNSUPPORTED_CERT;
-    }
-    issuer_start = scan;
-    if (!der_read_tlv(tbs, tbs_len, &scan, &tag, &val, &len) || tag != 0x30) return LARD_TLS_ERR_UNSUPPORTED_CERT;
-    out->issuer = tbs + issuer_start;
-    out->issuer_len = scan - issuer_start;
 
     while (to < tbs_len) {
         if (!der_read_tlv(tbs, tbs_len, &to, &tag, &val, &len)) break;
@@ -1360,6 +1359,14 @@ static int anchor_matches_cert(const lard_tls_trust_anchor_t* a, const x509_cert
     return 1;
 }
 
+static int cert_matches_any_trust_anchor(const x509_cert_t* cert)
+{
+    for (uint32_t i = 0; i < LARD_TLS_TRUST_ANCHOR_COUNT; i++) {
+        if (anchor_matches_cert(&lard_tls_trust_anchors[i], cert)) return 1;
+    }
+    return 0;
+}
+
 static int verify_cert_with_anchor(const x509_cert_t* cert, const lard_tls_trust_anchor_t* a)
 {
     if (!cert_name_eq(cert->issuer, cert->issuer_len, a->subject, a->subject_len)) return LARD_TLS_ERR_UNTRUSTED_ROOT;
@@ -1370,7 +1377,9 @@ static int verify_x509_chain(lard_tls_client_t* c, x509_cert_t* certs, uint32_t 
 {
     if (!cert_count || !certs[0].has_rsa) return LARD_TLS_ERR_UNSUPPORTED_CERT;
     for (uint32_t i = 1; i < cert_count; i++) {
-        if (!cert_is_usable_ca(&certs[i])) return LARD_TLS_ERR_CERT_VERIFY;
+        if (!cert_is_usable_ca(&certs[i]) && !cert_matches_any_trust_anchor(&certs[i])) {
+            return LARD_TLS_ERR_CERT_VERIFY;
+        }
     }
     for (uint32_t i = 0; i + 1u < cert_count; i++) {
         if (!cert_name_eq(certs[i].issuer, certs[i].issuer_len, certs[i + 1u].subject, certs[i + 1u].subject_len)) {
@@ -1644,7 +1653,6 @@ static int parse_server_hello(lard_tls_client_t* c, const uint8_t* body, uint32_
 
 static int parse_certificate_msg(lard_tls_client_t* c, const uint8_t* body, uint32_t len)
 {
-    x509_cert_t certs[8];
     if (len < 6u) return LARD_TLS_ERR_BAD_RECORD;
     uint32_t list_len = load_be24(body);
     if (list_len + 3u > len || list_len < 3u) return LARD_TLS_ERR_BAD_RECORD;
@@ -1656,13 +1664,13 @@ static int parse_certificate_msg(lard_tls_client_t* c, const uint8_t* body, uint
         uint32_t cert_len = load_be24(body + p);
         p += 3;
         if (cert_len == 0 || p + cert_len > end) return LARD_TLS_ERR_BAD_RECORD;
-        if (cert_count >= sizeof(certs) / sizeof(certs[0])) return LARD_TLS_ERR_UNSUPPORTED_CERT;
-        int r = parse_x509_cert(&certs[cert_count], body + p, cert_len, c->server_name, cert_count == 0);
+        if (cert_count >= sizeof(g_tls_certs) / sizeof(g_tls_certs[0])) return LARD_TLS_ERR_UNSUPPORTED_CERT;
+        int r = parse_x509_cert(&g_tls_certs[cert_count], body + p, cert_len, c->server_name, cert_count == 0);
         if (r != 0) return r;
         cert_count++;
         p += cert_len;
     }
-    return verify_x509_chain(c, certs, cert_count);
+    return verify_x509_chain(c, g_tls_certs, cert_count);
 }
 
 static int build_client_key_exchange(lard_tls_client_t* c, uint8_t* out, uint32_t cap, uint32_t* out_len)

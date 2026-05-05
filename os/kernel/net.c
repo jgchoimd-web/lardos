@@ -69,7 +69,6 @@ typedef struct net_stack_impl {
 } net_stack_impl_t;
 
 static inline net_stack_impl_t* impl(net_stack_t* n) { return (net_stack_impl_t*)(void*)n; }
-static inline const net_stack_impl_t* cimpl(const net_stack_t* n) { return (const net_stack_impl_t*)(const void*)n; }
 
 static uint16_t bswap16(uint16_t x) { return (uint16_t)((x >> 8) | (x << 8)); }
 static uint32_t bswap32(uint32_t x)
@@ -91,14 +90,6 @@ static uint32_t ip_u32(ip4_t ip)
 static void mac_broadcast(uint8_t m[6])
 {
     for (int i = 0; i < 6; i++) m[i] = 0xFF;
-}
-
-static int mac_eq(const uint8_t a[6], const uint8_t b[6])
-{
-    for (int i = 0; i < 6; i++) {
-        if (a[i] != b[i]) return 0;
-    }
-    return 1;
 }
 
 static uint16_t csum16(const void* data, uint32_t len)
@@ -356,7 +347,6 @@ int net_dhcp(net_stack_t* n, net_cfg_t* out)
     // QEMU usernet: DHCP is available; use broadcast.
     ip4_t ip0 = {{0, 0, 0, 0}};
     ip4_t bcast = {{255, 255, 255, 255}};
-    ip4_t dhcp_srv = {{255, 255, 255, 255}};
     uint8_t bmac[6];
     mac_broadcast(bmac);
 

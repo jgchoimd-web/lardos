@@ -37,18 +37,18 @@ plain HTTP.
 
 TLS is intentionally in-tree now. External TLS libraries, host fetch bridges,
 and generated CA bundles are not linked into the kernel. The native `lard_tls`
-module currently builds a TLS 1.2 ClientHello, sends it over the kernel TCP
-stack, parses ServerHello, and then returns a clear
-`native TLS crypto is not finished` status until the owned crypto pieces are
-implemented.
+module now completes a constrained TLS 1.2 client path without external TLS
+code: ClientHello with SNI, ServerHello parsing, DER leaf certificate parsing,
+RSA SubjectPublicKeyInfo extraction, SAN/CN hostname checks, RTC-based
+certificate validity checks, RSA PKCS#1 v1.5 ClientKeyExchange, SHA-256
+transcript hashing and PRF key schedule, ChangeCipherSpec/Finished verification,
+and AES-128-CBC/HMAC encrypted record read/write for HTTPS requests.
 
-The next TLS work is:
-
-- certificate parsing and validation
-- key exchange
-- transcript hashing and key schedule
-- encrypted record read/write
-- HTTP over completed TLS sessions
+Supported cipher suites are `TLS_RSA_WITH_AES_128_CBC_SHA` and
+`TLS_RSA_WITH_AES_128_CBC_SHA256`. Modern ECDHE-only servers will correctly fail
+with an unsupported-cipher status. Public CA chain validation still requires a
+native trust-anchor store; the current kernel validates the leaf certificate
+identity and validity window but does not ship a generated CA bundle.
 
 ### Real Hardware
 

@@ -231,8 +231,8 @@ static int ip_send_udp(net_stack_t* n,
     udp->csum = 0;
 
     uint8_t* pl = (uint8_t*)udp + sizeof(udp_hdr_t);
-    const uint8_t* s = (const uint8_t*)payload;
-    for (uint16_t i = 0; i < payload_len; i++) pl[i] = s[i];
+    const uint8_t* src = (const uint8_t*)payload;
+    for (uint16_t i = 0; i < payload_len; i++) pl[i] = src[i];
 
     uint16_t csum = csum_pseudo_ip4(src_ip, dst_ip, 17, udp, (uint16_t)(sizeof(udp_hdr_t) + payload_len));
     if (csum == 0) csum = 0xFFFF;
@@ -597,8 +597,8 @@ static int ip_send_tcp(net_stack_t* n,
     tcp->csum = 0;
     tcp->urg = 0;
     uint8_t* pl = (uint8_t*)tcp + sizeof(tcp_hdr_t);
-    const uint8_t* s = (const uint8_t*)payload;
-    for (uint16_t i = 0; i < payload_len; i++) pl[i] = s[i];
+    const uint8_t* src = (const uint8_t*)payload;
+    for (uint16_t i = 0; i < payload_len; i++) pl[i] = src[i];
 
     tcp->csum = csum_pseudo_ip4(src_ip, dst_ip, 6, tcp, (uint16_t)(sizeof(tcp_hdr_t) + payload_len));
     return rtl8139_send(&s->nic, frame, (uint32_t)(sizeof(eth_hdr_t) + ip_len));
@@ -1053,7 +1053,7 @@ static int parse_location(const char* v, uint32_t vlen, char* out_host, uint32_t
     // Supports:
     // - "/path"
     // - "http://host/path"
-    // - "https://host/path" (we treat as http for now)
+    // - "https://host/path" (caller keeps its current HTTP/HTTPS transport)
     if (vlen == 0) return -1;
     if (v[0] == '/') {
         // host unchanged -> empty

@@ -109,9 +109,18 @@ flowchart TB
 ```
 
 The HTTPS path does not call an external TLS library or host HTTPS bridge.
-`lard_tls` currently owns the TLS record writer, TLS 1.2 ClientHello, SNI
-extension, basic ServerHello parsing, and explicit status reporting for the
-remaining crypto work.
+`lard_tls` owns the TLS 1.2 handshake and record layer for a constrained native
+client profile: SNI ClientHello, ServerHello parsing, DER leaf certificate
+parsing, RSA public-key extraction, SAN/CN and RTC validity checks, RSA
+ClientKeyExchange, SHA-256 transcript/PRF key schedule, Finished verification,
+and AES-128-CBC plus HMAC encrypted application records.
+
+The implemented cipher suites are `TLS_RSA_WITH_AES_128_CBC_SHA` and
+`TLS_RSA_WITH_AES_128_CBC_SHA256`. This is real encrypted HTTPS traffic for
+servers that still allow RSA key exchange. It deliberately reports
+unsupported-cipher for ECDHE-only sites, and full public CA chain validation is
+left to a future native trust-anchor store rather than a generated external CA
+bundle.
 
 ## Important Files
 

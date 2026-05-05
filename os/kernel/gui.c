@@ -34,6 +34,7 @@ static uint32_t g_bg;
 static uint32_t g_backbuf[1024u * 768u];
 static fb_t g_bb;
 static int g_have_bb;
+static const fb_t* g_syscall_target_override;
 
 typedef struct {
     int mx;
@@ -281,23 +282,6 @@ static void fb_draw_image(const fb_t* f, uint16_t x, uint16_t y, const uint32_t*
     }
 }
 
-static void itoa_u32(char* out, uint32_t v)
-{
-    char tmp[16];
-    int n = 0;
-    if (v == 0) {
-        out[0] = '0';
-        out[1] = '\0';
-        return;
-    }
-    while (v && n < (int)sizeof(tmp)) {
-        tmp[n++] = (char)('0' + (v % 10));
-        v /= 10;
-    }
-    for (int i = 0; i < n; i++) out[i] = tmp[n - 1 - i];
-    out[n] = '\0';
-}
-
 int gui_init(void)
 {
     g_have_fb = (fb_from_bootinfo(&g_fb) == 0);
@@ -470,10 +454,8 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     /* Slider drag: while dragging, update values from mouse */
     if (g.settings_open && g.slider_drag) {
         int panel_x = g.win_x + g.win_w - 200;
-        int panel_y = g.win_y + title_h + 4;
         int track_x = panel_x + 100;
         int track_w = 90;
-        int row_h = 32;
         if (g.slider_drag == 1) {
             int v = (g.mx - track_x) * 100 / track_w;
             if (v < 0) v = 0;
@@ -863,7 +845,7 @@ void gui_handle_key(char ch)
             }
             return;
         }
-        /* JSDoc-style expansion: /** + Enter -> doc block template (Notes, LSH, Play) */
+        /* JSDoc-style expansion for slash-star-star + Enter -> doc block template. */
         if (g.app_id != 1 && g.tb_len >= 3 &&
             g.tb[g.tb_len - 3] == '/' && g.tb[g.tb_len - 2] == '*' && g.tb[g.tb_len - 1] == '*') {
             static const char doc_tpl[] = "\n * \n * @param \n * @return \n */";
@@ -1308,8 +1290,8 @@ void gui_render(void)
             if (bmp_decode(bf->data, bf->size, &br) == 0 && br.w > 0 && br.h > 0) {
                 img_glyph_assign(0xE000u, g.gallery_pixels, (uint16_t)br.w, (uint16_t)br.h);
                 int scale = 8;
-                if (br.w * scale > view_w - 12) scale = (view_w - 12) / (int)br.w;
-                if (br.h * scale > view_h) scale = view_h / (int)br.h;
+                if ((int)br.w * scale > view_w - 12) scale = (view_w - 12) / (int)br.w;
+                if ((int)br.h * scale > view_h) scale = view_h / (int)br.h;
                 if (scale < 1) scale = 1;
                 for (uint32_t py = 0; py < br.h; py++) {
                     for (uint32_t px = 0; px < br.w; px++) {
@@ -1439,8 +1421,6 @@ void gui_demo(void)
     gui_render();
 }
 
-static const fb_t* g_syscall_target_override;
-
 /* Syscall target. Override set at start of gui_render so lib3d etc. draw to current buffer. */
 static const fb_t* gui_syscall_target(void)
 {
@@ -1481,4 +1461,3 @@ uint16_t gui_syscall_get_height(void)
 {
     return g_have_fb ? g_fb.h : 0;
 }
-

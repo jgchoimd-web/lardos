@@ -287,8 +287,6 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
     img[pos++] = (uint8_t)(code_len >> 8);
     img[pos++] = (uint8_t)(code_len >> 16);
     img[pos++] = (uint8_t)(code_len >> 24);
-    uint32_t const_start = pos;
-
     nconst = 0;
     uint32_t code_start = 0;
     q = src;

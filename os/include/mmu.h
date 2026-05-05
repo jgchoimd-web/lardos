@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 // Builds new page tables and enables protections:
 // - kernel .text: RX (no write)
 // - kernel .rodata: R + NX
@@ -18,4 +20,3 @@ void mmu_map_user_ldll(uintptr_t va);
 // Map user segments for LARDX loader. paddrs/sizes/flags arrays, count segments.
 // flags: PF_X=1, PF_W=2, PF_R=4 (from LARDX phdr)
 void mmu_map_user_segments(const uint32_t* paddrs, const uint32_t* sizes, const uint32_t* flags, int count);
-

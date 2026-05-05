@@ -10,6 +10,7 @@
 #include "mem.h"
 #include "bosl_demo.h"
 #include "lil_demo.h"
+#include "lil.h"
 #include "gasm_demo.h"
 #include "lafillo_demo.h"
 #include "os_demo.h"
@@ -152,7 +153,6 @@ static int parse_url(const char* url,
     }
     *port_out = port;
 
-    uint32_t hn = 0;
     uint32_t copy_to = he - hs;
     if (copy_to >= hdr_cap) copy_to = hdr_cap - 1;
     for (uint32_t j = 0; j < copy_to; j++) host_hdr[j] = url[hs + j];

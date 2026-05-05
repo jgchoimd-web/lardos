@@ -41,6 +41,8 @@ static int s_in_sum_mode;
 /* Sandbox: run LARDX with restricted syscalls (no file/LDLL/network) */
 static int s_sandbox_mode;
 
+static void lsh_putc(char c, void* user);
+
 static const char* env_get(const char* name)
 {
     for (uint32_t i = 0; i < s_nenv; i++)
@@ -201,12 +203,6 @@ static const FsFile* lsh_open_read(char drive, const char* name)
     return fs_open(name);
 }
 
-static FsWritableFile* lsh_open_write(char drive, const char* name)
-{
-    if (drive_to_fs(drive) != 1) return NULL;
-    return fs_open_writable(name);
-}
-
 static void cmd_dir(const char* args)
 {
     char drv = s_drive;
@@ -342,7 +338,10 @@ static void cmd_run(const char* args)
 {
     char buf[LSH_MAX_LINE];
     uint32_t bi = 0;
-    while (args[bi] && bi < LSH_MAX_LINE - 1) buf[bi] = args[bi++];
+    while (args[bi] && bi < LSH_MAX_LINE - 1) {
+        buf[bi] = args[bi];
+        bi++;
+    }
     buf[bi] = '\0';
 
     char drv;
@@ -701,7 +700,10 @@ static int run_lsh_cmd(const char* name, const char* argv)
     (void)argv;
     char path[80];
     uint32_t i = 0;
-    while (name[i] && i < 76) path[i++] = name[i];
+    while (name[i] && i < 76) {
+        path[i] = name[i];
+        i++;
+    }
     path[i] = '\0';
     if (i < 4 || path[i-4] != '.' || path[i-3] != 'l' || path[i-2] != 's' || path[i-1] != 'h') {
         if (i + 4 < 80) {

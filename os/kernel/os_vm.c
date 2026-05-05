@@ -163,8 +163,6 @@ int os_vm_asm_eval(const char* src, os_vm_putc_fn putc, void* user)
     uint32_t code_len = 0;
     const char* p = src;
     char label_buf[32];
-    uint32_t label_val[16];
-    int nlabels = 0;
 
     while (*p) {
         while (*p == ' ' || *p == '\t' || *p == '\n') p++;
@@ -196,16 +194,21 @@ int os_vm_asm_eval(const char* src, os_vm_putc_fn putc, void* user)
             while (*p == ' ' || *p == '\t') p++;
             if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z')) {
                 int i = 0;
-                while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') && i < 31)
+                while (i < 31 && ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9')))
                     label_buf[i++] = *p++;
                 label_buf[i] = '\0';
+                while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9')) p++;
             } else if (*p >= '0' || *p == '-') {
-                parse_int(p, (int32_t*)&label_val[0], &p);
+                int32_t target;
+                parse_int(p, &target, &p);
             }
         } else if ((p[0] == 'j' || p[0] == 'J') && (p[1] == 'z' || p[1] == 'Z')) {
             p += 2; code_len += 5;
             while (*p == ' ' || *p == '\t') p++;
-            if (*p >= '0' || *p == '-') parse_int(p, (int32_t*)&label_val[0], &p);
+            if (*p >= '0' || *p == '-') {
+                int32_t target;
+                parse_int(p, &target, &p);
+            }
         } else if (*p && *p != '\n' && p[1] == ':') {
             p += 2; /* label: skip */
         } else {

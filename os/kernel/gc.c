@@ -29,12 +29,6 @@ static inline uintptr_t block_payload(gc_block_t* b)
     return (uintptr_t)b + GC_HDR;
 }
 
-static gc_block_t* block_from_payload(void* p)
-{
-    if (!p) return 0;
-    return (gc_block_t*)((uintptr_t)p - GC_HDR);
-}
-
 static int is_heap_ptr(uintptr_t v)
 {
     uint32_t start = mem_heap_start();

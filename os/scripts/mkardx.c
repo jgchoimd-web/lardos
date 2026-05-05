@@ -63,7 +63,7 @@ static void write_u32(unsigned char* p, uint32_t v) {
 
 static int elf64_parse(const unsigned char* blob, size_t size, uint32_t* entry, seg_t* segs, int* seg_count) {
     if (size < 64) return -1;
-    if (memcmp(blob, "\x7fELF", 4) != 0) return -1;
+    if (memcmp(blob, "\177" "ELF", 4) != 0) return -1;
     if (blob[4] != 2) return -1; /* ELF64 */
     if (blob[5] != 1) return -1; /* LE */
 
@@ -110,7 +110,7 @@ static int elf64_parse(const unsigned char* blob, size_t size, uint32_t* entry, 
 
 static int elf32_parse(const unsigned char* blob, size_t size, uint32_t* entry, seg_t* segs, int* seg_count) {
     if (size < 52) return -1;
-    if (memcmp(blob, "\x7fELF", 4) != 0) return -1;
+    if (memcmp(blob, "\177" "ELF", 4) != 0) return -1;
     if (blob[4] != 1) return -1;
     if (blob[5] != 1) return -1;
 
@@ -167,7 +167,6 @@ static void sort_segs(seg_t* segs, int n) {
 
 static size_t build_lardx(unsigned char* out, size_t cap, uint32_t entry, seg_t* segs, int seg_count, int image_type) {
     size_t pos = 0;
-    uint32_t file_off = 32 + seg_count * PHDR_SIZE;
 
     memcpy(out + pos, MAGIC, 4);
     pos += 4;

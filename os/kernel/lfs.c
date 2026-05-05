@@ -8,12 +8,6 @@
 static const uint8_t* s_lfs_image;
 static uint32_t s_lfs_size;
 
-static int str_eq(const char* a, const char* b)
-{
-    while (*a && *b && *a == *b) { a++; b++; }
-    return *a == '\0' && *b == '\0';
-}
-
 int lfs_mount(const uint8_t* image, uint32_t size)
 {
     if (!image || size < 10) return -1;

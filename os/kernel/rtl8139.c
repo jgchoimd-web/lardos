@@ -34,11 +34,6 @@
 static uint8_t rx_buf[RX_BUF_SIZE] __attribute__((aligned(16)));
 static uint32_t rx_off;
 
-static void io_wait(void)
-{
-    outb(0x80, 0);
-}
-
 static void mm_pause(void)
 {
     __asm__ __volatile__("pause");
@@ -216,4 +211,3 @@ int rtl8139_poll_rx(rtl8139_t* n, uint8_t* out_buf, uint32_t out_cap, uint32_t* 
 
     return 0;
 }
-

@@ -126,16 +126,16 @@ void usermode_run_lardx(uint32_t entry, int argc, const char** argv)
     uint64_t user_rflags = 0x202;
 
     __asm__ __volatile__(
-        "mov %1, %%rdi\n"
-        "mov %2, %%rsi\n"
-        "push %3\n"
-        "push %4\n"
-        "push %5\n"
-        "push %6\n"
-        "push %7\n"
+        "movq %0, %0\n"
+        "movq %1, %1\n"
+        "pushq %2\n"
+        "pushq %3\n"
+        "pushq %4\n"
+        "pushq %5\n"
+        "pushq %6\n"
         "iretq"
         :
-        : "r"((uint64_t)n), "r"(0x007FF000u),
+        : "D"((uint64_t)n), "S"((uint64_t)0x007FF000u),
           "r"(user_ss), "r"(user_rsp), "r"(user_rflags), "r"(user_cs), "r"(user_rip)
         : "memory"
     );

@@ -109,10 +109,12 @@ static void parse_ident(char* out, int cap)
 {
     int i = 0;
     skip_sp();
-    while ((*s_p >= 'a' && *s_p <= 'z') || (*s_p >= 'A' && *s_p <= 'Z') ||
-           (*s_p >= '0' && *s_p <= '9') || (*s_p >= 0x80)) {
+    unsigned char ch = (unsigned char)*s_p;
+    while ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+           (ch >= '0' && ch <= '9') || ch >= 0x80) {
         if (i + 1 < cap) out[i++] = *s_p++;
         else s_p++;
+        ch = (unsigned char)*s_p;
     }
     out[i] = '\0';
 }

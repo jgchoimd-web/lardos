@@ -338,10 +338,10 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
             while (*ln && lmd_y + line_h <= sy + sh && lmd_y < (int)buf_h) {
                 while (*ln == ' ' || *ln == '\t') ln++;
                 if (!*ln || *ln == '\n') { ln += (*ln ? 1 : 0); continue; }
-                int hdr = 0, scale = 1, bullet = 0;
-                if (ln[0] == '#' && ln[1] == ' ') { hdr = 1; scale = 2; ln += 2; }
-                else if (ln[0] == '#' && ln[1] == '#' && ln[2] == ' ') { hdr = 2; scale = 2; ln += 3; }
-                else if (ln[0] == '#' && ln[1] == '#' && ln[2] == '#' && ln[3] == ' ') { hdr = 3; scale = 1; ln += 4; }
+                int scale = 1, bullet = 0;
+                if (ln[0] == '#' && ln[1] == ' ') { scale = 2; ln += 2; }
+                else if (ln[0] == '#' && ln[1] == '#' && ln[2] == ' ') { scale = 2; ln += 3; }
+                else if (ln[0] == '#' && ln[1] == '#' && ln[2] == '#' && ln[3] == ' ') { scale = 1; ln += 4; }
                 else if (ln[0] == '-' && (ln[1] == ' ' || ln[1] == '\t')) { bullet = 1; ln += 2; }
                 int lx = sx;
                 if (bullet) {
@@ -357,7 +357,7 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
                         bold = 1;
                         ln += 2;
                     }
-                    char ch = *ln;
+                    unsigned char ch = (unsigned char)*ln;
                     if (ch == '*') {
                         if (ln[1] == '*' && ln[2] != '*') { ln += 2; bold = 0; continue; }
                         ln++; continue;
@@ -365,7 +365,7 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
                     if (ch == '`') {
                         ln++;
                         while (*ln && *ln != '`' && cx < max_w) {
-                            ch = *ln++;
+                            ch = (unsigned char)*ln++;
                             if (ch >= 'a' && ch <= 'z') ch -= 32;
                             uint8_t rowbits[8] = {0,0,0,0,0,0,0,0};
                             if (ch >= 32 && ch < 128) {
@@ -444,7 +444,7 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
             for (uint32_t ci = 0; o->text[ci] && ci < 32; ci++) {
                 int tx = sx + (int)ci * 8;
                 if (tx + 8 > (int)buf_w) break;
-                char ch = o->text[ci];
+                unsigned char ch = (unsigned char)o->text[ci];
                 if (ch >= 'a' && ch <= 'z') ch -= 32;
                 uint8_t rowbits[8] = {0,0,0,0,0,0,0,0};
                 if (ch >= 32 && ch < 128) {

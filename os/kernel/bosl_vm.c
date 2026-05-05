@@ -70,6 +70,8 @@ static int64_t bosl_to_i64(const bosl_val_t* v)
     return 0;
 }
 
+static void io_putc(bosl_putc_fn putc, void* user, char c);
+
 static void* bosl_ptr_from_val(const bosl_val_t* v)
 {
     if (!v || !bosl_is_intish(v)) {
@@ -103,13 +105,6 @@ static void io_write_i64(bosl_putc_fn putc, void* user, int64_t v)
     }
     while (n > 0) {
         io_putc(putc, user, buf[--n]);
-    }
-}
-
-static void console_write_bytes(const uint8_t* p, uint32_t n)
-{
-    for (uint32_t i = 0; i < n; i++) {
-        console_putc((char)p[i]);
     }
 }
 
@@ -1735,4 +1730,3 @@ int bosl_vm_run(const uint8_t* image, uint32_t size)
 {
     return bosl_vm_run_impl(image, size, 0, 0);
 }
-

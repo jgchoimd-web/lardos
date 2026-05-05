@@ -4,7 +4,7 @@
  *
  * Usage: seedc input.seed -o output.bosli
  *
- * Seed: minimal C-like. int main(), putint(n), putchar(c), +-*/%, if/while.
+ * Seed: minimal C-like. int main(), putint(n), putchar(c), arithmetic ops, if/while.
  */
 #include <stdio.h>
 #include <stdlib.h>

@@ -41,7 +41,7 @@ typedef struct {
 
 static int elf64_parse(const unsigned char* blob, size_t size, uint32_t* entry, seg_t* segs, int* seg_count) {
     if (size < 64) return -1;
-    if (memcmp(blob, "\x7fELF", 4) != 0) return -1;
+    if (memcmp(blob, "\177" "ELF", 4) != 0) return -1;
     if (blob[4] != 2 || blob[5] != 1) return -1;
 
     uint16_t e_phnum = (uint16_t)blob[56] | ((uint16_t)blob[57] << 8);
@@ -82,7 +82,7 @@ static int elf64_parse(const unsigned char* blob, size_t size, uint32_t* entry, 
 
 static int elf32_parse(const unsigned char* blob, size_t size, uint32_t* entry, seg_t* segs, int* seg_count) {
     if (size < 52) return -1;
-    if (memcmp(blob, "\x7fELF", 4) != 0) return -1;
+    if (memcmp(blob, "\177" "ELF", 4) != 0) return -1;
     if (blob[4] != 1 || blob[5] != 1) return -1;
 
     uint16_t e_phnum = (uint16_t)blob[44] | ((uint16_t)blob[45] << 8);

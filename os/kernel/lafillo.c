@@ -133,7 +133,8 @@ static uint32_t html_to_text(const char* in, uint32_t in_len, char* out, uint32_
                 if (c == '/' && tag_len == 0) tag_is_close = 1;
                 continue;
             }
-            if (tag_len < 15 && ((unsigned char)c >= 'a' && (unsigned char)c <= 'z' || (unsigned char)c >= 'A' && (unsigned char)c <= 'Z')) {
+            if (tag_len < 15 && (((unsigned char)c >= 'a' && (unsigned char)c <= 'z') ||
+                                 ((unsigned char)c >= 'A' && (unsigned char)c <= 'Z'))) {
                 tag_buf[tag_len++] = (char)((unsigned char)c >= 'A' && (unsigned char)c <= 'Z' ? c + 32 : c);
             }
             continue;

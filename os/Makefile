@@ -40,7 +40,8 @@ include deps.mk
 KERNEL_LIB_OBJS := $(addprefix $(KERNEL_DIR)/,$(addsuffix .o,$(KERNEL_LIBS)))
 LDLL_INC_DEPS   := $(addprefix $(KERNEL_DIR)/ldll_lib,$(addsuffix .inc,$(LDLL_LIBS)))
 
-CFLAGS    := -ffreestanding -O2 -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h
+HOST_CFLAGS := -std=c11 -O2 -Wall
+CFLAGS    := -std=gnu11 -ffreestanding -O2 -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h
 
 LDFLAGS   := -T linker.ld -nostdlib -m elf_x86_64
 
@@ -108,13 +109,13 @@ $(KERNEL_DIR)/lda.o: $(KERNEL_DIR)/lda.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(MKLDLL): $(SCRIPTS_DIR)/mkldll.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKARDX): $(SCRIPTS_DIR)/mkardx.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(BIN2INC): $(SCRIPTS_DIR)/bin2inc.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(LAFILLO_ELF): $(LANG_EX)/lafillo_demo.s $(LANG_EX)/user.ld
 	$(NASM) -f elf64 $(LANG_EX)/lafillo_demo.s -o $(LANG_EX)/lafillo_demo.o
@@ -127,28 +128,28 @@ $(LAFILLO_INC): $(LAFILLO_BOSX) $(BIN2INC)
 	$(BIN2INC) $(LAFILLO_BOSX) $@ file_lafillo_demo_bosx
 
 $(EMBED_CA): $(SCRIPTS_DIR)/embed_ca_pem.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKLFS): $(SCRIPTS_DIR)/mklfs.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MK_SSAV): $(SCRIPTS_DIR)/mk_default_ssav.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKEXE): $(SCRIPTS_DIR)/mkexe.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKIMG): $(SCRIPTS_DIR)/mkimg.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(BOSLA): lang/bosla.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(SEEDC): lang/seed/seedc.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 $(LIL): tools/lil.c
-	$(CC) -O2 -Wall -o $@ $<
+	$(CC) $(HOST_CFLAGS) -o $@ $<
 
 define ldll_rule
 $(KERNEL_DIR)/ldll_lib$(1).inc: $(MKLDLL)

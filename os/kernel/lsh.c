@@ -863,18 +863,21 @@ static void cmd_lcnt_list(void)
         return;
     }
     for (uint32_t i = 0; i < count; i++) {
-        lcontainer_info_t info;
-        char caps[80];
-        if (lcontainer_info(i, &info) != 0) continue;
-        lcontainer_caps_text(info.caps, caps, sizeof(caps));
-        out_append(info.active ? "* " : "  ");
-        out_append(info.name);
+        const char* name;
+        uint32_t cap_bits;
+        uint32_t runs;
+        int active;
+        char caps_text[80];
+        if (lcontainer_get(i, &name, &cap_bits, &runs, &active) != 0) continue;
+        lcontainer_caps_text(cap_bits, caps_text, sizeof(caps_text));
+        out_append(active ? "* " : "  ");
+        out_append(name);
         out_append(" profile=");
-        out_append(lcontainer_profile_name(info.caps));
+        out_append(lcontainer_profile_name(cap_bits));
         out_append(" caps=");
-        out_append(caps);
+        out_append(caps_text);
         out_append(" runs=");
-        out_append_u32(info.runs);
+        out_append_u32(runs);
         out_append("\n");
     }
 }

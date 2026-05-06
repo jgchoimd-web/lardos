@@ -4,14 +4,10 @@
 #include "string.h"
 #include <stddef.h>
 
-typedef struct {
-    char name[LCONTAINER_NAME_MAX];
-    uint32_t caps;
-    uint32_t runs;
-    int used;
-} LContainer;
-
-static LContainer s_containers[LCONTAINER_MAX];
+static char s_lc_name[LCONTAINER_MAX][LCONTAINER_NAME_MAX];
+static uint32_t s_lc_caps[LCONTAINER_MAX];
+static uint32_t s_lc_runs[LCONTAINER_MAX];
+static uint8_t s_lc_used[LCONTAINER_MAX];
 static int s_active = -1;
 
 static int copy_name(char* dst, uint32_t cap, const char* src)
@@ -32,23 +28,26 @@ static int copy_name(char* dst, uint32_t cap, const char* src)
     return 0;
 }
 
+static void clear_slot(int idx)
+{
+    s_lc_name[idx][0] = '\0';
+    s_lc_caps[idx] = 0;
+    s_lc_runs[idx] = 0;
+    s_lc_used[idx] = 0;
+}
+
 static int find_container(const char* name)
 {
     if (!name || !name[0]) return -1;
     for (int i = 0; i < LCONTAINER_MAX; i++) {
-        if (s_containers[i].used && strcmp(s_containers[i].name, name) == 0) return i;
+        if (s_lc_used[i] && strcmp(s_lc_name[i], name) == 0) return i;
     }
     return -1;
 }
 
 void lcontainer_init(void)
 {
-    for (int i = 0; i < LCONTAINER_MAX; i++) {
-        s_containers[i].used = 0;
-        s_containers[i].runs = 0;
-        s_containers[i].caps = 0;
-        s_containers[i].name[0] = '\0';
-    }
+    for (int i = 0; i < LCONTAINER_MAX; i++) clear_slot(i);
     s_active = -1;
     (void)lcontainer_create("sealed", SYSCALL_CAP_BASE);
     (void)lcontainer_create("fsbox", SYSCALL_CAP_FS);
@@ -63,19 +62,19 @@ int lcontainer_create(const char* name, uint32_t caps)
     if (r != 0) return -1;
     if (find_container(clean) >= 0) return -2;
     for (int i = 0; i < LCONTAINER_MAX; i++) {
-        if (!s_containers[i].used) {
+        if (!s_lc_used[i]) {
             slot = i;
             break;
         }
     }
     if (slot < 0) return -3;
     for (uint32_t i = 0; i < LCONTAINER_NAME_MAX; i++) {
-        s_containers[slot].name[i] = clean[i];
+        s_lc_name[slot][i] = clean[i];
         if (clean[i] == '\0') break;
     }
-    s_containers[slot].caps = caps & SYSCALL_CAP_ALL;
-    s_containers[slot].runs = 0;
-    s_containers[slot].used = 1;
+    s_lc_caps[slot] = caps & SYSCALL_CAP_ALL;
+    s_lc_runs[slot] = 0;
+    s_lc_used[slot] = 1;
     return 0;
 }
 
@@ -83,10 +82,7 @@ int lcontainer_remove(const char* name)
 {
     int idx = find_container(name);
     if (idx < 0) return -1;
-    s_containers[idx].used = 0;
-    s_containers[idx].name[0] = '\0';
-    s_containers[idx].runs = 0;
-    s_containers[idx].caps = 0;
+    clear_slot(idx);
     if (s_active == idx) s_active = -1;
     return 0;
 }
@@ -106,17 +102,17 @@ void lcontainer_exit(void)
 
 int lcontainer_has_active(void)
 {
-    return s_active >= 0 && s_active < LCONTAINER_MAX && s_containers[s_active].used;
+    return s_active >= 0 && s_active < LCONTAINER_MAX && s_lc_used[s_active];
 }
 
 const char* lcontainer_active_name(void)
 {
-    return lcontainer_has_active() ? s_containers[s_active].name : "";
+    return lcontainer_has_active() ? s_lc_name[s_active] : "";
 }
 
 uint32_t lcontainer_active_caps(void)
 {
-    return lcontainer_has_active() ? s_containers[s_active].caps : SYSCALL_CAP_ALL;
+    return lcontainer_has_active() ? s_lc_caps[s_active] : SYSCALL_CAP_ALL;
 }
 
 uint32_t lcontainer_profile_caps(const char* profile)
@@ -140,27 +136,26 @@ uint32_t lcontainer_count(void)
 {
     uint32_t n = 0;
     for (int i = 0; i < LCONTAINER_MAX; i++) {
-        if (s_containers[i].used) n++;
+        if (s_lc_used[i]) n++;
     }
     return n;
 }
 
-int lcontainer_info(uint32_t idx, lcontainer_info_t* out)
+int lcontainer_get(uint32_t idx, const char** name, uint32_t* caps, uint32_t* runs, int* active)
 {
     uint32_t seen = 0;
-    if (!out) return -1;
     for (int i = 0; i < LCONTAINER_MAX; i++) {
-        if (!s_containers[i].used) continue;
+        if (!s_lc_used[i]) continue;
         if (seen == idx) {
-            out->name = s_containers[i].name;
-            out->caps = s_containers[i].caps;
-            out->runs = s_containers[i].runs;
-            out->active = (s_active == i) ? 1 : 0;
+            if (name) *name = s_lc_name[i];
+            if (caps) *caps = s_lc_caps[i];
+            if (runs) *runs = s_lc_runs[i];
+            if (active) *active = (s_active == i) ? 1 : 0;
             return 0;
         }
         seen++;
     }
-    return -2;
+    return -1;
 }
 
 int lcontainer_run(const char* name, const char* path, int argc, const char** argv)
@@ -168,12 +163,12 @@ int lcontainer_run(const char* name, const char* path, int argc, const char** ar
     int idx = name && name[0] ? find_container(name) : s_active;
     uint32_t old_caps;
     int r;
-    if (idx < 0 || idx >= LCONTAINER_MAX || !s_containers[idx].used) return -40;
+    if (idx < 0 || idx >= LCONTAINER_MAX || !s_lc_used[idx]) return -40;
     old_caps = syscall_get_caps();
-    syscall_set_caps(s_containers[idx].caps);
+    syscall_set_caps(s_lc_caps[idx]);
     r = lardx_run(path, argc, argv);
     syscall_set_caps(old_caps);
-    if (r == 0) s_containers[idx].runs++;
+    if (r == 0) s_lc_runs[idx]++;
     return r;
 }
 

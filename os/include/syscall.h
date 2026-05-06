@@ -30,6 +30,15 @@
 #define SYS_LIPC_RECV     25
 #define SYS_LIPC_PENDING  26
 
+#define SYSCALL_CAP_FS      0x01u
+#define SYSCALL_CAP_LDLL    0x02u
+#define SYSCALL_CAP_GUI     0x04u
+#define SYSCALL_CAP_KEYS    0x08u
+#define SYSCALL_CAP_LIPC    0x10u
+#define SYSCALL_CAP_LAFILLO 0x20u
+#define SYSCALL_CAP_ALL     (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL | SYSCALL_CAP_GUI | SYSCALL_CAP_KEYS | SYSCALL_CAP_LIPC | SYSCALL_CAP_LAFILLO)
+#define SYSCALL_CAP_BASE    0u
+
 /* Register INT 0x80 handler. Must be called after gdt64_init. */
 void syscall_init(void);
 
@@ -45,3 +54,7 @@ void syscall_key_push(ps2_key_t k);
 /* Sandbox: when 1, block file/LDLL/network/GUI-write/keys. Allow write/exit/time/screen-size. */
 void syscall_set_sandbox(int on);
 int syscall_in_sandbox(void);
+
+void syscall_set_caps(uint32_t caps);
+uint32_t syscall_get_caps(void);
+void syscall_reset_process_state(void);

@@ -1,11 +1,10 @@
 /**
- * lafillo.c - LardOS 최적화 브라우저 엔진
+ * lafillo.c - LardOS-native HTML text extractor.
  *
- * Dillo 기반 제거, OS 최적화:
- * - 외부 의존성 없음 (third_party 제거)
- * - 스택/정적 버퍼만 사용 (kmalloc 없음)
- * - 최소 엔티티 테이블 (amp, lt, gt, quot, nbsp, apos)
- * - 블록 요소: br, div, p, h1-h6, li, table, tr, td, th
+ * No external browser engine or third_party dependency:
+ * - Stack/static buffers only.
+ * - Small entity table: amp, lt, gt, quot, nbsp, apos.
+ * - Block elements: br, div, p, h1-h6, li, table, tr, td, th.
  */
 #include "lafillo.h"
 #include <stddef.h>

@@ -16,12 +16,12 @@
  *   ... export_count u16
  *   ... for each export: name_len u8, name[], offset u32 (into code)
  *
- * Loaded at USER_LDLL_BASE (0x410000). Code must be position-independent.
+ * Loaded at USER_LDLL_BASE. Code must be position-independent.
  */
 
 #define LDLL_MAGIC  0x4C4C444C  /* "LDLL" */
 
-#define USER_LDLL_BASE  0x00410000
+#define USER_LDLL_BASE  0x00610000u
 
 /* Syscall: load LDLL from FS, return handle (1..N) or -1 */
 int ldll_load(const char* name);

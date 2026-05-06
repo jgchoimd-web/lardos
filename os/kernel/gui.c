@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+#include "gui.h"
 #include "bootinfo.h"
 #include "fs.h"
 #include "bmp.h"
@@ -11,6 +12,8 @@
 #include "lss.h"
 #include "lsh.h"
 #include "larsh.h"
+#include "lar.h"
+#include "ps2.h"
 #include "kr_basic.h"
 #include "syscall.h"
 #include "lib3d_demo.h"
@@ -128,7 +131,7 @@ static int fb_from_bootinfo(fb_t* out)
     if (bi->magic != 0x464E4942u || bi->version != 1) {
         return -1;
     }
-    if (bi->fb_bpp != 32 || bi->fb_addr_lo == 0) {
+    if ((bi->fb_bpp != 24 && bi->fb_bpp != 32) || bi->fb_addr_lo == 0) {
         return -2;
     }
     out->fb = (uint32_t*)(uintptr_t)bi->fb_addr_lo;
@@ -138,6 +141,8 @@ static int fb_from_bootinfo(fb_t* out)
     out->bpp = bi->fb_bpp;
     return 0;
 }
+
+static void fb_putpixel(const fb_t* f, uint16_t x, uint16_t y, uint32_t argb);
 
 static void fb_blit(const fb_t* dst, const fb_t* src)
 {
@@ -152,7 +157,6 @@ static void fb_blit(const fb_t* dst, const fb_t* src)
     float bright = (float)br / 100.f;
     float contrast = (q == 0) ? 0.85f : (q == 1) ? 1.f : 1.2f;
     for (uint16_t y = 0; y < h; y++) {
-        uint32_t* drow = (uint32_t*)((uintptr_t)dst->fb + (uintptr_t)dst->pitch_bytes * y);
         uint32_t* srow = (uint32_t*)((uintptr_t)src->fb + (uintptr_t)src->pitch_bytes * y);
         for (uint16_t x = 0; x < w; x++) {
             uint32_t p = srow[x];
@@ -163,10 +167,13 @@ static void fb_blit(const fb_t* dst, const fb_t* src)
             r = (int)(((float)r - 128.f) * contrast + 128.f) * (int)(bright * 256) >> 8;
             g_ = (int)(((float)g_ - 128.f) * contrast + 128.f) * (int)(bright * 256) >> 8;
             b = (int)(((float)b - 128.f) * contrast + 128.f) * (int)(bright * 256) >> 8;
-            if (r < 0) r = 0; if (r > 255) r = 255;
-            if (g_ < 0) g_ = 0; if (g_ > 255) g_ = 255;
-            if (b < 0) b = 0; if (b > 255) b = 255;
-            drow[x] = ((uint32_t)a << 24) | ((uint32_t)r << 16) | ((uint32_t)g_ << 8) | (uint32_t)b;
+            if (r < 0) r = 0;
+            if (r > 255) r = 255;
+            if (g_ < 0) g_ = 0;
+            if (g_ > 255) g_ = 255;
+            if (b < 0) b = 0;
+            if (b > 255) b = 255;
+            fb_putpixel(dst, x, y, ((uint32_t)a << 24) | ((uint32_t)r << 16) | ((uint32_t)g_ << 8) | (uint32_t)b);
         }
     }
 }
@@ -174,15 +181,23 @@ static void fb_blit(const fb_t* dst, const fb_t* src)
 static void fb_putpixel(const fb_t* f, uint16_t x, uint16_t y, uint32_t argb)
 {
     if (x >= f->w || y >= f->h) return;
-    uint32_t* row = (uint32_t*)((uintptr_t)f->fb + (uintptr_t)f->pitch_bytes * y);
-    row[x] = argb;
+    uint8_t* row = (uint8_t*)f->fb + (uintptr_t)f->pitch_bytes * y;
+    if (f->bpp == 32) {
+        ((uint32_t*)row)[x] = argb;
+    } else if (f->bpp == 24) {
+        uint8_t* p = row + (uint32_t)x * 3u;
+        p[0] = (uint8_t)(argb & 0xFFu);
+        p[1] = (uint8_t)((argb >> 8) & 0xFFu);
+        p[2] = (uint8_t)((argb >> 16) & 0xFFu);
+    }
 }
 
 static void fb_clear(const fb_t* f, uint32_t argb)
 {
     for (uint16_t y = 0; y < f->h; y++) {
-        uint32_t* row = (uint32_t*)((uintptr_t)f->fb + (uintptr_t)f->pitch_bytes * y);
-        for (uint16_t x = 0; x < f->w; x++) row[x] = argb;
+        for (uint16_t x = 0; x < f->w; x++) {
+            fb_putpixel(f, x, y, argb);
+        }
     }
 }
 
@@ -204,6 +219,7 @@ static const uint8_t font8x8[96][8] = {
     {0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0},
     // 0x2F '/'
     {0x02,0x04,0x08,0x10,0x20,0x40,0x00,0x00},
@@ -252,10 +268,66 @@ static const uint8_t font8x8[96][8] = {
     {0x7E,0x06,0x0C,0x18,0x30,0x60,0x7E,0x00}, // Z
 };
 
+static int glyph_is_empty(const uint8_t* g)
+{
+    for (int i = 0; i < 8; i++) {
+        if (g[i] != 0) return 0;
+    }
+    return 1;
+}
+
+static const uint8_t* fb_glyph_for_char(char ch)
+{
+    if (ch >= 'a' && ch <= 'z') {
+        ch = (char)(ch - ('a' - 'A'));
+    }
+    if (ch < 32 || ch > 126) {
+        ch = '?';
+    }
+
+    const uint8_t* g = font8x8[(uint8_t)ch - 32];
+    if (ch == ' ' || !glyph_is_empty(g)) {
+        return g;
+    }
+
+    switch (ch) {
+    case '!': { static const uint8_t v[8] = {0x18,0x18,0x18,0x18,0x18,0x00,0x18,0x00}; return v; }
+    case '"': { static const uint8_t v[8] = {0x66,0x66,0x24,0x00,0x00,0x00,0x00,0x00}; return v; }
+    case '#': { static const uint8_t v[8] = {0x24,0x24,0x7E,0x24,0x7E,0x24,0x24,0x00}; return v; }
+    case '$': { static const uint8_t v[8] = {0x18,0x3E,0x60,0x3C,0x06,0x7C,0x18,0x00}; return v; }
+    case '%': { static const uint8_t v[8] = {0x62,0x66,0x0C,0x18,0x30,0x66,0x46,0x00}; return v; }
+    case '&': { static const uint8_t v[8] = {0x38,0x6C,0x38,0x70,0xDE,0xCC,0x76,0x00}; return v; }
+    case '\'': { static const uint8_t v[8] = {0x18,0x18,0x30,0x00,0x00,0x00,0x00,0x00}; return v; }
+    case '(': { static const uint8_t v[8] = {0x0C,0x18,0x30,0x30,0x30,0x18,0x0C,0x00}; return v; }
+    case ')': { static const uint8_t v[8] = {0x30,0x18,0x0C,0x0C,0x0C,0x18,0x30,0x00}; return v; }
+    case '*': { static const uint8_t v[8] = {0x00,0x66,0x3C,0xFF,0x3C,0x66,0x00,0x00}; return v; }
+    case '+': { static const uint8_t v[8] = {0x00,0x18,0x18,0x7E,0x18,0x18,0x00,0x00}; return v; }
+    case ',': { static const uint8_t v[8] = {0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x30}; return v; }
+    case '-': { static const uint8_t v[8] = {0x00,0x00,0x00,0x7E,0x00,0x00,0x00,0x00}; return v; }
+    case '.': { static const uint8_t v[8] = {0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x00}; return v; }
+    case ';': { static const uint8_t v[8] = {0x00,0x18,0x18,0x00,0x00,0x18,0x18,0x30}; return v; }
+    case '<': { static const uint8_t v[8] = {0x0C,0x18,0x30,0x60,0x30,0x18,0x0C,0x00}; return v; }
+    case '=': { static const uint8_t v[8] = {0x00,0x00,0x7E,0x00,0x7E,0x00,0x00,0x00}; return v; }
+    case '>': { static const uint8_t v[8] = {0x30,0x18,0x0C,0x06,0x0C,0x18,0x30,0x00}; return v; }
+    case '?': { static const uint8_t v[8] = {0x3C,0x66,0x06,0x0C,0x18,0x00,0x18,0x00}; return v; }
+    case '@': { static const uint8_t v[8] = {0x3C,0x66,0x6E,0x6A,0x6E,0x60,0x3C,0x00}; return v; }
+    case '[': { static const uint8_t v[8] = {0x3C,0x30,0x30,0x30,0x30,0x30,0x3C,0x00}; return v; }
+    case '\\': { static const uint8_t v[8] = {0x40,0x20,0x10,0x08,0x04,0x02,0x00,0x00}; return v; }
+    case ']': { static const uint8_t v[8] = {0x3C,0x0C,0x0C,0x0C,0x0C,0x0C,0x3C,0x00}; return v; }
+    case '^': { static const uint8_t v[8] = {0x18,0x3C,0x66,0x00,0x00,0x00,0x00,0x00}; return v; }
+    case '_': { static const uint8_t v[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x7E,0x00}; return v; }
+    case '`': { static const uint8_t v[8] = {0x30,0x18,0x0C,0x00,0x00,0x00,0x00,0x00}; return v; }
+    case '{': { static const uint8_t v[8] = {0x0E,0x18,0x18,0x70,0x18,0x18,0x0E,0x00}; return v; }
+    case '|': { static const uint8_t v[8] = {0x18,0x18,0x18,0x00,0x18,0x18,0x18,0x00}; return v; }
+    case '}': { static const uint8_t v[8] = {0x70,0x18,0x18,0x0E,0x18,0x18,0x70,0x00}; return v; }
+    case '~': { static const uint8_t v[8] = {0x00,0x00,0x32,0x4C,0x00,0x00,0x00,0x00}; return v; }
+    default: { static const uint8_t v[8] = {0x3C,0x42,0x06,0x0C,0x18,0x00,0x18,0x00}; return v; }
+    }
+}
+
 static void fb_draw_char(const fb_t* f, uint16_t x, uint16_t y, char ch, uint32_t fg, uint32_t bg)
 {
-    if (ch < 32 || ch > 127) ch = '?';
-    const uint8_t* g = font8x8[(uint8_t)ch - 32];
+    const uint8_t* g = fb_glyph_for_char(ch);
     for (uint16_t row = 0; row < 8; row++) {
         uint8_t bits = g[row];
         for (uint16_t col = 0; col < 8; col++) {
@@ -265,11 +337,23 @@ static void fb_draw_char(const fb_t* f, uint16_t x, uint16_t y, char ch, uint32_
     }
 }
 
+static void fb_draw_text_cells(const fb_t* f, uint16_t x, uint16_t y, const char* s,
+                               uint16_t max_cells, uint32_t fg, uint32_t bg)
+{
+    const char* p = s ? s : "";
+    uint16_t cell = 0;
+    while (*p && cell < max_cells) {
+        uint32_t cp = utf8_next(&p);
+        if (cp == 0) break;
+        if (cp < 32 || cp > 126) cp = '?';
+        fb_draw_char(f, (uint16_t)(x + cell * 8), y, (char)cp, fg, bg);
+        cell++;
+    }
+}
+
 static void fb_draw_text(const fb_t* f, uint16_t x, uint16_t y, const char* s, uint32_t fg, uint32_t bg)
 {
-    for (uint16_t i = 0; s[i] != '\0'; i++) {
-        fb_draw_char(f, (uint16_t)(x + i * 8), y, s[i], fg, bg);
-    }
+    fb_draw_text_cells(f, x, y, s, 65535u, fg, bg);
 }
 
 static void fb_draw_image(const fb_t* f, uint16_t x, uint16_t y, const uint32_t* pixels, uint16_t w, uint16_t h)
@@ -308,10 +392,16 @@ int gui_init(void)
     g.prev_buttons = 0;
 
     // Window
-    g.win_w = 520;
-    g.win_h = 420;
-    g.win_x = (g_fb.w - g.win_w) / 2;
-    g.win_y = (g_fb.h - g.win_h) / 2;
+    int sw = (int)g_fb.w;
+    int sh = (int)g_fb.h;
+    g.win_w = sw >= 660 ? 640 : sw - 20;
+    g.win_h = sh >= 460 ? 420 : sh - 20;
+    if (g.win_w < 240) g.win_w = sw > 8 ? sw - 8 : sw;
+    if (g.win_h < 180) g.win_h = sh > 8 ? sh - 8 : sh;
+    g.win_x = (sw - g.win_w) / 2;
+    g.win_y = (sh - g.win_h) / 2;
+    if (g.win_x < 0) g.win_x = 0;
+    if (g.win_y < 0) g.win_y = 0;
     g.dragging = 0;
     g.btn_pressed = 0;
     g.btn_clicks = 0;
@@ -384,6 +474,140 @@ static void gui_draw_cursor_at(int x, int y, uint32_t color)
 static int in_rect(int x, int y, int rx, int ry, int rw, int rh)
 {
     return x >= rx && y >= ry && x < (rx + rw) && y < (ry + rh);
+}
+
+static void gui_resp_clear(void)
+{
+    g.resp[0] = '\0';
+    g.resp_scroll = 0;
+}
+
+static void gui_resp_append_n(const char* s, uint32_t len)
+{
+    uint32_t pos = 0;
+    while (pos + 1 < sizeof(g.resp) && g.resp[pos]) pos++;
+    for (uint32_t i = 0; i < len && pos + 1 < sizeof(g.resp); i++) {
+        g.resp[pos++] = s[i];
+    }
+    g.resp[pos] = '\0';
+}
+
+static void gui_resp_append(const char* s)
+{
+    uint32_t len = 0;
+    if (!s) return;
+    while (s[len]) len++;
+    gui_resp_append_n(s, len);
+}
+
+static void gui_resp_append_u32(uint32_t v)
+{
+    char tmp[10];
+    uint32_t n = 0;
+    if (v == 0) {
+        gui_resp_append("0");
+        return;
+    }
+    while (v && n < sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (v % 10u));
+        v /= 10u;
+    }
+    while (n > 0) {
+        char ch = tmp[--n];
+        gui_resp_append_n(&ch, 1);
+    }
+}
+
+static void gui_tb_set(const char* s)
+{
+    uint32_t i = 0;
+    if (!s) s = "";
+    while (s[i] && i + 1 < sizeof(g.tb)) {
+        g.tb[i] = s[i];
+        i++;
+    }
+    g.tb[i] = '\0';
+    g.tb_len = i;
+    g.tb_cur = i;
+}
+
+static void gui_lsh_sync_output(void)
+{
+    const char* out = lsh_get_output();
+    uint32_t i = 0;
+    while (out[i] && i + 1 < sizeof(g.resp)) {
+        g.resp[i] = out[i];
+        i++;
+    }
+    g.resp[i] = '\0';
+}
+
+void gui_activate_ring0_shortcut(void)
+{
+    gui_activity();
+    if (g.ss_active) g.ss_active = 0;
+    lsh_enter_sum_shortcut();
+    if (!g_have_fb) return;
+    g.app_id = 7;
+    g.tb_focused = 1;
+    g.lafaelo_focus = 0;
+    g.lafaelo_show_run = 1;
+    g.tb_len = 0;
+    g.tb_cur = 0;
+    g.tb[0] = '\0';
+    gui_lsh_sync_output();
+}
+
+static void gui_lar_list_cb(const lar_entry_t* entry, void* user)
+{
+    (void)user;
+    gui_resp_append("  ");
+    gui_resp_append_n(entry->name, entry->name_len);
+    gui_resp_append("  ");
+    gui_resp_append_u32(entry->unpacked_size);
+    gui_resp_append(entry->method == LAR_METHOD_STORE ? " bytes stored\n" : " bytes unsupported\n");
+}
+
+static void gui_lar_show_bundle(void)
+{
+    const FsFile* f = fs_open("bundle.lar");
+    gui_resp_clear();
+    gui_resp_append("LAR1 bundle.lar\n");
+    gui_resp_append("Enter a member name, then Extract.\n\n");
+    if (!f) {
+        gui_resp_append("bundle.lar not found.\n");
+        return;
+    }
+    if (lar_list(f->data, f->size, gui_lar_list_cb, NULL) != 0) {
+        gui_resp_append("Invalid LAR archive.\n");
+    }
+}
+
+static void gui_lar_extract_selected(void)
+{
+    const char* name = g.tb[0] ? g.tb : "hello.txt";
+    const FsFile* f = fs_open("bundle.lar");
+    FsWritableFile* w = fs_open_writable("lar_extract.txt");
+    gui_resp_clear();
+    if (!f || !w) {
+        gui_resp_append("LAR storage not available.\n");
+        return;
+    }
+    uint32_t out_len = w->cap > 0 ? w->cap - 1 : 0;
+    int r = lar_extract(f->data, f->size, name, w->data, &out_len);
+    if (r != 0) {
+        gui_resp_append("Extract failed: ");
+        gui_resp_append(name);
+        gui_resp_append("\n");
+        return;
+    }
+    w->size = out_len;
+    w->data[out_len] = 0;
+    fs_mark_dirty();
+    gui_resp_append("Extracted ");
+    gui_resp_append(name);
+    gui_resp_append(" -> lar_extract.txt\n\n");
+    gui_resp_append_n((const char*)w->data, out_len);
 }
 
 void gui_activity(void)
@@ -515,10 +739,8 @@ void gui_handle_mouse(int dx, int dy, int buttons)
                         while (glist[gi] && gi + 1 < sizeof(g.resp)) { g.resp[gi] = glist[gi]; gi++; }
                         g.resp[gi] = '\0';
                     } else if (idx == 4) {
-                        const char* z = "lard inflate ready.\nAdd .zip to fs to test.";
-                        uint32_t i = 0;
-                        while (z[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = z[i]; i++; }
-                        g.resp[i] = '\0';
+                        gui_tb_set("hello.txt");
+                        gui_lar_show_bundle();
                     } else if (idx == 5) {
                         const char* z = "Click Run to execute user-mode program.";
                         uint32_t i = 0;
@@ -538,7 +760,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
                         g.tb_cur = 0;
                         g.tb[0] = '\0';
                     } else if (idx == 8) {
-                        const char* z = "출력 \"안녕\" 또는 반복 3번 뿅 끝";
+                        const char* z = "print \"hello\" or repeat 3x poop end";
                         uint32_t i = 0;
                         while (z[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = z[i]; i++; }
                         g.resp[i] = '\0';
@@ -695,6 +917,8 @@ void gui_handle_mouse(int dx, int dy, int buttons)
                         g.resp[sz] = '\0';
                     }
                 }
+            } else if (g.app_id == 4) {
+                gui_lar_extract_selected();
             } else if (g.app_id == 5) {
                 if (in_rect(g.mx, g.my, btn_x + btn_w + 8, btn_y, 70, btn_h)) {
                     g.user_sandbox = 1 - g.user_sandbox;
@@ -861,6 +1085,9 @@ void gui_handle_key(char ch)
             return;
         }
         if (g.app_id == 0) g.submit_pending = 1;
+        else if (g.app_id == 4) {
+            gui_lar_extract_selected();
+        }
         else if (g.app_id == 8) {
             g.resp[0] = '\0';
             kr_basic_run(g.tb, g.resp, sizeof(g.resp));
@@ -906,6 +1133,10 @@ void gui_handle_key_nav(int kind)
     gui_activity();
     if (g.ss_active) {
         g.ss_active = 0;
+        return;
+    }
+    if (kind == PS2K_F10) {
+        gui_activate_ring0_shortcut();
         return;
     }
     uint32_t* cur = (g.app_id == 1) ? &g.calc_cur : (g.app_id == 9 && g.lafaelo_focus) ? &g.lafaelo_cur : &g.tb_cur;
@@ -1141,7 +1372,7 @@ void gui_render(void)
     fb_fill_rect(tgt, (uint16_t)(g.win_x + g.win_w - 1), (uint16_t)g.win_y, 1, (uint16_t)g.win_h, border);
 
     /* Tab bar */
-    static const char* tab_names[] = { "Lafillo", "Calc", "Notes", "Gallery", "Zip", "User", "LSS", "LSH", "Play", "Lafaelo" };
+    static const char* tab_names[] = { "Web", "Calc", "Note", "Pix", "Pak", "User", "LSS", "LSH", "Play", "Edit" };
     int tab_y = g.win_y + 20;
     int tab_h = 24;
     int tab_w = g.win_w / 10;
@@ -1180,7 +1411,7 @@ void gui_render(void)
             fb_draw_text(tgt, (uint16_t)(btn_x + d * (lfb + 4) + 4), (uint16_t)(btn_y + 10), lafaelo_labels[d], 0xFFFFFFFF, dbg);
         }
     } else {
-        const char* btn_label = (g.app_id == 1) ? "=" : (g.app_id == 2) ? "Save" : (g.app_id == 3) ? "View" : (g.app_id == 8) ? "Run" : "Run";
+        const char* btn_label = (g.app_id == 1) ? "=" : (g.app_id == 2) ? "Save" : (g.app_id == 3) ? "View" : (g.app_id == 4) ? "Extract" : (g.app_id == 8) ? "Run" : "Run";
         uint32_t btn_bg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
         fb_fill_rect(tgt, (uint16_t)btn_x, (uint16_t)btn_y, (uint16_t)btn_w, (uint16_t)btn_h, btn_bg);
         fb_draw_text(tgt, (uint16_t)(btn_x + 12), (uint16_t)(btn_y + 10), btn_label, 0xFFFFFFFF, btn_bg);
@@ -1207,10 +1438,12 @@ void gui_render(void)
     const char* input_label = "URL:";
     if (g.app_id == 1) input_label = "Expr:";
     else if (g.app_id == 2) input_label = "Add line:";
+    else if (g.app_id == 4) input_label = "File:";
     else if (g.app_id == 7) input_label = lsh_in_sum_mode() ? "SUM:" : "Cmd:";
     else if (g.app_id == 8) input_label = "Code:";
     else if (g.app_id == 9) input_label = "Path:";
-    fb_draw_text(tgt, (uint16_t)(tb_x + 6), (uint16_t)(tb_y + 8), input_text, 0xFFFFFFFF, tb_bg);
+    fb_draw_text_cells(tgt, (uint16_t)(tb_x + 6), (uint16_t)(tb_y + 8), input_text,
+                       (uint16_t)((tb_w - 12) / 8), 0xFFFFFFFF, tb_bg);
     fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)(tb_y - 12), input_label, 0xFFFFFFFF, win_bg);
 
     int view_x = g.win_x + 16;
@@ -1244,7 +1477,7 @@ void gui_render(void)
     if (g.app_id == 1) view_label = "Result:";
     else if (g.app_id == 2) view_label = "Notes:";
     else if (g.app_id == 3) view_label = "Gallery:";
-    else if (g.app_id == 4) view_label = "Zip:";
+    else if (g.app_id == 4) view_label = "LAR:";
     else if (g.app_id == 5) view_label = "Output:";
     else if (g.app_id == 6) view_label = "LSS (Shrine):";
     else if (g.app_id == 7) view_label = lsh_in_sum_mode() ? "SUM:" : "LSH:";

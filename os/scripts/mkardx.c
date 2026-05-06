@@ -69,7 +69,7 @@ static int elf64_parse(const unsigned char* blob, size_t size, uint32_t* entry, 
 
     uint16_t e_phnum = read_u16(blob + 56);
     uint16_t e_phentsize = read_u16(blob + 54);
-    uint32_t e_phoff = (uint32_t)read_u64(blob + 40);
+    uint32_t e_phoff = (uint32_t)read_u64(blob + 32);
     uint64_t e_entry = read_u64(blob + 24);
 
     if (e_phoff == 0 || e_phnum == 0) return -1;

@@ -1,8 +1,12 @@
-; boot/boot.s - 512-byte BIOS boot sector
-; Assembled with: nasm -f bin boot/boot.s -o boot/boot.bin
+; boot/boot.s - stage2 BIOS loader.
+; Stage1 loads this at 0x7E00, then this loads the LARDX kernel.
 
 BITS 16
-ORG 0x7C00
+ORG 0x7E00
+
+%ifndef KERNEL_LBA
+%define KERNEL_LBA 5
+%endif
 
 start:
     cli
@@ -30,14 +34,14 @@ start:
     ; If it fails, we keep text mode.
     call vbe_try_enable
 
-    ; Load LARDX executable (kernel) from disk (LBA 1..N) into 0x1000:0000.
+    ; Load LARDX executable (kernel) from disk into 0x1000:0000.
     ; We read the first sector to get total file size, then read the rest.
     mov ax, 0x1000
     mov es, ax
     xor bx, bx
 
-    ; Read 1 sector at LBA=1 into ES:BX (0x10000)
-    mov dword [dap_lba], 1
+    ; Read 1 sector at KERNEL_LBA into ES:BX (0x10000)
+    mov dword [dap_lba], KERNEL_LBA
     mov word  [dap_count], 1
     mov word  [dap_off], bx
     mov word  [dap_seg], es
@@ -83,12 +87,12 @@ start:
     jb disk_error
     mov [total_sectors], ax
 
-    ; Read remaining sectors starting at LBA=2 into buffer+512
+    ; Read remaining sectors starting at KERNEL_LBA+1 into buffer+512
     mov si, [total_sectors]
     dec si                      ; remaining count
     jz .done_load
 
-    mov dword [dap_lba], 2
+    mov dword [dap_lba], KERNEL_LBA + 1
     mov bx, 512                 ; offset into buffer
 .read_loop:
     cmp si, 127
@@ -98,14 +102,28 @@ start:
 .chunk_ok:
     mov cx, si
 .have_chunk:
+    ; Keep every BIOS read inside one 64KiB ES:BX window.
+    mov ax, bx
+    shr ax, 9
+    mov dx, 128
+    sub dx, ax
+    cmp cx, dx
+    jbe .chunk_fits
+    mov cx, dx
+.chunk_fits:
     mov word [dap_count], cx
     mov word [dap_off], bx
     mov word [dap_seg], es
     call disk_read_lba
-    ; bx += cx*512
+    ; ES:BX += cx*512
     mov dx, cx
     shl dx, 9
     add bx, dx
+    jnc .same_read_segment
+    mov ax, es
+    add ax, 0x1000
+    mov es, ax
+.same_read_segment:
     ; dap_lba += cx (low 32-bits)
     mov ax, cx
     add word [dap_lba], ax
@@ -152,14 +170,12 @@ protected_start:
     cmp ax, 2
     jb .bosx_layout
     ; LARDX v2 layout
-    mov ax, [esi+0x08]
-    mov ebp, eax
+    movzx ebp, word [esi+0x08]
     mov eax, [esi+0x0E]
     jmp .have_phoff
 .bosx_layout:
     ; BOSX layout
-    mov ax, [esi+0x06]
-    mov ebp, eax
+    movzx ebp, word [esi+0x06]
     mov eax, [esi+0x0C]
 .have_phoff:
     add eax, esi                ; phoff + base = phdr table
@@ -214,7 +230,7 @@ protected_start:
 
     ; -----------------------------
     ; Enter long mode (x86_64)
-    ; Identity-map first 2 MiB using a single 2 MiB page.
+    ; Identity-map first 8 MiB using 2 MiB pages.
     ; -----------------------------
     cli
 
@@ -253,7 +269,7 @@ setup_identity_paging:
     ; PML4  = 0x70000
     ; PDPT  = 0x71000
     ; PD    = 0x72000
-    ; Identity map 0..2MiB using PD[0] 2MiB page.
+    ; Identity map 0..8MiB using PD[0..3] 2MiB pages.
     pushad
 
     ; Zero 3 pages (PML4/PDPT/PD)
@@ -270,9 +286,15 @@ setup_identity_paging:
     mov dword [0x00071000], 0x00072003
     mov dword [0x00071000 + 4], 0x00000000
 
-    ; PD[0] = 0x00000000 | P|RW|PS (2MiB page)
+    ; PD[0..3] = 0..8MiB | P|RW|PS (2MiB pages)
     mov dword [0x00072000], 0x00000083
     mov dword [0x00072000 + 4], 0x00000000
+    mov dword [0x00072000 + 8], 0x00200083
+    mov dword [0x00072000 + 12], 0x00000000
+    mov dword [0x00072000 + 16], 0x00400083
+    mov dword [0x00072000 + 20], 0x00000000
+    mov dword [0x00072000 + 24], 0x00600083
+    mov dword [0x00072000 + 28], 0x00000000
 
     popad
     ret
@@ -295,7 +317,15 @@ long_mode_start:
     ; Enable supervisor write-protect (CR0.WP=1)
     mov rax, cr0
     bts rax, 16
+    btr rax, 2                   ; CR0.EM=0
+    bts rax, 1                   ; CR0.MP=1
     mov cr0, rax
+
+    ; Let the compiler-generated kernel code use SSE instructions.
+    mov rax, cr4
+    bts rax, 9                   ; CR4.OSFXSR=1
+    bts rax, 10                  ; CR4.OSXMMEXCPT=1
+    mov cr4, rax
 
     ; Jump to kernel entry (physical, identity-mapped).
     mov eax, dword [kernel_entry]
@@ -385,11 +415,6 @@ LONG_CODE_SEL equ 0x18
 kernel_entry dd 0
 phdr_size   dw 16               ; 16 for BOSX, 20 for LARDX v2
 
-; BIOS passes boot drive in DL; save it early
-save_drive:
-    mov [boot_drive], dl
-    ret
-
 ; -----------------------------
 ; VBE (real mode) framebuffer setup
 ; -----------------------------
@@ -441,15 +466,16 @@ vbe_try_enable:
     mov dword [es:BOOTINFO_OFF + 0], 0x464E4942
     mov word  [es:BOOTINFO_OFF + 4], 1
 
-    ; pitch u16 at +16, xres u16 at +18, yres u16 at +20, bpp u8 at +25, physbase u32 at +40
+    ; VBE: pitch +16, xres +18, yres +20, bpp +25, physbase +40.
+    ; bootinfo_t: fb_addr +8, width +12, height +14, pitch +16, bpp +18.
     mov ax, [es:VBE_MODEINFO_OFF + 16]
-    mov [es:BOOTINFO_OFF + 14], ax
+    mov [es:BOOTINFO_OFF + 16], ax
     mov ax, [es:VBE_MODEINFO_OFF + 18]
     mov [es:BOOTINFO_OFF + 12], ax
     mov ax, [es:VBE_MODEINFO_OFF + 20]
-    mov [es:BOOTINFO_OFF + 10], ax
+    mov [es:BOOTINFO_OFF + 14], ax
     mov al, [es:VBE_MODEINFO_OFF + 25]
-    mov [es:BOOTINFO_OFF + 16], al
+    mov [es:BOOTINFO_OFF + 18], al
     mov eax, [es:VBE_MODEINFO_OFF + 40]
     mov [es:BOOTINFO_OFF + 8], eax
 
@@ -462,7 +488,3 @@ vbe_try_enable:
     pop ds
     popa
     ret
-
-times 510-($-$$) db 0
-dw 0xAA55
-

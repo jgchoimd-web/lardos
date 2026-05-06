@@ -18,6 +18,7 @@ typedef enum {
     PS2K_PGUP,
     PS2K_PGDN,
     PS2K_DEL,
+    PS2K_F10,
 } ps2_key_kind_t;
 
 typedef struct {
@@ -28,4 +29,3 @@ typedef struct {
 // Returns 0 and sets *out on a keypress.
 // Returns 1 if no key available. Negative on error.
 int ps2_kbd_poll(ps2_key_t* out);
-

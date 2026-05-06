@@ -14,6 +14,8 @@ void usermode_run(void);
  * Builds argv on stack and iretq to user. Does not return until SYS_EXIT. */
 void usermode_run_lardx(uint32_t entry, int argc, const char** argv);
 
-/* User virtual addresses (identity-mapped for simplicity) */
-#define USER_ENTRY   0x00400000
-#define USER_STACK   0x007FF000   /* stack top, grows down */
+/* User virtual addresses (identity-mapped for simplicity). */
+#define USER_VALID_LO 0x00600000u
+#define USER_VALID_HI 0x00800000u
+#define USER_ENTRY    0x00600000u
+#define USER_STACK    0x007FF000u   /* stack top, grows down */

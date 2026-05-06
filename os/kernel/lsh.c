@@ -9,6 +9,10 @@
 #include "os_vm.h"
 #include "lardx_load.h"
 #include "lafillo.h"
+#include "lar.h"
+#include "lvcs.h"
+#include "drfl.h"
+#include "lcontainer.h"
 #include "gui.h"
 #include "io.h"
 #include "string.h"
@@ -140,6 +144,59 @@ static void out_append_char(char c)
     }
 }
 
+static void out_append_u32(uint32_t v)
+{
+    char tmp[10];
+    uint32_t n = 0;
+    if (v == 0) {
+        out_append_char('0');
+        return;
+    }
+    while (v && n < sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (v % 10u));
+        v /= 10u;
+    }
+    while (n > 0) out_append_char(tmp[--n]);
+}
+
+static void out_append_i32(int32_t v)
+{
+    if (v < 0) {
+        out_append_char('-');
+        out_append_u32((uint32_t)(-v));
+    } else {
+        out_append_u32((uint32_t)v);
+    }
+}
+
+static void out_append_hex16(uint16_t v)
+{
+    static const char hex[] = "0123456789abcdef";
+    out_append("0x");
+    for (int i = 3; i >= 0; i--) {
+        out_append_char(hex[(v >> (uint16_t)(i * 4)) & 0xFu]);
+    }
+}
+
+static void out_append_hex32(uint32_t v)
+{
+    static const char hex[] = "0123456789abcdef";
+    out_append("0x");
+    for (int i = 7; i >= 0; i--) {
+        out_append_char(hex[(v >> (uint32_t)(i * 4)) & 0xFu]);
+    }
+}
+
+void lsh_enter_sum_shortcut(void)
+{
+    if (!s_in_sum_mode) {
+        s_in_sum_mode = 1;
+        out_append("SUM (ring 0) enabled by Fn+0/F10. asm_ for hardware I/O. exitsum to leave.\n");
+    } else {
+        out_append("SUM already enabled.\n");
+    }
+}
+
 static int s_dir_skip_ram;
 
 static void dir_cb(const char* nm, uint32_t sz, void* u)
@@ -166,6 +223,17 @@ static void dir_cb(const char* nm, uint32_t sz, void* u)
     ln[i++] = '\n';
     ln[i] = '\0';
     out_append(ln);
+}
+
+static void dir_ram_name(const char* name)
+{
+    FsWritableFile* w = fs_open_writable(name);
+    if (!w) return;
+    out_append("  ");
+    out_append(w->name);
+    out_append(" ");
+    out_append_u32(w->size);
+    out_append("\n");
 }
 
 static int drive_to_fs(char d)
@@ -226,16 +294,10 @@ static void cmd_dir(const char* args)
         fs_list(dir_cb, NULL);
         s_dir_skip_ram = 0;
     } else {
-        FsWritableFile* w = fs_open_writable("notes.txt");
-        if (w) {
-            out_append("  notes.txt ");
-            char tmp[16];
-            uint32_t sz = w->size, t = 0;
-            if (sz == 0) tmp[t++] = '0';
-            else while (sz) { tmp[t++] = (char)('0' + (sz % 10)); sz /= 10; }
-            while (t--) out_append_char(tmp[t]);
-            out_append("\n");
-        }
+        dir_ram_name("notes.txt");
+        dir_ram_name("lafillo_saved.txt");
+        dir_ram_name("lar_extract.txt");
+        dir_ram_name("vcs_restore.txt");
     }
 }
 
@@ -291,6 +353,408 @@ static void cmd_lafillo(const char* args)
     out_append("\n");
 }
 
+static void lar_list_lsh_cb(const lar_entry_t* entry, void* user)
+{
+    (void)user;
+    out_append("  ");
+    for (uint32_t i = 0; i < entry->name_len; i++) out_append_char(entry->name[i]);
+    out_append("  ");
+    out_append_u32(entry->unpacked_size);
+    out_append(entry->method == LAR_METHOD_STORE ? " bytes stored\n" : " bytes unsupported\n");
+}
+
+static void cmd_larls(const char* args)
+{
+    char drv;
+    char name[64];
+    resolve_path(args, &drv, name, sizeof(name));
+    if (!name[0]) {
+        uint32_t i = 0;
+        const char* def = "bundle.lar";
+        while (def[i] && i + 1 < sizeof(name)) { name[i] = def[i]; i++; }
+        name[i] = '\0';
+        drv = 'X';
+    }
+
+    const FsFile* f = lsh_open_read(drv, name);
+    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    const uint8_t* data = f ? f->data : (w ? w->data : NULL);
+    uint32_t size = f ? f->size : (w ? w->size : 0);
+    if (!data || size == 0) {
+        out_append("larls: archive not found.\n");
+        return;
+    }
+
+    out_append("LAR1 ");
+    out_append(name);
+    out_append("\n");
+    int r = lar_list(data, size, lar_list_lsh_cb, NULL);
+    if (r != 0) out_append("larls: invalid LAR archive.\n");
+}
+
+static void cmd_larx(const char* args)
+{
+    char archive_arg[64];
+    char member[64];
+    uint32_t ai = 0;
+    uint32_t mi = 0;
+    while (*args == ' ' || *args == '\t') args++;
+    while (*args && *args != ' ' && *args != '\t' && ai + 1 < sizeof(archive_arg)) archive_arg[ai++] = *args++;
+    archive_arg[ai] = '\0';
+    while (*args == ' ' || *args == '\t') args++;
+    while (*args && *args != ' ' && *args != '\t' && mi + 1 < sizeof(member)) member[mi++] = *args++;
+    member[mi] = '\0';
+
+    if (!archive_arg[0]) {
+        const char* def_member = "hello.txt";
+        while (def_member[mi] && mi + 1 < sizeof(member)) { member[mi] = def_member[mi]; mi++; }
+        member[mi] = '\0';
+    } else if (!member[0]) {
+        uint32_t i = 0;
+        while (archive_arg[i] && i + 1 < sizeof(member)) { member[i] = archive_arg[i]; i++; }
+        member[i] = '\0';
+        archive_arg[0] = '\0';
+    }
+    if (!archive_arg[0]) {
+        ai = 0;
+        const char* def_archive = "bundle.lar";
+        while (def_archive[ai] && ai + 1 < sizeof(archive_arg)) { archive_arg[ai] = def_archive[ai]; ai++; }
+        archive_arg[ai] = '\0';
+    }
+
+    char drv;
+    char archive[64];
+    resolve_path(archive_arg, &drv, archive, sizeof(archive));
+    const FsFile* f = lsh_open_read(drv, archive);
+    FsWritableFile* wsrc = (drive_to_fs(drv) == 1) ? fs_open_writable(archive) : NULL;
+    const uint8_t* data = f ? f->data : (wsrc ? wsrc->data : NULL);
+    uint32_t size = f ? f->size : (wsrc ? wsrc->size : 0);
+    FsWritableFile* out = fs_open_writable("lar_extract.txt");
+    if (!data || size == 0 || !out) {
+        out_append("larx: storage not available.\n");
+        return;
+    }
+
+    uint32_t out_len = out->cap > 0 ? out->cap - 1 : 0;
+    int r = lar_extract(data, size, member, out->data, &out_len);
+    if (r != 0) {
+        out_append("larx: extract failed.\n");
+        return;
+    }
+    out->size = out_len;
+    out->data[out_len] = 0;
+    fs_mark_dirty();
+    out_append("Extracted ");
+    out_append(member);
+    out_append(" -> lar_extract.txt\n");
+}
+
+static int vcs_read_word(const char** args, char* out, uint32_t cap)
+{
+    uint32_t i = 0;
+    const char* p = *args;
+    while (*p == ' ' || *p == '\t') p++;
+    while (*p && *p != ' ' && *p != '\t' && i + 1 < cap) out[i++] = *p++;
+    out[i] = '\0';
+    while (*p == ' ' || *p == '\t') p++;
+    *args = p;
+    return i > 0 ? 0 : -1;
+}
+
+static int vcs_parse_u32(const char** args, uint32_t* out)
+{
+    uint32_t v = 0;
+    const char* p = *args;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p < '0' || *p > '9') return -1;
+    while (*p >= '0' && *p <= '9') {
+        v = v * 10u + (uint32_t)(*p - '0');
+        p++;
+    }
+    while (*p == ' ' || *p == '\t') p++;
+    *args = p;
+    *out = v;
+    return 0;
+}
+
+static void vcs_file_lsh_cb(const lvcs_file_info_t* info, void* user)
+{
+    (void)user;
+    out_append("  ");
+    out_append(info->name);
+    out_append(" ");
+    out_append_u32(info->size);
+    out_append(" bytes ");
+    out_append_hex32(info->hash);
+    out_append("\n");
+}
+
+static void vcs_log_lsh_cb(const lvcs_commit_info_t* info, void* user)
+{
+    (void)user;
+    out_append("commit ");
+    out_append_u32(info->id);
+    if (info->parent) {
+        out_append(" parent ");
+        out_append_u32(info->parent);
+    }
+    out_append(" ");
+    out_append_hex32(info->hash);
+    out_append("\n  files ");
+    out_append_u32(info->file_count);
+    out_append("  ");
+    out_append(info->message);
+    out_append("\n");
+}
+
+static void cmd_vcsinit(const char* args)
+{
+    (void)args;
+    lvcs_init();
+    out_append("LVCS repo reset.\n");
+}
+
+static void cmd_vcsstatus(const char* args)
+{
+    uint32_t staged;
+    uint32_t commits;
+    uint32_t used;
+    uint32_t cap;
+    (void)args;
+    lvcs_status(&staged, &commits, &used, &cap);
+    out_append("LVCS: ");
+    out_append_u32(commits);
+    out_append(" commits, ");
+    out_append_u32(staged);
+    out_append(" staged, store ");
+    out_append_u32(used);
+    out_append("/");
+    out_append_u32(cap);
+    out_append("\n");
+    if (staged) lvcs_stage(vcs_file_lsh_cb, NULL);
+}
+
+static void cmd_vcsadd(const char* args)
+{
+    char drv;
+    char name[64];
+    const FsFile* f;
+    FsWritableFile* w;
+    const uint8_t* data;
+    uint32_t size;
+    int r;
+
+    resolve_path(args, &drv, name, sizeof(name));
+    if (!name[0]) {
+        out_append("Usage: vcsadd [drive:]file\n");
+        return;
+    }
+    f = lsh_open_read(drv, name);
+    w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    data = f ? f->data : (w ? w->data : NULL);
+    size = f ? f->size : (w ? w->size : 0);
+    if (!f && !w) {
+        out_append("vcsadd: file not found.\n");
+        return;
+    }
+
+    r = lvcs_add(name, data, size);
+    if (r == -12) out_append("vcsadd: file too large for LVCS.\n");
+    else if (r == -13) out_append("vcsadd: object store full.\n");
+    else if (r == -20) out_append("vcsadd: stage full.\n");
+    else if (r != 0) out_append("vcsadd: failed.\n");
+    else {
+        out_append("Staged ");
+        out_append(name);
+        out_append(" ");
+        out_append_u32(size);
+        out_append(" bytes ");
+        out_append_hex32(lvcs_hash(data, size));
+        out_append("\n");
+    }
+}
+
+static void cmd_vcscommit(const char* args)
+{
+    uint32_t id = 0;
+    int r;
+    while (*args == ' ' || *args == '\t') args++;
+    r = lvcs_commit(args, &id);
+    if (r == -1) out_append("vcscommit: nothing staged.\n");
+    else if (r == -2) out_append("vcscommit: commit limit reached.\n");
+    else if (r != 0) out_append("vcscommit: failed.\n");
+    else {
+        out_append("Committed ");
+        out_append_u32(id);
+        out_append("\n");
+    }
+}
+
+static void cmd_vcslog(const char* args)
+{
+    int n;
+    (void)args;
+    n = lvcs_log(vcs_log_lsh_cb, NULL);
+    if (n == 0) out_append("No LVCS commits.\n");
+}
+
+static void cmd_vcsshow(const char* args)
+{
+    uint32_t id;
+    char name[64];
+    FsWritableFile* out;
+    uint32_t out_len;
+    int r;
+
+    if (vcs_parse_u32(&args, &id) != 0) {
+        out_append("Usage: vcsshow commit [file]\n");
+        return;
+    }
+    if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+        r = lvcs_commit_files(id, vcs_file_lsh_cb, NULL);
+        if (r < 0) out_append("vcsshow: commit not found.\n");
+        return;
+    }
+
+    out = fs_open_writable("vcs_restore.txt");
+    if (!out) {
+        out_append("vcsshow: restore file missing.\n");
+        return;
+    }
+    out_len = out->cap > 0 ? out->cap - 1 : 0;
+    r = lvcs_checkout(id, name, out->data, &out_len);
+    if (r == -1) out_append("vcsshow: commit not found.\n");
+    else if (r == -3) out_append("vcsshow: output too small.\n");
+    else if (r != 0) out_append("vcsshow: file not found in history.\n");
+    else {
+        out->size = out_len;
+        out->data[out_len] = 0;
+        fs_mark_dirty();
+        out_append("Restored ");
+        out_append(name);
+        out_append(" from commit ");
+        out_append_u32(id);
+        out_append(" -> vcs_restore.txt\n");
+        for (uint32_t i = 0; i < out_len && i < 1024; i++) out_append_char((char)out->data[i]);
+        if (out_len > 0) out_append("\n");
+    }
+}
+
+static void cmd_vcs(const char* args)
+{
+    char sub[16];
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        out_append("Usage: vcs init|status|add|commit|log|show\n");
+        return;
+    }
+    if (strcmp(sub, "init") == 0) { cmd_vcsinit(args); return; }
+    if (strcmp(sub, "status") == 0) { cmd_vcsstatus(args); return; }
+    if (strcmp(sub, "add") == 0) { cmd_vcsadd(args); return; }
+    if (strcmp(sub, "commit") == 0) { cmd_vcscommit(args); return; }
+    if (strcmp(sub, "log") == 0) { cmd_vcslog(args); return; }
+    if (strcmp(sub, "show") == 0) { cmd_vcsshow(args); return; }
+    out_append("vcs: unknown subcommand.\n");
+}
+
+static void drivers_lsh_cb(uint16_t vendor_id, uint16_t device_id, uint8_t type,
+                           const char* name, void* user)
+{
+    (void)user;
+    out_append("  ");
+    out_append(name);
+    out_append("  ");
+    if (type == DRFL_TYPE_NET) out_append("net");
+    else if (type == DRFL_TYPE_BLOCK) out_append("block");
+    else {
+        out_append("type ");
+        out_append_u32(type);
+    }
+    out_append("  pci ");
+    out_append_hex16(vendor_id);
+    out_append(":");
+    out_append_hex16(device_id);
+    out_append("\n");
+}
+
+static void cmd_drivers(const char* args)
+{
+    uint32_t available;
+    uint32_t dirty;
+    uint32_t lba;
+    uint32_t sectors;
+    int last;
+    const char* driver;
+    uint32_t count;
+    (void)args;
+
+    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
+    out_append("Storage: ");
+    out_append(driver);
+    out_append(available ? " online" : " offline");
+    out_append(" LPST ");
+    out_append_u32(lba);
+    out_append("+");
+    out_append_u32(sectors);
+    out_append(dirty ? " dirty\n" : " clean\n");
+    out_append("DRFL:\n");
+    count = drfl_list(drivers_lsh_cb, NULL);
+    if (count == 0) out_append("  none\n");
+}
+
+static void cmd_fsstat(const char* args)
+{
+    uint32_t available;
+    uint32_t dirty;
+    uint32_t lba;
+    uint32_t sectors;
+    int last;
+    const char* driver;
+    (void)args;
+
+    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
+    out_append("FS persist: ");
+    out_append(available ? "available" : "offline");
+    out_append(" driver=");
+    out_append(driver);
+    out_append(" lba=");
+    out_append_u32(lba);
+    out_append(" sectors=");
+    out_append_u32(sectors);
+    out_append(" dirty=");
+    out_append_u32(dirty);
+    out_append(" last=");
+    out_append_i32(last);
+    out_append("\n");
+}
+
+static void cmd_fssave(const char* args)
+{
+    int r;
+    (void)args;
+    r = fs_persist_save();
+    if (r == 0) {
+        out_append("FS saved to non-volatile LPST store.\n");
+    } else {
+        out_append("fssave: failed ");
+        out_append_i32(r);
+        out_append("\n");
+    }
+}
+
+static void cmd_fsload(const char* args)
+{
+    int r;
+    (void)args;
+    r = fs_persist_load();
+    if (r == 0) {
+        out_append("FS loaded from non-volatile LPST store.\n");
+    } else {
+        out_append("fsload: failed ");
+        out_append_i32(r);
+        out_append("\n");
+    }
+}
+
 static void cmd_ver(const char* args)
 {
     (void)args;
@@ -334,6 +798,24 @@ static void cmd_echo(const char* args)
 
 #define LARDX_ARGV_MAX 16
 
+static void report_lardx_result(int r)
+{
+    if (r == 0) return;
+    if (r == -1) out_append("run: file not found or too small.\n");
+    else if (r == -2) out_append("run: not a LARDX file.\n");
+    else if (r == -3) out_append("run: unsupported LARDX version.\n");
+    else if (r == -4) out_append("run: not a user executable (use mkardx --user).\n");
+    else if (r == -5) out_append("run: invalid segment count.\n");
+    else if (r == -6) out_append("run: truncated file.\n");
+    else if (r == -7) out_append("run: segment overflow.\n");
+    else if (r == -40) out_append("run: no active Lard container.\n");
+    else {
+        out_append("run: failed ");
+        out_append_i32(r);
+        out_append("\n");
+    }
+}
+
 static void cmd_run(const char* args)
 {
     char buf[LSH_MAX_LINE];
@@ -353,6 +835,7 @@ static void cmd_run(const char* args)
     }
 
     char* rest = buf;
+    while (*rest == ' ' || *rest == '\t') rest++;
     while (*rest && *rest != ' ' && *rest != '\t') rest++;
     while (*rest == ' ' || *rest == '\t') rest++;
 
@@ -367,14 +850,151 @@ static void cmd_run(const char* args)
         while (*rest == ' ' || *rest == '\t') rest++;
     }
 
-    int r = s_sandbox_mode ? lardx_run_sandbox(path, argc, argv) : lardx_run(path, argc, argv);
-    if (r == -1) out_append("run: file not found or too small.\n");
-    else if (r == -2) out_append("run: not a LARDX file.\n");
-    else if (r == -3) out_append("run: unsupported LARDX version.\n");
-    else if (r == -4) out_append("run: not a user executable (use mkardx --user).\n");
-    else if (r == -5) out_append("run: invalid segment count.\n");
-    else if (r == -6) out_append("run: truncated file.\n");
-    else if (r == -7) out_append("run: segment overflow.\n");
+    int r = s_sandbox_mode ? lardx_run_sandbox(path, argc, argv) :
+            (lcontainer_has_active() ? lcontainer_run(NULL, path, argc, argv) : lardx_run(path, argc, argv));
+    report_lardx_result(r);
+}
+
+static void cmd_lcnt_list(void)
+{
+    uint32_t count = lcontainer_count();
+    if (count == 0) {
+        out_append("No Lard containers.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lcontainer_info_t info;
+        char caps[80];
+        if (lcontainer_info(i, &info) != 0) continue;
+        lcontainer_caps_text(info.caps, caps, sizeof(caps));
+        out_append(info.active ? "* " : "  ");
+        out_append(info.name);
+        out_append(" profile=");
+        out_append(lcontainer_profile_name(info.caps));
+        out_append(" caps=");
+        out_append(caps);
+        out_append(" runs=");
+        out_append_u32(info.runs);
+        out_append("\n");
+    }
+}
+
+static void cmd_lcnt_run(const char* args)
+{
+    char name[LCONTAINER_NAME_MAX];
+    char buf[LSH_MAX_LINE];
+    char drv;
+    char path[64];
+    uint32_t bi = 0;
+    if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+        out_append("Usage: lcnt run name [drive:]file.bosx [args]\n");
+        return;
+    }
+    while (args[bi] && bi < LSH_MAX_LINE - 1) {
+        buf[bi] = args[bi];
+        bi++;
+    }
+    buf[bi] = '\0';
+    resolve_path(buf, &drv, path, sizeof(path));
+    (void)drv;
+    if (!path[0]) {
+        out_append("Usage: lcnt run name [drive:]file.bosx [args]\n");
+        return;
+    }
+
+    char* rest = buf;
+    while (*rest == ' ' || *rest == '\t') rest++;
+    while (*rest && *rest != ' ' && *rest != '\t') rest++;
+    while (*rest == ' ' || *rest == '\t') rest++;
+
+    const char* argv[LARDX_ARGV_MAX + 1];
+    int argc = 1;
+    argv[0] = path;
+    while (*rest && argc <= LARDX_ARGV_MAX) {
+        argv[argc++] = rest;
+        while (*rest && *rest != ' ' && *rest != '\t') rest++;
+        if (*rest) *rest++ = '\0';
+        while (*rest == ' ' || *rest == '\t') rest++;
+    }
+    report_lardx_result(lcontainer_run(name, path, argc, argv));
+}
+
+static void cmd_lcnt(const char* args)
+{
+    char sub[16];
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        out_append("Usage: lcnt list|create|rm|use|exit|run|info\n");
+        return;
+    }
+    if (strcmp(sub, "list") == 0) {
+        cmd_lcnt_list();
+        return;
+    }
+    if (strcmp(sub, "info") == 0) {
+        out_append("Lard containers isolate user programs with syscall caps.\n");
+        out_append("Profiles: sealed, fs, gui, dev, ipc, open.\n");
+        cmd_lcnt_list();
+        return;
+    }
+    if (strcmp(sub, "create") == 0) {
+        char name[LCONTAINER_NAME_MAX];
+        char profile[16];
+        uint32_t caps;
+        int r;
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: lcnt create name [sealed|fs|gui|dev|ipc|open]\n");
+            return;
+        }
+        if (vcs_read_word(&args, profile, sizeof(profile)) != 0) {
+            profile[0] = 's'; profile[1] = 'e'; profile[2] = 'a'; profile[3] = 'l';
+            profile[4] = 'e'; profile[5] = 'd'; profile[6] = '\0';
+        }
+        caps = lcontainer_profile_caps(profile);
+        r = lcontainer_create(name, caps);
+        if (r == 0) {
+            out_append("Created Lard container ");
+            out_append(name);
+            out_append(" profile=");
+            out_append(lcontainer_profile_name(caps));
+            out_append("\n");
+        } else if (r == -2) out_append("lcnt: container already exists.\n");
+        else if (r == -3) out_append("lcnt: container table full.\n");
+        else out_append("lcnt: bad container name.\n");
+        return;
+    }
+    if (strcmp(sub, "rm") == 0) {
+        char name[LCONTAINER_NAME_MAX];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: lcnt rm name\n");
+            return;
+        }
+        if (lcontainer_remove(name) == 0) out_append("Removed Lard container.\n");
+        else out_append("lcnt: container not found.\n");
+        return;
+    }
+    if (strcmp(sub, "use") == 0) {
+        char name[LCONTAINER_NAME_MAX];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: lcnt use name\n");
+            return;
+        }
+        if (lcontainer_use(name) == 0) {
+            out_append("Entered Lard container ");
+            out_append(name);
+            out_append(". run now uses its caps.\n");
+        } else out_append("lcnt: container not found.\n");
+        return;
+    }
+    if (strcmp(sub, "exit") == 0) {
+        lcontainer_exit();
+        out_append("Left Lard container.\n");
+        return;
+    }
+    if (strcmp(sub, "run") == 0) {
+        cmd_lcnt_run(args);
+        return;
+    }
+    out_append("lcnt: unknown subcommand.\n");
 }
 
 static void cmd_more(const char* args)
@@ -723,7 +1343,7 @@ static int run_lsh_cmd(const char* name, const char* argv)
     if (mag != LSH_MAGIC) return 0;
     if (d[4] != 1) return 0;
     uint8_t nlen = d[5];
-    if (nlen >= 32 || 6 + nlen + 2 >= f->size) return 0;
+    if (nlen >= 32 || 6u + (uint32_t)nlen + 2u >= f->size) return 0;
     uint8_t typ = d[6 + nlen];
     const uint8_t* payload = d + 6 + nlen + 1;
     uint32_t pay_len = f->size - (6 + nlen + 1);
@@ -744,6 +1364,22 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'd' && cmd[1] == 'i' && cmd[2] == 'r' && cmd[3] == '\0') { cmd_dir(args); return; }
     if (cmd[0] == 't' && cmd[1] == 'y' && cmd[2] == 'p' && cmd[3] == 'e' && cmd[4] == '\0') { cmd_type(args); return; }
     if (strncmp(cmd, "lafillo", 7) == 0 && (cmd[7] == '\0' || cmd[7] == ' ' || cmd[7] == '\t')) { cmd_lafillo(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 'l' && cmd[4] == 's' && cmd[5] == '\0') { cmd_larls(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 'x' && cmd[4] == '\0') { cmd_larx(args); return; }
+    if (cmd[0] == 'd' && cmd[1] == 'r' && cmd[2] == 'i' && cmd[3] == 'v' && cmd[4] == 'e' && cmd[5] == 'r' && cmd[6] == 's' && cmd[7] == '\0') { cmd_drivers(args); return; }
+    if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == 't' && cmd[4] == 'a' && cmd[5] == 't' && cmd[6] == '\0') { cmd_fsstat(args); return; }
+    if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == 'a' && cmd[4] == 'v' && cmd[5] == 'e' && cmd[6] == '\0') { cmd_fssave(args); return; }
+    if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 'l' && cmd[3] == 'o' && cmd[4] == 'a' && cmd[5] == 'd' && cmd[6] == '\0') { cmd_fsload(args); return; }
+    if (cmd[0] == 's' && cmd[1] == 'y' && cmd[2] == 'n' && cmd[3] == 'c' && cmd[4] == '\0') { cmd_fssave(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 'c' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == '\0') { cmd_lcnt(args); return; }
+    if (cmd[0] == 'c' && cmd[1] == 'o' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == 'a' && cmd[5] == 'i' && cmd[6] == 'n' && cmd[7] == 'e' && cmd[8] == 'r' && cmd[9] == '\0') { cmd_lcnt(args); return; }
+    if (cmd[0] == 'v' && cmd[1] == 'c' && cmd[2] == 's' && cmd[3] == '\0') { cmd_vcs(args); return; }
+    if (cmd[0] == 'v' && cmd[1] == 'c' && cmd[2] == 's' && cmd[3] == 'i' && cmd[4] == 'n' && cmd[5] == 'i' && cmd[6] == 't' && cmd[7] == '\0') { cmd_vcsinit(args); return; }
+    if (cmd[0] == 'v' && cmd[1] == 'c' && cmd[2] == 's' && cmd[3] == 's' && cmd[4] == 't' && cmd[5] == 'a' && cmd[6] == 't' && cmd[7] == 'u' && cmd[8] == 's' && cmd[9] == '\0') { cmd_vcsstatus(args); return; }
+    if (cmd[0] == 'v' && cmd[1] == 'c' && cmd[2] == 's' && cmd[3] == 'a' && cmd[4] == 'd' && cmd[5] == 'd' && cmd[6] == '\0') { cmd_vcsadd(args); return; }
+    if (cmd[0] == 'v' && cmd[1] == 'c' && cmd[2] == 's' && cmd[3] == 'c' && cmd[4] == 'o' && cmd[5] == 'm' && cmd[6] == 'm' && cmd[7] == 'i' && cmd[8] == 't' && cmd[9] == '\0') { cmd_vcscommit(args); return; }
+    if (cmd[0] == 'v' && cmd[1] == 'c' && cmd[2] == 's' && cmd[3] == 'l' && cmd[4] == 'o' && cmd[5] == 'g' && cmd[6] == '\0') { cmd_vcslog(args); return; }
+    if (cmd[0] == 'v' && cmd[1] == 'c' && cmd[2] == 's' && cmd[3] == 's' && cmd[4] == 'h' && cmd[5] == 'o' && cmd[6] == 'w' && cmd[7] == '\0') { cmd_vcsshow(args); return; }
     if (cmd[0] == 'v' && cmd[1] == 'e' && cmd[2] == 'r' && cmd[3] == '\0') { cmd_ver(args); return; }
     if (cmd[0] == 'e' && cmd[1] == 'c' && cmd[2] == 'h' && cmd[3] == 'o' && cmd[4] == '\0') { cmd_echo(args); return; }
     if (cmd[0] == 'c' && cmd[1] == 'l' && cmd[2] == 's' && cmd[3] == '\0') { lsh_clear_output(); return; }
@@ -785,6 +1421,8 @@ void lsh_init(void)
     s_nenv = 0;
     s_in_sum_mode = 0;
     s_sandbox_mode = 0;
+    lcontainer_init();
+    lvcs_init();
 }
 
 static void parse_and_run(const char* cmd, const char* args);
@@ -840,6 +1478,12 @@ void lsh_exec(const char* line)
             out_append("[sandbox] ");
             out_append_char(s_drive);
             out_append(":\\> ");
+        } else if (lcontainer_has_active()) {
+            out_append("[lcnt:");
+            out_append(lcontainer_active_name());
+            out_append("] ");
+            out_append_char(s_drive);
+            out_append(":\\> ");
         } else {
             out_append_char(s_drive);
             out_append(":\\> ");
@@ -856,6 +1500,12 @@ void lsh_exec(const char* line)
             out_append("[sandbox] ");
             out_append_char(s_drive);
             out_append(":\\> ");
+        } else if (lcontainer_has_active()) {
+            out_append("[lcnt:");
+            out_append(lcontainer_active_name());
+            out_append("] ");
+            out_append_char(s_drive);
+            out_append(":\\> ");
         } else {
             out_append_char(s_drive);
             out_append(":\\> ");
@@ -870,6 +1520,12 @@ void lsh_exec(const char* line)
         out_append("SUM# ");
     } else if (s_sandbox_mode) {
         out_append("[sandbox] ");
+        out_append_char(s_drive);
+        out_append(":\\> ");
+    } else if (lcontainer_has_active()) {
+        out_append("[lcnt:");
+        out_append(lcontainer_active_name());
+        out_append("] ");
         out_append_char(s_drive);
         out_append(":\\> ");
     } else {

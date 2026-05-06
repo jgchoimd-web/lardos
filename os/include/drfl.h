@@ -35,8 +35,17 @@ int drfl_load(const char* name);
 
 /* Net driver init: takes nic context (e.g. rtl8139_t*). Returns 0 on success. */
 typedef int (*drfl_net_init_fn)(void* nic_ctx);
+typedef int (*drfl_block_init_fn)(void* block_ctx);
+typedef void (*drfl_list_cb)(uint16_t vendor_id, uint16_t device_id, uint8_t type,
+                             const char* name, void* user);
+
+/* Enumerate loaded driver descriptors. Returns descriptor count. */
+uint32_t drfl_list(drfl_list_cb cb, void* user);
 
 /* Probe for net device. Tries DRFL entries (vendor/device + driver name), then built-in fallback.
    For each DRFL entry with type=net, tries pci_find. If found and name matches, calls init_fn.
    Built-in fallback: vendor 0x10EC device 0x8139 uses init_fn (rtl8139). */
 int drfl_probe_net(void* nic_ctx, drfl_net_init_fn init_fn);
+
+/* Probe for block device. Built-in fallback: Intel PIIX3 IDE (0x8086, 0x7010). */
+int drfl_probe_block(void* block_ctx, drfl_block_init_fn init_fn);

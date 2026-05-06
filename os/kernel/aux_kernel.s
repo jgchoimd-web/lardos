@@ -25,3 +25,5 @@ aux_kernel_start:
 
 GLOBAL aux_kernel_end
 aux_kernel_end:
+
+section .note.GNU-stack noalloc noexec nowrite progbits

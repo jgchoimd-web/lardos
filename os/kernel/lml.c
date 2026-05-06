@@ -99,7 +99,6 @@ int lml_parse(const char* src, lml_cb_fn cb, void* user)
     char tag_buf[TAG_BUF];
     char attr_name[ATTR_BUF];
     char attr_val[ATTR_BUF];
-    const char* depth_tags[MAX_DEPTH];
     int depth = 0;
 
     for (;;) {
@@ -125,7 +124,7 @@ int lml_parse(const char* src, lml_cb_fn cb, void* user)
             p++;
             if (parse_name(&p, tag_buf, sizeof(tag_buf)) < 0) return -7;
             if (depth >= MAX_DEPTH) return -8;
-            depth_tags[depth++] = p - strlen(tag_buf) - 1;
+            depth++;
 
             if (cb(LML_OPEN_TAG, tag_buf, 0, user) != 0) return -9;
 

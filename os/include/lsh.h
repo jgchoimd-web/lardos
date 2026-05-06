@@ -47,3 +47,6 @@ int lsh_poll_background(void);
 
 /* True when in SUM (Super User Mode, ring 0). */
 int lsh_in_sum_mode(void);
+
+/* Global shortcut entry for SUM/ring-0 mode. */
+void lsh_enter_sum_shortcut(void);

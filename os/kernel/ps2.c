@@ -84,17 +84,24 @@ int ps2_init(void)
     uint8_t cfg = 0;
     if (read_data(&cfg) != 0) return -2;
 
-    // Enable IRQs bits off (we poll), enable mouse clock (bit 5 = disable mouse)
+    // Polling mode, mouse clock enabled, keyboard translated to Set 1.
     cfg &= ~(1u << 0);
     cfg &= ~(1u << 1);
-    cfg &= ~(1u << 6); // translation off
+    cfg |= (1u << 6);
 
     // Write config byte
     if (write_cmd(0x60) != 0) return -3;
     if (write_data(cfg) != 0) return -4;
 
-    // Re-enable devices
+    // Re-enable keyboard and make sure it scans keys.
     write_cmd(0xAE);
+    flush_out();
+    if (write_data(0xF4) == 0) {
+        uint8_t ack = 0;
+        (void)read_data(&ack);
+    }
+
+    // Re-enable mouse.
     write_cmd(0xA8);
     flush_out();
     return 0;
@@ -122,8 +129,7 @@ int ps2_mouse_poll(int* out_dx, int* out_dy, int* out_buttons)
     uint8_t st = inb(PS2_STAT);
     if ((st & 0x01) == 0) return 1;
     if ((st & 0x20) == 0) {
-        // keyboard byte, drop for now
-        (void)inb(PS2_DATA);
+        // Keyboard byte: leave it for ps2_kbd_poll().
         return 1;
     }
 
@@ -223,6 +229,13 @@ int ps2_kbd_poll(ps2_key_t* out)
 
     if (released) return 1;
 
+    if (code == 0x44) {
+        out->kind = PS2K_F10;
+        out->ch = 0;
+        ext = 0;
+        return 0;
+    }
+
     // Extended keys (E0 prefix), set 1
     if (ext) {
         ext = 0;
@@ -247,4 +260,3 @@ int ps2_kbd_poll(ps2_key_t* out)
     out->ch = c;
     return 0;
 }
-

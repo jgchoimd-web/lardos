@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 int gui_init(void);
 void gui_handle_mouse(int dx, int dy, int buttons);
 void gui_handle_key(char ch);
@@ -21,6 +23,9 @@ void gui_lafillo_set_content(const char* extracted, const char* raw);
 // LARSH: load and play .larsh file (switches to Gallery tab)
 void gui_larsh_play(const char* path);
 
+// Global keyboard shortcut: Fn+0 on many keyboards reports as F10.
+void gui_activate_ring0_shortcut(void);
+
 // GUI syscalls (for user programs via LDLL)
 void gui_syscall_put_pixel(uint16_t x, uint16_t y, uint32_t argb);
 void gui_syscall_fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t argb);
@@ -28,4 +33,3 @@ void gui_syscall_draw_text(uint16_t x, uint16_t y, const char* s, uint32_t fg, u
 void gui_syscall_clear(uint32_t argb);
 uint16_t gui_syscall_get_width(void);
 uint16_t gui_syscall_get_height(void);
-

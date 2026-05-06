@@ -177,13 +177,13 @@ void kmain(void)
     vga_puts("Long mode (64-bit) OK\n", 0x0F);
 
     gdt64_init();
-    smp_init();  /* 코어 3개 이상이면 코어 1에서 보조 커널 구동 */
     idt64_init();
     syscall_init();
     mmu_init_protection();
     usermode_init();
 
     gui_demo();
+    smp_init();
 
     /* Custom language demos: BOSL (bytecode) + LIL (s-expr interpreter). */
     mem_init();
@@ -315,10 +315,13 @@ void kmain(void)
         }
         ps2_key_t k;
         if (ps2_kbd_poll(&k) == 0) {
-            syscall_key_push(k);
-            if (k.kind == PS2K_ASCII) {
+            if (k.kind == PS2K_F10) {
+                gui_activate_ring0_shortcut();
+            } else if (k.kind == PS2K_ASCII) {
+                syscall_key_push(k);
                 gui_handle_key(k.ch);
             } else {
+                syscall_key_push(k);
                 gui_handle_key_nav((int)k.kind);
             }
             gui_render();

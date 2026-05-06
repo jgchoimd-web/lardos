@@ -54,8 +54,6 @@ isr64_stub_%1:
 ; [rsp+0] vec
 ; [rsp+8] err
 isr64_common:
-    ; Swap order to match C frame: vec then err
-    xchg qword [rsp], qword [rsp+8]
     jmp isr64_save
 
 ; Common path when CPU pushed err and we pushed vec:
@@ -151,3 +149,4 @@ isr64_stub_128:
     push qword 128
     jmp isr64_save
 
+section .note.GNU-stack noalloc noexec nowrite progbits

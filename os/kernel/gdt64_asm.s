@@ -8,3 +8,5 @@ gdt64_load:
     mov ax, si
     ltr ax
     ret
+
+section .note.GNU-stack noalloc noexec nowrite progbits

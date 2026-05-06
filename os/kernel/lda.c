@@ -10,7 +10,9 @@
 int lda_decompress(const uint8_t* data, uint32_t len, uint8_t* out, uint32_t* out_len)
 {
     if (!data || !out || !out_len || len < 9) return -1;
-    if ((uint32_t)data[0] | ((uint32_t)data[1] << 8) | ((uint32_t)data[2] << 16) | ((uint32_t)data[3] << 24) != LDA_MAGIC)
+    uint32_t magic = (uint32_t)data[0] | ((uint32_t)data[1] << 8) |
+                     ((uint32_t)data[2] << 16) | ((uint32_t)data[3] << 24);
+    if (magic != LDA_MAGIC)
         return -2;
     if (data[4] != 1) return -3;
     unsigned int orig_size = (unsigned int)data[5] | ((unsigned int)data[6] << 8) |

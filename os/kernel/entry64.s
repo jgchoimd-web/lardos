@@ -16,3 +16,4 @@ _start:
     hlt
     jmp .halt
 
+section .note.GNU-stack noalloc noexec nowrite progbits

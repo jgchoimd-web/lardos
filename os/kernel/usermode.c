@@ -65,6 +65,7 @@ void usermode_init(void)
     for (uint32_t i = 0; i < sizeof(user_prog); i++) {
         dst[i] = user_prog[i];
     }
+    mmu_protect_user_code(USER_ENTRY);
 }
 
 void usermode_run(void)
@@ -102,7 +103,7 @@ void usermode_run_lardx(uint32_t entry, int argc, const char** argv)
     __asm__ __volatile__("mov %%rsp, %0" : "=r"(rsp_val));
     g_usermode_return_rsp = rsp_val;
 
-    uint8_t* stack = (uint8_t*)(uintptr_t)0x007FF000u;
+    uint8_t* stack = (uint8_t*)(uintptr_t)USER_STACK;
     uint32_t str_off = 64;
     uint64_t* argv_arr = (uint64_t*)(stack + 0);
     int n = argc > LARDX_ARGV_MAX ? LARDX_ARGV_MAX : argc;
@@ -111,7 +112,7 @@ void usermode_run_lardx(uint32_t entry, int argc, const char** argv)
     for (int i = 0; i < n && str_off < LARDX_ARGV_BUF - 32; i++) {
         const char* s = argv[i] ? argv[i] : "";
         uint32_t pos = str_off;
-        argv_arr[i] = 0x007FF000u + pos;
+        argv_arr[i] = USER_STACK + pos;
         while (*s && str_off + 1 < LARDX_ARGV_BUF) {
             stack[str_off++] = (uint8_t)*s++;
         }
@@ -119,7 +120,7 @@ void usermode_run_lardx(uint32_t entry, int argc, const char** argv)
     }
     argv_arr[n] = 0;
 
-    uint64_t user_rsp = 0x007FF000u;
+    uint64_t user_rsp = USER_STACK;
     uint64_t user_rip = entry;
     uint64_t user_cs = GDT64_SEL_UCODE;
     uint64_t user_ss = GDT64_SEL_UDATA;
@@ -135,7 +136,7 @@ void usermode_run_lardx(uint32_t entry, int argc, const char** argv)
         "pushq %6\n"
         "iretq"
         :
-        : "D"((uint64_t)n), "S"((uint64_t)0x007FF000u),
+        : "D"((uint64_t)n), "S"((uint64_t)USER_STACK),
           "r"(user_ss), "r"(user_rsp), "r"(user_rflags), "r"(user_cs), "r"(user_rip)
         : "memory"
     );

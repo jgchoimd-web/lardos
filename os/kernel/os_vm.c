@@ -162,7 +162,6 @@ int os_vm_asm_eval(const char* src, os_vm_putc_fn putc, void* user)
     /* Count code size, collect labels */
     uint32_t code_len = 0;
     const char* p = src;
-    char label_buf[32];
 
     while (*p) {
         while (*p == ' ' || *p == '\t' || *p == '\n') p++;
@@ -193,10 +192,6 @@ int os_vm_asm_eval(const char* src, os_vm_putc_fn putc, void* user)
             p += 3; code_len += 5;
             while (*p == ' ' || *p == '\t') p++;
             if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z')) {
-                int i = 0;
-                while (i < 31 && ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9')))
-                    label_buf[i++] = *p++;
-                label_buf[i] = '\0';
                 while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9')) p++;
             } else if (*p >= '0' || *p == '-') {
                 int32_t target;

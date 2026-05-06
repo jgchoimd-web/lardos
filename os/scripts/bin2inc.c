@@ -1,7 +1,7 @@
 /*
  * bin2inc - Emit C array from binary file (like xxd -i).
  * Usage: bin2inc input.bin output.inc [var_name]
- * Default var_name: basename with . replaced by _, e.g. dillo_demo_bosx
+ * Default var_name: basename with . replaced by _, e.g. lafillo_demo_bosx
  */
 #include <stdio.h>
 #include <stdlib.h>

@@ -3,6 +3,7 @@
  * 코어가 3개 이상이면 코어 1에서 보조 모놀리식 커널(aux)을 실행.
  */
 #include "smp.h"
+#include "mmu.h"
 #include <stddef.h>
 
 /* Local APIC MMIO (물리 주소) */
@@ -145,6 +146,9 @@ static void copy_aux_kernel(void)
 
 void smp_init(void)
 {
+    if (!mmu_protection_is_ready())
+        return;
+
     int ncpu = count_cpus_from_mp_table();
     if (ncpu < 3)
         return;

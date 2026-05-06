@@ -1,7 +1,9 @@
 #include "fs.h"
 #include "lfs.h"
+#include "storage.h"
 #include "fs_ldll.inc"
 #include "lafillo_demo_data.inc"
+#include <stddef.h>
 
 /* Hybrid: built-in table + LFS volume + writable RAM files. */
 
@@ -26,6 +28,15 @@ static const uint8_t file_rtl8139_drfl[23] = {
     'r', 't', 'l', '8', '1', '3', '9'
 };
 
+/* piix3ide.drfl - DRFL entry for Intel PIIX3 IDE (vendor 0x8086, device 0x7010) */
+static const uint8_t file_piix3ide_drfl[23] = {
+    'D', 'R', 'F', 'L', 1, 0, 0, 0,    /* magic, version, reserved */
+    1, 0,                              /* entry_count = 1 */
+    0x86, 0x80, 0x10, 0x70,            /* vendor 0x8086, device 0x7010 */
+    1, 7,                              /* type=block, name_len=7 */
+    'a', 't', 'a', '-', 'p', 'i', 'o'
+};
+
 #define RAM_FILE_CAP 8192u
 /* Initial Notes: "Image: " + U+E000 (UTF-8 EE 80 80) - view Gallery sample.bmp first to assign */
 static const uint8_t notes_init[] = "Image: \xEE\x80\x80\n";
@@ -36,12 +47,47 @@ static FsWritableFile ram_notes = { "notes.txt", ram_notes_buf, 0, RAM_FILE_CAP 
 static uint8_t ram_lafillo_save_buf[LAFILLO_SAVE_CAP];
 static FsWritableFile ram_lafillo_save = { "lafillo_saved.txt", ram_lafillo_save_buf, 0, LAFILLO_SAVE_CAP };
 
+#define LAR_EXTRACT_CAP 2048u
+static uint8_t ram_lar_extract_buf[LAR_EXTRACT_CAP];
+static FsWritableFile ram_lar_extract = { "lar_extract.txt", ram_lar_extract_buf, 0, LAR_EXTRACT_CAP };
+
+#define VCS_RESTORE_CAP 4096u
+static uint8_t ram_vcs_restore_buf[VCS_RESTORE_CAP];
+static FsWritableFile ram_vcs_restore = { "vcs_restore.txt", ram_vcs_restore_buf, 0, VCS_RESTORE_CAP };
+
+#define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
+#define LPST_VERSION     1u
+#define LPST_START_LBA   2816u
+#define LPST_SECTORS     64u
+#define LPST_BYTES       (LPST_SECTORS * STORAGE_SECTOR_SIZE)
+#define LPST_HEADER_SIZE 20u
+#define LPST_ENTRY_SIZE  48u
+
+static uint8_t s_lpstore[LPST_BYTES];
+static uint32_t s_fs_dirty;
+static int s_persist_last_result = -9;
+
 static const uint8_t file_hello_txt[] =
     "Hello from the in-memory filesystem!\n"
     "This data is embedded in the kernel image.\n";
 
 static const uint8_t file_readme_txt[] =
     "This is a tiny RAM-based filesystem used for experimentation.\n";
+
+/* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
+static const uint8_t file_bundle_lar[166] = {
+    'L','A','R','1', 0x03,0x00, 0x4D,0x00,
+    0x09,0x00,0x00,0x00, 0x55,0x00,0x00,0x00, 0x16,0x00,0x00,0x00, 0x16,0x00,0x00,0x00,
+    'h','e','l','l','o','.','t','x','t',
+    0x0A,0x00,0x00,0x00, 0x6B,0x00,0x00,0x00, 0x2D,0x00,0x00,0x00, 0x2D,0x00,0x00,0x00,
+    'r','e','a','d','m','e','.','t','x','t',
+    0x0A,0x00,0x00,0x00, 0x98,0x00,0x00,0x00, 0x0E,0x00,0x00,0x00, 0x0E,0x00,0x00,0x00,
+    's','c','r','i','p','t','.','l','s','h',
+    'H','e','l','l','o',' ','f','r','o','m',' ','b','u','n','d','l','e','.','l','a','r','\n',
+    'L','A','R',' ','s','t','o','r','e','s',' ','m','a','n','y',' ','f','i','l','e','s',' ',
+    'i','n',' ','o','n','e',' ','n','a','t','i','v','e',' ','a','r','c','h','i','v','e','.','\n',
+    'e','c','h','o',' ','f','r','o','m','-','l','a','r','\n'
+};
 
 /* 8x8 24-bit BMP (red/blue gradient) */
 static const uint8_t file_sample_bmp[246] = {
@@ -97,8 +143,10 @@ static const FsFile FS_FILES[] = {
     { "hello.shrine",  file_hello_shrine,  sizeof(file_hello_shrine) },
     { "hello.txt",     file_hello_txt,     sizeof(file_hello_txt) - 1 },
     { "readme.txt",    file_readme_txt,    sizeof(file_readme_txt) - 1 },
+    { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
     { "rtl8139.drfl",  file_rtl8139_drfl,  sizeof(file_rtl8139_drfl) },
+    { "piix3ide.drfl", file_piix3ide_drfl, sizeof(file_piix3ide_drfl) },
 #include "fs_ldll_entries.inc"
     { "lafillo_demo.bosx", file_lafillo_demo_bosx, sizeof(file_lafillo_demo_bosx) },
     { "demo.larsh",      file_demo_larsh,      sizeof(file_demo_larsh) - 1 },
@@ -110,6 +158,48 @@ static FsFile g_lfs_result;
 static char g_lfs_name[LFS_MAX_NAME];
 static FsFile g_ram_result;
 
+static uint32_t lpst_read32(const uint8_t* p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static void lpst_write32(uint8_t* p, uint32_t v)
+{
+    p[0] = (uint8_t)(v & 0xFFu);
+    p[1] = (uint8_t)((v >> 8) & 0xFFu);
+    p[2] = (uint8_t)((v >> 16) & 0xFFu);
+    p[3] = (uint8_t)((v >> 24) & 0xFFu);
+}
+
+static uint32_t lpst_hash(const uint8_t* data, uint32_t len)
+{
+    uint32_t h = 2166136261u;
+    for (uint32_t i = 0; i < len; i++) {
+        h ^= data[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void lpst_zero(void)
+{
+    for (uint32_t i = 0; i < LPST_BYTES; i++) s_lpstore[i] = 0;
+}
+
+static uint32_t writable_count(void)
+{
+    return 4u;
+}
+
+static FsWritableFile* writable_at(uint32_t idx)
+{
+    if (idx == 0) return &ram_notes;
+    if (idx == 1) return &ram_lafillo_save;
+    if (idx == 2) return &ram_lar_extract;
+    if (idx == 3) return &ram_vcs_restore;
+    return NULL;
+}
+
 void fs_init(void)
 {
     for (uint32_t i = 0; i < sizeof(notes_init) - 1 && i < RAM_FILE_CAP; i++) {
@@ -117,6 +207,7 @@ void fs_init(void)
     }
     ram_notes.size = sizeof(notes_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
+    (void)fs_persist_load();
 }
 
 const FsFile* fs_open(const char* name)
@@ -164,6 +255,24 @@ const FsFile* fs_open(const char* name)
             g_ram_result.size = ram_lafillo_save.size;
             return &g_ram_result;
         }
+        j = 0;
+        const char* n3 = "lar_extract.txt";
+        while (n3[j] && name[j] && n3[j] == name[j]) j++;
+        if (n3[j] == '\0' && name[j] == '\0') {
+            g_ram_result.name = ram_lar_extract.name;
+            g_ram_result.data = ram_lar_extract.data;
+            g_ram_result.size = ram_lar_extract.size;
+            return &g_ram_result;
+        }
+        j = 0;
+        const char* n4 = "vcs_restore.txt";
+        while (n4[j] && name[j] && n4[j] == name[j]) j++;
+        if (n4[j] == '\0' && name[j] == '\0') {
+            g_ram_result.name = ram_vcs_restore.name;
+            g_ram_result.data = ram_vcs_restore.data;
+            g_ram_result.size = ram_vcs_restore.size;
+            return &g_ram_result;
+        }
     }
     return 0;
 }
@@ -195,6 +304,152 @@ void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user
     lfs_list(cb, user);
     cb(ram_notes.name, ram_notes.size, user);
     cb(ram_lafillo_save.name, ram_lafillo_save.size, user);
+    cb(ram_lar_extract.name, ram_lar_extract.size, user);
+    cb(ram_vcs_restore.name, ram_vcs_restore.size, user);
+}
+
+static int lpst_name_equals(const uint8_t* fixed_name, const char* name)
+{
+    for (uint32_t i = 0; i < 32u; i++) {
+        char a = (char)fixed_name[i];
+        char b = name[i];
+        if (a != b) return 0;
+        if (a == '\0') return 1;
+    }
+    return 0;
+}
+
+void fs_mark_dirty(void)
+{
+    s_fs_dirty = 1;
+}
+
+int fs_persist_save(void)
+{
+    uint32_t count = writable_count();
+    uint32_t data_off = LPST_HEADER_SIZE + count * LPST_ENTRY_SIZE;
+
+    if (storage_init() != 0) {
+        s_persist_last_result = -1;
+        return -1;
+    }
+    if (data_off > LPST_BYTES) {
+        s_persist_last_result = -2;
+        return -2;
+    }
+
+    lpst_zero();
+    lpst_write32(s_lpstore + 0, LPST_MAGIC);
+    lpst_write32(s_lpstore + 4, LPST_VERSION);
+    lpst_write32(s_lpstore + 8, count);
+
+    for (uint32_t i = 0; i < count; i++) {
+        FsWritableFile* w = writable_at(i);
+        uint8_t* entry = s_lpstore + LPST_HEADER_SIZE + i * LPST_ENTRY_SIZE;
+        uint32_t n = 0;
+
+        if (!w || w->size > w->cap || w->size > LPST_BYTES - data_off) {
+            s_persist_last_result = -3;
+            return -3;
+        }
+        while (w->name[n] && n < 31u) {
+            entry[n] = (uint8_t)w->name[n];
+            n++;
+        }
+        entry[n] = 0;
+        lpst_write32(entry + 32, w->size);
+        lpst_write32(entry + 36, data_off);
+        lpst_write32(entry + 40, w->cap);
+        lpst_write32(entry + 44, lpst_hash(w->data, w->size));
+        for (uint32_t j = 0; j < w->size; j++) s_lpstore[data_off + j] = w->data[j];
+        data_off += w->size;
+    }
+
+    lpst_write32(s_lpstore + 12, data_off);
+    lpst_write32(s_lpstore + 16, lpst_hash(s_lpstore + LPST_HEADER_SIZE, data_off - LPST_HEADER_SIZE));
+
+    for (uint32_t sector = 0; sector < LPST_SECTORS; sector++) {
+        if (storage_write_sector(LPST_START_LBA + sector, s_lpstore + sector * STORAGE_SECTOR_SIZE) != 0) {
+            s_persist_last_result = -4;
+            return -4;
+        }
+    }
+
+    s_fs_dirty = 0;
+    s_persist_last_result = 0;
+    return 0;
+}
+
+int fs_persist_load(void)
+{
+    uint32_t count;
+    uint32_t total;
+    uint32_t checksum;
+
+    if (storage_init() != 0) {
+        s_persist_last_result = -1;
+        return -1;
+    }
+    for (uint32_t sector = 0; sector < LPST_SECTORS; sector++) {
+        if (storage_read_sector(LPST_START_LBA + sector, s_lpstore + sector * STORAGE_SECTOR_SIZE) != 0) {
+            s_persist_last_result = -2;
+            return -2;
+        }
+    }
+
+    if (lpst_read32(s_lpstore + 0) != LPST_MAGIC || lpst_read32(s_lpstore + 4) != LPST_VERSION) {
+        s_persist_last_result = -3;
+        return -3;
+    }
+    count = lpst_read32(s_lpstore + 8);
+    total = lpst_read32(s_lpstore + 12);
+    checksum = lpst_read32(s_lpstore + 16);
+    if (count > 32u || total < LPST_HEADER_SIZE || total > LPST_BYTES ||
+        LPST_HEADER_SIZE + count * LPST_ENTRY_SIZE > total) {
+        s_persist_last_result = -4;
+        return -4;
+    }
+    if (lpst_hash(s_lpstore + LPST_HEADER_SIZE, total - LPST_HEADER_SIZE) != checksum) {
+        s_persist_last_result = -5;
+        return -5;
+    }
+
+    for (uint32_t i = 0; i < count; i++) {
+        const uint8_t* entry = s_lpstore + LPST_HEADER_SIZE + i * LPST_ENTRY_SIZE;
+        uint32_t size = lpst_read32(entry + 32);
+        uint32_t data_off = lpst_read32(entry + 36);
+        uint32_t cap = lpst_read32(entry + 40);
+        uint32_t hash = lpst_read32(entry + 44);
+        FsWritableFile* w = NULL;
+
+        for (uint32_t wi = 0; wi < writable_count(); wi++) {
+            FsWritableFile* cand = writable_at(wi);
+            if (cand && lpst_name_equals(entry, cand->name)) {
+                w = cand;
+                break;
+            }
+        }
+        if (!w) continue;
+        if (cap != w->cap || size > w->cap || data_off > total || size > total - data_off) continue;
+        if (lpst_hash(s_lpstore + data_off, size) != hash) continue;
+        for (uint32_t j = 0; j < size; j++) w->data[j] = s_lpstore[data_off + j];
+        w->size = size;
+    }
+
+    s_fs_dirty = 0;
+    s_persist_last_result = 0;
+    return 0;
+}
+
+void fs_persist_info(uint32_t* available, uint32_t* dirty, int* last_result,
+                     const char** driver, uint32_t* lba, uint32_t* sectors)
+{
+    if (available) *available = storage_available() ? 1u : 0u;
+    if (dirty) *dirty = s_fs_dirty;
+    if (last_result) *last_result = s_persist_last_result;
+    if (driver) *driver = storage_driver_name();
+    if (lba) *lba = LPST_START_LBA;
+    if (sectors) *sectors = LPST_SECTORS;
 }
 
 FsWritableFile* fs_open_writable(const char* name)
@@ -207,6 +462,14 @@ FsWritableFile* fs_open_writable(const char* name)
     i = 0;
     while (n2[i] && name[i] && n2[i] == name[i]) i++;
     if (n2[i] == '\0' && name[i] == '\0') return &ram_lafillo_save;
+    const char* n3 = "lar_extract.txt";
+    i = 0;
+    while (n3[i] && name[i] && n3[i] == name[i]) i++;
+    if (n3[i] == '\0' && name[i] == '\0') return &ram_lar_extract;
+    const char* n4 = "vcs_restore.txt";
+    i = 0;
+    while (n4[i] && name[i] && n4[i] == name[i]) i++;
+    if (n4[i] == '\0' && name[i] == '\0') return &ram_vcs_restore;
     return NULL;
 }
 
@@ -215,7 +478,8 @@ uint32_t fs_write(FsWritableFile* f, uint32_t offset, const uint8_t* buf, uint32
     if (!f || !buf || offset > f->cap) return 0;
     if (len > f->cap - offset) len = f->cap - offset;
     for (uint32_t i = 0; i < len; i++) f->data[offset + i] = buf[i];
-    if (offset + len > f->size) f->size = offset + len;
+    if (offset == 0 || offset + len > f->size) f->size = offset + len;
+    s_fs_dirty = 1;
     return len;
 }
 
@@ -225,6 +489,6 @@ uint32_t fs_append(FsWritableFile* f, const uint8_t* buf, uint32_t len)
     if (f->size + len > f->cap) len = f->cap - f->size;
     for (uint32_t i = 0; i < len; i++) f->data[f->size + i] = buf[i];
     f->size += len;
+    if (len) s_fs_dirty = 1;
     return len;
 }
-

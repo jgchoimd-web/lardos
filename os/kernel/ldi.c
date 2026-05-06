@@ -9,7 +9,9 @@
 int ldi_decode(const uint8_t* data, uint32_t len, ldi_result_t* out)
 {
     if (!data || !out || len < 10) return -1;
-    if ((uint32_t)data[0] | ((uint32_t)data[1] << 8) | ((uint32_t)data[2] << 16) | ((uint32_t)data[3] << 24) != LDI_MAGIC)
+    uint32_t magic = (uint32_t)data[0] | ((uint32_t)data[1] << 8) |
+                     ((uint32_t)data[2] << 16) | ((uint32_t)data[3] << 24);
+    if (magic != LDI_MAGIC)
         return -2;
     if (data[4] != 1) return -3; /* version */
     uint16_t w = (uint16_t)(data[5] | (data[6] << 8));

@@ -82,6 +82,17 @@ void drfl_load_all(void)
     fs_list(load_cb, NULL);
 }
 
+uint32_t drfl_list(drfl_list_cb cb, void* user)
+{
+    if (cb) {
+        for (uint16_t i = 0; i < s_entry_count; i++) {
+            drfl_entry_t* e = &s_entries[i];
+            cb(e->vendor_id, e->device_id, e->type, e->name, user);
+        }
+    }
+    return s_entry_count;
+}
+
 int drfl_probe_net(void* nic_ctx, drfl_net_init_fn init_fn)
 {
     pci_addr_t dev;
@@ -98,6 +109,24 @@ int drfl_probe_net(void* nic_ctx, drfl_net_init_fn init_fn)
     /* Fallback: built-in RTL8139 (0x10EC, 0x8139) */
     if (pci_find_device(0x10EC, 0x8139, &dev) == 0) {
         return init_fn(nic_ctx);
+    }
+    return -1;
+}
+
+int drfl_probe_block(void* block_ctx, drfl_block_init_fn init_fn)
+{
+    pci_addr_t dev;
+
+    for (uint16_t i = 0; i < s_entry_count; i++) {
+        drfl_entry_t* e = &s_entries[i];
+        if (e->type != DRFL_TYPE_BLOCK) continue;
+        if (pci_find_device(e->vendor_id, e->device_id, &dev) == 0) {
+            if (init_fn(block_ctx) == 0) return 0;
+        }
+    }
+
+    if (pci_find_device(0x8086, 0x7010, &dev) == 0) {
+        return init_fn(block_ctx);
     }
     return -1;
 }

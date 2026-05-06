@@ -9,3 +9,5 @@ syscall_exit_to_kernel:
     add rsp, 176
     mov rsp, [g_usermode_return_rsp]
     ret
+
+section .note.GNU-stack noalloc noexec nowrite progbits

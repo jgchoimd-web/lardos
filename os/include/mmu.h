@@ -9,10 +9,14 @@
 // - stack: RW + NX with an unmapped guard page below it
 void mmu_init_protection(void);
 
+int mmu_protection_is_ready(void);
+
 // Map user-mode pages (PTE_U). Call after mmu_init_protection.
-// user_code_va: 4K at va, RX
+// user_code_va: 4K at va, writable until mmu_protect_user_code()
 // user_stack_va: 4K at va, RW + NX
 void mmu_map_user_region(uintptr_t user_code_va, uintptr_t user_stack_va);
+
+void mmu_protect_user_code(uintptr_t user_code_va);
 
 // Map one more user page for LDLL at va (RX, PTE_U)
 void mmu_map_user_ldll(uintptr_t va);

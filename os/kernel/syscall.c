@@ -14,10 +14,9 @@
 #include "lafillo.h"
 #include "hash.h"
 #include "base64.h"
+#include "usermode.h"
 #include <stdint.h>
 
-#define USER_VALID_LO  0x400000u
-#define USER_VALID_HI  0x800000u
 #define FD_MAX  8
 #define FD_BASE 2
 #define SYS_PATH_MAX 64
@@ -67,16 +66,37 @@ void syscall_key_push(ps2_key_t k)
 static char g_syscall_out[512];
 static uint32_t g_syscall_out_len;
 
-static int s_sandbox;
+static uint32_t s_caps = SYSCALL_CAP_ALL;
 
 void syscall_set_sandbox(int on)
 {
-    s_sandbox = on ? 1 : 0;
+    s_caps = on ? SYSCALL_CAP_BASE : SYSCALL_CAP_ALL;
 }
 
 int syscall_in_sandbox(void)
 {
-    return s_sandbox;
+    return s_caps != SYSCALL_CAP_ALL;
+}
+
+void syscall_set_caps(uint32_t caps)
+{
+    s_caps = caps & SYSCALL_CAP_ALL;
+}
+
+uint32_t syscall_get_caps(void)
+{
+    return s_caps;
+}
+
+void syscall_reset_process_state(void)
+{
+    for (int i = 0; i < FD_MAX; i++) {
+        s_fds[i].f = 0;
+        s_fds[i].w = 0;
+        s_fds[i].offset = 0;
+    }
+    s_key_head = 0;
+    s_key_tail = 0;
 }
 
 void syscall_append(const char* s, uint32_t len)
@@ -104,9 +124,9 @@ extern void syscall_exit_to_kernel(void);
 
 #define SANDBOX_DENY (-1)
 
-static int sandbox_blocks(uint64_t nr)
+static int cap_blocks(uint64_t nr)
 {
-    if (!s_sandbox) return 0;
+    if (s_caps == SYSCALL_CAP_ALL) return 0;
     switch ((uint32_t)nr) {
     case SYS_WRITE:
     case SYS_EXIT:
@@ -117,7 +137,29 @@ static int sandbox_blocks(uint64_t nr)
     case SYS_HASH_FNV1A:
     case SYS_BASE64_ENCODE:
     case SYS_BASE64_DECODE:
+    case SYS_CLOSE:
         return 0;
+    case SYS_OPEN:
+    case SYS_READ:
+        return (s_caps & SYSCALL_CAP_FS) ? 0 : 1;
+    case SYS_LDLL_LOAD:
+    case SYS_LDLL_SYM:
+    case SYS_LDLL_CLOSE:
+        return (s_caps & SYSCALL_CAP_LDLL) ? 0 : 1;
+    case SYS_GUI_PUT_PIXEL:
+    case SYS_GUI_FILL_RECT:
+    case SYS_GUI_DRAW_TEXT:
+    case SYS_GUI_CLEAR:
+        return (s_caps & SYSCALL_CAP_GUI) ? 0 : 1;
+    case SYS_POLL_KEY:
+    case SYS_GET_KEY:
+        return (s_caps & SYSCALL_CAP_KEYS) ? 0 : 1;
+    case SYS_LAFILLO_HTML:
+        return (s_caps & SYSCALL_CAP_LAFILLO) ? 0 : 1;
+    case SYS_LIPC_SEND:
+    case SYS_LIPC_RECV:
+    case SYS_LIPC_PENDING:
+        return (s_caps & SYSCALL_CAP_LIPC) ? 0 : 1;
     default:
         return 1;
     }
@@ -131,7 +173,7 @@ void syscall_handler(void* frame)
     uint64_t a2 = f->rsi;
     uint64_t a3 = f->rdx;
 
-    if (sandbox_blocks(nr)) {
+    if (cap_blocks(nr)) {
         f->rax = (uint64_t)(int64_t)SANDBOX_DENY;
         return;
     }

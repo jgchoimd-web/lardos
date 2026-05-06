@@ -1,17 +1,16 @@
 /*
  * LDLL - LardOS Dynamic Link Library loader.
- * Loads .ldll files from FS into user space (0x410000).
+ * Loads .ldll files from FS into user space.
  */
 #include "ldll.h"
 #include "fs.h"
 #include "mmu.h"
+#include "usermode.h"
 #include <stddef.h>
 #include <stdint.h>
 
 #define LDLL_MAX_HANDLES  4
 #define LDLL_MAX_NAME     64
-#define USER_VALID_LO     0x400000u
-#define USER_VALID_HI     0x800000u
 
 static struct {
     int in_use;

@@ -25,3 +25,9 @@ FsWritableFile* fs_open_writable(const char* name);
 uint32_t fs_write(FsWritableFile* f, uint32_t offset, const uint8_t* buf, uint32_t len);
 uint32_t fs_append(FsWritableFile* f, const uint8_t* buf, uint32_t len);
 
+/* Persistent LPST store on the boot block device. */
+int fs_persist_load(void);
+int fs_persist_save(void);
+void fs_persist_info(uint32_t* available, uint32_t* dirty, int* last_result,
+                     const char** driver, uint32_t* lba, uint32_t* sectors);
+void fs_mark_dirty(void);

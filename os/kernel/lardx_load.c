@@ -66,14 +66,16 @@ int lardx_run(const char* path, int argc, const char** argv)
     }
 
     mmu_map_user_segments(paddrs, sizes, seg_flags, (int)seg_count);
+    syscall_reset_process_state();
     usermode_run_lardx(entry, argc, argv);
     return 0;
 }
 
 int lardx_run_sandbox(const char* path, int argc, const char** argv)
 {
+    uint32_t old_caps = syscall_get_caps();
     syscall_set_sandbox(1);
     int r = lardx_run(path, argc, argv);
-    syscall_set_sandbox(0);
+    syscall_set_caps(old_caps);
     return r;
 }

@@ -3,7 +3,10 @@
 ; 위치 무관 코드로 작성 후 0x4000에 복사하여 실행.
 
 BITS 16
+%define AP_TRAMPOLINE_PA 0x4000
 GLOBAL ap_trampoline_start
+GLOBAL ap_gdt
+GLOBAL ap_gdtr
 ap_trampoline_start:
     cli
     xor ax, ax
@@ -19,7 +22,7 @@ ap_trampoline_start:
     mov eax, cr0
     or eax, 1
     mov cr0, eax
-    jmp 0x08:ap_pm_start
+    jmp 0x08:(AP_TRAMPOLINE_PA + ap_pm_start - ap_trampoline_start)
 
 BITS 32
 ap_pm_start:
@@ -64,7 +67,7 @@ ap_pm_start:
     bts eax, 31
     mov cr0, eax
 
-    jmp 0x18:ap_lm_start
+    jmp 0x18:(AP_TRAMPOLINE_PA + ap_lm_start - ap_trampoline_start)
 
 BITS 64
 ap_lm_start:
@@ -104,3 +107,5 @@ ap_gdtr:
 
 GLOBAL ap_trampoline_end
 ap_trampoline_end:
+
+section .note.GNU-stack noalloc noexec nowrite progbits

@@ -20,6 +20,7 @@
 #include <stdint.h>
 
 #define LSH_MAGIC  0x0048534Cu  /* "LSH\0" LE */
+#define LARDOS_VERSION "v1.0.0a"
 
 static char s_drive = 'X';
 static char s_output[LSH_MAX_OUTPUT];
@@ -707,11 +708,15 @@ static void cmd_fsstat(const char* args)
     uint32_t dirty;
     uint32_t lba;
     uint32_t sectors;
+    uint32_t bank;
+    uint32_t generation;
+    uint32_t bank_sectors;
     int last;
     const char* driver;
     (void)args;
 
     fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
+    fs_persist_detail(&bank, &generation, &bank_sectors);
     out_append("FS persist: ");
     out_append(available ? "available" : "offline");
     out_append(" driver=");
@@ -724,6 +729,13 @@ static void cmd_fsstat(const char* args)
     out_append_u32(dirty);
     out_append(" last=");
     out_append_i32(last);
+    out_append(" bank=");
+    if (bank == 0xFFFFFFFFu) out_append("none");
+    else out_append_u32(bank);
+    out_append(" gen=");
+    out_append_u32(generation);
+    out_append(" banksectors=");
+    out_append_u32(bank_sectors);
     out_append("\n");
 }
 
@@ -755,10 +767,74 @@ static void cmd_fsload(const char* args)
     }
 }
 
+static void selftest_check(const char* name, int ok, uint32_t* pass, uint32_t* fail)
+{
+    out_append(ok ? "PASS " : "FAIL ");
+    out_append(name);
+    out_append("\n");
+    if (ok) (*pass)++;
+    else (*fail)++;
+}
+
+static void cmd_selftest(const char* args)
+{
+    uint32_t pass = 0;
+    uint32_t fail = 0;
+    uint32_t available;
+    uint32_t dirty;
+    uint32_t lba;
+    uint32_t sectors;
+    uint32_t bank;
+    uint32_t generation;
+    uint32_t bank_sectors;
+    int last;
+    const char* driver;
+    const FsFile* bundle;
+    const uint8_t hash_data[3] = { 'a', 'b', 'c' };
+    (void)args;
+
+    out_append("LardOS ");
+    out_append(LARDOS_VERSION);
+    out_append(" selftest\n");
+
+    bundle = fs_open("bundle.lar");
+    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
+    fs_persist_detail(&bank, &generation, &bank_sectors);
+
+    selftest_check("fs: hello.txt", fs_open("hello.txt") != NULL, &pass, &fail);
+    selftest_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, &pass, &fail);
+    selftest_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, &pass, &fail);
+    selftest_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, &pass, &fail);
+    selftest_check("lcnt: defaults", lcontainer_count() >= 3u, &pass, &fail);
+    selftest_check("lpst: dual-bank layout", lba == 2752u && sectors == 128u && bank_sectors == 64u, &pass, &fail);
+    selftest_check("lpst: driver string", driver && driver[0], &pass, &fail);
+    selftest_check("lvcs: hash engine", lvcs_hash(hash_data, sizeof(hash_data)) != 0, &pass, &fail);
+    selftest_check("lcnt: dev profile", (lcontainer_profile_caps("dev") & (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL)) == (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL), &pass, &fail);
+
+    out_append("Selftest: ");
+    out_append_u32(pass);
+    out_append(" passed, ");
+    out_append_u32(fail);
+    out_append(" failed");
+    if (available) {
+        out_append(", storage online");
+        out_append(dirty ? ", dirty" : ", clean");
+    } else {
+        out_append(", storage offline");
+    }
+    out_append(", last=");
+    out_append_i32(last);
+    out_append(", gen=");
+    out_append_u32(generation);
+    out_append("\n");
+}
+
 static void cmd_ver(const char* args)
 {
     (void)args;
-    out_append("LardOS LSH 1.0\n");
+    out_append("LardOS ");
+    out_append(LARDOS_VERSION);
+    out_append("\n");
 }
 
 static void cmd_set(const char* args)
@@ -1374,6 +1450,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == 'a' && cmd[4] == 'v' && cmd[5] == 'e' && cmd[6] == '\0') { cmd_fssave(args); return; }
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 'l' && cmd[3] == 'o' && cmd[4] == 'a' && cmd[5] == 'd' && cmd[6] == '\0') { cmd_fsload(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'y' && cmd[2] == 'n' && cmd[3] == 'c' && cmd[4] == '\0') { cmd_fssave(args); return; }
+    if (cmd[0] == 's' && cmd[1] == 'e' && cmd[2] == 'l' && cmd[3] == 'f' && cmd[4] == 't' && cmd[5] == 'e' && cmd[6] == 's' && cmd[7] == 't' && cmd[8] == '\0') { cmd_selftest(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'c' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == '\0') { cmd_lcnt(args); return; }
     if (cmd[0] == 'c' && cmd[1] == 'o' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == 'a' && cmd[5] == 'i' && cmd[6] == 'n' && cmd[7] == 'e' && cmd[8] == 'r' && cmd[9] == '\0') { cmd_lcnt(args); return; }
     if (cmd[0] == 'v' && cmd[1] == 'c' && cmd[2] == 's' && cmd[3] == '\0') { cmd_vcs(args); return; }

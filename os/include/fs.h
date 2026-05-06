@@ -30,4 +30,5 @@ int fs_persist_load(void);
 int fs_persist_save(void);
 void fs_persist_info(uint32_t* available, uint32_t* dirty, int* last_result,
                      const char** driver, uint32_t* lba, uint32_t* sectors);
+void fs_persist_detail(uint32_t* active_bank, uint32_t* generation, uint32_t* bank_sectors);
 void fs_mark_dirty(void);

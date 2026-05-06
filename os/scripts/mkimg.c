@@ -13,8 +13,8 @@
 #define SECTOR_SIZE 512
 #define SECTOR_COUNT 2880
 #define STAGE2_SECTORS 4
-#define PERSIST_START_SECTOR 2816
-#define PERSIST_SECTORS 64
+#define PERSIST_START_SECTOR 2752
+#define PERSIST_SECTORS 128
 #define IMAGE_SIZE ((size_t)SECTOR_SIZE * SECTOR_COUNT)
 
 static int read_file(const char* path, unsigned char** buf, size_t* len)

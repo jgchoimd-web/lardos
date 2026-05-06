@@ -56,16 +56,21 @@ static uint8_t ram_vcs_restore_buf[VCS_RESTORE_CAP];
 static FsWritableFile ram_vcs_restore = { "vcs_restore.txt", ram_vcs_restore_buf, 0, VCS_RESTORE_CAP };
 
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
-#define LPST_VERSION     1u
-#define LPST_START_LBA   2816u
-#define LPST_SECTORS     64u
-#define LPST_BYTES       (LPST_SECTORS * STORAGE_SECTOR_SIZE)
-#define LPST_HEADER_SIZE 20u
+#define LPST_VERSION     2u
+#define LPST_START_LBA   2752u
+#define LPST_BANKS       2u
+#define LPST_BANK_SECTORS 64u
+#define LPST_SECTORS     (LPST_BANKS * LPST_BANK_SECTORS)
+#define LPST_BANK_BYTES  (LPST_BANK_SECTORS * STORAGE_SECTOR_SIZE)
+#define LPST_HEADER_SIZE 24u
+#define LPST_V1_HEADER_SIZE 20u
 #define LPST_ENTRY_SIZE  48u
 
-static uint8_t s_lpstore[LPST_BYTES];
+static uint8_t s_lpstore[LPST_BANK_BYTES];
 static uint32_t s_fs_dirty;
 static int s_persist_last_result = -9;
+static uint32_t s_persist_generation;
+static uint32_t s_persist_active_bank = 0xFFFFFFFFu;
 
 static const uint8_t file_hello_txt[] =
     "Hello from the in-memory filesystem!\n"
@@ -183,7 +188,40 @@ static uint32_t lpst_hash(const uint8_t* data, uint32_t len)
 
 static void lpst_zero(void)
 {
-    for (uint32_t i = 0; i < LPST_BYTES; i++) s_lpstore[i] = 0;
+    for (uint32_t i = 0; i < LPST_BANK_BYTES; i++) s_lpstore[i] = 0;
+}
+
+static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
+                              uint32_t* count, uint32_t* total, uint32_t* generation)
+{
+    uint32_t version;
+    uint32_t hsz;
+    uint32_t c;
+    uint32_t t;
+    uint32_t checksum;
+
+    if (lpst_read32(store + 0) != LPST_MAGIC) return -1;
+    version = lpst_read32(store + 4);
+    if (version == 1u) {
+        hsz = LPST_V1_HEADER_SIZE;
+        if (generation) *generation = 0;
+    } else if (version == LPST_VERSION) {
+        hsz = LPST_HEADER_SIZE;
+        if (generation) *generation = lpst_read32(store + 20);
+    } else {
+        return -2;
+    }
+
+    c = lpst_read32(store + 8);
+    t = lpst_read32(store + 12);
+    checksum = lpst_read32(store + 16);
+    if (c > 32u || t < hsz || t > LPST_BANK_BYTES || hsz + c * LPST_ENTRY_SIZE > t) return -3;
+    if (lpst_hash(store + hsz, t - hsz) != checksum) return -4;
+
+    if (header_size) *header_size = hsz;
+    if (count) *count = c;
+    if (total) *total = t;
+    return 0;
 }
 
 static uint32_t writable_count(void)
@@ -328,27 +366,34 @@ int fs_persist_save(void)
 {
     uint32_t count = writable_count();
     uint32_t data_off = LPST_HEADER_SIZE + count * LPST_ENTRY_SIZE;
+    uint32_t target_bank;
+    uint32_t next_generation;
 
     if (storage_init() != 0) {
         s_persist_last_result = -1;
         return -1;
     }
-    if (data_off > LPST_BYTES) {
+    if (data_off > LPST_BANK_BYTES) {
         s_persist_last_result = -2;
         return -2;
     }
+
+    target_bank = (s_persist_active_bank < LPST_BANKS) ? (1u - s_persist_active_bank) : 0u;
+    next_generation = s_persist_generation + 1u;
+    if (next_generation == 0) next_generation = 1;
 
     lpst_zero();
     lpst_write32(s_lpstore + 0, LPST_MAGIC);
     lpst_write32(s_lpstore + 4, LPST_VERSION);
     lpst_write32(s_lpstore + 8, count);
+    lpst_write32(s_lpstore + 20, next_generation);
 
     for (uint32_t i = 0; i < count; i++) {
         FsWritableFile* w = writable_at(i);
         uint8_t* entry = s_lpstore + LPST_HEADER_SIZE + i * LPST_ENTRY_SIZE;
         uint32_t n = 0;
 
-        if (!w || w->size > w->cap || w->size > LPST_BYTES - data_off) {
+        if (!w || w->size > w->cap || w->size > LPST_BANK_BYTES - data_off) {
             s_persist_last_result = -3;
             return -3;
         }
@@ -368,54 +413,72 @@ int fs_persist_save(void)
     lpst_write32(s_lpstore + 12, data_off);
     lpst_write32(s_lpstore + 16, lpst_hash(s_lpstore + LPST_HEADER_SIZE, data_off - LPST_HEADER_SIZE));
 
-    for (uint32_t sector = 0; sector < LPST_SECTORS; sector++) {
-        if (storage_write_sector(LPST_START_LBA + sector, s_lpstore + sector * STORAGE_SECTOR_SIZE) != 0) {
+    for (uint32_t sector = 0; sector < LPST_BANK_SECTORS; sector++) {
+        uint32_t lba = LPST_START_LBA + target_bank * LPST_BANK_SECTORS + sector;
+        if (storage_write_sector(lba, s_lpstore + sector * STORAGE_SECTOR_SIZE) != 0) {
             s_persist_last_result = -4;
             return -4;
         }
     }
 
     s_fs_dirty = 0;
+    s_persist_active_bank = target_bank;
+    s_persist_generation = next_generation;
     s_persist_last_result = 0;
     return 0;
 }
 
 int fs_persist_load(void)
 {
+    uint32_t best_bank = 0xFFFFFFFFu;
+    uint32_t best_generation = 0;
     uint32_t count;
     uint32_t total;
-    uint32_t checksum;
+    uint32_t header_size;
 
     if (storage_init() != 0) {
         s_persist_last_result = -1;
         return -1;
     }
-    for (uint32_t sector = 0; sector < LPST_SECTORS; sector++) {
-        if (storage_read_sector(LPST_START_LBA + sector, s_lpstore + sector * STORAGE_SECTOR_SIZE) != 0) {
+
+    for (uint32_t bank = 0; bank < LPST_BANKS; bank++) {
+        uint32_t generation = 0;
+        int read_ok = 1;
+        for (uint32_t sector = 0; sector < LPST_BANK_SECTORS; sector++) {
+            uint32_t lba = LPST_START_LBA + bank * LPST_BANK_SECTORS + sector;
+            if (storage_read_sector(lba, s_lpstore + sector * STORAGE_SECTOR_SIZE) != 0) {
+                read_ok = 0;
+                break;
+            }
+        }
+        if (!read_ok) continue;
+        if (lpst_validate_bank(s_lpstore, NULL, NULL, NULL, &generation) == 0) {
+            if (best_bank == 0xFFFFFFFFu || generation >= best_generation) {
+                best_bank = bank;
+                best_generation = generation;
+            }
+        }
+    }
+
+    if (best_bank == 0xFFFFFFFFu) {
+        s_persist_last_result = -3;
+        return -3;
+    }
+
+    for (uint32_t sector = 0; sector < LPST_BANK_SECTORS; sector++) {
+        uint32_t lba = LPST_START_LBA + best_bank * LPST_BANK_SECTORS + sector;
+        if (storage_read_sector(lba, s_lpstore + sector * STORAGE_SECTOR_SIZE) != 0) {
             s_persist_last_result = -2;
             return -2;
         }
     }
-
-    if (lpst_read32(s_lpstore + 0) != LPST_MAGIC || lpst_read32(s_lpstore + 4) != LPST_VERSION) {
-        s_persist_last_result = -3;
-        return -3;
-    }
-    count = lpst_read32(s_lpstore + 8);
-    total = lpst_read32(s_lpstore + 12);
-    checksum = lpst_read32(s_lpstore + 16);
-    if (count > 32u || total < LPST_HEADER_SIZE || total > LPST_BYTES ||
-        LPST_HEADER_SIZE + count * LPST_ENTRY_SIZE > total) {
-        s_persist_last_result = -4;
-        return -4;
-    }
-    if (lpst_hash(s_lpstore + LPST_HEADER_SIZE, total - LPST_HEADER_SIZE) != checksum) {
+    if (lpst_validate_bank(s_lpstore, &header_size, &count, &total, &best_generation) != 0) {
         s_persist_last_result = -5;
         return -5;
     }
 
     for (uint32_t i = 0; i < count; i++) {
-        const uint8_t* entry = s_lpstore + LPST_HEADER_SIZE + i * LPST_ENTRY_SIZE;
+        const uint8_t* entry = s_lpstore + header_size + i * LPST_ENTRY_SIZE;
         uint32_t size = lpst_read32(entry + 32);
         uint32_t data_off = lpst_read32(entry + 36);
         uint32_t cap = lpst_read32(entry + 40);
@@ -437,6 +500,8 @@ int fs_persist_load(void)
     }
 
     s_fs_dirty = 0;
+    s_persist_active_bank = best_bank;
+    s_persist_generation = best_generation;
     s_persist_last_result = 0;
     return 0;
 }
@@ -450,6 +515,13 @@ void fs_persist_info(uint32_t* available, uint32_t* dirty, int* last_result,
     if (driver) *driver = storage_driver_name();
     if (lba) *lba = LPST_START_LBA;
     if (sectors) *sectors = LPST_SECTORS;
+}
+
+void fs_persist_detail(uint32_t* active_bank, uint32_t* generation, uint32_t* bank_sectors)
+{
+    if (active_bank) *active_bank = s_persist_active_bank;
+    if (generation) *generation = s_persist_generation;
+    if (bank_sectors) *bank_sectors = LPST_BANK_SECTORS;
 }
 
 FsWritableFile* fs_open_writable(const char* name)

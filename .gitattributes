@@ -1,0 +1,5 @@
+# GitHub Linguist guesses generated C include fragments as C++.
+# This project intentionally uses C only.
+*.c linguist-language=C
+*.h linguist-language=C
+*.inc linguist-language=C

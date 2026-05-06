@@ -188,6 +188,28 @@ static void out_append_hex32(uint32_t v)
     }
 }
 
+static char lardos_version_suffix(void)
+{
+    uint32_t i = 0;
+    while (LARDOS_VERSION[i]) i++;
+    return i ? LARDOS_VERSION[i - 1] : '?';
+}
+
+static const char* lardos_version_channel(void)
+{
+    char suffix = lardos_version_suffix();
+    if (suffix == 'a') return "official";
+    if (suffix == 'b') return "beta";
+    if (suffix == 'p') return "hotpatch";
+    return "unknown";
+}
+
+static int lardos_version_suffix_known(void)
+{
+    char suffix = lardos_version_suffix();
+    return suffix == 'a' || suffix == 'b' || suffix == 'p';
+}
+
 void lsh_enter_sum_shortcut(void)
 {
     if (!s_in_sum_mode) {
@@ -795,6 +817,8 @@ static void cmd_selftest(const char* args)
 
     out_append("LardOS ");
     out_append(LARDOS_VERSION);
+    out_append(" ");
+    out_append(lardos_version_channel());
     out_append(" selftest\n");
 
     bundle = fs_open("bundle.lar");
@@ -806,6 +830,7 @@ static void cmd_selftest(const char* args)
     selftest_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, &pass, &fail);
     selftest_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, &pass, &fail);
     selftest_check("lcnt: defaults", lcontainer_count() >= 3u, &pass, &fail);
+    selftest_check("version: suffix policy", lardos_version_suffix_known(), &pass, &fail);
     selftest_check("lpst: dual-bank layout", lba == 2752u && sectors == 128u && bank_sectors == 64u, &pass, &fail);
     selftest_check("lpst: driver string", driver && driver[0], &pass, &fail);
     selftest_check("lvcs: hash engine", lvcs_hash(hash_data, sizeof(hash_data)) != 0, &pass, &fail);
@@ -834,7 +859,9 @@ static void cmd_ver(const char* args)
     (void)args;
     out_append("LardOS ");
     out_append(LARDOS_VERSION);
-    out_append("\n");
+    out_append(" (");
+    out_append(lardos_version_channel());
+    out_append(")\n");
 }
 
 static void cmd_set(const char* args)

@@ -87,6 +87,9 @@ commands:
   command` queues a command at a chosen priority. `tasktop` renders a compact
   dashboard and `task pause`, `task resume`, `task up`, and `task down` adjust
   queued work without hiding it from the user.
+- `bootprof` controls boot profiles stored in `bootprof.txt`. `normal` boots
+  normally, `safe` forces POST and skips networking, `netoff` skips networking,
+  and `dev` keeps networking on while raising the default task priority.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
@@ -105,9 +108,10 @@ During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
 Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
 descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
-scratch storage, OSLink packet framing, TaskPrio scheduling, LPST persistence
-metadata, LVCS hashing, containers, and LIL feature forms. The screen checks are
-there to catch visible boot/UI regressions as well as code errors.
+scratch storage, OSLink packet framing, TaskPrio scheduling, BootProf profile
+flags, LPST persistence metadata, LVCS hashing, containers, and LIL feature
+forms. The screen checks are there to catch visible boot/UI regressions as well
+as code errors.
 
 Each feature addition gets a release: bump the kernel version, add an entry to
 `os/RELEASES.lardd`, keep the embedded `releases.lardd` in sync so LSH can show

@@ -3,6 +3,8 @@
 #include "unicode.h"
 #include "net.h"
 #include "oslink.h"
+#include "bootprof.h"
+#include "taskprio.h"
 #include "ps2.h"
 #include "gui.h"
 #include "idt64.h"
@@ -337,7 +339,9 @@ void kmain(void)
     /* Custom language demos: BOSL (bytecode) + LIL (s-expr interpreter). */
     mem_init();
     fs_init();
+    bootprof_load();
     lsh_init();
+    if (bootprof_dev_mode()) taskprio_set_default(7);
     drfl_load_all();
     lss_init();
     char bosl_out[256];
@@ -431,7 +435,7 @@ void kmain(void)
     int ps2_ready = ps2_init();
     if (ps2_ready == 0) {
         int boot_choice = boot_post_offer();
-        if (boot_choice == 1) {
+        if (boot_choice == 1 || bootprof_force_post()) {
             boot_post_run_screen();
         } else if (boot_choice == 2) {
             boot_mode_run_screen();
@@ -445,28 +449,33 @@ void kmain(void)
     ps2_mouse_init();
 
     net_stack_t net;
-    if (net_init(&net) != 0) {
-        panic("NET init failed");
-    }
-
     net_cfg_t cfg;
-    if (net_dhcp(&net, &cfg) != 0) {
-        panic("DHCP failed");
-    }
-    oslink_init(&net, &cfg, "lardos");
-    vga_puts("DHCP OK\n", 0x2F);
-
-    ip4_t ip;
-    if (net_dns_a(&net, cfg.dns, "example.com", &ip) != 0) {
-        panic("DNS failed");
-    }
-    vga_puts("DNS OK\n", 0x2F);
-
+    int net_ready = 0;
     static char resp[4096];
-    if (net_http_get(&net, ip, 80, "example.com", "/", resp, sizeof(resp)) == 0) {
-        vga_puts("HTTP OK\n", 0x2F);
+    if (bootprof_network_enabled()) {
+        if (net_init(&net) != 0) {
+            panic("NET init failed");
+        }
+        if (net_dhcp(&net, &cfg) != 0) {
+            panic("DHCP failed");
+        }
+        net_ready = 1;
+        oslink_init(&net, &cfg, "lardos");
+        vga_puts("DHCP OK\n", 0x2F);
+
+        ip4_t ip;
+        if (net_dns_a(&net, cfg.dns, "example.com", &ip) != 0) {
+            panic("DNS failed");
+        }
+        vga_puts("DNS OK\n", 0x2F);
+
+        if (net_http_get(&net, ip, 80, "example.com", "/", resp, sizeof(resp)) == 0) {
+            vga_puts("HTTP OK\n", 0x2F);
+        } else {
+            vga_puts("HTTP unavailable\n", 0x4F);
+        }
     } else {
-        vga_puts("HTTP unavailable\n", 0x4F);
+        vga_puts("Network skipped by boot profile\n", 0x2F);
     }
     vga_puts("Native TLS loaded (external TLS removed)\n", 0x2F);
 
@@ -525,41 +534,45 @@ void kmain(void)
                 }
             }
             if (!is_file) {
-            char host[128];
-            char host_hdr[160];
-            char path[512];
-            uint16_t url_port = 80;
-            if (parse_url(http_req.url, host, sizeof(host), host_hdr, sizeof(host_hdr), &url_port, path, sizeof(path)) != 0) {
-                gui_set_response("Bad URL");
-            } else {
-                ip4_t dip;
-                int is_https = (http_req.url[0] == 'h' && http_req.url[1] == 't' && http_req.url[2] == 't' && http_req.url[3] == 'p' && http_req.url[4] == 's' && http_req.url[5] == ':');
-                int have_ip = 0;
-                if (parse_ipv4_host(host, &dip) == 0) {
-                    have_ip = 1;
-                } else if (net_dns_a(&net, cfg.dns, host, &dip) == 0) {
-                    have_ip = 1;
+                if (!net_ready) {
+                    gui_set_response("Network disabled by boot profile");
                 } else {
-                    gui_set_response("DNS failed");
-                }
-                if (have_ip) {
-                    resp[0] = '\0';
-                    int r = is_https ? net_https_request(&net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(resp))
-                                     : net_http_request(&net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(resp));
-                    if (r != 0) {
-                        gui_set_response((is_https && resp[0]) ? resp : (is_https ? "HTTPS failed" : "HTTP failed"));
+                    char host[128];
+                    char host_hdr[160];
+                    char path[512];
+                    uint16_t url_port = 80;
+                    if (parse_url(http_req.url, host, sizeof(host), host_hdr, sizeof(host_hdr), &url_port, path, sizeof(path)) != 0) {
+                        gui_set_response("Bad URL");
                     } else {
-                        static char doc_out[4096];
-                        if (lard_doc_to_text(resp, (uint32_t)strlen(resp), doc_out, sizeof(doc_out)) == 0) {
-                            gui_lafillo_set_content(doc_out, resp);
-                        } else if (lafillo_http_to_text(resp, (uint32_t)strlen(resp), doc_out, sizeof(doc_out)) == 0) {
-                            gui_lafillo_set_content(doc_out, resp);
+                        ip4_t dip;
+                        int is_https = (http_req.url[0] == 'h' && http_req.url[1] == 't' && http_req.url[2] == 't' && http_req.url[3] == 'p' && http_req.url[4] == 's' && http_req.url[5] == ':');
+                        int have_ip = 0;
+                        if (parse_ipv4_host(host, &dip) == 0) {
+                            have_ip = 1;
+                        } else if (net_dns_a(&net, cfg.dns, host, &dip) == 0) {
+                            have_ip = 1;
                         } else {
-                            gui_set_response(resp);
+                            gui_set_response("DNS failed");
+                        }
+                        if (have_ip) {
+                            resp[0] = '\0';
+                            int r = is_https ? net_https_request(&net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(resp))
+                                             : net_http_request(&net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(resp));
+                            if (r != 0) {
+                                gui_set_response((is_https && resp[0]) ? resp : (is_https ? "HTTPS failed" : "HTTP failed"));
+                            } else {
+                                static char doc_out[4096];
+                                if (lard_doc_to_text(resp, (uint32_t)strlen(resp), doc_out, sizeof(doc_out)) == 0) {
+                                    gui_lafillo_set_content(doc_out, resp);
+                                } else if (lafillo_http_to_text(resp, (uint32_t)strlen(resp), doc_out, sizeof(doc_out)) == 0) {
+                                    gui_lafillo_set_content(doc_out, resp);
+                                } else {
+                                    gui_set_response(resp);
+                                }
+                            }
                         }
                     }
                 }
-            }
             }
             gui_set_loading(0);
             gui_render();

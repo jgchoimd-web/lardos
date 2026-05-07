@@ -61,6 +61,7 @@ flowchart TB
     Net["net DHCP DNS TCP HTTP"]
     OSLink["oslink OS-to-OS UDP"]
     TaskPrio["taskprio user priorities"]
+    BootProf["bootprof profiles"]
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
     VM["BOSL GASM LIL LML OSVM"]
@@ -73,6 +74,7 @@ flowchart TB
     Kmain --> Syscall
     Kmain --> Drivers
     Kmain --> Storage
+    Storage --> BootProf
     Kmain --> POST
     Kmain --> Net
     Net --> OSLink
@@ -166,6 +168,7 @@ messages, and sends automatic acknowledgements or pongs.
 | Memory | `os/kernel/mem.c`, `os/kernel/mmu.c` |
 | SMP | `os/kernel/smp.c`, `os/kernel/ap_trampoline.s`, `os/kernel/aux_kernel.s` |
 | Power-On Self-Test | `os/kernel/post.c`, `os/include/post.h` |
+| Boot profiles | `os/kernel/bootprof.c`, `os/include/bootprof.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
 | Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |
@@ -194,21 +197,27 @@ let the user change scheduling directly. `tasktop` renders the queue with
 priority bars, runnable/paused counts, and command names. The queue selects the
 highest effective priority and ages waiting tasks.
 
+`bootprof.c` reads `bootprof.txt` after the writable filesystem is restored and
+turns it into boot behavior. `normal` uses the default path, `safe` forces POST
+and disables networking, `netoff` skips networking without forcing POST, and
+`dev` keeps networking while raising the default task priority. LSH exposes this
+through `bootprof status` and `bootprof set`.
+
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
-ScreenRAM scratch storage, OSLink packet framing, TaskPrio scheduling, LPST
-metadata, LVCS hashing, containers, and LIL feature forms.
+ScreenRAM scratch storage, OSLink packet framing, TaskPrio scheduling, BootProf
+profile flags, LPST metadata, LVCS hashing, containers, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
 OS-to-OS messaging (`oslink`), task priority control (`task`, `prio`, `nice`),
-POST reruns (`post`, `selftest`), native document rendering (`lars`, `lardd`,
-`doc`), native LIL script execution (`lil file`), writable RAM file editing
-(`write`, `append`, `copy`), LPST persistence
+boot profile control (`bootprof`), POST reruns (`post`, `selftest`), native
+document rendering (`lars`, `lardd`, `doc`), native LIL script execution (`lil
+file`), writable RAM file editing (`write`, `append`, `copy`), LPST persistence
 (`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and
 SUM-only raw machine controls (`peek`, `poke`, `asm_`).
 

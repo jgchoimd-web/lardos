@@ -20,6 +20,7 @@
 #include "cpumode.h"
 #include "oslink.h"
 #include "taskprio.h"
+#include "bootprof.h"
 #include "version.h"
 #include "io.h"
 #include "string.h"
@@ -242,7 +243,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
@@ -1095,7 +1096,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode oslink task cls\n");
+    out_append("  help control status release ver post selftest magic mode oslink task bootprof cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
@@ -1105,6 +1106,7 @@ static void cmd_help(const char* args)
     out_append("  vcs init|status|add|commit|log|show\n");
     out_append("  drivers fsstat fsload fssave sync sram sandbox exitsandbox\n");
     out_append("  tasktop  task list|set|up|down|pause|resume|drop  nice prio cmd\n");
+    out_append("  bootprof status|set normal|safe|netoff|dev\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
 }
@@ -1127,6 +1129,7 @@ static void cmd_control(const char* args)
     out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
     out_append("  oslink status       inspect OS-to-OS message link\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
+    out_append("  bootprof set netoff save a boot profile in bootprof.txt\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
@@ -1249,6 +1252,18 @@ static void cmd_status(const char* args)
     out_append_i32(tasks.default_priority);
     out_append(", completed=");
     out_append_u32(tasks.completed);
+    out_append("\n");
+
+    bootprof_info_t bp;
+    bootprof_info(&bp);
+    out_append("BootProf: ");
+    out_append(bp.name);
+    out_append(", net=");
+    out_append(bp.network ? "on" : "off");
+    out_append(", post=");
+    out_append(bp.force_post ? "on" : "off");
+    out_append(", dev=");
+    out_append(bp.dev_mode ? "on" : "off");
     out_append("\n");
 }
 
@@ -1900,6 +1915,58 @@ static void cmd_prio(const char* args)
     }
     if (taskprio_set_priority(id, prio) == 0) out_append("prio: updated.\n");
     else out_append("prio: id not found.\n");
+}
+
+static void cmd_bootprof_status(void)
+{
+    bootprof_info_t info;
+    bootprof_info(&info);
+    out_append("Boot profile: ");
+    out_append(info.name);
+    out_append("\n");
+    out_append("network=");
+    out_append(info.network ? "on" : "off");
+    out_append(" force_post=");
+    out_append(info.force_post ? "on" : "off");
+    out_append(" safe=");
+    out_append(info.safe_mode ? "on" : "off");
+    out_append(" dev=");
+    out_append(info.dev_mode ? "on" : "off");
+    out_append("\nProfiles: normal safe netoff dev\n");
+    out_append("Stored in bootprof.txt. Use sync to persist it.\n");
+}
+
+static void cmd_bootprof(const char* args)
+{
+    char sub[16];
+    char name[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0 ||
+        strcmp(sub, "list") == 0) {
+        cmd_bootprof_status();
+        return;
+    }
+    if (strcmp(sub, "set") == 0 || strcmp(sub, "use") == 0) {
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: bootprof set normal|safe|netoff|dev\n");
+            return;
+        }
+        int r = bootprof_set(name);
+        if (r == 0) {
+            out_append("bootprof: set ");
+            out_append(name);
+            out_append(". Run sync to persist.\n");
+        } else {
+            out_append("bootprof: unknown profile.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(bootprof_selftest() == 0 ? "bootprof: selftest OK\n" : "bootprof: selftest failed\n");
+        return;
+    }
+    out_append("Usage: bootprof status|set|test\n");
 }
 
 static int lsh_require_sum(const char* cmd)
@@ -2746,6 +2813,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }
     if (strcmp(cmd, "tasktop") == 0) { cmd_tasktop(args); return; }
+    if (strcmp(cmd, "bootprof") == 0) { cmd_bootprof(args); return; }
     if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
     if (strcmp(cmd, "prio") == 0) { cmd_prio(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }

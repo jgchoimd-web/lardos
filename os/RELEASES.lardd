@@ -3,6 +3,13 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.14.0a
+ITEM Added BootProf, a user-editable boot profile system backed by bootprof.txt.
+ITEM Added bootprof status, set, and test commands for normal, safe, netoff, and dev profiles.
+ITEM safe forces POST and disables network; netoff skips network; dev raises the default task priority.
+ITEM The Doc tab reports network-disabled when a profile intentionally skips networking.
+ITEM POST now checks BootProf profile flag behavior.
+
 SECTION v1.13.0a
 ITEM Added tasktop, a dashboard-style task manager for the TaskPrio queue.
 ITEM Added task up, task down, task pause, and task resume for direct user scheduling control.

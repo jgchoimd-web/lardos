@@ -13,6 +13,7 @@
 - `task list|set|default|run|boost|drop` - inspect and change task priority.
 - `tasktop` - show queued tasks with status and priority bars.
 - `nice priority command` - queue a command at a chosen priority.
+- `bootprof status|set` - inspect or select normal, safe, netoff, or dev boot profiles.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

@@ -5,6 +5,7 @@
 #include "oslink.h"
 #include "bootprof.h"
 #include "taskprio.h"
+#include "crashlog.h"
 #include "ps2.h"
 #include "gui.h"
 #include "idt64.h"
@@ -339,6 +340,7 @@ void kmain(void)
     /* Custom language demos: BOSL (bytecode) + LIL (s-expr interpreter). */
     mem_init();
     fs_init();
+    crashlog_init();
     bootprof_load();
     lsh_init();
     if (bootprof_dev_mode()) taskprio_set_default(7);

@@ -3,6 +3,7 @@
 #include "drfl.h"
 #include "bootprof.h"
 #include "cpumode.h"
+#include "crashlog.h"
 #include "fs.h"
 #include "gui.h"
 #include "lar.h"
@@ -118,6 +119,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("oslink: packet codec", oslink_selftest() == 0, emit, user, &pass, &fail);
     post_check("taskprio: priority queue", taskprio_selftest() == 0, emit, user, &pass, &fail);
     post_check("bootprof: profile flags", bootprof_selftest() == 0, emit, user, &pass, &fail);
+    post_check("crashlog: writable log", crashlog_selftest() == 0, emit, user, &pass, &fail);
     post_check("lcnt: dev profile", (lcontainer_profile_caps("dev") & (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL)) == (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL), emit, user, &pass, &fail);
     post_check("lil: feature forms", lil_eval_int("(begin (assert (eq (pow 2 8) 256)) (assert (eq (clamp 99 0 10) 10)) (gcd 84 30))", &lil_value) == 0 && lil_value == 6, emit, user, &pass, &fail);
 

@@ -21,6 +21,7 @@
 #include "oslink.h"
 #include "taskprio.h"
 #include "bootprof.h"
+#include "crashlog.h"
 #include "version.h"
 #include "io.h"
 #include "string.h"
@@ -243,7 +244,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
@@ -1096,7 +1097,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode oslink task bootprof cls\n");
+    out_append("  help control status release ver post selftest magic mode oslink task bootprof crashlog cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
@@ -1107,6 +1108,7 @@ static void cmd_help(const char* args)
     out_append("  drivers fsstat fsload fssave sync sram sandbox exitsandbox\n");
     out_append("  tasktop  task list|set|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  bootprof status|set normal|safe|netoff|dev\n");
+    out_append("  crashlog show|clear|test\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
 }
@@ -1130,6 +1132,7 @@ static void cmd_control(const char* args)
     out_append("  oslink status       inspect OS-to-OS message link\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
     out_append("  bootprof set netoff save a boot profile in bootprof.txt\n");
+    out_append("  crashlog show       inspect panic and diagnostic history\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
@@ -1264,6 +1267,10 @@ static void cmd_status(const char* args)
     out_append(bp.force_post ? "on" : "off");
     out_append(", dev=");
     out_append(bp.dev_mode ? "on" : "off");
+    out_append("\n");
+
+    out_append("CrashLog: events=");
+    out_append_u32(crashlog_count());
     out_append("\n");
 }
 
@@ -1967,6 +1974,33 @@ static void cmd_bootprof(const char* args)
         return;
     }
     out_append("Usage: bootprof status|set|test\n");
+}
+
+static void cmd_crashlog(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        const char* text = crashlog_text();
+        out_append(text && text[0] ? text : "crashlog: empty\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        if (crashlog_clear() == 0) out_append("crashlog: cleared.\n");
+        else out_append("crashlog: unavailable.\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        crashlog_record("test", "manual diagnostic event");
+        out_append("crashlog: test event recorded.\n");
+        return;
+    }
+    if (strcmp(sub, "selftest") == 0) {
+        out_append(crashlog_selftest() == 0 ? "crashlog: selftest OK\n" : "crashlog: selftest failed\n");
+        return;
+    }
+    out_append("Usage: crashlog show|clear|test|selftest\n");
 }
 
 static int lsh_require_sum(const char* cmd)
@@ -2814,6 +2848,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }
     if (strcmp(cmd, "tasktop") == 0) { cmd_tasktop(args); return; }
     if (strcmp(cmd, "bootprof") == 0) { cmd_bootprof(args); return; }
+    if (strcmp(cmd, "crashlog") == 0) { cmd_crashlog(args); return; }
     if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
     if (strcmp(cmd, "prio") == 0) { cmd_prio(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }

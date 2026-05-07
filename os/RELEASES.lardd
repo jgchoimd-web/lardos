@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.15.0a
+ITEM Added CrashLog, a persistent panic and diagnostic event log backed by crashlog.txt.
+ITEM panic and panic_u64 now record crash entries and try to save LPST before halting.
+ITEM Added crashlog show, clear, test, and selftest commands in LSH.
+ITEM status now reports crashlog event count and POST checks that the log is writable.
+
 SECTION v1.14.0a
 ITEM Added BootProf, a user-editable boot profile system backed by bootprof.txt.
 ITEM Added bootprof status, set, and test commands for normal, safe, netoff, and dev profiles.

@@ -14,6 +14,7 @@
 - `tasktop` - show queued tasks with status and priority bars.
 - `nice priority command` - queue a command at a chosen priority.
 - `bootprof status|set` - inspect or select normal, safe, netoff, or dev boot profiles.
+- `crashlog show|clear|test` - inspect or write diagnostic crash history.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

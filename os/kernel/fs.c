@@ -61,6 +61,11 @@ static const uint8_t bootprof_init[] = "normal\n";
 static uint8_t ram_bootprof_buf[BOOTPROF_CAP];
 static FsWritableFile ram_bootprof = { "bootprof.txt", ram_bootprof_buf, 0, BOOTPROF_CAP };
 
+#define CRASHLOG_CAP 2048u
+static const uint8_t crashlog_init[] = "LardOS crashlog\n";
+static uint8_t ram_crashlog_buf[CRASHLOG_CAP];
+static FsWritableFile ram_crashlog = { "crashlog.txt", ram_crashlog_buf, 0, CRASHLOG_CAP };
+
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
 #define LPST_VERSION     2u
 #define LPST_START_LBA   2752u
@@ -101,6 +106,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use task list and task set id prio to inspect and change queued task priority.\n"
     "li Use tasktop to see runnable and paused task queues with priority bars.\n"
     "li Use bootprof set safe or bootprof set netoff to change the next boot profile.\n"
+    "li Use crashlog show to inspect panic and diagnostic history.\n"
     "li Press P during boot for POST, or M for the CPU Mode Bridge Test.\n"
     "li Use write notes.txt text and append notes.txt text for the RAM FS.\n"
     "li Use vcs status/log/show to inspect the in-OS history layer.\n"
@@ -115,6 +121,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd task list\n"
     "cmd tasktop\n"
     "cmd bootprof status\n"
+    "cmd crashlog show\n"
     "cmd post\n"
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
@@ -314,7 +321,7 @@ static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
 
 static uint32_t writable_count(void)
 {
-    return 5u;
+    return 6u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -324,6 +331,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 2) return &ram_lar_extract;
     if (idx == 3) return &ram_vcs_restore;
     if (idx == 4) return &ram_bootprof;
+    if (idx == 5) return &ram_crashlog;
     return NULL;
 }
 
@@ -337,6 +345,10 @@ void fs_init(void)
         ram_bootprof_buf[i] = bootprof_init[i];
     }
     ram_bootprof.size = sizeof(bootprof_init) - 1;
+    for (uint32_t i = 0; i < sizeof(crashlog_init) - 1 && i < CRASHLOG_CAP; i++) {
+        ram_crashlog_buf[i] = crashlog_init[i];
+    }
+    ram_crashlog.size = sizeof(crashlog_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
 }
@@ -413,6 +425,15 @@ const FsFile* fs_open(const char* name)
             g_ram_result.size = ram_bootprof.size;
             return &g_ram_result;
         }
+        j = 0;
+        const char* n6 = "crashlog.txt";
+        while (n6[j] && name[j] && n6[j] == name[j]) j++;
+        if (n6[j] == '\0' && name[j] == '\0') {
+            g_ram_result.name = ram_crashlog.name;
+            g_ram_result.data = ram_crashlog.data;
+            g_ram_result.size = ram_crashlog.size;
+            return &g_ram_result;
+        }
     }
     return 0;
 }
@@ -447,6 +468,7 @@ void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user
     cb(ram_lar_extract.name, ram_lar_extract.size, user);
     cb(ram_vcs_restore.name, ram_vcs_restore.size, user);
     cb(ram_bootprof.name, ram_bootprof.size, user);
+    cb(ram_crashlog.name, ram_crashlog.size, user);
 }
 
 static int lpst_name_equals(const uint8_t* fixed_name, const char* name)
@@ -649,6 +671,10 @@ FsWritableFile* fs_open_writable(const char* name)
     i = 0;
     while (n5[i] && name[i] && n5[i] == name[i]) i++;
     if (n5[i] == '\0' && name[i] == '\0') return &ram_bootprof;
+    const char* n6 = "crashlog.txt";
+    i = 0;
+    while (n6[i] && name[i] && n6[i] == name[i]) i++;
+    if (n6[i] == '\0' && name[i] == '\0') return &ram_crashlog;
     return NULL;
 }
 

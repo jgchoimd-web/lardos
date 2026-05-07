@@ -3,6 +3,7 @@
  * 운영체제 전용 Flash+Entry 스타일 포맷
  */
 #include "larsh.h"
+#include "lard_doc.h"
 #include "string.h"
 #include <stddef.h>
 
@@ -150,7 +151,8 @@ int larsh_parse(const char* src, uint32_t len, larsh_scene_t* out)
             else if ((p[0] == 'c' || p[0] == 'C') && (p[1] == 'i' || p[1] == 'I') && (p[2] == 'r' || p[2] == 'R') && (p[3] == 'c' || p[3] == 'C') && (p[4] == 'l' || p[4] == 'L') && (p[5] == 'e' || p[5] == 'E')) { ty = 1; p += 6; }
             else if ((p[0] == 'l' || p[0] == 'L') && (p[1] == 'i' || p[1] == 'I') && (p[2] == 'n' || p[2] == 'N') && (p[3] == 'e' || p[3] == 'E')) { ty = 2; p += 4; }
             else if ((p[0] == 't' || p[0] == 'T') && (p[1] == 'e' || p[1] == 'E') && (p[2] == 'x' || p[2] == 'X') && (p[3] == 't' || p[3] == 'T')) { ty = 3; p += 4; }
-            else if ((p[0] == 'l' || p[0] == 'L') && (p[1] == 'm' || p[1] == 'M') && (p[2] == 'd' || p[2] == 'D')) { ty = 4; p += 3; }
+            else if ((p[0] == 'l' || p[0] == 'L') && (p[1] == 'a' || p[1] == 'A') && (p[2] == 'r' || p[2] == 'R') &&
+                     (p[3] == 'd' || p[3] == 'D') && (p[4] == 'd' || p[4] == 'D')) { ty = 4; p += 5; }
             else { while (p < end && *p != '\n') p++; continue; }
             larsh_obj_t* o = &out->obj[out->n_obj];
             o->type = ty;
@@ -189,10 +191,10 @@ int larsh_parse(const char* src, uint32_t len, larsh_scene_t* out)
                 if (*p == '"' || *p == '\'') {
                     char q = *p++;
                     uint32_t ti = 0;
-                    while (p < end && *p != q && ti < LARSH_MAX_LMD - 1) {
-                        o->lmd[ti++] = *p++;
+                    while (p < end && *p != q && ti < LARSH_MAX_LARDD - 1) {
+                        o->lardd[ti++] = *p++;
                     }
-                    o->lmd[ti] = '\0';
+                    o->lardd[ti] = '\0';
                     if (p < end && *p == q) p++;
                 }
             } else {
@@ -303,7 +305,7 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
             int y1 = sy + sh;
             draw_line(pixels, buf_w, buf_h, sx, sy, x1, y1, c);
         } else if (o->type == 4) {
-            /* LMD (Lard Markdown): # ## ### headers, - list, **bold**, `code` */
+            /* LARDD document block rendered with the same native document parser used by Doc. */
             static const uint8_t font8[96][8] = {
                 {0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},
                 {0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},
@@ -330,12 +332,16 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
                 {0x63,0x63,0x63,0x6B,0x7F,0x77,0x63,0},{0x66,0x66,0x3C,0x18,0x3C,0x66,0x66,0},
                 {0x66,0x66,0x66,0x3C,0x18,0x18,0x18,0},{0x7E,0x06,0x0C,0x18,0x30,0x60,0x7E,0},
             };
-            int lmd_y = sy;
+            int doc_y = sy;
             int line_h = 10;
             int col_w = 8;
             int max_w = sw > 0 ? sw / col_w : 40;
-            const char* ln = o->lmd;
-            while (*ln && lmd_y + line_h <= sy + sh && lmd_y < (int)buf_h) {
+            char rendered[512];
+            const char* ln = o->lardd;
+            uint32_t doc_len = 0;
+            while (o->lardd[doc_len]) doc_len++;
+            if (lard_doc_to_text(o->lardd, doc_len, rendered, sizeof(rendered)) == 0) ln = rendered;
+            while (*ln && doc_y + line_h <= sy + sh && doc_y < (int)buf_h) {
                 while (*ln == ' ' || *ln == '\t') ln++;
                 if (!*ln || *ln == '\n') { ln += (*ln ? 1 : 0); continue; }
                 int scale = 1, bullet = 0;
@@ -347,7 +353,7 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
                 if (bullet) {
                     for (int by = 2; by < 6; by++)
                         for (int bx = 2; bx < 6; bx++)
-                            putpixel(pixels, buf_w, buf_h, lx + bx, lmd_y + by, c);
+                            putpixel(pixels, buf_w, buf_h, lx + bx, doc_y + by, c);
                     lx += col_w;
                 }
                 int cx = 0;
@@ -377,7 +383,7 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
                                 for (int col = 0; col < 8; col++)
                                     if (rowbits[row] & (1 << (7 - col))) {
                                         int px = lx + (int)cx * col_w + col;
-                                        int py = lmd_y + row;
+                                        int py = doc_y + row;
                                         putpixel(pixels, buf_w, buf_h, px, py, cc);
                                     }
                             cx++;
@@ -397,7 +403,7 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
                         for (int col = 0; col < 8; col++)
                             if (rowbits[row] & (1 << (7 - col))) {
                                 int px = lx + (int)cx * col_w + col;
-                                int py = lmd_y + row;
+                                int py = doc_y + row;
                                 if (scale == 2) {
                                     putpixel(pixels, buf_w, buf_h, px * 2, py * 2, c);
                                     putpixel(pixels, buf_w, buf_h, px * 2 + 1, py * 2, c);
@@ -412,7 +418,7 @@ void larsh_render_frame(const larsh_scene_t* s, uint32_t tick, uint32_t* pixels,
                 }
                 while (*ln && *ln != '\n') ln++;
                 if (*ln == '\n') ln++;
-                lmd_y += (scale == 2 ? 16 : line_h);
+                doc_y += (scale == 2 ? 16 : line_h);
             }
         } else if (o->type == 3) {
             static const uint8_t font8[96][8] = {

@@ -342,6 +342,7 @@ disk_err_msg db 'Disk read error!', 0
 
 boot_drive db 0
 total_sectors dw 0
+chs_lba dd 0
 
 ; INT 13h Extensions Disk Address Packet (DAP)
 dap:
@@ -367,9 +368,80 @@ disk_read_lba:
     mov ah, 0x42
     mov dl, [boot_drive]
     int 0x13
+    jnc .ok
+    call disk_read_chs
     jc disk_error
+.ok:
     pop ds
     popa
+    ret
+
+; Classic floppy CHS fallback for El Torito emulation BIOSes without EDD.
+disk_read_chs:
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+
+    mov si, [dap_count]
+    mov bx, [dap_off]
+    mov ax, [dap_seg]
+    mov es, ax
+    mov eax, [dap_lba]
+    mov [chs_lba], eax
+.loop:
+    test si, si
+    jz .done
+
+    mov eax, [chs_lba]
+    xor edx, edx
+    mov ecx, 36
+    div ecx                 ; EAX=cylinder, EDX=head*18+sector_index
+    mov di, ax
+    mov ax, dx
+    xor dx, dx
+    mov cx, 18
+    div cx                  ; AX=head, DX=sector_index
+    mov dh, al
+    mov ax, di
+    mov ch, al
+    and ah, 0x03
+    shl ah, 6
+    mov cl, dl
+    inc cl
+    or cl, ah
+
+    mov ax, 0x0201
+    mov dl, [boot_drive]
+    int 0x13
+    jc .fail
+
+    add bx, 512
+    jnc .same_seg
+    mov ax, es
+    add ax, 0x1000
+    mov es, ax
+.same_seg:
+    inc dword [chs_lba]
+    dec si
+    jmp .loop
+
+.done:
+    clc
+    jmp .out
+.fail:
+    stc
+.out:
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
     ret
 
 disk_error:

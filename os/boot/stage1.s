@@ -10,6 +10,31 @@ ORG 0x7C00
 
 STAGE2_LOAD equ 0x7E00
 
+    jmp short start
+    nop
+
+    ; 1.44M floppy BPB. Raw BIOS boot does not need FAT, but El Torito
+    ; floppy emulation firmware often expects these geometry fields.
+    db 'LARDOS  '        ; OEM
+    dw 512               ; bytes per sector
+    db 1                 ; sectors per cluster
+    dw 1                 ; reserved sectors
+    db 2                 ; FAT count
+    dw 224               ; root entries
+    dw 2880              ; total sectors
+    db 0xF0              ; media descriptor
+    dw 9                 ; sectors per FAT
+    dw 18                ; sectors per track
+    dw 2                 ; heads
+    dd 0                 ; hidden sectors
+    dd 0                 ; large total sectors
+    db 0                 ; drive number
+    db 0                 ; reserved
+    db 0x29              ; extended boot signature
+    dd 0x4C415244        ; volume serial "LARD"
+    db 'LARDOS BOOT'     ; volume label
+    db 'FAT12   '        ; filesystem type
+
 start:
     cli
     xor ax, ax
@@ -31,8 +56,21 @@ start:
     mov ah, 0x42
     mov dl, [boot_drive]
     int 0x13
+    jnc .stage2_ok
+
+    ; El Torito floppy emulation may expose only classic CHS reads.
+    xor ax, ax
+    mov es, ax
+    mov bx, STAGE2_LOAD
+    mov ax, 0x0200 | STAGE2_SECTORS
+    mov ch, 0
+    mov cl, 2
+    mov dh, 0
+    mov dl, [boot_drive]
+    int 0x13
     jc disk_error
 
+.stage2_ok:
     mov dl, [boot_drive]
     jmp 0x0000:STAGE2_LOAD
 

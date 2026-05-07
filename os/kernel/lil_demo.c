@@ -46,5 +46,5 @@ int lil_demo_inline(char* out, uint32_t out_cap)
     b.len = 0;
     if (out && out_cap) out[0] = '\0';
 
-    return LIL_ASM_IO("(print (+ 40 2))", buf_putc, &b);
+    return LIL_ASM_IO("(begin (print (pow 2 8)) (repeat 3 (printn it) (emit 32)) (emit 10))", buf_putc, &b);
 }

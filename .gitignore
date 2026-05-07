@@ -2,3 +2,17 @@
 ._*
 Thumbs.db
 System Volume Information/
+build/tools/
+os/*.img
+os/*.iso
+os/release/
+os/boot/*.bin
+os/kernel/*.bosx
+os/kernel/*.elf
+os/kernel/*.o
+os/kernel/lafillo_demo_data.inc
+os/kernel/releases_lardd.inc
+os/lang/examples/*.bosx
+os/lang/examples/*.elf
+os/lang/examples/*.o
+os/os-image.bin

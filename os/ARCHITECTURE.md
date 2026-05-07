@@ -81,7 +81,9 @@ flowchart LR
     LD["ld -m elf_x86_64"]
     MKARDX["mkardx"]
     MKIMG["mkimg"]
+    MKISO["mkiso"]
     Image["os-image.bin"]
+    Release["release/vX/lardos-vX.img + .iso"]
 
     BootS --> NASM
     KernelS --> NASM
@@ -90,6 +92,7 @@ flowchart LR
     NASM --> LD
     GCC --> LD
     LD --> MKARDX --> MKIMG --> Image
+    Image --> MKISO --> Release
 ```
 
 ## Networking And TLS
@@ -137,3 +140,35 @@ requires the final signature to validate against that native table.
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | Native TLS | `os/kernel/lard_tls.c`, `os/include/lard_tls.h` |
 | GUI and shell | `os/kernel/gui.c`, `os/kernel/lsh.c`, `os/kernel/lafillo.c` |
+
+## Built-In User Tools
+
+`kernel/fs.c` embeds `lardos.lars` as a local control-room document for the Doc
+tab and `lardd_guide.lardd` as the native document-format guide. LardOS uses
+`LARS` instead of HTML for local structured pages and `LARDD` instead of
+Markdown for project documents. `kernel/lard_doc.c` renders both formats with a
+small freestanding C parser.
+
+`LSH` provides command discovery (`help`), a system control map (`control`), a
+system snapshot (`status`), native document rendering (`lars`, `lardd`, `doc`),
+native LIL script execution (`lil file`), writable RAM file editing (`write`,
+`append`, `copy`), LPST persistence
+(`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and
+SUM-only raw machine controls (`peek`, `poke`, `asm_`).
+
+LIL is available in both the kernel and the host toolchain. Its control forms
+include assertions, `when`/`unless`, `repeat` with the `it` index, stepped
+`for` loops, and integer helpers such as `clamp`, `between`, `within`, `pow`,
+`gcd`, and `lcm`.
+
+Release suffix policy is deliberately small and visible: `a` is official, `b`
+is beta/experimental, and `p` is hotpatch.
+
+Feature work is released as it lands. A feature release updates the kernel
+version, records the change in `os/RELEASES.lardd`, embeds the matching
+`releases.lardd` file so the `release` command shows the same history inside
+LardOS, and produces versioned boot media with `make release`.
+
+Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
+builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
+bootable El Torito ISO for `release/<version>/lardos-<version>.iso`.

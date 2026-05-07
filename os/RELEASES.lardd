@@ -1,0 +1,28 @@
+LARDD 1
+TITLE LardOS Releases
+TEXT Every feature addition gets a release entry. The running kernel version is the active release.
+TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
+
+SECTION v1.5.0a
+ITEM Added C-only mkiso host tooling for bootable El Torito ISO release artifacts.
+ITEM Added make release to publish versioned IMG and ISO files under os/release.
+ITEM Added run-iso for checking the ISO boot path in QEMU.
+
+SECTION v1.4.0a
+ITEM Added LSH lil file execution for native LIL scripts in the in-memory filesystem.
+ITEM Added features.lil as an embedded script tour for LIL.
+ITEM Extended LIL with assert, when, unless, repeat, stepped for loops, clamp, between, within, pow, gcd, and lcm.
+ITEM Updated the host LIL runner to match kernel LIL semantics for printn, emit, defun, for, and new feature forms.
+
+SECTION v1.3.0a
+ITEM Added LARS as the native replacement for HTML local documents.
+ITEM Added LARDD as the native replacement for Markdown-style project docs.
+ITEM Added the kernel lard_doc renderer plus lars, lardd, doc, and release shell commands.
+ITEM Switched the Doc tab home file to file://lardos.lars.
+
+SECTION v1.2.0a
+ITEM Added full-control LSH surface commands: control, status, peek, poke, write, append, and copy.
+ITEM Added SUM-only raw memory controls for user-owned system inspection.
+ITEM Removed stale checked-in kernel object files from the build path.
+
+END

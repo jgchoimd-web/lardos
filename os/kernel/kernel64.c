@@ -24,6 +24,7 @@
 #include "syscall.h"
 #include "usermode.h"
 #include "lafillo.h"
+#include "lard_doc.h"
 #include "smp.h"
 #include "string.h"
 #include "fs.h"
@@ -346,9 +347,11 @@ void kmain(void)
                         uint32_t i;
                         for (i = 0; i < sz; i++) resp[i] = (char)d[i];
                         resp[i] = '\0';
-                        static char html_out[4096];
-                        if (lafillo_http_to_text(resp, (uint32_t)sz, html_out, sizeof(html_out)) == 0) {
-                            gui_lafillo_set_content(html_out, resp);
+                        static char doc_out[4096];
+                        if (lard_doc_to_text(resp, (uint32_t)sz, doc_out, sizeof(doc_out)) == 0) {
+                            gui_lafillo_set_content(doc_out, resp);
+                        } else if (lafillo_http_to_text(resp, (uint32_t)sz, doc_out, sizeof(doc_out)) == 0) {
+                            gui_lafillo_set_content(doc_out, resp);
                         } else {
                             gui_set_response(resp);
                         }
@@ -384,9 +387,11 @@ void kmain(void)
                     if (r != 0) {
                         gui_set_response((is_https && resp[0]) ? resp : (is_https ? "HTTPS failed" : "HTTP failed"));
                     } else {
-                        static char html_out[4096];
-                        if (lafillo_http_to_text(resp, (uint32_t)strlen(resp), html_out, sizeof(html_out)) == 0) {
-                            gui_lafillo_set_content(html_out, resp);
+                        static char doc_out[4096];
+                        if (lard_doc_to_text(resp, (uint32_t)strlen(resp), doc_out, sizeof(doc_out)) == 0) {
+                            gui_lafillo_set_content(doc_out, resp);
+                        } else if (lafillo_http_to_text(resp, (uint32_t)strlen(resp), doc_out, sizeof(doc_out)) == 0) {
+                            gui_lafillo_set_content(doc_out, resp);
                         } else {
                             gui_set_response(resp);
                         }

@@ -9,6 +9,8 @@
 #include "os_vm.h"
 #include "lardx_load.h"
 #include "lafillo.h"
+#include "lard_doc.h"
+#include "lil.h"
 #include "lar.h"
 #include "lvcs.h"
 #include "drfl.h"
@@ -20,7 +22,7 @@
 #include <stdint.h>
 
 #define LSH_MAGIC  0x0048534Cu  /* "LSH\0" LE */
-#define LARDOS_VERSION "v1.0.0a"
+#define LARDOS_VERSION "v1.5.0a"
 
 static char s_drive = 'X';
 static char s_output[LSH_MAX_OUTPUT];
@@ -188,6 +190,22 @@ static void out_append_hex32(uint32_t v)
     }
 }
 
+static void out_append_hex64(uint64_t v)
+{
+    static const char hex[] = "0123456789abcdef";
+    out_append("0x");
+    for (int i = 15; i >= 0; i--) {
+        out_append_char(hex[(v >> (uint32_t)(i * 4)) & 0xFu]);
+    }
+}
+
+static void out_append_hex8(uint8_t v)
+{
+    static const char hex[] = "0123456789abcdef";
+    out_append_char(hex[(v >> 4) & 0xFu]);
+    out_append_char(hex[v & 0xFu]);
+}
+
 static char lardos_version_suffix(void)
 {
     uint32_t i = 0;
@@ -199,7 +217,7 @@ static const char* lardos_version_channel(void)
 {
     char suffix = lardos_version_suffix();
     if (suffix == 'a') return "official";
-    if (suffix == 'b') return "beta";
+    if (suffix == 'b') return "beta-experimental";
     if (suffix == 'p') return "hotpatch";
     return "unknown";
 }
@@ -376,6 +394,46 @@ static void cmd_lafillo(const char* args)
     out_append("\n");
 }
 
+static void cmd_larddoc(const char* args, const char* usage)
+{
+    char drv;
+    char name[64];
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    char out[2048];
+    resolve_path(args, &drv, name, sizeof(name));
+    if (!name[0]) {
+        out_append(usage);
+        out_append("\n");
+        return;
+    }
+    const FsFile* f = lsh_open_read(drv, name);
+    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    if (f) {
+        data = f->data;
+        size = f->size;
+    } else if (w) {
+        data = w->data;
+        size = w->size;
+    }
+    if (!data || size == 0 || size >= 4096) {
+        out_append("doc: file not found or too large.\n");
+        return;
+    }
+    if (lard_doc_to_text((const char*)data, size, out, sizeof(out)) != 0) {
+        out_append("doc: not a LARS/LARDD document.\n");
+        return;
+    }
+    out_append(out);
+    out_append("\n");
+}
+
+static void cmd_release(const char* args)
+{
+    (void)args;
+    cmd_larddoc("releases.lardd", "Usage: release");
+}
+
 static void lar_list_lsh_cb(const lar_entry_t* entry, void* user)
 {
     (void)user;
@@ -494,6 +552,38 @@ static int vcs_parse_u32(const char** args, uint32_t* out)
         v = v * 10u + (uint32_t)(*p - '0');
         p++;
     }
+    while (*p == ' ' || *p == '\t') p++;
+    *args = p;
+    *out = v;
+    return 0;
+}
+
+static int lsh_parse_u64(const char** args, uint64_t* out)
+{
+    const char* p = *args;
+    uint64_t v = 0;
+    int any = 0;
+    int hex = 0;
+    while (*p == ' ' || *p == '\t') p++;
+    if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+        hex = 1;
+        p += 2;
+    }
+    while (*p) {
+        uint32_t d;
+        uint64_t next;
+        if (*p >= '0' && *p <= '9') d = (uint32_t)(*p - '0');
+        else if (hex && *p >= 'a' && *p <= 'f') d = (uint32_t)(*p - 'a' + 10);
+        else if (hex && *p >= 'A' && *p <= 'F') d = (uint32_t)(*p - 'A' + 10);
+        else break;
+        if (!hex && d > 9u) break;
+        next = hex ? ((v << 4) | (uint64_t)d) : (v * 10u + (uint64_t)d);
+        if (next < v) return -2;
+        v = next;
+        any = 1;
+        p++;
+    }
+    if (!any) return -1;
     while (*p == ' ' || *p == '\t') p++;
     *args = p;
     *out = v;
@@ -813,6 +903,7 @@ static void cmd_selftest(const char* args)
     const char* driver;
     const FsFile* bundle;
     const uint8_t hash_data[3] = { 'a', 'b', 'c' };
+    int64_t lil_value = 0;
     (void)args;
 
     out_append("LardOS ");
@@ -826,6 +917,10 @@ static void cmd_selftest(const char* args)
     fs_persist_detail(&bank, &generation, &bank_sectors);
 
     selftest_check("fs: hello.txt", fs_open("hello.txt") != NULL, &pass, &fail);
+    selftest_check("fs: lardos.lars", fs_open("lardos.lars") != NULL, &pass, &fail);
+    selftest_check("fs: lardd guide", fs_open("lardd_guide.lardd") != NULL, &pass, &fail);
+    selftest_check("fs: releases", fs_open("releases.lardd") != NULL, &pass, &fail);
+    selftest_check("fs: features.lil", fs_open("features.lil") != NULL, &pass, &fail);
     selftest_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, &pass, &fail);
     selftest_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, &pass, &fail);
     selftest_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, &pass, &fail);
@@ -835,6 +930,7 @@ static void cmd_selftest(const char* args)
     selftest_check("lpst: driver string", driver && driver[0], &pass, &fail);
     selftest_check("lvcs: hash engine", lvcs_hash(hash_data, sizeof(hash_data)) != 0, &pass, &fail);
     selftest_check("lcnt: dev profile", (lcontainer_profile_caps("dev") & (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL)) == (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL), &pass, &fail);
+    selftest_check("lil: feature forms", lil_eval_int("(begin (assert (eq (pow 2 8) 256)) (assert (eq (clamp 99 0 10) 10)) (gcd 84 30))", &lil_value) == 0 && lil_value == 6, &pass, &fail);
 
     out_append("Selftest: ");
     out_append_u32(pass);
@@ -862,6 +958,309 @@ static void cmd_ver(const char* args)
     out_append(" (");
     out_append(lardos_version_channel());
     out_append(")\n");
+}
+
+static void cmd_help(const char* args)
+{
+    (void)args;
+    out_append("Lard Shell commands\n");
+    out_append("  help control status release ver selftest cls\n");
+    out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
+    out_append("  write file text  append file text  copy src dst\n");
+    out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
+    out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
+    out_append("  bosl file  lil file  lafvm file  osvm file  run file.bosx [args]\n");
+    out_append("  lcnt list|create|rm|use|exit|run|info\n");
+    out_append("  vcs init|status|add|commit|log|show\n");
+    out_append("  drivers fsstat fsload fssave sync sandbox exitsandbox\n");
+    out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
+    out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
+}
+
+static void cmd_control(const char* args)
+{
+    (void)args;
+    out_append("LardOS control surface\n");
+    out_append("  Kernel and host tools are C. Runtime features stay in-tree.\n");
+    out_append("  Files live in LFS, RAM files, LPST persistence, and embedded FS tables.\n");
+    out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
+    out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
+    out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
+    out_append("  Release suffix: a=official, b=beta-experimental, p=hotpatch.\n");
+    out_append("  Each feature addition gets a version bump and releases.lardd entry.\n");
+    out_append("\n");
+    out_append("Start points:\n");
+    out_append("  status              inspect version, drivers, storage, containers\n");
+    out_append("  write notes.txt ... edit the writable RAM filesystem\n");
+    out_append("  vcs status          inspect the in-OS source/history layer\n");
+    out_append("  lcnt info           inspect syscall-cap containers\n");
+    out_append("  sum                 enter full-control ring-0 mode\n");
+    out_append("  peek 0xb8000 32     read raw memory in SUM\n");
+    out_append("  poke addr val 8     write raw memory in SUM\n");
+}
+
+static void cmd_status(const char* args)
+{
+    uint32_t available;
+    uint32_t dirty;
+    uint32_t lba;
+    uint32_t sectors;
+    uint32_t bank;
+    uint32_t generation;
+    uint32_t bank_sectors;
+    uint32_t drivers;
+    int last;
+    const char* driver;
+    (void)args;
+
+    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
+    fs_persist_detail(&bank, &generation, &bank_sectors);
+    drivers = drfl_list(NULL, NULL);
+
+    out_append("LardOS ");
+    out_append(LARDOS_VERSION);
+    out_append(" (");
+    out_append(lardos_version_channel());
+    out_append(")\n");
+    out_append("Drive: ");
+    out_append_char(s_drive);
+    out_append(":\\\n");
+    out_append("Mode: ");
+    if (s_in_sum_mode) {
+        out_append("SUM ring0\n");
+    } else if (s_sandbox_mode) {
+        out_append("sandbox\n");
+    } else if (lcontainer_has_active()) {
+        out_append("container ");
+        out_append(lcontainer_active_name());
+        out_append("\n");
+    } else {
+        out_append("normal\n");
+    }
+    out_append("LPST: ");
+    out_append(available ? "online" : "offline");
+    out_append(dirty ? ", dirty" : ", clean");
+    out_append(", driver=");
+    out_append(driver && driver[0] ? driver : "none");
+    out_append(", last=");
+    out_append_i32(last);
+    out_append("\n");
+    out_append("LPST layout: lba=");
+    out_append_u32(lba);
+    out_append(", sectors=");
+    out_append_u32(sectors);
+    out_append(", bank_sectors=");
+    out_append_u32(bank_sectors);
+    out_append(", active_bank=");
+    if (bank == 0xFFFFFFFFu) out_append("none");
+    else out_append_u32(bank);
+    out_append(", gen=");
+    out_append_u32(generation);
+    out_append("\n");
+    out_append("Drivers: ");
+    out_append_u32(drivers);
+    out_append(" DRFL entries\n");
+    out_append("Containers: ");
+    out_append_u32(lcontainer_count());
+    if (lcontainer_has_active()) {
+        out_append(", active=");
+        out_append(lcontainer_active_name());
+    }
+    out_append("\n");
+}
+
+static int lsh_require_sum(const char* cmd)
+{
+    if (s_in_sum_mode) return 1;
+    out_append(cmd);
+    out_append(": SUM mode required. Type 'sum' first.\n");
+    return 0;
+}
+
+static void cmd_peek(const char* args)
+{
+    uint64_t addr;
+    uint64_t len = 64;
+    volatile const uint8_t* p;
+    if (!lsh_require_sum("peek")) return;
+    if (lsh_parse_u64(&args, &addr) != 0) {
+        out_append("Usage: peek addr [len]\n");
+        return;
+    }
+    if (*args && lsh_parse_u64(&args, &len) != 0) {
+        out_append("Usage: peek addr [len]\n");
+        return;
+    }
+    if (len == 0) len = 1;
+    if (len > 256) {
+        out_append("peek: capped to 256 bytes for console output.\n");
+        len = 256;
+    }
+    p = (volatile const uint8_t*)(uintptr_t)addr;
+    for (uint64_t i = 0; i < len; i++) {
+        if ((i & 15u) == 0) {
+            if (i) out_append("\n");
+            out_append_hex64(addr + i);
+            out_append(": ");
+        }
+        out_append_hex8(p[i]);
+        out_append_char(' ');
+    }
+    out_append("\n");
+}
+
+static void cmd_poke(const char* args)
+{
+    uint64_t addr;
+    uint64_t val;
+    uint64_t width = 8;
+    if (!lsh_require_sum("poke")) return;
+    if (lsh_parse_u64(&args, &addr) != 0 || lsh_parse_u64(&args, &val) != 0) {
+        out_append("Usage: poke addr value [8|16|32]\n");
+        return;
+    }
+    if (*args && lsh_parse_u64(&args, &width) != 0) {
+        out_append("Usage: poke addr value [8|16|32]\n");
+        return;
+    }
+    if (width == 8) {
+        *(volatile uint8_t*)(uintptr_t)addr = (uint8_t)val;
+    } else if (width == 16) {
+        *(volatile uint16_t*)(uintptr_t)addr = (uint16_t)val;
+    } else if (width == 32) {
+        *(volatile uint32_t*)(uintptr_t)addr = (uint32_t)val;
+    } else {
+        out_append("poke: width must be 8, 16, or 32.\n");
+        return;
+    }
+    out_append("poke: wrote ");
+    out_append_u32((uint32_t)width);
+    out_append("-bit ");
+    out_append_hex64(val);
+    out_append(" -> ");
+    out_append_hex64(addr);
+    out_append("\n");
+}
+
+static int lsh_read_data_arg(const char* arg, const uint8_t** data, uint32_t* size,
+                             char* name, uint32_t name_cap)
+{
+    char drv;
+    const FsFile* f;
+    FsWritableFile* w;
+    resolve_path(arg, &drv, name, name_cap);
+    if (!name[0]) return -1;
+    f = lsh_open_read(drv, name);
+    if (f) {
+        *data = f->data;
+        *size = f->size;
+        return 0;
+    }
+    w = fs_open_writable(name);
+    if (w) {
+        *data = w->data;
+        *size = w->size;
+        return 0;
+    }
+    return -2;
+}
+
+static void cmd_copy(const char* args)
+{
+    char src_arg[64];
+    char dst_arg[64];
+    char src_name[64];
+    char dst_name[64];
+    char dst_drive;
+    const uint8_t* data;
+    uint32_t size;
+    FsWritableFile* dst;
+    if (vcs_read_word(&args, src_arg, sizeof(src_arg)) != 0 ||
+        vcs_read_word(&args, dst_arg, sizeof(dst_arg)) != 0) {
+        out_append("Usage: copy src dst\n");
+        return;
+    }
+    if (lsh_read_data_arg(src_arg, &data, &size, src_name, sizeof(src_name)) != 0) {
+        out_append("copy: source not found.\n");
+        return;
+    }
+    resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    (void)dst_drive;
+    dst = fs_open_writable(dst_name);
+    if (!dst) {
+        out_append("copy: destination must be a writable RAM file.\n");
+        return;
+    }
+    if (size > dst->cap) {
+        out_append("copy: destination too small.\n");
+        return;
+    }
+    fs_write(dst, 0, data, size);
+    out_append("Copied ");
+    out_append(src_name);
+    out_append(" -> ");
+    out_append(dst_name);
+    out_append(" (");
+    out_append_u32(size);
+    out_append(" bytes)\n");
+}
+
+static void cmd_write_like(const char* args, int append)
+{
+    char file_arg[64];
+    char name[64];
+    char drv;
+    FsWritableFile* w;
+    uint32_t len = 0;
+    uint32_t wrote;
+    const uint8_t newline = '\n';
+
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+        out_append(append ? "Usage: append file text\n" : "Usage: write file text\n");
+        return;
+    }
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    (void)drv;
+    w = fs_open_writable(name);
+    if (!w) {
+        out_append(append ? "append: target must be a writable RAM file.\n" :
+                            "write: target must be a writable RAM file.\n");
+        return;
+    }
+    while (args[len]) len++;
+    if (append) {
+        uint32_t need = len + (len ? 1u : 0u);
+        if (w->size + need > w->cap) {
+            out_append("append: not enough space.\n");
+            return;
+        }
+        wrote = fs_append(w, (const uint8_t*)args, len);
+        if (len) wrote += fs_append(w, &newline, 1);
+        out_append("Appended ");
+    } else {
+        uint32_t need = len + (len ? 1u : 0u);
+        if (need > w->cap) {
+            out_append("write: text too large.\n");
+            return;
+        }
+        wrote = fs_write(w, 0, (const uint8_t*)args, len);
+        if (len) wrote += fs_write(w, len, &newline, 1);
+        out_append("Wrote ");
+    }
+    out_append_u32(wrote);
+    out_append(" bytes to ");
+    out_append(name);
+    out_append("\n");
+}
+
+static void cmd_write(const char* args)
+{
+    cmd_write_like(args, 0);
+}
+
+static void cmd_append(const char* args)
+{
+    cmd_write_like(args, 1);
 }
 
 static void cmd_set(const char* args)
@@ -1152,6 +1551,40 @@ static void cmd_bosl(const char* args)
     }
     int r = bosl_vm_run_jit_io(data, size, lsh_putc, NULL);
     if (r != 0) out_append("BOSL execution failed.\n");
+}
+
+static void cmd_lil(const char* args)
+{
+    char drv;
+    char name[64];
+    static char src[8192];
+    resolve_path(args, &drv, name, sizeof(name));
+    if (!name[0]) {
+        out_append("Usage: lil [drive:]file.lil\n");
+        return;
+    }
+    const FsFile* f = lsh_open_read(drv, name);
+    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    const uint8_t* data = f ? f->data : (w ? w->data : NULL);
+    uint32_t size = f ? f->size : (w ? w->size : 0);
+    if (!data || size == 0) {
+        out_append("LIL file not found.\n");
+        return;
+    }
+    if (size >= sizeof(src)) {
+        out_append("LIL source too large.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < size; i++) {
+        src[i] = (char)data[i];
+    }
+    src[size] = 0;
+    int r = lil_run(src, lsh_putc, NULL);
+    if (r != 0) {
+        out_append("LIL execution failed: ");
+        out_append_i32(r);
+        out_append("\n");
+    }
 }
 
 #define DVM_MAGIC 0x004D5644u  /* "DVM\0" LE */
@@ -1465,6 +1898,18 @@ static void parse_and_run(const char* cmd, const char* args)
 {
     if (!cmd || !cmd[0]) return;
 
+    if (strcmp(cmd, "help") == 0 || (cmd[0] == '?' && cmd[1] == '\0')) { cmd_help(args); return; }
+    if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
+    if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
+    if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
+    if (strcmp(cmd, "peek") == 0) { cmd_peek(args); return; }
+    if (strcmp(cmd, "poke") == 0) { cmd_poke(args); return; }
+    if (strcmp(cmd, "lars") == 0) { cmd_larddoc(args, "Usage: lars [drive:]file.lars"); return; }
+    if (strcmp(cmd, "lardd") == 0) { cmd_larddoc(args, "Usage: lardd [drive:]file.lardd"); return; }
+    if (strcmp(cmd, "doc") == 0) { cmd_larddoc(args, "Usage: doc [drive:]file.lars|file.lardd"); return; }
+    if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
+    if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }
+    if (strcmp(cmd, "append") == 0) { cmd_append(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'e' && cmd[2] == 't' && cmd[3] == '\0') { cmd_set(args); return; }
     if (cmd[0] == 'm' && cmd[1] == 'o' && cmd[2] == 'r' && cmd[3] == 'e' && cmd[4] == '\0') { cmd_more(args); return; }
     if (cmd[0] == 'd' && cmd[1] == 'i' && cmd[2] == 'r' && cmd[3] == '\0') { cmd_dir(args); return; }
@@ -1497,6 +1942,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'a' && cmd[1] == 's' && cmd[2] == 'm' && cmd[3] == '_' && cmd[4] == '\0') { cmd_asm_(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 's' && cmd[4] == 'h' && cmd[5] == '\0') { cmd_larsh(args); return; }
     if (cmd[0] == 'b' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 'l' && cmd[4] == '\0') { cmd_bosl(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == '\0') { cmd_lil(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'f' && cmd[3] == 'v' && cmd[4] == 'm' && cmd[5] == '\0') { cmd_lafvm(args); return; }
     if (cmd[0] == 'o' && cmd[1] == 's' && cmd[2] == 'v' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_osvm(args); return; }
     if (cmd[0] == 'r' && cmd[1] == 'u' && cmd[2] == 'n' && cmd[3] == '\0') { cmd_run(args); return; }
@@ -1530,6 +1976,7 @@ void lsh_init(void)
     s_sandbox_mode = 0;
     lcontainer_init();
     lvcs_init();
+    out_append("Lard Shell ready. Type help for commands.\n");
 }
 
 static void parse_and_run(const char* cmd, const char* args);

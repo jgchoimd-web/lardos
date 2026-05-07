@@ -3,6 +3,7 @@
 #include "storage.h"
 #include "fs_ldll.inc"
 #include "lafillo_demo_data.inc"
+#include "releases_lardd.inc"
 #include <stddef.h>
 
 /* Hybrid: built-in table + LFS volume + writable RAM files. */
@@ -79,6 +80,62 @@ static const uint8_t file_hello_txt[] =
 static const uint8_t file_readme_txt[] =
     "This is a tiny RAM-based filesystem used for experimentation.\n";
 
+static const uint8_t file_lardos_lars[] =
+    "LARS 1\n"
+    "title LardOS Control Room\n"
+    "p A TempleOS-inspired, user-owned system built from C, in-tree tools, native filesystems, and LardOS languages.\n"
+    "p LardOS local documents use LARS instead of HTML so the system owns its own document surface.\n"
+    "section Full-control starts\n"
+    "li Run control in LSH for the system control map.\n"
+    "li Run status to inspect version, storage, drivers, and containers.\n"
+    "li Use write notes.txt text and append notes.txt text for the RAM FS.\n"
+    "li Use vcs status/log/show to inspect the in-OS history layer.\n"
+    "li Use lcnt info to inspect syscall-cap containers.\n"
+    "li Run lil features.lil to try the native LIL scripting language.\n"
+    "li Use sum, peek, poke, and asm_ when you want raw ring-0 control.\n"
+    "cmd release\n"
+    "cmd lil features.lil\n"
+    "cmd lardd lardd_guide.lardd\n"
+    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch.\n"
+    "end\n";
+
+static const uint8_t file_lardd_guide[] =
+    "LARDD 1\n"
+    "TITLE LARDD Format\n"
+    "TEXT LARDD replaces Markdown for LardOS-authored local documents.\n"
+    "TEXT It is record based, easy to parse in freestanding C, and readable without a renderer.\n"
+    "SECTION Records\n"
+    "ITEM TITLE text -> document title.\n"
+    "ITEM SECTION text -> section heading.\n"
+    "ITEM TEXT text -> paragraph line.\n"
+    "ITEM ITEM text -> list item.\n"
+    "ITEM QUOTE text -> quoted note.\n"
+    "ITEM CODE / ENDCODE -> verbatim code block.\n"
+    "SECTION Example\n"
+    "CODE\n"
+    "LARDD 1\n"
+    "TITLE Notes\n"
+    "TEXT A local LardOS document.\n"
+    "ITEM One record per line.\n"
+    "ENDCODE\n"
+    "END\n";
+
+static const uint8_t file_features_lil[] =
+    "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
+    "(begin\n"
+    "  (assert (eq (pow 2 8) 256))\n"
+    "  (assert (eq (gcd 84 30) 6))\n"
+    "  (print (clamp 99 0 10))\n"
+    "  (print (between 5 1 5))\n"
+    "  (print (within 5 1 5))\n"
+    "  (when (eq 1 1) (print 111))\n"
+    "  (unless 0 (print 222))\n"
+    "  (repeat 4 (printn it) (emit 32))\n"
+    "  (emit 10)\n"
+    "  (for i 5 -1 -2 (begin (printn i) (emit 32)))\n"
+    "  (emit 10)\n"
+    "  (print (lcm 6 14 21)))\n";
+
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
 static const uint8_t file_bundle_lar[166] = {
     'L','A','R','1', 0x03,0x00, 0x4D,0x00,
@@ -111,7 +168,7 @@ static const uint8_t file_sample_bmp[246] = {
     255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0,
 };
 
-/* demo.larsh - LARSH animation: rect + circle + text + LMD with keyframe */
+/* demo.larsh - LARSH animation: rect + circle + text + LARDD with keyframe */
 static const uint8_t file_demo_larsh[] =
     "LARSH 1\n"
     "w 256\n"
@@ -123,7 +180,12 @@ static const uint8_t file_demo_larsh[] =
     "obj 0 rect 20 80 60 40 0xe94560\n"
     "obj 1 circle 200 96 25 0x0f3460\n"
     "obj 2 text 80 4 \"Hello LardOS\" 0xeaeaea\n"
-    "obj 3 lmd 8 24 240 160 0xeaeaea \"# LMD Demo\\n- **bold** text\\n- `code` style\\n- List items\"\n"
+    "obj 3 lardd 8 24 240 160 0xeaeaea \"LARDD 1\n"
+    "TITLE LARSH LARDD Demo\n"
+    "TEXT Animated scenes can carry native LardOS documents.\n"
+    "ITEM No Markdown surface is needed.\n"
+    "ITEM LARDD is parsed by kernel/lard_doc.c.\n"
+    "END\"\n"
     "\n"
     "key 0 0 x 20\n"
     "key 60 0 x 180\n"
@@ -148,6 +210,10 @@ static const FsFile FS_FILES[] = {
     { "hello.shrine",  file_hello_shrine,  sizeof(file_hello_shrine) },
     { "hello.txt",     file_hello_txt,     sizeof(file_hello_txt) - 1 },
     { "readme.txt",    file_readme_txt,    sizeof(file_readme_txt) - 1 },
+    { "lardos.lars",   file_lardos_lars,   sizeof(file_lardos_lars) - 1 },
+    { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
+    { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
+    { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
     { "rtl8139.drfl",  file_rtl8139_drfl,  sizeof(file_rtl8139_drfl) },

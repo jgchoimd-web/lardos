@@ -438,7 +438,7 @@ int gui_init(void)
     g.lafillo_extracted[0] = '\0';
 
     // Default URL
-    const char* def = "example.com/";
+    const char* def = "file://lardos.lars";
     for (g.tb_len = 0; def[g.tb_len] && g.tb_len + 1 < sizeof(g.tb); g.tb_len++) g.tb[g.tb_len] = def[g.tb_len];
     g.tb[g.tb_len] = '\0';
     g.tb_cur = g.tb_len;
@@ -1372,7 +1372,7 @@ void gui_render(void)
     fb_fill_rect(tgt, (uint16_t)(g.win_x + g.win_w - 1), (uint16_t)g.win_y, 1, (uint16_t)g.win_h, border);
 
     /* Tab bar */
-    static const char* tab_names[] = { "Web", "Calc", "Note", "Pix", "Pak", "User", "LSS", "LSH", "Play", "Edit" };
+    static const char* tab_names[] = { "Doc", "Calc", "Note", "Pix", "Pak", "User", "LSS", "LSH", "Play", "Edit" };
     int tab_y = g.win_y + 20;
     int tab_h = 24;
     int tab_w = g.win_w / 10;
@@ -1558,14 +1558,15 @@ void gui_render(void)
                 col = 0;
                 if (cp == '\n') continue;
             }
-            row = (uint16_t)(line - g.resp_scroll);
-            if (row >= (uint16_t)rows) break;
+            int visible_row = line - g.resp_scroll;
+            int on_screen = visible_row >= 0 && visible_row < rows;
+            if (on_screen) row = (uint16_t)visible_row;
 
             if (cp >= IMG_GLYPH_PUA_START && cp <= IMG_GLYPH_PUA_END) {
                 const uint32_t* px;
                 uint16_t gw, gh;
                 if (img_glyph_get(cp, &px, &gw, &gh)) {
-                    if (line >= g.resp_scroll && row < (uint16_t)rows) {
+                    if (on_screen) {
                         fb_draw_image(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), px, gw, gh);
                     }
                     col++;
@@ -1574,7 +1575,7 @@ void gui_render(void)
             }
 
             if (cp < 32 || cp > 127) cp = '?';
-            if (line >= g.resp_scroll && row < (uint16_t)rows) {
+            if (on_screen) {
                 fb_draw_char(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), (char)cp, 0xFFFFFFFF, win_bg);
             }
             col++;

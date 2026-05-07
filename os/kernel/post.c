@@ -1,6 +1,7 @@
 #include "post.h"
 
 #include "drfl.h"
+#include "cpumode.h"
 #include "fs.h"
 #include "gui.h"
 #include "lar.h"
@@ -81,6 +82,8 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     gui_ok = (gui_post_check(&gui_info) == 0);
 
     post_check("cpu: 64-bit long mode", sizeof(void*) == 8, emit, user, &pass, &fail);
+    post_check("cpu: mode bridge ready", cpu_mode_bridge_ready(), emit, user, &pass, &fail);
+    post_check("cpu: real/long roundtrip", cpu_mode_roundtrip_probe() == 0, emit, user, &pass, &fail);
     post_check("mem: heap allocator pattern", post_heap_pattern(), emit, user, &pass, &fail);
     post_check("mem: heap free counter", mem_bytes_free() > 1024u * 1024u, emit, user, &pass, &fail);
 

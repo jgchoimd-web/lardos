@@ -38,6 +38,12 @@ The boot sector uses the 32-bit phase only as a bridge into long mode. The
 kernel payload is built with `-m64`, linked as `elf_x86_64`, and entered through
 `entry64.s`.
 
+At runtime the kernel also owns a controlled CPU mode bridge. `cpumode.c` copies
+a low-memory trampoline to `0x6000`, and `mode_switch.s` can briefly walk from
+64-bit long mode through a 32-bit protected-mode selector into real mode, then
+restore paging, EFER, CR3, and the 64-bit code segment before returning to C.
+The bridge is explicit: use `mode probe`, the boot-time `M` option, or POST.
+
 ## Kernel
 
 ```mermaid
@@ -46,6 +52,7 @@ flowchart TB
     GDT["gdt64"]
     IDT["idt64 / isr64"]
     MMU["mmu"]
+    CpuMode["cpumode + mode_switch"]
     SMP["smp + ap_trampoline"]
     Syscall["syscall"]
     Drivers["pci / rtl8139 / ps2 / rtc"]
@@ -59,6 +66,7 @@ flowchart TB
     Kmain --> GDT
     Kmain --> IDT
     Kmain --> MMU
+    Kmain --> CpuMode
     Kmain --> SMP
     Kmain --> Syscall
     Kmain --> Drivers
@@ -143,6 +151,7 @@ POST only for 307/308.
 | Boot | `os/boot/boot.s` |
 | 64-bit entry | `os/kernel/entry64.s`, `os/kernel/kernel64.c` |
 | Descriptor tables | `os/kernel/gdt64.c`, `os/kernel/idt64.c`, `os/kernel/isr64.s` |
+| CPU mode bridge | `os/kernel/cpumode.c`, `os/kernel/mode_switch.s`, `os/include/cpumode.h` |
 | Memory | `os/kernel/mem.c`, `os/kernel/mmu.c` |
 | SMP | `os/kernel/smp.c`, `os/kernel/ap_trampoline.s`, `os/kernel/aux_kernel.s` |
 | Power-On Self-Test | `os/kernel/post.c`, `os/include/post.h` |
@@ -159,15 +168,16 @@ Markdown for project documents. `kernel/lard_doc.c` renders both formats with a
 small freestanding C parser.
 
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
-boot-time `P` option, and LSH exposes the same checks through `post` and
-`selftest`. POST covers CPU mode, heap allocation, native FS files, LARS/LARDD
-rendering, LAR archives, DRFL descriptors, expected PCI devices, GUI
+boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
+exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
+real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
+archives, DRFL descriptors, expected PCI devices, GUI
 framebuffer/layout state, LPST metadata, LVCS hashing, containers, and LIL
 feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
-POST reruns (`post`, `selftest`), native document rendering (`lars`, `lardd`,
+CPU mode bridge inspection (`mode`), POST reruns (`post`, `selftest`), native document rendering (`lars`, `lardd`,
 `doc`), native LIL script execution (`lil file`), writable RAM file editing
 (`write`, `append`, `copy`), LPST persistence
 (`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and

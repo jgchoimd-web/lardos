@@ -17,6 +17,7 @@
 #include "lcontainer.h"
 #include "gui.h"
 #include "post.h"
+#include "cpumode.h"
 #include "version.h"
 #include "io.h"
 #include "string.h"
@@ -232,7 +233,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
@@ -1085,7 +1086,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic cls\n");
+    out_append("  help control status release ver post selftest magic mode cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
@@ -1113,6 +1114,7 @@ static void cmd_control(const char* args)
     out_append("Start points:\n");
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
+    out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
     out_append("  lcnt info           inspect syscall-cap containers\n");
@@ -1188,6 +1190,81 @@ static void cmd_status(const char* args)
         out_append(", active=");
         out_append(lcontainer_active_name());
     }
+    out_append("\n");
+
+    cpu_mode_info_t mode;
+    cpu_mode_info(&mode);
+    out_append("CPU: ");
+    out_append(cpu_mode_current_name());
+    out_append(", bridge=");
+    out_append(mode.bridge_ready ? "ready" : "offline");
+    out_append(", trips=");
+    out_append_u32(mode.roundtrip_count);
+    out_append(", last=");
+    out_append(mode.last_roundtrip_ok ? "ok" : "none");
+    out_append("\n");
+}
+
+static int args_word_is(const char* args, const char* word)
+{
+    uint32_t i = 0;
+    if (!args || !word) return 0;
+    while (args[i] == ' ' || args[i] == '\t') i++;
+    uint32_t j = 0;
+    while (word[j]) {
+        if (args[i + j] != word[j]) return 0;
+        j++;
+    }
+    char tail = args[i + j];
+    return tail == '\0' || tail == ' ' || tail == '\t';
+}
+
+static int args_has_text(const char* args)
+{
+    uint32_t i = 0;
+    if (!args) return 0;
+    while (args[i] == ' ' || args[i] == '\t') i++;
+    return args[i] != '\0';
+}
+
+static void cmd_mode(const char* args)
+{
+    cpu_mode_info_t info;
+    if (!args) args = "";
+    cpu_mode_info(&info);
+
+    if (args_word_is(args, "probe") || args_word_is(args, "real")) {
+        out_append("mode: entering a controlled real16 window and returning to long64...\n");
+        if (cpu_mode_roundtrip_probe() == 0) {
+            out_append("mode: real16 -> long64 roundtrip OK\n");
+        } else {
+            cpu_mode_info(&info);
+            out_append("mode: roundtrip failed, err=");
+            out_append_u32(info.last_error);
+            out_append("\n");
+        }
+        return;
+    }
+
+    if (args_has_text(args) && !args_word_is(args, "status")) {
+        out_append("Usage: mode [status|probe|real]\n");
+        return;
+    }
+
+    out_append("CPU mode: ");
+    out_append(cpu_mode_current_name());
+    out_append("\nBridge: ");
+    out_append(info.bridge_ready ? "ready" : "offline");
+    out_append(" at ");
+    out_append_hex32(info.trampoline_pa);
+    out_append(", size=");
+    out_append_u32(info.trampoline_size);
+    out_append("\nRoundtrips: ");
+    out_append_u32(info.roundtrip_count);
+    out_append(", last=");
+    out_append(info.last_roundtrip_ok ? "ok" : "none");
+    out_append(", err=");
+    out_append_u32(info.last_error);
     out_append("\n");
 }
 
@@ -2031,6 +2108,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "help") == 0 || (cmd[0] == '?' && cmd[1] == '\0')) { cmd_help(args); return; }
     if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
+    if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
     if (strcmp(cmd, "peek") == 0) { cmd_peek(args); return; }
     if (strcmp(cmd, "poke") == 0) { cmd_poke(args); return; }

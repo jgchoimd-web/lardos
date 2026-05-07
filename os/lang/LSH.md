@@ -7,6 +7,7 @@
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `magic command [args]` - predict and run a mistyped safe built-in command.
+- `mode [status|probe|real]` - inspect or run the controlled real16/long64 bridge.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

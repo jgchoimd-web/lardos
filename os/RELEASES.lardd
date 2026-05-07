@@ -3,6 +3,13 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.9.0a
+ITEM Added a CPU mode bridge for controlled long64 to real16 and back roundtrips.
+ITEM Added cpumode.c and mode_switch.s with a low-memory trampoline at 0x6000.
+ITEM Added the LSH mode command with status, probe, and real aliases for explicit bridge tests.
+ITEM Added a boot-time M option and POST coverage for CPU mode bridge diagnostics.
+ITEM Updated GDT/MMU setup with a 32-bit protected-mode bridge selector and executable low trampoline page.
+
 SECTION v1.8.0a
 ITEM Added the magic prefix command for predicted safe command execution.
 ITEM magic command [args] corrects near-miss built-in commands and executes the predicted target directly.

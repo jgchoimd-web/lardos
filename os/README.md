@@ -73,6 +73,8 @@ commands:
   from the boot option.
 - `magic command [args]` predicts a mistyped safe built-in command and executes
   the predicted command directly, for example `magic statsu`.
+- `mode [status|probe|real]` inspects the CPU mode bridge or runs a controlled
+  real-mode window that returns to 64-bit long mode.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
@@ -87,10 +89,11 @@ commands:
 Release suffixes are part of the project contract: `a` means official, `b`
 means beta/experimental, and `p` means hotpatch.
 
-During boot, LardOS offers a `P` key option for Power-On Self-Test. POST checks
-CPU mode, heap allocation, native filesystem content, LARS/LARDD rendering, LAR
-archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
-LPST persistence metadata, LVCS hashing, containers, and LIL feature forms. The
+During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
+Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
+allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
+descriptors, expected PCI devices, GUI framebuffer/layout state, LPST
+persistence metadata, LVCS hashing, containers, and LIL feature forms. The
 screen checks are there to catch visible boot/UI regressions as well as code
 errors.
 

@@ -53,7 +53,7 @@ typedef struct __attribute__((packed)) {
     uint32_t reserved;
 } gdt_tss_t;
 
-static gdt_entry_t gdt[8];
+static gdt_entry_t gdt[9];
 static gdtr_t gdtr;
 
 extern void gdt64_load(uintptr_t gdtr_addr, uint16_t tss_sel);
@@ -117,6 +117,14 @@ void gdt64_init(void)
     gdt[6].base_hi = (uint8_t)((tss_base >> 24) & 0xFF);
     ((uint32_t*)(&gdt[6]))[2] = (uint32_t)(tss_base >> 32);
     ((uint32_t*)(&gdt[6]))[3] = 0;
+
+    /* 32-bit protected-mode bridge code for controlled real-mode roundtrips. */
+    gdt[8].limit_lo = 0xFFFF;
+    gdt[8].base_lo = 0;
+    gdt[8].base_mid = 0;
+    gdt[8].access = 0x9A;
+    gdt[8].limit_hi_flags = 0xCF;
+    gdt[8].base_hi = 0;
 
     gdtr.limit = (uint16_t)(sizeof(gdt) - 1);
     gdtr.base = (uint64_t)(uintptr_t)gdt;

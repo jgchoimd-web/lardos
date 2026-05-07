@@ -2,6 +2,7 @@
 #include "panic.h"
 #include "bootinfo.h"
 #include "usermode.h"
+#include "cpumode.h"
 
 #include <stdint.h>
 #include <stddef.h>
@@ -101,6 +102,9 @@ static void remap_kernel_ranges_in_pt0(void)
 
     // Allow VGA text memory RW (still NX)
     // 0xB8000 is inside low 2MiB, already RW+NX.
+
+    // CPU mode bridge trampoline: copied to low memory and executed briefly.
+    map_4k_in_pt0(CPU_MODE_TRAMPOLINE_PA, CPU_MODE_TRAMPOLINE_PA, PTE_W);
 
     // Stack: top at 0xA0000, grow down. Map 16KiB [0x9C000, 0xA0000), leave 4KiB guard at 0x9B000.
     uintptr_t stack_top = 0xA0000;

@@ -22,6 +22,7 @@
 #include "lsh.h"
 #include "post.h"
 #include "gdt64.h"
+#include "cpumode.h"
 #include "syscall.h"
 #include "usermode.h"
 #include "lafillo.h"
@@ -113,6 +114,7 @@ static int boot_post_poll_key(int post_only)
     ps2_key_t k;
     if (ps2_kbd_poll(&k) == 0) {
         if (k.kind == PS2K_ASCII && (k.ch == 'p' || k.ch == 'P')) return 1;
+        if (k.kind == PS2K_ASCII && (k.ch == 'm' || k.ch == 'M')) return 2;
         if (!post_only) return 1;
         return -1;
     }
@@ -125,7 +127,7 @@ static int boot_post_wait_key(uint32_t seconds, uint32_t fallback_loops, int pos
     if (start > 0) {
         for (;;) {
             int r = boot_post_poll_key(post_only);
-            if (r != 0) return r > 0 ? 1 : 0;
+            if (r != 0) return r > 0 ? r : 0;
             int64_t now = rtc_unix_seconds();
             if (now > 0 && (uint32_t)(now - start) >= seconds) return 0;
             __asm__ __volatile__("pause");
@@ -133,7 +135,7 @@ static int boot_post_wait_key(uint32_t seconds, uint32_t fallback_loops, int pos
     }
     for (uint32_t i = 0; i < fallback_loops; i++) {
         int r = boot_post_poll_key(post_only);
-        if (r != 0) return r > 0 ? 1 : 0;
+        if (r != 0) return r > 0 ? r : 0;
         __asm__ __volatile__("pause");
     }
     return 0;
@@ -145,10 +147,42 @@ static int boot_post_offer(void)
         "LardOS " LARDOS_VERSION " power-on options\n"
         "\n"
         "P  Power-On Self-Test\n"
+        "M  CPU Mode Bridge Test\n"
         "Enter or timeout  Normal boot\n";
     gui_set_response(msg);
     gui_render();
     return boot_post_wait_key(4u, 240000000u, 1);
+}
+
+static void boot_mode_run_screen(void)
+{
+    static char out[1024];
+    cpu_mode_info_t info;
+    int r;
+
+    out[0] = '\0';
+    append_line(out, sizeof(out), "LardOS " LARDOS_VERSION " CPU Mode Bridge Test\n\n");
+    append_line(out, sizeof(out), "Path: long64 -> protected32 -> real16 -> protected32 -> long64\n");
+    r = cpu_mode_roundtrip_probe();
+    cpu_mode_info(&info);
+    append_line(out, sizeof(out), r == 0 ? "PASS real16/long64 roundtrip\n" : "FAIL real16/long64 roundtrip\n");
+    append_line(out, sizeof(out), "Current: ");
+    append_line(out, sizeof(out), cpu_mode_current_name());
+    append_line(out, sizeof(out), "\nBridge: ");
+    append_line(out, sizeof(out), info.bridge_ready ? "ready" : "offline");
+    append_line(out, sizeof(out), ", trips=");
+    char num[32];
+    snprintf(num, sizeof(num), "%u", info.roundtrip_count);
+    append_line(out, sizeof(out), num);
+    append_line(out, sizeof(out), ", err=");
+    snprintf(num, sizeof(num), "%u", info.last_error);
+    append_line(out, sizeof(out), num);
+    append_line(out, sizeof(out), "\n");
+
+    gui_set_response(out);
+    gui_render();
+    vga_puts(r == 0 ? "CPU mode bridge OK\n" : "CPU mode bridge failed\n", r == 0 ? 0x2F : 0x4F);
+    (void)boot_post_wait_key(6u, 360000000u, 0);
 }
 
 static void boot_post_run_screen(void)
@@ -293,6 +327,7 @@ void kmain(void)
     idt64_init();
     syscall_init();
     mmu_init_protection();
+    cpu_mode_init();
     usermode_init();
 
     gui_demo();
@@ -394,8 +429,11 @@ void kmain(void)
 
     int ps2_ready = ps2_init();
     if (ps2_ready == 0) {
-        if (boot_post_offer()) {
+        int boot_choice = boot_post_offer();
+        if (boot_choice == 1) {
             boot_post_run_screen();
+        } else if (boot_choice == 2) {
+            boot_mode_run_screen();
         } else {
             gui_set_response(combined);
             gui_render();

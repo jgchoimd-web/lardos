@@ -19,7 +19,7 @@
 #define LSH_MAX_VAR_LEN 64
 #define LSH_PIPE_BUF   2048
 #define LSH_MAX_PIPE_SEG 2
-#define LSH_MAX_BG     4
+#define LSH_MAX_BG     8
 
 /* Init LSH. Call after fs_init. */
 void lsh_init(void);

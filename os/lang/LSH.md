@@ -10,6 +10,8 @@
 - `mode [status|probe|real]` - inspect or run the controlled real16/long64 bridge.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `oslink status|ping|send|recv|peers` - OS-to-OS messages over UDP.
+- `task list|set|default|run|boost|drop` - inspect and change task priority.
+- `nice priority command` - queue a command at a chosen priority.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 
@@ -29,5 +31,6 @@
 ## Background
 
 - `cmd &` — queue command, return immediately
-- Commands run one per `gui_tick`
-- Queue limit: 4 commands
+- Commands run one per `gui_tick`, highest effective priority first
+- Queue limit: 8 tasks
+- `task set id priority` changes queued work; priority range is 0..9

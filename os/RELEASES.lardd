@@ -3,6 +3,13 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.12.0a
+ITEM Added TaskPrio, a user-changeable task priority queue for LSH background work.
+ITEM Added task list, task set, task default, task run, task boost, task drop, prio, and nice commands.
+ITEM Background commands submitted with & now become numbered tasks with visible priorities.
+ITEM The scheduler chooses the highest effective priority and ages waiting tasks so low-priority work is not starved.
+ITEM POST now checks the TaskPrio priority queue.
+
 SECTION v1.11.0a
 ITEM Added OSLink, a small OS-to-OS communication module over the native UDP stack.
 ITEM Added public net_udp_send and net_udp_recv helpers for in-kernel datagram protocols.

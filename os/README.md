@@ -81,6 +81,10 @@ commands:
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink recv`, and
   `oslink peers`.
+- `task` / `tasks` exposes a user-changeable priority queue for background
+  work. `cmd &` queues a numbered task, `task set id priority` changes it,
+  `task default priority` changes new background work, and `task run priority
+  command` queues a command at a chosen priority.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
@@ -99,9 +103,9 @@ During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
 Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
 descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
-scratch storage, OSLink packet framing, LPST persistence metadata, LVCS
-hashing, containers, and LIL feature forms. The screen checks are there to
-catch visible boot/UI regressions as well as code errors.
+scratch storage, OSLink packet framing, TaskPrio scheduling, LPST persistence
+metadata, LVCS hashing, containers, and LIL feature forms. The screen checks are
+there to catch visible boot/UI regressions as well as code errors.
 
 Each feature addition gets a release: bump the kernel version, add an entry to
 `os/RELEASES.lardd`, keep the embedded `releases.lardd` in sync so LSH can show

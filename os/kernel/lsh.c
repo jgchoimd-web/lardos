@@ -19,6 +19,7 @@
 #include "post.h"
 #include "cpumode.h"
 #include "oslink.h"
+#include "taskprio.h"
 #include "version.h"
 #include "io.h"
 #include "string.h"
@@ -40,10 +41,6 @@ static char s_pipe_buf[LSH_PIPE_BUF];
 static uint32_t s_pipe_len;
 static int s_redirect_to_pipe;  /* 1 = out_append goes to pipe */
 static int s_pipe_has_input;    /* 1 = segment 2, stdin is s_pipe_buf */
-
-/* Background: queue of command lines */
-static char s_bg_queue[LSH_MAX_BG][LSH_MAX_LINE];
-static uint32_t s_bg_count;
 
 /* SUM (Super User Mode): ring 0, full permissions, asm_ for hardware I/O */
 static int s_in_sum_mode;
@@ -245,7 +242,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
@@ -1098,7 +1095,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode oslink cls\n");
+    out_append("  help control status release ver post selftest magic mode oslink task cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
@@ -1107,6 +1104,7 @@ static void cmd_help(const char* args)
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
     out_append("  drivers fsstat fsload fssave sync sram sandbox exitsandbox\n");
+    out_append("  task list|set|default|run|boost|drop  nice prio cmd  prio id prio\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
 }
@@ -1128,6 +1126,7 @@ static void cmd_control(const char* args)
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
     out_append("  oslink status       inspect OS-to-OS message link\n");
+    out_append("  task list           inspect and reprioritize queued tasks\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
@@ -1236,6 +1235,16 @@ static void cmd_status(const char* args)
     out_append_u32(link.inbox_count);
     out_append(", peers=");
     out_append_u32(link.peer_count);
+    out_append("\n");
+
+    taskprio_info_t tasks;
+    taskprio_info(&tasks);
+    out_append("Tasks: queued=");
+    out_append_u32(tasks.queued);
+    out_append(", default-prio=");
+    out_append_i32(tasks.default_priority);
+    out_append(", completed=");
+    out_append_u32(tasks.completed);
     out_append("\n");
 }
 
@@ -1640,6 +1649,163 @@ static void cmd_oslink(const char* args)
         return;
     }
     out_append("Usage: oslink status|hello|ping|send|recv|peers|poll|test\n");
+}
+
+static void cmd_task_list(void)
+{
+    taskprio_info_t info;
+    taskprio_info(&info);
+    out_append("Tasks queued=");
+    out_append_u32(info.queued);
+    out_append(" default-prio=");
+    out_append_i32(info.default_priority);
+    out_append(" completed=");
+    out_append_u32(info.completed);
+    out_append("\n");
+    if (info.queued == 0) {
+        out_append("task: no queued tasks.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < info.queued; i++) {
+        taskprio_task_t t;
+        if (taskprio_at(i, &t) == 0) {
+            out_append("#");
+            out_append_u32(t.id);
+            out_append(" prio=");
+            out_append_i32(t.priority);
+            out_append(" wait=");
+            out_append_u32(t.wait_ticks);
+            out_append(" ");
+            out_append(t.name);
+            out_append(" :: ");
+            out_append(t.command);
+            out_append("\n");
+        }
+    }
+}
+
+static int task_parse_priority(const char** args, int32_t* out)
+{
+    uint32_t v;
+    if (vcs_parse_u32(args, &v) != 0 || v > (uint32_t)TASKPRIO_MAX) return -1;
+    *out = (int32_t)v;
+    return 0;
+}
+
+static void cmd_task_run_like(const char* args)
+{
+    int32_t prio;
+    uint32_t id;
+    if (task_parse_priority(&args, &prio) != 0) {
+        out_append("Usage: task run priority command\n");
+        return;
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    if (!*args) {
+        out_append("Usage: task run priority command\n");
+        return;
+    }
+    if (taskprio_enqueue(NULL, args, prio, &id) == 0) {
+        out_append("task: queued #");
+        out_append_u32(id);
+        out_append(" prio=");
+        out_append_i32(prio);
+        out_append("\n");
+    } else {
+        out_append("task: queue full or empty command.\n");
+    }
+}
+
+static void cmd_task(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        cmd_task_list();
+        return;
+    }
+    if (strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0 || strcmp(sub, "status") == 0) {
+        cmd_task_list();
+        return;
+    }
+    if (strcmp(sub, "default") == 0) {
+        int32_t prio;
+        if (task_parse_priority(&args, &prio) != 0) {
+            out_append("task: default-prio=");
+            out_append_i32(taskprio_default_priority());
+            out_append("\nUsage: task default priority\n");
+            return;
+        }
+        taskprio_set_default(prio);
+        out_append("task: default priority ");
+        out_append_i32(prio);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "set") == 0 || strcmp(sub, "prio") == 0) {
+        uint32_t id;
+        int32_t prio;
+        if (vcs_parse_u32(&args, &id) != 0 || task_parse_priority(&args, &prio) != 0) {
+            out_append("Usage: task set id priority\n");
+            return;
+        }
+        if (taskprio_set_priority(id, prio) == 0) {
+            out_append("task: #");
+            out_append_u32(id);
+            out_append(" priority ");
+            out_append_i32(prio);
+            out_append("\n");
+        } else {
+            out_append("task: id not found.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "boost") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task boost id\n");
+            return;
+        }
+        if (taskprio_set_priority(id, TASKPRIO_MAX) == 0) out_append("task: boosted.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "drop") == 0 || strcmp(sub, "kill") == 0 || strcmp(sub, "rm") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task drop id\n");
+            return;
+        }
+        if (taskprio_remove(id) == 0) out_append("task: dropped.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "run") == 0 || strcmp(sub, "queue") == 0) {
+        cmd_task_run_like(args);
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(taskprio_selftest() == 0 ? "task: selftest OK\n" : "task: selftest failed\n");
+        return;
+    }
+    out_append("Usage: task list|set|default|run|boost|drop|test\n");
+}
+
+static void cmd_nice(const char* args)
+{
+    cmd_task_run_like(args);
+}
+
+static void cmd_prio(const char* args)
+{
+    uint32_t id;
+    int32_t prio;
+    if (vcs_parse_u32(&args, &id) != 0 || task_parse_priority(&args, &prio) != 0) {
+        out_append("Usage: prio id priority\n");
+        return;
+    }
+    if (taskprio_set_priority(id, prio) == 0) out_append("prio: updated.\n");
+    else out_append("prio: id not found.\n");
 }
 
 static int lsh_require_sum(const char* cmd)
@@ -2484,6 +2650,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
+    if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }
+    if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
+    if (strcmp(cmd, "prio") == 0) { cmd_prio(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
     if (strcmp(cmd, "peek") == 0) { cmd_peek(args); return; }
     if (strcmp(cmd, "poke") == 0) { cmd_poke(args); return; }
@@ -2560,6 +2729,7 @@ void lsh_init(void)
     s_nenv = 0;
     s_in_sum_mode = 0;
     s_sandbox_mode = 0;
+    taskprio_init();
     lcontainer_init();
     lvcs_init();
     out_append("Lard Shell ready. Type help for commands.\n");
@@ -2604,36 +2774,9 @@ void lsh_exec(const char* line)
 
     expand_env(buf);
 
-    if (background && s_bg_count < LSH_MAX_BG) {
-        uint32_t j = 0;
-        while (buf[j] && j < LSH_MAX_LINE - 1) {
-            s_bg_queue[s_bg_count][j] = buf[j];
-            j++;
-        }
-        s_bg_queue[s_bg_count][j] = '\0';
-        s_bg_count++;
-        if (s_in_sum_mode) {
-            out_append("SUM# ");
-        } else if (s_sandbox_mode) {
-            out_append("[sandbox] ");
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        } else if (lcontainer_has_active()) {
-            out_append("[lcnt:");
-            out_append(lcontainer_active_name());
-            out_append("] ");
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        } else {
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        }
-        out_append(line);
-        out_append("\n");
-        out_append("(background)\n");
-        return;
-    }
     if (background) {
+        uint32_t task_id = 0;
+        int enqueue_ok = taskprio_enqueue(NULL, buf, taskprio_default_priority(), &task_id) == 0;
         if (s_in_sum_mode) {
             out_append("SUM# ");
         } else if (s_sandbox_mode) {
@@ -2652,7 +2795,15 @@ void lsh_exec(const char* line)
         }
         out_append(line);
         out_append("\n");
-        out_append("Background queue full.\n");
+        if (enqueue_ok) {
+            out_append("(background task #");
+            out_append_u32(task_id);
+            out_append(" prio=");
+            out_append_i32(taskprio_default_priority());
+            out_append(")\n");
+        } else {
+            out_append("Background task queue full.\n");
+        }
         return;
     }
 
@@ -2720,21 +2871,9 @@ static void lsh_exec_impl(const char* buf, int show_prompt)
 
 int lsh_poll_background(void)
 {
-    if (s_bg_count == 0) return 0;
-    char line[LSH_MAX_LINE];
-    uint32_t i = 0;
-    while (s_bg_queue[0][i] && i < LSH_MAX_LINE - 1) { line[i] = s_bg_queue[0][i]; i++; }
-    line[i] = '\0';
-    s_bg_count--;
-    for (uint32_t q = 0; q < s_bg_count; q++) {
-        i = 0;
-        while (s_bg_queue[q + 1][i]) {
-            s_bg_queue[q][i] = s_bg_queue[q + 1][i];
-            i++;
-        }
-        s_bg_queue[q][i] = '\0';
-    }
-    lsh_exec_impl(line, 0);
+    taskprio_task_t task;
+    if (taskprio_dequeue_next(&task) != 1) return 0;
+    lsh_exec_impl(task.command, 0);
     return 1;
 }
 

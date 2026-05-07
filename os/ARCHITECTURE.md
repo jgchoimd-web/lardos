@@ -60,6 +60,7 @@ flowchart TB
     POST["post diagnostics"]
     Net["net DHCP DNS TCP HTTP"]
     OSLink["oslink OS-to-OS UDP"]
+    TaskPrio["taskprio user priorities"]
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
     VM["BOSL GASM LIL LML OSVM"]
@@ -77,6 +78,7 @@ flowchart TB
     Net --> OSLink
     Net --> TLS
     Kmain --> GUI
+    GUI --> TaskPrio
     GUI --> VM
 ```
 
@@ -166,6 +168,7 @@ messages, and sends automatic acknowledgements or pongs.
 | Power-On Self-Test | `os/kernel/post.c`, `os/include/post.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
+| Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |
 | Native TLS | `os/kernel/lard_tls.c`, `os/include/lard_tls.h` |
 | GUI and shell | `os/kernel/gui.c`, `os/kernel/lsh.c`, `os/kernel/lafillo.c` |
 
@@ -183,20 +186,27 @@ corner; `sram rect x y w h` lets the user sacrifice a chosen screen area. GUI
 redraws restore the encoded bytes before blitting so the region behaves like
 small RAM while still visibly living in screen memory.
 
+`taskprio.c` owns the user-changeable task priority queue used by LSH
+background commands. Commands submitted with `&` become numbered tasks with a
+default priority; `task set`, `task default`, `task run`, `task boost`, `task
+drop`, `prio`, and `nice` let the user change scheduling directly. The queue
+selects the highest effective priority and ages waiting tasks.
+
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
-ScreenRAM scratch storage, OSLink packet framing, LPST metadata, LVCS hashing,
-containers, and LIL feature forms.
+ScreenRAM scratch storage, OSLink packet framing, TaskPrio scheduling, LPST
+metadata, LVCS hashing, containers, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
-OS-to-OS messaging (`oslink`), POST reruns (`post`, `selftest`), native document
-rendering (`lars`, `lardd`, `doc`), native LIL script execution (`lil file`),
-writable RAM file editing (`write`, `append`, `copy`), LPST persistence
+OS-to-OS messaging (`oslink`), task priority control (`task`, `prio`, `nice`),
+POST reruns (`post`, `selftest`), native document rendering (`lars`, `lardd`,
+`doc`), native LIL script execution (`lil file`), writable RAM file editing
+(`write`, `append`, `copy`), LPST persistence
 (`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and
 SUM-only raw machine controls (`peek`, `poke`, `asm_`).
 

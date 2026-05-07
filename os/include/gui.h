@@ -17,6 +17,17 @@ int gui_take_submit(char* out_url, unsigned out_cap); // returns 1 if got submit
 void gui_set_response(const char* text);
 void gui_set_loading(int on);
 
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t changed_samples;
+    int window_inside;
+    int response_view_ok;
+} gui_post_info_t;
+
+/* POST-visible screen sanity checks. Returns 0 when a framebuffer is present. */
+int gui_post_check(gui_post_info_t* out);
+
 // Lafillo tab: set extracted + raw content (for View Source)
 void gui_lafillo_set_content(const char* extracted, const char* raw);
 

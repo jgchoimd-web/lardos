@@ -5,6 +5,7 @@
 ## Commands
 
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
+- `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

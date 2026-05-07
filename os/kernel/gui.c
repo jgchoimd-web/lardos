@@ -1244,6 +1244,32 @@ int gui_take_submit(char* out_url, unsigned out_cap)
     return 1;
 }
 
+int gui_post_check(gui_post_info_t* out)
+{
+    if (!g_have_fb || !g_fb.fb) return -1;
+    if (out) {
+        out->width = g_fb.w;
+        out->height = g_fb.h;
+        out->changed_samples = 0;
+        out->window_inside = (g.win_x >= 0 && g.win_y >= 0 &&
+                              g.win_x + g.win_w <= (int)g_fb.w &&
+                              g.win_y + g.win_h <= (int)g_fb.h);
+        out->response_view_ok = (g.win_w >= 320 && g.win_h >= 240 &&
+                                 g.win_h - 190 >= 40 && g.win_w - 32 >= 160);
+        uint32_t step_x = g_fb.w >= 64 ? (uint32_t)g_fb.w / 32u : 1u;
+        uint32_t step_y = g_fb.h >= 64 ? (uint32_t)g_fb.h / 24u : 1u;
+        if (step_x == 0) step_x = 1;
+        if (step_y == 0) step_y = 1;
+        for (uint32_t y = 0; y < g_fb.h; y += step_y) {
+            uint32_t row = y * (uint32_t)(g_fb.pitch_bytes / 4u);
+            for (uint32_t x = 0; x < g_fb.w; x += step_x) {
+                if (g_fb.fb[row + x] != g_bg) out->changed_samples++;
+            }
+        }
+    }
+    return 0;
+}
+
 void gui_set_response(const char* text)
 {
     if (!g_have_fb) return;

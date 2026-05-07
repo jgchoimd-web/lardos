@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.6.0a
+ITEM Added an optional Power-On Self-Test prompt during boot.
+ITEM Added shared POST diagnostics for CPU mode, heap, native FS docs, LARS/LARDD rendering, LAR archives, DRFL descriptors, PCI options, GUI framebuffer/layout, LPST, LVCS, containers, and LIL feature forms.
+ITEM Added the LSH post command as an alias for selftest, using the same POST engine.
+ITEM Added GUI framebuffer sampling so POST can catch visible screen/layout failures, not just syntax errors.
+
 SECTION v1.5.0a
 ITEM Added C-only mkiso host tooling for bootable El Torito ISO release artifacts.
 ITEM Added make release to publish versioned IMG and ISO files under os/release.

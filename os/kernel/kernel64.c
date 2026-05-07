@@ -20,14 +20,17 @@
 #include "drfl.h"
 #include "lss.h"
 #include "lsh.h"
+#include "post.h"
 #include "gdt64.h"
 #include "syscall.h"
 #include "usermode.h"
 #include "lafillo.h"
 #include "lard_doc.h"
+#include "rtc.h"
 #include "smp.h"
 #include "string.h"
 #include "fs.h"
+#include "version.h"
 
 static volatile uint16_t* const VGA = (volatile uint16_t*)0xB8000;
 
@@ -57,14 +60,123 @@ static void vga_puts(const char* s, uint8_t color)
 
 static void append_line(char* buf, uint32_t cap, const char* s)
 {
+    if (!buf || cap == 0) return;
     uint32_t i = 0;
-    while (i < cap && buf[i]) {
+    while (i + 1 < cap && buf[i]) {
         i++;
     }
     while (*s && i + 1 < cap) {
         buf[i++] = *s++;
     }
     buf[i] = '\0';
+}
+
+typedef struct {
+    char* buf;
+    uint32_t cap;
+} boot_post_text_t;
+
+static void boot_post_append(boot_post_text_t* text, const char* s)
+{
+    if (!text || !text->buf || text->cap == 0 || !s) return;
+    uint32_t i = 0;
+    while (i + 1 < text->cap && text->buf[i]) i++;
+    while (*s && i + 1 < text->cap) text->buf[i++] = *s++;
+    text->buf[i] = '\0';
+}
+
+static void boot_post_append_u32(boot_post_text_t* text, uint32_t v)
+{
+    char tmp[16];
+    snprintf(tmp, sizeof(tmp), "%u", v);
+    boot_post_append(text, tmp);
+}
+
+static void boot_post_append_i32(boot_post_text_t* text, int v)
+{
+    char tmp[16];
+    snprintf(tmp, sizeof(tmp), "%d", v);
+    boot_post_append(text, tmp);
+}
+
+static void boot_post_emit(const char* status, const char* name, void* user)
+{
+    boot_post_text_t* text = (boot_post_text_t*)user;
+    boot_post_append(text, status);
+    boot_post_append(text, " ");
+    boot_post_append(text, name);
+    boot_post_append(text, "\n");
+}
+
+static int boot_post_poll_key(int post_only)
+{
+    ps2_key_t k;
+    if (ps2_kbd_poll(&k) == 0) {
+        if (k.kind == PS2K_ASCII && (k.ch == 'p' || k.ch == 'P')) return 1;
+        if (!post_only) return 1;
+        return -1;
+    }
+    return 0;
+}
+
+static int boot_post_wait_key(uint32_t seconds, uint32_t fallback_loops, int post_only)
+{
+    int64_t start = rtc_unix_seconds();
+    if (start > 0) {
+        for (;;) {
+            int r = boot_post_poll_key(post_only);
+            if (r != 0) return r > 0 ? 1 : 0;
+            int64_t now = rtc_unix_seconds();
+            if (now > 0 && (uint32_t)(now - start) >= seconds) return 0;
+            __asm__ __volatile__("pause");
+        }
+    }
+    for (uint32_t i = 0; i < fallback_loops; i++) {
+        int r = boot_post_poll_key(post_only);
+        if (r != 0) return r > 0 ? 1 : 0;
+        __asm__ __volatile__("pause");
+    }
+    return 0;
+}
+
+static int boot_post_offer(void)
+{
+    static const char* msg =
+        "LardOS " LARDOS_VERSION " power-on options\n"
+        "\n"
+        "P  Power-On Self-Test\n"
+        "Enter or timeout  Normal boot\n";
+    gui_set_response(msg);
+    gui_render();
+    return boot_post_wait_key(4u, 240000000u, 1);
+}
+
+static void boot_post_run_screen(void)
+{
+    static char out[4096];
+    lard_post_result_t post;
+    boot_post_text_t text = { out, sizeof(out) };
+    out[0] = '\0';
+    boot_post_append(&text, "LardOS ");
+    boot_post_append(&text, LARDOS_VERSION);
+    boot_post_append(&text, " Power-On Self-Test\n\n");
+    lard_post_run(boot_post_emit, &text, &post);
+    boot_post_append(&text, "\nPOST: ");
+    boot_post_append_u32(&text, post.pass);
+    boot_post_append(&text, " passed, ");
+    boot_post_append_u32(&text, post.fail);
+    boot_post_append(&text, " failed");
+    boot_post_append(&text, post.storage_available ? ", storage online" : ", storage offline");
+    boot_post_append(&text, post.storage_dirty ? ", dirty" : ", clean");
+    boot_post_append(&text, ", last=");
+    boot_post_append_i32(&text, post.storage_last_result);
+    boot_post_append(&text, ", gen=");
+    boot_post_append_u32(&text, post.storage_generation);
+    boot_post_append(&text, "\n");
+    gui_set_response(out);
+    gui_render();
+    vga_puts(post.fail ? "POST found failures\n" : "POST OK\n", post.fail ? 0x4F : 0x2F);
+    (void)boot_post_wait_key(6u, 360000000u, 0);
 }
 
 static int parse_ipv4_host(const char* host, ip4_t* out_ip)
@@ -280,7 +392,17 @@ void kmain(void)
     gui_set_response(combined);
     gui_render();
 
-    ps2_init();
+    int ps2_ready = ps2_init();
+    if (ps2_ready == 0) {
+        if (boot_post_offer()) {
+            boot_post_run_screen();
+        } else {
+            gui_set_response(combined);
+            gui_render();
+        }
+    } else {
+        vga_puts("PS/2 unavailable for POST option\n", 0x4F);
+    }
     ps2_mouse_init();
 
     net_stack_t net;

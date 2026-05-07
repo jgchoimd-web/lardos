@@ -16,13 +16,14 @@
 #include "drfl.h"
 #include "lcontainer.h"
 #include "gui.h"
+#include "post.h"
+#include "version.h"
 #include "io.h"
 #include "string.h"
 #include <stddef.h>
 #include <stdint.h>
 
 #define LSH_MAGIC  0x0048534Cu  /* "LSH\0" LE */
-#define LARDOS_VERSION "v1.5.0a"
 
 static char s_drive = 'X';
 static char s_output[LSH_MAX_OUTPUT];
@@ -220,12 +221,6 @@ static const char* lardos_version_channel(void)
     if (suffix == 'b') return "beta-experimental";
     if (suffix == 'p') return "hotpatch";
     return "unknown";
-}
-
-static int lardos_version_suffix_known(void)
-{
-    char suffix = lardos_version_suffix();
-    return suffix == 'a' || suffix == 'b' || suffix == 'p';
 }
 
 void lsh_enter_sum_shortcut(void)
@@ -879,74 +874,43 @@ static void cmd_fsload(const char* args)
     }
 }
 
-static void selftest_check(const char* name, int ok, uint32_t* pass, uint32_t* fail)
+static void selftest_emit(const char* status, const char* name, void* user)
 {
-    out_append(ok ? "PASS " : "FAIL ");
+    (void)user;
+    out_append(status);
+    out_append(" ");
     out_append(name);
     out_append("\n");
-    if (ok) (*pass)++;
-    else (*fail)++;
 }
 
 static void cmd_selftest(const char* args)
 {
-    uint32_t pass = 0;
-    uint32_t fail = 0;
-    uint32_t available;
-    uint32_t dirty;
-    uint32_t lba;
-    uint32_t sectors;
-    uint32_t bank;
-    uint32_t generation;
-    uint32_t bank_sectors;
-    int last;
-    const char* driver;
-    const FsFile* bundle;
-    const uint8_t hash_data[3] = { 'a', 'b', 'c' };
-    int64_t lil_value = 0;
+    lard_post_result_t post;
     (void)args;
 
     out_append("LardOS ");
     out_append(LARDOS_VERSION);
     out_append(" ");
     out_append(lardos_version_channel());
-    out_append(" selftest\n");
+    out_append(" Power-On Self-Test\n");
 
-    bundle = fs_open("bundle.lar");
-    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
-    fs_persist_detail(&bank, &generation, &bank_sectors);
+    lard_post_run(selftest_emit, NULL, &post);
 
-    selftest_check("fs: hello.txt", fs_open("hello.txt") != NULL, &pass, &fail);
-    selftest_check("fs: lardos.lars", fs_open("lardos.lars") != NULL, &pass, &fail);
-    selftest_check("fs: lardd guide", fs_open("lardd_guide.lardd") != NULL, &pass, &fail);
-    selftest_check("fs: releases", fs_open("releases.lardd") != NULL, &pass, &fail);
-    selftest_check("fs: features.lil", fs_open("features.lil") != NULL, &pass, &fail);
-    selftest_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, &pass, &fail);
-    selftest_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, &pass, &fail);
-    selftest_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, &pass, &fail);
-    selftest_check("lcnt: defaults", lcontainer_count() >= 3u, &pass, &fail);
-    selftest_check("version: suffix policy", lardos_version_suffix_known(), &pass, &fail);
-    selftest_check("lpst: dual-bank layout", lba == 2752u && sectors == 128u && bank_sectors == 64u, &pass, &fail);
-    selftest_check("lpst: driver string", driver && driver[0], &pass, &fail);
-    selftest_check("lvcs: hash engine", lvcs_hash(hash_data, sizeof(hash_data)) != 0, &pass, &fail);
-    selftest_check("lcnt: dev profile", (lcontainer_profile_caps("dev") & (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL)) == (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL), &pass, &fail);
-    selftest_check("lil: feature forms", lil_eval_int("(begin (assert (eq (pow 2 8) 256)) (assert (eq (clamp 99 0 10) 10)) (gcd 84 30))", &lil_value) == 0 && lil_value == 6, &pass, &fail);
-
-    out_append("Selftest: ");
-    out_append_u32(pass);
+    out_append("POST: ");
+    out_append_u32(post.pass);
     out_append(" passed, ");
-    out_append_u32(fail);
+    out_append_u32(post.fail);
     out_append(" failed");
-    if (available) {
+    if (post.storage_available) {
         out_append(", storage online");
-        out_append(dirty ? ", dirty" : ", clean");
+        out_append(post.storage_dirty ? ", dirty" : ", clean");
     } else {
         out_append(", storage offline");
     }
     out_append(", last=");
-    out_append_i32(last);
+    out_append_i32(post.storage_last_result);
     out_append(", gen=");
-    out_append_u32(generation);
+    out_append_u32(post.storage_generation);
     out_append("\n");
 }
 
@@ -964,7 +928,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver selftest cls\n");
+    out_append("  help control status release ver post selftest cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
@@ -1922,6 +1886,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == 'a' && cmd[4] == 'v' && cmd[5] == 'e' && cmd[6] == '\0') { cmd_fssave(args); return; }
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 'l' && cmd[3] == 'o' && cmd[4] == 'a' && cmd[5] == 'd' && cmd[6] == '\0') { cmd_fsload(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'y' && cmd[2] == 'n' && cmd[3] == 'c' && cmd[4] == '\0') { cmd_fssave(args); return; }
+    if (cmd[0] == 'p' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 't' && cmd[4] == '\0') { cmd_selftest(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'e' && cmd[2] == 'l' && cmd[3] == 'f' && cmd[4] == 't' && cmd[5] == 'e' && cmd[6] == 's' && cmd[7] == 't' && cmd[8] == '\0') { cmd_selftest(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'c' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == '\0') { cmd_lcnt(args); return; }
     if (cmd[0] == 'c' && cmd[1] == 'o' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == 'a' && cmd[5] == 'i' && cmd[6] == 'n' && cmd[7] == 'e' && cmd[8] == 'r' && cmd[9] == '\0') { cmd_lcnt(args); return; }

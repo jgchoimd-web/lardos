@@ -10,6 +10,8 @@ os/boot/*.bin
 os/kernel/*.bosx
 os/kernel/*.elf
 os/kernel/*.o
+os/kernel/ldll_lib*.inc
+os/kernel/lib*.ldll
 os/kernel/lafillo_demo_data.inc
 os/kernel/releases_lardd.inc
 os/lang/examples/*.bosx

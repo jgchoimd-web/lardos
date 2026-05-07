@@ -50,6 +50,7 @@ flowchart TB
     Syscall["syscall"]
     Drivers["pci / rtl8139 / ps2 / rtc"]
     Storage["fs / lfs / ldll"]
+    POST["post diagnostics"]
     Net["net DHCP DNS TCP HTTP"]
     TLS["lard_tls native TLS"]
     GUI["gui / lafillo / lsh"]
@@ -62,6 +63,7 @@ flowchart TB
     Kmain --> Syscall
     Kmain --> Drivers
     Kmain --> Storage
+    Kmain --> POST
     Kmain --> Net
     Net --> TLS
     Kmain --> GUI
@@ -137,6 +139,7 @@ requires the final signature to validate against that native table.
 | Descriptor tables | `os/kernel/gdt64.c`, `os/kernel/idt64.c`, `os/kernel/isr64.s` |
 | Memory | `os/kernel/mem.c`, `os/kernel/mmu.c` |
 | SMP | `os/kernel/smp.c`, `os/kernel/ap_trampoline.s`, `os/kernel/aux_kernel.s` |
+| Power-On Self-Test | `os/kernel/post.c`, `os/include/post.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | Native TLS | `os/kernel/lard_tls.c`, `os/include/lard_tls.h` |
 | GUI and shell | `os/kernel/gui.c`, `os/kernel/lsh.c`, `os/kernel/lafillo.c` |
@@ -149,10 +152,17 @@ tab and `lardd_guide.lardd` as the native document-format guide. LardOS uses
 Markdown for project documents. `kernel/lard_doc.c` renders both formats with a
 small freestanding C parser.
 
+`post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
+boot-time `P` option, and LSH exposes the same checks through `post` and
+`selftest`. POST covers CPU mode, heap allocation, native FS files, LARS/LARDD
+rendering, LAR archives, DRFL descriptors, expected PCI devices, GUI
+framebuffer/layout state, LPST metadata, LVCS hashing, containers, and LIL
+feature forms.
+
 `LSH` provides command discovery (`help`), a system control map (`control`), a
-system snapshot (`status`), native document rendering (`lars`, `lardd`, `doc`),
-native LIL script execution (`lil file`), writable RAM file editing (`write`,
-`append`, `copy`), LPST persistence
+system snapshot (`status`), POST reruns (`post`, `selftest`), native document
+rendering (`lars`, `lardd`, `doc`), native LIL script execution (`lil file`),
+writable RAM file editing (`write`, `append`, `copy`), LPST persistence
 (`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and
 SUM-only raw machine controls (`peek`, `poke`, `asm_`).
 

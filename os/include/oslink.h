@@ -42,6 +42,7 @@ void oslink_poll(void);
 int oslink_send_hello(ip4_t dst);
 int oslink_send_ping(ip4_t dst, const char* text);
 int oslink_send_text(ip4_t dst, const char* text);
+int oslink_send_exec(ip4_t dst, const char* command);
 int oslink_recv(oslink_msg_t* out);
 uint32_t oslink_peer_count(void);
 int oslink_peer_at(uint32_t idx, oslink_peer_t* out);

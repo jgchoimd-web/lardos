@@ -1,5 +1,7 @@
 #include "oslink.h"
 
+#include "taskprio.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -15,6 +17,7 @@ enum {
     OSLINK_TYPE_PONG = 3,
     OSLINK_TYPE_TEXT = 4,
     OSLINK_TYPE_ACK = 5,
+    OSLINK_TYPE_EXEC = 6,
 };
 
 typedef struct {
@@ -63,6 +66,65 @@ static int streq(const char* a, const char* b)
     if (!a || !b) return 0;
     while (a[i] && b[i] && a[i] == b[i]) i++;
     return a[i] == '\0' && b[i] == '\0';
+}
+
+static void first_word(const char* in, char* out, uint32_t cap, const char** rest)
+{
+    uint32_t i = 0;
+    if (!in) in = "";
+    while (*in == ' ' || *in == '\t') in++;
+    while (*in && *in != ' ' && *in != '\t' && i + 1u < cap) out[i++] = *in++;
+    out[i] = '\0';
+    while (*in == ' ' || *in == '\t') in++;
+    if (rest) *rest = in;
+}
+
+static int has_control_pipe(const char* s)
+{
+    while (s && *s) {
+        if (*s == '&' || *s == '|' || *s == ';') return 1;
+        s++;
+    }
+    return 0;
+}
+
+static int rest_empty_or_word(const char* rest, const char* a, const char* b, const char* c)
+{
+    char word[16];
+    const char* tail;
+    first_word(rest, word, sizeof(word), &tail);
+    if (!word[0]) return 1;
+    if (tail && tail[0]) return 0;
+    return streq(word, a) || (b && streq(word, b)) || (c && streq(word, c));
+}
+
+static int rest_word_allows_tail(const char* rest, const char* a, const char* b, const char* c)
+{
+    char word[16];
+    first_word(rest, word, sizeof(word), NULL);
+    if (!word[0]) return 0;
+    return streq(word, a) || (b && streq(word, b)) || (c && streq(word, c));
+}
+
+static int safe_exec_command(const char* command)
+{
+    char cmd[32];
+    const char* rest;
+    first_word(command, cmd, sizeof(cmd), &rest);
+    if (!cmd[0] || has_control_pipe(command)) return 0;
+    if (streq(cmd, "help") || streq(cmd, "control") || streq(cmd, "status") ||
+        streq(cmd, "release") || streq(cmd, "releases") || streq(cmd, "ver") ||
+        streq(cmd, "post") || streq(cmd, "selftest") || streq(cmd, "tasktop") ||
+        streq(cmd, "dir") || streq(cmd, "type") || streq(cmd, "lars") ||
+        streq(cmd, "lardd") || streq(cmd, "doc") || streq(cmd, "larsform")) {
+        return 1;
+    }
+    if (streq(cmd, "oslink")) return rest_empty_or_word(rest, "status", "peers", "poll");
+    if (streq(cmd, "task") || streq(cmd, "tasks")) return rest_empty_or_word(rest, "list", "status", "ls");
+    if (streq(cmd, "bootprof")) return rest_empty_or_word(rest, "status", "info", "list");
+    if (streq(cmd, "crashlog")) return rest_empty_or_word(rest, "show", "status", NULL);
+    if (streq(cmd, "lpack")) return rest_word_allows_tail(rest, "info", "list", "test");
+    return 0;
 }
 
 static uint16_t rd16(const uint8_t* p)
@@ -229,7 +291,8 @@ void oslink_poll(void)
         (void)sport;
         remember_peer(src, src_node);
         s_oslink.received++;
-        if (type == OSLINK_TYPE_HELLO || type == OSLINK_TYPE_PING || type == OSLINK_TYPE_TEXT) {
+        if (type == OSLINK_TYPE_HELLO || type == OSLINK_TYPE_PING ||
+            type == OSLINK_TYPE_TEXT || type == OSLINK_TYPE_EXEC) {
             queue_msg(src, src_node, type, seq, text);
         }
         if (type == OSLINK_TYPE_HELLO) {
@@ -238,6 +301,14 @@ void oslink_poll(void)
             (void)send_type(src, OSLINK_TYPE_PONG, text[0] ? text : "pong");
         } else if (type == OSLINK_TYPE_TEXT) {
             (void)send_type(src, OSLINK_TYPE_ACK, "text");
+        } else if (type == OSLINK_TYPE_EXEC) {
+            if (!safe_exec_command(text)) {
+                (void)send_type(src, OSLINK_TYPE_ACK, "exec denied");
+            } else {
+                uint32_t id = 0;
+                int qr = taskprio_enqueue("remote", text, 6, &id);
+                (void)send_type(src, OSLINK_TYPE_ACK, qr == 0 ? "exec queued" : "exec queue full");
+            }
         }
     }
 }
@@ -255,6 +326,11 @@ int oslink_send_ping(ip4_t dst, const char* text)
 int oslink_send_text(ip4_t dst, const char* text)
 {
     return send_type(dst, OSLINK_TYPE_TEXT, text && text[0] ? text : "");
+}
+
+int oslink_send_exec(ip4_t dst, const char* command)
+{
+    return send_type(dst, OSLINK_TYPE_EXEC, command && command[0] ? command : "");
 }
 
 int oslink_recv(oslink_msg_t* out)
@@ -300,11 +376,12 @@ int oslink_selftest(void)
     char text[OSLINK_TEXT_MAX + 1u];
     uint8_t type;
     uint32_t seq;
-    int len = build_packet(OSLINK_TYPE_TEXT, 0x44556677u, "selftest", pkt, sizeof(pkt));
+    int len = build_packet(OSLINK_TYPE_EXEC, 0x44556677u, "status", pkt, sizeof(pkt));
     if (len <= 0) return -1;
     if (parse_packet(pkt, (uint32_t)len, &type, &seq, src, sizeof(src), text, sizeof(text)) != 0) return -2;
-    if (type != OSLINK_TYPE_TEXT || seq != 0x44556677u) return -3;
+    if (type != OSLINK_TYPE_EXEC || seq != 0x44556677u) return -3;
     if (!streq(src, s_oslink.node)) return -4;
-    if (!streq(text, "selftest")) return -5;
+    if (!streq(text, "status")) return -5;
+    if (!safe_exec_command("status") || safe_exec_command("poke 0 1 8")) return -6;
     return 0;
 }

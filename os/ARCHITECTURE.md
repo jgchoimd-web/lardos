@@ -159,7 +159,9 @@ POST only for 307/308.
 `oslink.c` is the small OS-to-OS communication layer. It uses public
 `net_udp_send` and `net_udp_recv` helpers, frames packets with an `OSLK`
 signature, remembers peers by IPv4/node name, queues inbound hello/ping/text
-messages, and sends automatic acknowledgements or pongs.
+messages, and sends automatic acknowledgements or pongs. EXEC packets carry
+remote command requests; receivers filter them to safe read/diagnostic commands
+and queue accepted work through TaskPrio under the `remote` task name.
 
 ## Important Files
 
@@ -229,21 +231,22 @@ boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
-ScreenRAM scratch storage, OSLink packet framing, TaskPrio scheduling, BootProf
-profile flags, CrashLog writes, LARS form parsing, LardPack package parsing,
-LPST metadata, LVCS hashing, containers, and LIL feature forms.
+ScreenRAM scratch storage, OSLink packet framing and safe exec filtering,
+TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
+LardPack package parsing, LPST metadata, LVCS hashing, containers, and LIL
+feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
-OS-to-OS messaging (`oslink`), task priority control (`task`, `prio`, `nice`),
-boot profile control (`bootprof`), crash history (`crashlog`), POST reruns
-(`post`, `selftest`), native document rendering and form actions (`lars`,
-`lardd`, `doc`, `larsform`, `larsact`), LardPack package inspection and install
-(`lpack`), native LIL script execution (`lil file`), writable RAM file editing
-(`write`, `append`, `copy`), LPST persistence (`sync`/`fssave`), LVCS, Lard
-containers, the language/runtime launchers, and SUM-only raw machine controls
-(`peek`, `poke`, `asm_`).
+OS-to-OS messaging and safe remote command requests (`oslink`), task priority
+control (`task`, `prio`, `nice`), boot profile control (`bootprof`), crash
+history (`crashlog`), POST reruns (`post`, `selftest`), native document
+rendering and form actions (`lars`, `lardd`, `doc`, `larsform`, `larsact`),
+LardPack package inspection and install (`lpack`), native LIL script execution
+(`lil file`), writable RAM file editing (`write`, `append`, `copy`), LPST
+persistence (`sync`/`fssave`), LVCS, Lard containers, the language/runtime
+launchers, and SUM-only raw machine controls (`peek`, `poke`, `asm_`).
 
 `magic` is deliberately a prefix command rather than a global autocorrect mode.
 It uses a small edit-distance predictor over known built-ins and runs the

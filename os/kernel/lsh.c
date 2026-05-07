@@ -1697,6 +1697,7 @@ static const char* oslink_type_name(uint8_t type)
     if (type == 3) return "pong";
     if (type == 4) return "text";
     if (type == 5) return "ack";
+    if (type == 6) return "exec";
     return "packet";
 }
 
@@ -1779,13 +1780,15 @@ static void cmd_oslink_send_like(const char* args, int kind)
     if (lsh_parse_ip4_arg(&args, &dst) != 0) {
         out_append(kind == 1 ? "Usage: oslink hello ip\n" :
                    kind == 2 ? "Usage: oslink ping ip [text]\n" :
-                               "Usage: oslink send ip text\n");
+                   kind == 3 ? "Usage: oslink send ip text\n" :
+                               "Usage: oslink exec ip command\n");
         return;
     }
     while (*args == ' ' || *args == '\t') args++;
     if (kind == 1) r = oslink_send_hello(dst);
     else if (kind == 2) r = oslink_send_ping(dst, args);
-    else r = oslink_send_text(dst, args);
+    else if (kind == 3) r = oslink_send_text(dst, args);
+    else r = oslink_send_exec(dst, args);
     if (r == 0) {
         out_append("oslink: sent to ");
         out_append_ip4(dst);
@@ -1832,11 +1835,15 @@ static void cmd_oslink(const char* args)
         cmd_oslink_send_like(args, 3);
         return;
     }
+    if (strcmp(sub, "exec") == 0 || strcmp(sub, "run") == 0) {
+        cmd_oslink_send_like(args, 4);
+        return;
+    }
     if (strcmp(sub, "test") == 0) {
         out_append(oslink_selftest() == 0 ? "oslink: selftest OK\n" : "oslink: selftest failed\n");
         return;
     }
-    out_append("Usage: oslink status|hello|ping|send|recv|peers|poll|test\n");
+    out_append("Usage: oslink status|hello|ping|send|exec|recv|peers|poll|test\n");
 }
 
 static void cmd_task_list(void)

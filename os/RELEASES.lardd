@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.18.0a
+ITEM Added OSLink EXEC packets for OS-to-OS safe remote command requests.
+ITEM Added oslink exec ip command in LSH; receivers queue allowed diagnostics through TaskPrio as remote tasks.
+ITEM Remote execution is whitelist-filtered and blocks raw-control commands, pipes, background control, and writes.
+ITEM OSLink selftest now covers EXEC packet framing and safe-command filtering.
+
 SECTION v1.17.0a
 ITEM Added LardPack, a native LPACK 1 package format parsed and installed by freestanding kernel C.
 ITEM Added sample.lpack to the embedded filesystem and lpack info, list, install, and test commands.

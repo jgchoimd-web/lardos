@@ -79,8 +79,9 @@ commands:
   scratch RAM. Use `sram on` for the default corner, `sram rect x y w h` for a
   user-selected area, then `sram write offset text` and `sram read offset len`.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
-  `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink recv`, and
-  `oslink peers`.
+  `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
+  command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered
+  to safe read/diagnostic commands and queued through TaskPrio.
 - `task` / `tasks` exposes a user-changeable priority queue for background
   work. `cmd &` queues a numbered task, `task set id priority` changes it,
   `task default priority` changes new background work, and `task run priority
@@ -116,9 +117,10 @@ During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
 Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
 descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
-scratch storage, OSLink packet framing, TaskPrio scheduling, BootProf profile
-flags, CrashLog writes, LARS form parsing, LardPack package parsing, LPST
-persistence metadata, LVCS hashing, containers, and LIL feature forms. The screen checks are there to catch visible boot/UI
+scratch storage, OSLink packet framing and safe exec filtering, TaskPrio
+scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
+LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
+and LIL feature forms. The screen checks are there to catch visible boot/UI
 regressions as well as code errors.
 
 Each feature addition gets a release: bump the kernel version, add an entry to
@@ -131,8 +133,8 @@ available.
 The kernel networking stack owns DHCP, DNS, IPv4, UDP, a small TCP path, and
 plain HTTP. HTTP requests are no longer GET-only: the shared request builder can
 send GET or POST, and the Doc tab exposes that as a method option. OSLink uses
-UDP port 39010 for hello, ping, text, acknowledgement, and peer-discovery
-packets between LardOS nodes.
+UDP port 39010 for hello, ping, text, acknowledgement, safe exec, and
+peer-discovery packets between LardOS nodes.
 
 TLS is intentionally in-tree now. External TLS libraries and host fetch bridges
 are not linked into the kernel. The native `lard_tls`

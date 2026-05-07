@@ -59,6 +59,7 @@ flowchart TB
     Storage["fs / lfs / ldll"]
     POST["post diagnostics"]
     Net["net DHCP DNS TCP HTTP"]
+    OSLink["oslink OS-to-OS UDP"]
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
     VM["BOSL GASM LIL LML OSVM"]
@@ -73,6 +74,7 @@ flowchart TB
     Kmain --> Storage
     Kmain --> POST
     Kmain --> Net
+    Net --> OSLink
     Net --> TLS
     Kmain --> GUI
     GUI --> VM
@@ -114,9 +116,11 @@ flowchart TB
     TCP["small TCP path"]
     HTTP["net_http_request GET/POST"]
     HTTPS["net_https_request GET/POST"]
+    OSLink["oslink UDP 39010"]
     TLS["lard_tls"]
 
     RTL --> Net --> TCP
+    Net --> OSLink
     TCP --> HTTP
     TCP --> HTTPS --> TLS
 ```
@@ -144,6 +148,11 @@ HTTP request construction is shared by HTTP and HTTPS. `net_http_request` and
 `Content-Length` and `application/x-www-form-urlencoded`; redirects preserve
 POST only for 307/308.
 
+`oslink.c` is the small OS-to-OS communication layer. It uses public
+`net_udp_send` and `net_udp_recv` helpers, frames packets with an `OSLK`
+signature, remembers peers by IPv4/node name, queues inbound hello/ping/text
+messages, and sends automatic acknowledgements or pongs.
+
 ## Important Files
 
 | Area | Files |
@@ -156,6 +165,7 @@ POST only for 307/308.
 | SMP | `os/kernel/smp.c`, `os/kernel/ap_trampoline.s`, `os/kernel/aux_kernel.s` |
 | Power-On Self-Test | `os/kernel/post.c`, `os/include/post.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
+| OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
 | Native TLS | `os/kernel/lard_tls.c`, `os/include/lard_tls.h` |
 | GUI and shell | `os/kernel/gui.c`, `os/kernel/lsh.c`, `os/kernel/lafillo.c` |
 
@@ -178,15 +188,15 @@ boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
-ScreenRAM scratch storage, LPST metadata, LVCS hashing, containers, and LIL
-feature forms.
+ScreenRAM scratch storage, OSLink packet framing, LPST metadata, LVCS hashing,
+containers, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
-POST reruns (`post`, `selftest`), native document rendering (`lars`, `lardd`,
-`doc`), native LIL script execution (`lil file`), writable RAM file editing
-(`write`, `append`, `copy`), LPST persistence
+OS-to-OS messaging (`oslink`), POST reruns (`post`, `selftest`), native document
+rendering (`lars`, `lardd`, `doc`), native LIL script execution (`lil file`),
+writable RAM file editing (`write`, `append`, `copy`), LPST persistence
 (`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and
 SUM-only raw machine controls (`peek`, `poke`, `asm_`).
 

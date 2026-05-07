@@ -9,6 +9,7 @@
 - `magic command [args]` - predict and run a mistyped safe built-in command.
 - `mode [status|probe|real]` - inspect or run the controlled real16/long64 bridge.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
+- `oslink status|ping|send|recv|peers` - OS-to-OS messages over UDP.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

@@ -10,6 +10,7 @@
 #include "lil.h"
 #include "lvcs.h"
 #include "mem.h"
+#include "oslink.h"
 #include "pci.h"
 #include "string.h"
 #include "syscall.h"
@@ -112,6 +113,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lpst: dual-bank layout", lba == 2752u && sectors == 128u && bank_sectors == 64u, emit, user, &pass, &fail);
     post_check("lpst: driver string", driver && driver[0], emit, user, &pass, &fail);
     post_check("lvcs: hash engine", lvcs_hash(hash_data, sizeof(hash_data)) != 0, emit, user, &pass, &fail);
+    post_check("oslink: packet codec", oslink_selftest() == 0, emit, user, &pass, &fail);
     post_check("lcnt: dev profile", (lcontainer_profile_caps("dev") & (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL)) == (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL), emit, user, &pass, &fail);
     post_check("lil: feature forms", lil_eval_int("(begin (assert (eq (pow 2 8) 256)) (assert (eq (clamp 99 0 10) 10)) (gcd 84 30))", &lil_value) == 0 && lil_value == 6, emit, user, &pass, &fail);
 

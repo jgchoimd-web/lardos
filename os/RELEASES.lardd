@@ -3,6 +3,13 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.11.0a
+ITEM Added OSLink, a small OS-to-OS communication module over the native UDP stack.
+ITEM Added public net_udp_send and net_udp_recv helpers for in-kernel datagram protocols.
+ITEM Added oslink status, hello, ping, send, recv, peers, poll, and test commands in LSH.
+ITEM OSLink tracks peer nodes, queues incoming messages, and replies to hello, ping, and text packets.
+ITEM POST now checks the OSLink packet codec.
+
 SECTION v1.10.0a
 ITEM Added ScreenRAM, an optional framebuffer/backbuffer scratch RAM region.
 ITEM Added sram and screenram LSH commands for default corner storage, user-selected rectangles, reads, writes, clears, and self-tests.

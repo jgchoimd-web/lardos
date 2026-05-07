@@ -252,6 +252,87 @@ int net_get_cfg(net_stack_t* n, net_cfg_t* out)
     return 0;
 }
 
+static int ip_is_broadcast(ip4_t ip)
+{
+    return ip.b[0] == 255 && ip.b[1] == 255 && ip.b[2] == 255 && ip.b[3] == 255;
+}
+
+static uint32_t ip4_pack(ip4_t ip)
+{
+    return ((uint32_t)ip.b[0] << 24) | ((uint32_t)ip.b[1] << 16) | ((uint32_t)ip.b[2] << 8) | (uint32_t)ip.b[3];
+}
+
+static int ip_same_subnet(ip4_t a, ip4_t b, ip4_t mask)
+{
+    uint32_t m = ip4_pack(mask);
+    return (ip4_pack(a) & m) == (ip4_pack(b) & m);
+}
+
+int net_udp_send(net_stack_t* n,
+                 ip4_t dst,
+                 uint16_t src_port,
+                 uint16_t dst_port,
+                 const void* payload,
+                 uint32_t payload_len)
+{
+    net_stack_impl_t* s = impl(n);
+    net_cfg_t cfg;
+    uint8_t mac[6];
+    if (!n || (!payload && payload_len) || payload_len > 1400u) return -1;
+    if (net_get_cfg(n, &cfg) != 0) return -2;
+    if (ip_is_broadcast(dst)) {
+        mac_broadcast(mac);
+    } else if (ip_same_subnet(cfg.ip, dst, cfg.mask)) {
+        if (arp_resolve(n, cfg.ip, dst, mac) != 0) return -3;
+    } else {
+        if (!s->gw_mac_valid) {
+            if (arp_resolve(n, cfg.ip, cfg.gw, s->gw_mac) != 0) return -3;
+            s->gw_mac_valid = 1;
+        }
+        for (int i = 0; i < 6; i++) mac[i] = s->gw_mac[i];
+    }
+    return ip_send_udp(n, mac, cfg.ip, dst, src_port, dst_port, payload, (uint16_t)payload_len);
+}
+
+int net_udp_recv(net_stack_t* n,
+                 uint16_t dst_port,
+                 void* out_payload,
+                 uint32_t out_cap,
+                 ip4_t* out_src,
+                 uint16_t* out_src_port)
+{
+    if (!n || !out_payload || out_cap == 0) return -1;
+    uint8_t* rx = NULL;
+    uint32_t rx_len = 0;
+    if (nic_rx(n, &rx, &rx_len) != 0) return 0;
+    if (rx_len < sizeof(eth_hdr_t) + sizeof(ip4_hdr_t) + sizeof(udp_hdr_t)) return 0;
+    const eth_hdr_t* eth = (const eth_hdr_t*)rx;
+    if (ntohs(eth->ethertype) != 0x0800) return 0;
+    const ip4_hdr_t* ip = (const ip4_hdr_t*)(rx + sizeof(eth_hdr_t));
+    if (ip->proto != 17) return 0;
+    uint8_t ihl = (uint8_t)((ip->ver_ihl & 0x0Fu) * 4u);
+    if (ihl < sizeof(ip4_hdr_t)) return 0;
+    if (rx_len < sizeof(eth_hdr_t) + ihl + sizeof(udp_hdr_t)) return 0;
+    const udp_hdr_t* udp = (const udp_hdr_t*)((const uint8_t*)ip + ihl);
+    if (ntohs(udp->dst_port) != dst_port) return 0;
+    uint16_t udp_len = ntohs(udp->len);
+    if (udp_len < sizeof(udp_hdr_t)) return 0;
+    if (rx_len < sizeof(eth_hdr_t) + ihl + udp_len) return 0;
+    uint32_t pay_len = (uint32_t)udp_len - sizeof(udp_hdr_t);
+    if (pay_len > out_cap) return -1;
+    const uint8_t* pay = (const uint8_t*)udp + sizeof(udp_hdr_t);
+    for (uint32_t i = 0; i < pay_len; i++) ((uint8_t*)out_payload)[i] = pay[i];
+    if (out_src) {
+        uint32_t src = ntohl(ip->src);
+        out_src->b[0] = (uint8_t)(src >> 24);
+        out_src->b[1] = (uint8_t)(src >> 16);
+        out_src->b[2] = (uint8_t)(src >> 8);
+        out_src->b[3] = (uint8_t)src;
+    }
+    if (out_src_port) *out_src_port = ntohs(udp->src_port);
+    return (int)pay_len;
+}
+
 // ---- DHCP (very small: DISCOVER/REQUEST) ----
 typedef struct __attribute__((packed)) {
     uint8_t op, htype, hlen, hops;

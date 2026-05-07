@@ -18,6 +18,7 @@
 #include "gui.h"
 #include "post.h"
 #include "cpumode.h"
+#include "oslink.h"
 #include "version.h"
 #include "io.h"
 #include "string.h"
@@ -210,6 +211,17 @@ static void out_append_hex8(uint8_t v)
     out_append_char(hex[v & 0xFu]);
 }
 
+static void out_append_ip4(ip4_t ip)
+{
+    out_append_u32(ip.b[0]);
+    out_append_char('.');
+    out_append_u32(ip.b[1]);
+    out_append_char('.');
+    out_append_u32(ip.b[2]);
+    out_append_char('.');
+    out_append_u32(ip.b[3]);
+}
+
 static char lardos_version_suffix(void)
 {
     uint32_t i = 0;
@@ -233,7 +245,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
@@ -1086,7 +1098,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode cls\n");
+    out_append("  help control status release ver post selftest magic mode oslink cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
@@ -1115,6 +1127,7 @@ static void cmd_control(const char* args)
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
+    out_append("  oslink status       inspect OS-to-OS message link\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
@@ -1213,6 +1226,16 @@ static void cmd_status(const char* args)
     out_append_u32(sram.capacity);
     out_append(", used=");
     out_append_u32(sram.used);
+    out_append("\n");
+
+    oslink_info_t link;
+    oslink_info(&link);
+    out_append("OSLink: ");
+    out_append(link.ready ? "ready" : "offline");
+    out_append(", inbox=");
+    out_append_u32(link.inbox_count);
+    out_append(", peers=");
+    out_append_u32(link.peer_count);
     out_append("\n");
 }
 
@@ -1434,6 +1457,189 @@ static void cmd_sram(const char* args)
         return;
     }
     out_append("Usage: sram status|on|off|corner|rect|write|read|clear|test\n");
+}
+
+static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
+{
+    const char* p = *args;
+    uint32_t seg = 0;
+    uint32_t val = 0;
+    int have = 0;
+    while (*p == ' ' || *p == '\t') p++;
+    for (;;) {
+        char c = *p;
+        if (c >= '0' && c <= '9') {
+            val = val * 10u + (uint32_t)(c - '0');
+            if (val > 255u) return -1;
+            have = 1;
+            p++;
+        } else if (c == '.' || c == '\0' || c == ' ' || c == '\t') {
+            if (!have || seg >= 4u) return -1;
+            out->b[seg++] = (uint8_t)val;
+            val = 0;
+            have = 0;
+            if (c == '.') {
+                p++;
+                continue;
+            }
+            break;
+        } else {
+            return -1;
+        }
+    }
+    if (seg != 4u) return -1;
+    while (*p == ' ' || *p == '\t') p++;
+    *args = p;
+    return 0;
+}
+
+static const char* oslink_type_name(uint8_t type)
+{
+    if (type == 1) return "hello";
+    if (type == 2) return "ping";
+    if (type == 3) return "pong";
+    if (type == 4) return "text";
+    if (type == 5) return "ack";
+    return "packet";
+}
+
+static void cmd_oslink_status(void)
+{
+    oslink_info_t info;
+    oslink_info(&info);
+    out_append("OSLink ");
+    out_append(info.ready ? "ready" : "offline");
+    out_append(" node=");
+    out_append(info.node);
+    out_append(" ip=");
+    out_append_ip4(info.ip);
+    out_append(" port=");
+    out_append_u32(info.port);
+    out_append("\n");
+    out_append("sent=");
+    out_append_u32(info.sent);
+    out_append(" recv=");
+    out_append_u32(info.received);
+    out_append(" dropped=");
+    out_append_u32(info.dropped);
+    out_append(" inbox=");
+    out_append_u32(info.inbox_count);
+    out_append(" peers=");
+    out_append_u32(info.peer_count);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_oslink_peers(void)
+{
+    uint32_t count = oslink_peer_count();
+    if (count == 0) {
+        out_append("oslink: no peers yet.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        oslink_peer_t p;
+        if (oslink_peer_at(i, &p) == 0) {
+            out_append_u32(i);
+            out_append(" ");
+            out_append_ip4(p.ip);
+            out_append(" ");
+            out_append(p.node);
+            out_append(" seen=");
+            out_append_u32(p.seen);
+            out_append("\n");
+        }
+    }
+}
+
+static void cmd_oslink_recv(void)
+{
+    oslink_msg_t m;
+    oslink_poll();
+    if (oslink_recv(&m) == 0) {
+        out_append("oslink: inbox empty.\n");
+        return;
+    }
+    out_append(oslink_type_name(m.type));
+    out_append(" from ");
+    out_append(m.src_node);
+    out_append(" ");
+    out_append_ip4(m.src_ip);
+    out_append(" seq=");
+    out_append_u32(m.seq);
+    out_append("\n");
+    if (m.text[0]) {
+        out_append(m.text);
+        out_append("\n");
+    }
+}
+
+static void cmd_oslink_send_like(const char* args, int kind)
+{
+    ip4_t dst;
+    int r;
+    if (lsh_parse_ip4_arg(&args, &dst) != 0) {
+        out_append(kind == 1 ? "Usage: oslink hello ip\n" :
+                   kind == 2 ? "Usage: oslink ping ip [text]\n" :
+                               "Usage: oslink send ip text\n");
+        return;
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    if (kind == 1) r = oslink_send_hello(dst);
+    else if (kind == 2) r = oslink_send_ping(dst, args);
+    else r = oslink_send_text(dst, args);
+    if (r == 0) {
+        out_append("oslink: sent to ");
+        out_append_ip4(dst);
+        out_append("\n");
+    } else {
+        out_append("oslink: send failed.\n");
+    }
+}
+
+static void cmd_oslink(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        cmd_oslink_status();
+        return;
+    }
+    if (strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_oslink_status();
+        return;
+    }
+    if (strcmp(sub, "peers") == 0) {
+        cmd_oslink_peers();
+        return;
+    }
+    if (strcmp(sub, "poll") == 0) {
+        oslink_poll();
+        out_append("oslink: polled.\n");
+        return;
+    }
+    if (strcmp(sub, "recv") == 0 || strcmp(sub, "inbox") == 0) {
+        cmd_oslink_recv();
+        return;
+    }
+    if (strcmp(sub, "hello") == 0) {
+        cmd_oslink_send_like(args, 1);
+        return;
+    }
+    if (strcmp(sub, "ping") == 0) {
+        cmd_oslink_send_like(args, 2);
+        return;
+    }
+    if (strcmp(sub, "send") == 0 || strcmp(sub, "msg") == 0) {
+        cmd_oslink_send_like(args, 3);
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(oslink_selftest() == 0 ? "oslink: selftest OK\n" : "oslink: selftest failed\n");
+        return;
+    }
+    out_append("Usage: oslink status|hello|ping|send|recv|peers|poll|test\n");
 }
 
 static int lsh_require_sum(const char* cmd)
@@ -2277,6 +2483,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
+    if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
     if (strcmp(cmd, "peek") == 0) { cmd_peek(args); return; }
     if (strcmp(cmd, "poke") == 0) { cmd_poke(args); return; }

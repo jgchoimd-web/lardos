@@ -23,6 +23,21 @@ int net_dhcp(net_stack_t* n, net_cfg_t* out);
 int net_get_cfg(net_stack_t* n, net_cfg_t* out);
 int net_dns_a(net_stack_t* n, ip4_t dns, const char* name, ip4_t* out_ip);
 
+int net_udp_send(net_stack_t* n,
+                 ip4_t dst,
+                 uint16_t src_port,
+                 uint16_t dst_port,
+                 const void* payload,
+                 uint32_t payload_len);
+
+/* Poll one UDP datagram for dst_port. Returns payload bytes, 0 if none, -1 on bad args/truncation. */
+int net_udp_recv(net_stack_t* n,
+                 uint16_t dst_port,
+                 void* out_payload,
+                 uint32_t out_cap,
+                 ip4_t* out_src,
+                 uint16_t* out_src_port);
+
 /* host_hdr is the full Host header value, for example example.com or 10.0.2.2:8765. */
 int net_http_request(net_stack_t* n,
                      ip4_t dst,

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "unicode.h"
 #include "net.h"
+#include "oslink.h"
 #include "ps2.h"
 #include "gui.h"
 #include "idt64.h"
@@ -452,6 +453,7 @@ void kmain(void)
     if (net_dhcp(&net, &cfg) != 0) {
         panic("DHCP failed");
     }
+    oslink_init(&net, &cfg, "lardos");
     vga_puts("DHCP OK\n", 0x2F);
 
     ip4_t ip;
@@ -564,6 +566,7 @@ void kmain(void)
         }
 
         gui_tick();
+        oslink_poll();
         if (gui_screensaver_active()) gui_render();
         __asm__ __volatile__("pause");
     }

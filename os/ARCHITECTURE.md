@@ -104,8 +104,8 @@ flowchart TB
     RTL["rtl8139"]
     Net["net.c"]
     TCP["small TCP path"]
-    HTTP["net_http_get"]
-    HTTPS["net_https_get"]
+    HTTP["net_http_request GET/POST"]
+    HTTPS["net_https_request GET/POST"]
     TLS["lard_tls"]
 
     RTL --> Net --> TCP
@@ -129,6 +129,12 @@ unsupported-cipher for ECDHE-only sites. Trust anchors live in
 `kernel/lard_tls_roots.inc` as subject DER plus RSA public-key parameters
 generated from Windows Root stores; the verifier walks the presented chain and
 requires the final signature to validate against that native table.
+
+HTTP request construction is shared by HTTP and HTTPS. `net_http_request` and
+`net_https_request` support GET and POST, while `net_http_get` and
+`net_https_get` remain wrappers for older callers. POST sends
+`Content-Length` and `application/x-www-form-urlencoded`; redirects preserve
+POST only for 307/308.
 
 ## Important Files
 

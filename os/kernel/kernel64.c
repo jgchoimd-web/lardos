@@ -451,14 +451,14 @@ void kmain(void)
         }
 
         // URL submit -> fetch
-        char url[256];
-        if (gui_take_submit(url, sizeof(url))) {
+        gui_http_request_t http_req;
+        if (gui_take_submit(&http_req)) {
             gui_set_loading(1);
             gui_set_response("");
             gui_render();
             int is_file = 0;
-            if (url[0] == 'f' && url[1] == 'i' && url[2] == 'l' && url[3] == 'e') {
-                const char* path = (url[4] == ':' && url[5] == '/' && url[6] == '/') ? url + 7 : (url[4] == ':') ? url + 5 : NULL;
+            if (http_req.url[0] == 'f' && http_req.url[1] == 'i' && http_req.url[2] == 'l' && http_req.url[3] == 'e') {
+                const char* path = (http_req.url[4] == ':' && http_req.url[5] == '/' && http_req.url[6] == '/') ? http_req.url + 7 : (http_req.url[4] == ':') ? http_req.url + 5 : NULL;
                 if (path && path[0]) {
                     is_file = 1;
                     const FsFile* f = fs_open(path);
@@ -489,11 +489,11 @@ void kmain(void)
             char host_hdr[160];
             char path[512];
             uint16_t url_port = 80;
-            if (parse_url(url, host, sizeof(host), host_hdr, sizeof(host_hdr), &url_port, path, sizeof(path)) != 0) {
+            if (parse_url(http_req.url, host, sizeof(host), host_hdr, sizeof(host_hdr), &url_port, path, sizeof(path)) != 0) {
                 gui_set_response("Bad URL");
             } else {
                 ip4_t dip;
-                int is_https = (url[0] == 'h' && url[1] == 't' && url[2] == 't' && url[3] == 'p' && url[4] == 's' && url[5] == ':');
+                int is_https = (http_req.url[0] == 'h' && http_req.url[1] == 't' && http_req.url[2] == 't' && http_req.url[3] == 'p' && http_req.url[4] == 's' && http_req.url[5] == ':');
                 int have_ip = 0;
                 if (parse_ipv4_host(host, &dip) == 0) {
                     have_ip = 1;
@@ -504,8 +504,8 @@ void kmain(void)
                 }
                 if (have_ip) {
                     resp[0] = '\0';
-                    int r = is_https ? net_https_get(&net, dip, url_port, host_hdr, path, resp, sizeof(resp))
-                                     : net_http_get(&net, dip, url_port, host_hdr, path, resp, sizeof(resp));
+                    int r = is_https ? net_https_request(&net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(resp))
+                                     : net_http_request(&net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(resp));
                     if (r != 0) {
                         gui_set_response((is_https && resp[0]) ? resp : (is_https ? "HTTPS failed" : "HTTP failed"));
                     } else {

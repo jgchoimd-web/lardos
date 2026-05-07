@@ -59,6 +59,10 @@ Both are record-based, readable without a renderer, and parsed by freestanding C
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
 does not use HTML or Markdown for its own built-in documents.
 
+The Doc tab can choose GET or POST for HTTP/HTTPS requests. In POST mode, type
+`URL|body` in the address field; the in-kernel request builder sends the body
+with `Content-Length` and `application/x-www-form-urlencoded`.
+
 The Lard Shell (`LSH` tab) includes command discovery and RAM-file workflow
 commands:
 
@@ -96,7 +100,8 @@ available.
 ### Networking And TLS
 
 The kernel networking stack owns DHCP, DNS, IPv4, UDP, a small TCP path, and
-plain HTTP.
+plain HTTP. HTTP requests are no longer GET-only: the shared request builder can
+send GET or POST, and the Doc tab exposes that as a method option.
 
 TLS is intentionally in-tree now. External TLS libraries and host fetch bridges
 are not linked into the kernel. The native `lard_tls`

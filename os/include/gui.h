@@ -13,7 +13,18 @@ int gui_screensaver_active(void);  /* 1 if screensaver is showing */
 void gui_demo(void);
 
 // GUI -> kernel integration for "fetch" demo
-int gui_take_submit(char* out_url, unsigned out_cap); // returns 1 if got submit
+#define GUI_HTTP_URL_MAX 256u
+#define GUI_HTTP_METHOD_MAX 8u
+#define GUI_HTTP_BODY_MAX 1024u
+
+typedef struct {
+    char url[GUI_HTTP_URL_MAX];
+    char method[GUI_HTTP_METHOD_MAX];
+    char body[GUI_HTTP_BODY_MAX];
+    uint32_t body_len;
+} gui_http_request_t;
+
+int gui_take_submit(gui_http_request_t* out); // returns 1 if got submit
 void gui_set_response(const char* text);
 void gui_set_loading(int on);
 

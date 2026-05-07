@@ -91,6 +91,7 @@ typedef struct {
     int user_sandbox;  /* User tab: run with sandbox */
 
     /* Lafillo: View Source, Save */
+    int http_post_mode;
     int lafillo_src_mode;
     char lafillo_raw[4096];
     char lafillo_extracted[4096];
@@ -418,6 +419,7 @@ int gui_init(void)
     g.resp_total_lines = 0;
     g.scroll_drag = 0;
     g.scroll_drag_off_y = 0;
+    g.http_post_mode = 0;
     g.app_id = 0;
     g.calc_display[0] = '0';
     g.calc_display[1] = '\0';
@@ -792,15 +794,15 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int btn_y = content_y_m + 36;
     int btn_w = 120;
     int btn_h = 28;
-    int lafillo_btn_w = 64;
-    int lafillo_src_w = 50;
+    int lafillo_w[] = { 48, 64, 52, 56, 50 };
     int lafaelo_btn_w = 56;
     if (l_pressed) {
         if (g.app_id == 0) {
-            if (in_rect(g.mx, g.my, btn_x, btn_y, lafillo_btn_w, btn_h)) g.btn_pressed = 1;
-            else if (in_rect(g.mx, g.my, btn_x + lafillo_btn_w + 4, btn_y, lafillo_btn_w, btn_h)) g.btn_pressed = 1;
-            else if (in_rect(g.mx, g.my, btn_x + (lafillo_btn_w + 4) * 2, btn_y, lafillo_btn_w, btn_h)) g.btn_pressed = 1;
-            else if (in_rect(g.mx, g.my, btn_x + (lafillo_btn_w + 4) * 3, btn_y, lafillo_src_w, btn_h)) g.btn_pressed = 1;
+            int x = btn_x;
+            for (int d = 0; d < 5; d++) {
+                if (in_rect(g.mx, g.my, x, btn_y, lafillo_w[d], btn_h)) g.btn_pressed = 1;
+                x += lafillo_w[d] + 4;
+            }
         } else if (g.app_id == 9) {
             if (in_rect(g.mx, g.my, btn_x, btn_y, lafaelo_btn_w, btn_h)) g.btn_pressed = 1;
             else if (in_rect(g.mx, g.my, btn_x + lafaelo_btn_w + 4, btn_y, lafaelo_btn_w, btn_h)) g.btn_pressed = 1;
@@ -813,18 +815,29 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     }
     if (l_released) {
         if (g.btn_pressed && g.app_id == 0) {
-            if (in_rect(g.mx, g.my, btn_x, btn_y, lafillo_btn_w, btn_h)) {
+            int x = btn_x;
+            int hit = -1;
+            for (int d = 0; d < 5; d++) {
+                if (in_rect(g.mx, g.my, x, btn_y, lafillo_w[d], btn_h)) {
+                    hit = d;
+                    break;
+                }
+                x += lafillo_w[d] + 4;
+            }
+            if (hit == 0) {
                 g.submit_pending = 1;
-            } else if (in_rect(g.mx, g.my, btn_x + lafillo_btn_w + 4, btn_y, lafillo_btn_w, btn_h)) {
+            } else if (hit == 1) {
                 g.submit_pending = 1;
-            } else if (in_rect(g.mx, g.my, btn_x + (lafillo_btn_w + 4) * 2, btn_y, lafillo_btn_w, btn_h)) {
+            } else if (hit == 2) {
+                g.http_post_mode = 1 - g.http_post_mode;
+            } else if (hit == 3) {
                 FsWritableFile* w = fs_open_writable("lafillo_saved.txt");
                 if (w) {
                     uint32_t n = 0;
                     while (g.resp[n] && n < sizeof(g.resp) - 1) n++;
                     fs_write(w, 0, (const uint8_t*)g.resp, n);
                 }
-            } else if (in_rect(g.mx, g.my, btn_x + (lafillo_btn_w + 4) * 3, btn_y, lafillo_src_w, btn_h)) {
+            } else if (hit == 4) {
                 g.lafillo_src_mode = 1 - g.lafillo_src_mode;
                 g.resp_scroll = 0;
                 if (g.lafillo_src_mode) {
@@ -1231,16 +1244,64 @@ int gui_screensaver_active(void)
     return g.ss_active ? 1 : 0;
 }
 
-int gui_take_submit(char* out_url, unsigned out_cap)
+static int gui_is_space(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+static uint32_t gui_copy_trim(char* out, uint32_t cap, const char* src, uint32_t start, uint32_t end)
+{
+    if (!out || cap == 0 || !src) return 0;
+    while (start < end && gui_is_space(src[start])) start++;
+    while (end > start && gui_is_space(src[end - 1u])) end--;
+    uint32_t n = 0;
+    while (start < end && n + 1u < cap) {
+        out[n++] = src[start++];
+    }
+    out[n] = '\0';
+    return n;
+}
+
+int gui_take_submit(gui_http_request_t* out)
 {
     if (!g_have_fb) return 0;
     if (!g.submit_pending) return 0;
     g.submit_pending = 0;
-    if (!out_url || out_cap == 0) return 1;
-    unsigned n = (unsigned)g.tb_len;
-    if (n >= out_cap) n = out_cap - 1;
-    for (unsigned i = 0; i < n; i++) out_url[i] = g.tb[i];
-    out_url[n] = '\0';
+    if (!out) return 1;
+
+    out->method[0] = g.http_post_mode ? 'P' : 'G';
+    out->method[1] = g.http_post_mode ? 'O' : 'E';
+    out->method[2] = g.http_post_mode ? 'S' : 'T';
+    out->method[3] = g.http_post_mode ? 'T' : '\0';
+    out->method[4] = '\0';
+    out->body[0] = '\0';
+    out->body_len = 0;
+
+    uint32_t split = g.tb_len;
+    int have_split = 0;
+    if (g.http_post_mode) {
+        for (uint32_t i = 0; i < g.tb_len; i++) {
+            if (g.tb[i] == '|') {
+                split = i;
+                have_split = 1;
+                break;
+            }
+        }
+        if (!have_split) {
+            for (uint32_t i = 0; i < g.tb_len; i++) {
+                if (gui_is_space(g.tb[i])) {
+                    split = i;
+                    have_split = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    gui_copy_trim(out->url, GUI_HTTP_URL_MAX, g.tb, 0, split);
+    if (g.http_post_mode && have_split && split + 1u < g.tb_len) {
+        out->body_len = gui_copy_trim(out->body, GUI_HTTP_BODY_MAX, g.tb, split + 1u, g.tb_len);
+    }
     return 1;
 }
 
@@ -1419,14 +1480,14 @@ void gui_render(void)
     int btn_w = 120;
     int btn_h = 28;
     if (g.app_id == 0) {
-        static const char* lafillo_labels[] = { "Go", "Refresh", "Save", "Src" };
-        int dw = 64, dw2 = 50;
-        int dx[] = { 0, dw + 4, (dw + 4) * 2, (dw + 4) * 3 };
-        int dww[] = { dw, dw, dw, dw2 };
-        for (int d = 0; d < 4; d++) {
+        static const char* lafillo_labels[] = { "Go", "Refresh", "", "Save", "Src" };
+        int dx[] = { 0, 52, 120, 176, 236 };
+        int dww[] = { 48, 64, 52, 56, 50 };
+        for (int d = 0; d < 5; d++) {
+            const char* label = (d == 2) ? (g.http_post_mode ? "POST" : "GET") : lafillo_labels[d];
             uint32_t dbg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
             fb_fill_rect(tgt, (uint16_t)(btn_x + dx[d]), (uint16_t)btn_y, (uint16_t)dww[d], (uint16_t)btn_h, dbg);
-            fb_draw_text(tgt, (uint16_t)(btn_x + dx[d] + 4), (uint16_t)(btn_y + 10), lafillo_labels[d], 0xFFFFFFFF, dbg);
+            fb_draw_text(tgt, (uint16_t)(btn_x + dx[d] + 4), (uint16_t)(btn_y + 10), label, 0xFFFFFFFF, dbg);
         }
     } else if (g.app_id == 9) {
         static const char* lafaelo_labels[] = { "Open", "Save", "Run" };
@@ -1462,6 +1523,7 @@ void gui_render(void)
     const char* input_text = (g.app_id == 1) ? g.calc_display : g.tb;
     uint32_t input_cur = (g.app_id == 1) ? g.calc_cur : g.tb_cur;
     const char* input_label = "URL:";
+    if (g.app_id == 0 && g.http_post_mode) input_label = "URL|Body:";
     if (g.app_id == 1) input_label = "Expr:";
     else if (g.app_id == 2) input_label = "Add line:";
     else if (g.app_id == 4) input_label = "File:";

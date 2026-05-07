@@ -887,6 +887,93 @@ static uint32_t str_len(const char* s)
     return n;
 }
 
+static int http_method_is_post(const char* method)
+{
+    return method && method[0] == 'P' && method[1] == 'O' && method[2] == 'S' &&
+           method[3] == 'T' && method[4] == '\0';
+}
+
+static int req_puts(char* out, uint32_t cap, uint32_t* pos, const char* s)
+{
+    if (!out || !pos || !s) return -1;
+    while (*s) {
+        if (*pos + 1u >= cap) return -2;
+        out[(*pos)++] = *s++;
+    }
+    return 0;
+}
+
+static int req_putn(char* out, uint32_t cap, uint32_t* pos, const char* s, uint32_t n)
+{
+    if (!out || !pos || (!s && n)) return -1;
+    for (uint32_t i = 0; i < n; i++) {
+        if (*pos + 1u >= cap) return -2;
+        out[(*pos)++] = s[i];
+    }
+    return 0;
+}
+
+static int req_put_u32(char* out, uint32_t cap, uint32_t* pos, uint32_t v)
+{
+    char tmp[12];
+    uint32_t n = 0;
+    if (v == 0) {
+        return req_puts(out, cap, pos, "0");
+    }
+    while (v && n < sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (v % 10u));
+        v /= 10u;
+    }
+    while (n) {
+        if (*pos + 1u >= cap) return -2;
+        out[(*pos)++] = tmp[--n];
+    }
+    return 0;
+}
+
+static int build_http_request(char* req,
+                              uint32_t cap,
+                              const char* method,
+                              const char* host,
+                              const char* path,
+                              const char* body,
+                              uint32_t body_len,
+                              uint32_t* out_len)
+{
+    if (!req || cap < 64 || !host || !path || !out_len) return -1;
+    uint32_t p = 0;
+    int is_post = http_method_is_post(method);
+    const char* verb = is_post ? "POST" : "GET";
+    if (!is_post) {
+        body = NULL;
+        body_len = 0;
+    } else if (body && body_len == 0) {
+        body_len = str_len(body);
+    }
+
+    if (req_puts(req, cap, &p, verb) != 0) return -2;
+    if (req_puts(req, cap, &p, " ") != 0) return -2;
+    if (path[0]) {
+        if (req_puts(req, cap, &p, path) != 0) return -2;
+    } else {
+        if (req_puts(req, cap, &p, "/") != 0) return -2;
+    }
+    if (req_puts(req, cap, &p, " HTTP/1.0\r\nHost: ") != 0) return -2;
+    if (req_puts(req, cap, &p, host) != 0) return -2;
+    if (req_puts(req, cap, &p, "\r\nConnection: close\r\n") != 0) return -2;
+    if (is_post) {
+        if (req_puts(req, cap, &p, "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: ") != 0) return -2;
+        if (req_put_u32(req, cap, &p, body_len) != 0) return -2;
+        if (req_puts(req, cap, &p, "\r\n\r\n") != 0) return -2;
+        if (body_len && req_putn(req, cap, &p, body, body_len) != 0) return -2;
+    } else {
+        if (req_puts(req, cap, &p, "\r\n") != 0) return -2;
+    }
+    req[p] = '\0';
+    *out_len = p;
+    return 0;
+}
+
 /* Split "host:port" in place for DNS; default_port if no ':'. */
 static int dns_host_strip_port(char* host, uint16_t* port, uint16_t default_port)
 {
@@ -1080,7 +1167,19 @@ static int parse_location(const char* v, uint32_t vlen, char* out_host, uint32_t
     return 0;
 }
 
-static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap, int* out_status, char* out_loc, uint32_t loc_cap)
+static int net_https_request_once(net_stack_t* n,
+                                  ip4_t dst,
+                                  uint16_t port,
+                                  const char* host,
+                                  const char* path,
+                                  const char* method,
+                                  const char* body,
+                                  uint32_t body_len,
+                                  char* out,
+                                  uint32_t out_cap,
+                                  int* out_status,
+                                  char* out_loc,
+                                  uint32_t loc_cap)
 {
     net_sock_t sock;
     if (net_sock_connect(n, dst, port, &sock) != 0) return -2;
@@ -1097,16 +1196,12 @@ static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const ch
         return tr;
     }
 
-    char req[1024];
+    char req[2048];
     uint32_t rlen = 0;
-    const char* pfx = "GET ";
-    for (int i = 0; pfx[i]; i++) req[rlen++] = pfx[i];
-    for (int i = 0; path[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = path[i];
-    const char* mid = " HTTP/1.0\r\nHost: ";
-    for (int i = 0; mid[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = mid[i];
-    for (int i = 0; host[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = host[i];
-    const char* end = "\r\nConnection: close\r\n\r\n";
-    for (int i = 0; end[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = end[i];
+    if (build_http_request(req, sizeof(req), method, host, path, body, body_len, &rlen) != 0) {
+        net_sock_close(n, &sock);
+        return -6;
+    }
 
     uint32_t sent = 0;
     while (sent < rlen) {
@@ -1202,24 +1297,35 @@ static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const ch
     return 0;
 }
 
-static int net_http_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap, int* out_status, char* out_loc, uint32_t loc_cap)
+static int net_http_request_once(net_stack_t* n,
+                                 ip4_t dst,
+                                 uint16_t port,
+                                 const char* host,
+                                 const char* path,
+                                 const char* method,
+                                 const char* body,
+                                 uint32_t body_len,
+                                 char* out,
+                                 uint32_t out_cap,
+                                 int* out_status,
+                                 char* out_loc,
+                                 uint32_t loc_cap)
 {
     net_sock_t sock;
     if (net_sock_connect(n, dst, port, &sock) != 0) return -2;
 
     // HTTP request
-    char req[1024];
+    char req[2048];
     uint32_t rlen = 0;
-    const char* pfx = "GET ";
-    for (int i = 0; pfx[i]; i++) req[rlen++] = pfx[i];
-    for (int i = 0; path[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = path[i];
-    const char* mid = " HTTP/1.0\r\nHost: ";
-    for (int i = 0; mid[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = mid[i];
-    for (int i = 0; host[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = host[i];
-    const char* end = "\r\nConnection: close\r\n\r\n";
-    for (int i = 0; end[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = end[i];
+    if (build_http_request(req, sizeof(req), method, host, path, body, body_len, &rlen) != 0) {
+        net_sock_close(n, &sock);
+        return -6;
+    }
 
-    if (net_sock_send(n, &sock, req, rlen) != 0) return -5;
+    if (net_sock_send(n, &sock, req, rlen) != 0) {
+        net_sock_close(n, &sock);
+        return -5;
+    }
 
     // Parse/accumulate
     uint32_t out_len = 0;
@@ -1373,20 +1479,31 @@ static int net_http_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const cha
     return 0;
 }
 
-int net_http_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
+int net_http_request(net_stack_t* n,
+                     ip4_t dst,
+                     uint16_t port,
+                     const char* host,
+                     const char* path,
+                     const char* method,
+                     const char* body,
+                     uint32_t body_len,
+                     char* out,
+                     uint32_t out_cap)
 {
     // Follow up to 1 redirect.
     net_cfg_t cfg;
+    int is_post = http_method_is_post(method);
     if (net_get_cfg(n, &cfg) != 0) {
         cfg.dns = (ip4_t){{10, 0, 2, 3}};
     }
 
     char loc[192];
     int st = -1;
-    int r = net_http_get_once(n, dst, port, host, path, out, out_cap, &st, loc, sizeof(loc));
+    int r = net_http_request_once(n, dst, port, host, path, method, body, body_len, out, out_cap, &st, loc, sizeof(loc));
     if (r != 0) return r;
 
     if ((st == 301 || st == 302 || st == 307 || st == 308) && loc[0] != '\0') {
+        if (is_post && st != 307 && st != 308) return 0;
         char nhost[128];
         char npath[128];
         if (parse_location(loc, str_len(loc), nhost, sizeof(nhost), npath, sizeof(npath)) == 0) {
@@ -1414,24 +1531,40 @@ int net_http_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, con
                 }
                 host_hdr_val = nhost;
             }
-            return net_http_get_once(n, use_dst, use_port, host_hdr_val, use_path, out, out_cap, &st, NULL, 0);
+            return net_http_request_once(n, use_dst, use_port, host_hdr_val, use_path, method, body, body_len, out, out_cap, &st, NULL, 0);
         }
     }
     return 0;
 }
 
-int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
+int net_http_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
+{
+    return net_http_request(n, dst, port, host, path, "GET", NULL, 0, out, out_cap);
+}
+
+int net_https_request(net_stack_t* n,
+                      ip4_t dst,
+                      uint16_t port,
+                      const char* host,
+                      const char* path,
+                      const char* method,
+                      const char* body,
+                      uint32_t body_len,
+                      char* out,
+                      uint32_t out_cap)
 {
     net_cfg_t cfg;
+    int is_post = http_method_is_post(method);
     if (net_get_cfg(n, &cfg) != 0) cfg.dns = (ip4_t){{10, 0, 2, 3}};
     if (out && out_cap) out[0] = '\0';
 
     char loc[192];
     int st = -1;
-    int r = net_https_get_once(n, dst, port, host, path, out, out_cap, &st, loc, sizeof(loc));
+    int r = net_https_request_once(n, dst, port, host, path, method, body, body_len, out, out_cap, &st, loc, sizeof(loc));
     if (r != 0) return r;
 
     if ((st == 301 || st == 302 || st == 307 || st == 308) && loc[0] != '\0') {
+        if (is_post && st != 307 && st != 308) return 0;
         char nhost[128];
         char npath[128];
         if (parse_location(loc, str_len(loc), nhost, sizeof(nhost), npath, sizeof(npath)) == 0) {
@@ -1449,15 +1582,20 @@ int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, co
                     if (dns_host_strip_port(hbuf, &use_port, scheme_port) == 0 && net_dns_a(n, cfg.dns, hbuf, &use_dst) == 0) {
                         host_hdr_val = nhost;
                         if (streq_prefix(loc, "http://"))
-                            return net_http_get_once(n, use_dst, use_port, host_hdr_val, npath, out, out_cap, &st, NULL, 0);
-                        return net_https_get_once(n, use_dst, use_port, host_hdr_val, npath, out, out_cap, &st, NULL, 0);
+                            return net_http_request_once(n, use_dst, use_port, host_hdr_val, npath, method, body, body_len, out, out_cap, &st, NULL, 0);
+                        return net_https_request_once(n, use_dst, use_port, host_hdr_val, npath, method, body, body_len, out, out_cap, &st, NULL, 0);
                     }
                 }
             }
             if (streq_prefix(loc, "http://"))
-                return net_http_get_once(n, use_dst, use_port, host, npath, out, out_cap, &st, NULL, 0);
-            return net_https_get_once(n, use_dst, use_port, host, npath, out, out_cap, &st, NULL, 0);
+                return net_http_request_once(n, use_dst, use_port, host, npath, method, body, body_len, out, out_cap, &st, NULL, 0);
+            return net_https_request_once(n, use_dst, use_port, host, npath, method, body, body_len, out, out_cap, &st, NULL, 0);
         }
     }
     return 0;
+}
+
+int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
+{
+    return net_https_request(n, dst, port, host, path, "GET", NULL, 0, out, out_cap);
 }

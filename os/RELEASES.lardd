@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.7.0a
+ITEM Added a Doc tab GET/POST method option instead of forcing every HTTP request to GET.
+ITEM Added net_http_request and net_https_request so the in-kernel HTTP/TLS path can send POST bodies.
+ITEM POST mode reads the Doc address as URL|body, sends Content-Length and application/x-www-form-urlencoded, and keeps GET wrappers for older callers.
+ITEM POST redirects are kept conservative: 307/308 preserve POST, while 301/302 leave the original response visible.
+
 SECTION v1.6.0a
 ITEM Added an optional Power-On Self-Test prompt during boot.
 ITEM Added shared POST diagnostics for CPU mode, heap, native FS docs, LARS/LARDD rendering, LAR archives, DRFL descriptors, PCI options, GUI framebuffer/layout, LPST, LVCS, containers, and LIL feature forms.

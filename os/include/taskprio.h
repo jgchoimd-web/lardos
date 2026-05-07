@@ -16,6 +16,7 @@ typedef struct {
     int32_t priority;
     uint32_t wait_ticks;
     uint32_t runs;
+    uint32_t paused;
 } taskprio_task_t;
 
 typedef struct {
@@ -23,6 +24,8 @@ typedef struct {
     uint32_t completed;
     uint32_t next_id;
     uint32_t last_id;
+    uint32_t paused;
+    uint32_t runnable;
     int32_t default_priority;
 } taskprio_info_t;
 
@@ -32,6 +35,8 @@ int taskprio_dequeue_next(taskprio_task_t* out);
 uint32_t taskprio_count(void);
 int taskprio_at(uint32_t idx, taskprio_task_t* out);
 int taskprio_set_priority(uint32_t id, int32_t priority);
+int taskprio_adjust_priority(uint32_t id, int32_t delta);
+int taskprio_pause(uint32_t id, int pause);
 int taskprio_remove(uint32_t id);
 void taskprio_set_default(int32_t priority);
 int32_t taskprio_default_priority(void);

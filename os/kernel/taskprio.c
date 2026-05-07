@@ -95,6 +95,7 @@ int taskprio_enqueue(const char* name, const char* command, int32_t priority, ui
     t->priority = clamp_priority(priority);
     t->wait_ticks = 0;
     t->runs = 0;
+    t->paused = 0;
     s_taskprio.last_id = t->id;
     if (out_id) *out_id = t->id;
     return 0;
@@ -103,14 +104,21 @@ int taskprio_enqueue(const char* name, const char* command, int32_t priority, ui
 int taskprio_dequeue_next(taskprio_task_t* out)
 {
     if (s_taskprio.count == 0) return 0;
-    uint32_t best = 0;
+    uint32_t best = 0xFFFFFFFFu;
     int32_t best_score = -1;
     for (uint32_t i = 0; i < s_taskprio.count; i++) {
+        if (s_taskprio.tasks[i].paused) continue;
         int32_t score = s_taskprio.tasks[i].priority * 16 + (int32_t)s_taskprio.tasks[i].wait_ticks;
         if (score > best_score) {
             best_score = score;
             best = i;
         }
+    }
+    if (best == 0xFFFFFFFFu) {
+        for (uint32_t i = 0; i < s_taskprio.count; i++) {
+            if (s_taskprio.tasks[i].wait_ticks < 255u) s_taskprio.tasks[i].wait_ticks++;
+        }
+        return 0;
     }
     if (out) {
         *out = s_taskprio.tasks[best];
@@ -145,6 +153,24 @@ int taskprio_set_priority(uint32_t id, int32_t priority)
     return 0;
 }
 
+int taskprio_adjust_priority(uint32_t id, int32_t delta)
+{
+    int idx = find_index(id);
+    if (idx < 0) return -1;
+    taskprio_task_t* t = &s_taskprio.tasks[(uint32_t)idx];
+    t->priority = clamp_priority(t->priority + delta);
+    t->wait_ticks = 0;
+    return 0;
+}
+
+int taskprio_pause(uint32_t id, int pause)
+{
+    int idx = find_index(id);
+    if (idx < 0) return -1;
+    s_taskprio.tasks[(uint32_t)idx].paused = pause ? 1u : 0u;
+    return 0;
+}
+
 int taskprio_remove(uint32_t id)
 {
     int idx = find_index(id);
@@ -170,6 +196,12 @@ void taskprio_info(taskprio_info_t* out)
     out->completed = s_taskprio.completed;
     out->next_id = s_taskprio.next_id;
     out->last_id = s_taskprio.last_id;
+    out->paused = 0;
+    out->runnable = 0;
+    for (uint32_t i = 0; i < s_taskprio.count; i++) {
+        if (s_taskprio.tasks[i].paused) out->paused++;
+        else out->runnable++;
+    }
     out->default_priority = s_taskprio.default_priority;
 }
 
@@ -192,18 +224,26 @@ int taskprio_selftest(void)
         s_taskprio = saved;
         return -3;
     }
-    if (taskprio_dequeue_next(&t) != 1 || t.id != low_id || t.priority != 9) {
+    if (taskprio_pause(high_id, 1) != 0) {
         s_taskprio = saved;
         return -4;
     }
-    if (taskprio_remove(high_id) != 0 || taskprio_count() != 0) {
+    if (taskprio_dequeue_next(&t) != 1 || t.id != low_id || t.priority != 9) {
         s_taskprio = saved;
         return -5;
+    }
+    if (taskprio_pause(high_id, 0) != 0 || taskprio_adjust_priority(high_id, -3) != 0) {
+        s_taskprio = saved;
+        return -6;
+    }
+    if (taskprio_remove(high_id) != 0 || taskprio_count() != 0) {
+        s_taskprio = saved;
+        return -7;
     }
     taskprio_set_default(7);
     if (taskprio_default_priority() != 7) {
         s_taskprio = saved;
-        return -6;
+        return -8;
     }
     s_taskprio = saved;
     return 0;

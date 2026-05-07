@@ -84,7 +84,9 @@ commands:
 - `task` / `tasks` exposes a user-changeable priority queue for background
   work. `cmd &` queues a numbered task, `task set id priority` changes it,
   `task default priority` changes new background work, and `task run priority
-  command` queues a command at a chosen priority.
+  command` queues a command at a chosen priority. `tasktop` renders a compact
+  dashboard and `task pause`, `task resume`, `task up`, and `task down` adjust
+  queued work without hiding it from the user.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has

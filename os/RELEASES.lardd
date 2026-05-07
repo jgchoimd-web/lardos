@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.13.0a
+ITEM Added tasktop, a dashboard-style task manager for the TaskPrio queue.
+ITEM Added task up, task down, task pause, and task resume for direct user scheduling control.
+ITEM Paused tasks stay visible but are skipped by the background scheduler until resumed.
+ITEM Task listings now show runnable and paused counts plus a compact priority bar.
+
 SECTION v1.12.0a
 ITEM Added TaskPrio, a user-changeable task priority queue for LSH background work.
 ITEM Added task list, task set, task default, task run, task boost, task drop, prio, and nice commands.

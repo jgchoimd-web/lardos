@@ -189,8 +189,10 @@ small RAM while still visibly living in screen memory.
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a
 default priority; `task set`, `task default`, `task run`, `task boost`, `task
-drop`, `prio`, and `nice` let the user change scheduling directly. The queue
-selects the highest effective priority and ages waiting tasks.
+drop`, `task pause`, `task resume`, `task up`, `task down`, `prio`, and `nice`
+let the user change scheduling directly. `tasktop` renders the queue with
+priority bars, runnable/paused counts, and command names. The queue selects the
+highest effective priority and ages waiting tasks.
 
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH

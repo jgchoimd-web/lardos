@@ -242,7 +242,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
@@ -1104,7 +1104,7 @@ static void cmd_help(const char* args)
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
     out_append("  drivers fsstat fsload fssave sync sram sandbox exitsandbox\n");
-    out_append("  task list|set|default|run|boost|drop  nice prio cmd  prio id prio\n");
+    out_append("  tasktop  task list|set|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
 }
@@ -1241,6 +1241,10 @@ static void cmd_status(const char* args)
     taskprio_info(&tasks);
     out_append("Tasks: queued=");
     out_append_u32(tasks.queued);
+    out_append(", runnable=");
+    out_append_u32(tasks.runnable);
+    out_append(", paused=");
+    out_append_u32(tasks.paused);
     out_append(", default-prio=");
     out_append_i32(tasks.default_priority);
     out_append(", completed=");
@@ -1657,6 +1661,10 @@ static void cmd_task_list(void)
     taskprio_info(&info);
     out_append("Tasks queued=");
     out_append_u32(info.queued);
+    out_append(" runnable=");
+    out_append_u32(info.runnable);
+    out_append(" paused=");
+    out_append_u32(info.paused);
     out_append(" default-prio=");
     out_append_i32(info.default_priority);
     out_append(" completed=");
@@ -1675,6 +1683,7 @@ static void cmd_task_list(void)
             out_append_i32(t.priority);
             out_append(" wait=");
             out_append_u32(t.wait_ticks);
+            out_append(t.paused ? " pause " : " run   ");
             out_append(" ");
             out_append(t.name);
             out_append(" :: ");
@@ -1682,6 +1691,51 @@ static void cmd_task_list(void)
             out_append("\n");
         }
     }
+}
+
+static void tasktop_bar(int32_t priority)
+{
+    out_append("[");
+    for (int32_t i = 0; i <= TASKPRIO_MAX; i++) {
+        out_append_char(i <= priority ? '#' : '.');
+    }
+    out_append("]");
+}
+
+static void cmd_tasktop(const char* args)
+{
+    (void)args;
+    taskprio_info_t info;
+    taskprio_info(&info);
+    out_append("TASKTOP  queued=");
+    out_append_u32(info.queued);
+    out_append(" runnable=");
+    out_append_u32(info.runnable);
+    out_append(" paused=");
+    out_append_u32(info.paused);
+    out_append(" done=");
+    out_append_u32(info.completed);
+    out_append(" default=");
+    out_append_i32(info.default_priority);
+    out_append("\n");
+    out_append("ID  ST  PRIO BAR        WAIT CMD\n");
+    for (uint32_t i = 0; i < info.queued; i++) {
+        taskprio_task_t t;
+        if (taskprio_at(i, &t) == 0) {
+            out_append_u32(t.id);
+            out_append("  ");
+            out_append(t.paused ? "PAU " : "RUN ");
+            out_append_i32(t.priority);
+            out_append("    ");
+            tasktop_bar(t.priority);
+            out_append(" ");
+            out_append_u32(t.wait_ticks);
+            out_append("    ");
+            out_append(t.command);
+            out_append("\n");
+        }
+    }
+    if (info.queued == 0) out_append("No queued tasks. Use: task run 7 echo hello\n");
 }
 
 static int task_parse_priority(const char** args, int32_t* out)
@@ -1770,6 +1824,46 @@ static void cmd_task(const char* args)
         else out_append("task: id not found.\n");
         return;
     }
+    if (strcmp(sub, "up") == 0 || strcmp(sub, "+") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task up id\n");
+            return;
+        }
+        if (taskprio_adjust_priority(id, 1) == 0) out_append("task: priority up.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "down") == 0 || strcmp(sub, "-") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task down id\n");
+            return;
+        }
+        if (taskprio_adjust_priority(id, -1) == 0) out_append("task: priority down.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "pause") == 0 || strcmp(sub, "hold") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task pause id\n");
+            return;
+        }
+        if (taskprio_pause(id, 1) == 0) out_append("task: paused.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "resume") == 0 || strcmp(sub, "cont") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task resume id\n");
+            return;
+        }
+        if (taskprio_pause(id, 0) == 0) out_append("task: resumed.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
     if (strcmp(sub, "drop") == 0 || strcmp(sub, "kill") == 0 || strcmp(sub, "rm") == 0) {
         uint32_t id;
         if (vcs_parse_u32(&args, &id) != 0) {
@@ -1788,7 +1882,7 @@ static void cmd_task(const char* args)
         out_append(taskprio_selftest() == 0 ? "task: selftest OK\n" : "task: selftest failed\n");
         return;
     }
-    out_append("Usage: task list|set|default|run|boost|drop|test\n");
+    out_append("Usage: task list|set|default|run|up|down|pause|resume|boost|drop|test\n");
 }
 
 static void cmd_nice(const char* args)
@@ -2651,6 +2745,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }
+    if (strcmp(cmd, "tasktop") == 0) { cmd_tasktop(args); return; }
     if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
     if (strcmp(cmd, "prio") == 0) { cmd_prio(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }

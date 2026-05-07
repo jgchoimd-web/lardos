@@ -11,6 +11,7 @@
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `oslink status|ping|send|recv|peers` - OS-to-OS messages over UDP.
 - `task list|set|default|run|boost|drop` - inspect and change task priority.
+- `tasktop` - show queued tasks with status and priority bars.
 - `nice priority command` - queue a command at a chosen priority.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
@@ -34,3 +35,4 @@
 - Commands run one per `gui_tick`, highest effective priority first
 - Queue limit: 8 tasks
 - `task set id priority` changes queued work; priority range is 0..9
+- `task pause id` keeps a task visible but skips it until `task resume id`

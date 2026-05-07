@@ -96,6 +96,8 @@ commands:
 - `LARS` documents can include `button label | command` and `input name value`
   records. `larsform file.lars` lists those controls and `larsact file.lars n`
   executes a button action through LSH.
+- `lpack info|list|install file.lpack` inspects and installs native LardPack
+  packages. The built-in `sample.lpack` writes a starter note into `notes.txt`.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
@@ -115,8 +117,8 @@ Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
 descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
 scratch storage, OSLink packet framing, TaskPrio scheduling, BootProf profile
-flags, CrashLog writes, LARS form parsing, LPST persistence metadata, LVCS
-hashing, containers, and LIL feature forms. The screen checks are there to catch visible boot/UI
+flags, CrashLog writes, LARS form parsing, LardPack package parsing, LPST
+persistence metadata, LVCS hashing, containers, and LIL feature forms. The screen checks are there to catch visible boot/UI
 regressions as well as code errors.
 
 Each feature addition gets a release: bump the kernel version, add an entry to

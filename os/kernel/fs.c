@@ -107,6 +107,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use tasktop to see runnable and paused task queues with priority bars.\n"
     "li Use bootprof set safe or bootprof set netoff to change the next boot profile.\n"
     "li Use crashlog show to inspect panic and diagnostic history.\n"
+    "li Use lpack list sample.lpack and lpack install sample.lpack for native package installs.\n"
     "button System status | status\n"
     "button Task dashboard | tasktop\n"
     "button Crash history | crashlog show\n"
@@ -126,6 +127,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd tasktop\n"
     "cmd bootprof status\n"
     "cmd crashlog show\n"
+    "cmd lpack list sample.lpack\n"
     "cmd post\n"
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
@@ -168,6 +170,15 @@ static const uint8_t file_features_lil[] =
     "  (for i 5 -1 -2 (begin (printn i) (emit 32)))\n"
     "  (emit 10)\n"
     "  (print (lcm 6 14 21)))\n";
+
+static const uint8_t file_sample_lpack[] =
+    "LPACK 1\n"
+    "NAME starter\n"
+    "FILE notes.txt\n"
+    "Installed by LardPack.\n"
+    "Use type notes.txt after install.\n"
+    "ENDFILE\n"
+    "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
 static const uint8_t file_bundle_lar[166] = {
@@ -247,6 +258,7 @@ static const FsFile FS_FILES[] = {
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
+    { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
     { "rtl8139.drfl",  file_rtl8139_drfl,  sizeof(file_rtl8139_drfl) },

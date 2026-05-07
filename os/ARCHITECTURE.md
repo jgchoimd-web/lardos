@@ -56,13 +56,14 @@ flowchart TB
     SMP["smp + ap_trampoline"]
     Syscall["syscall"]
     Drivers["pci / rtl8139 / ps2 / rtc"]
-    Storage["fs / lfs / ldll"]
+    Storage["fs / lfs / ldll / lpack"]
     POST["post diagnostics"]
     Net["net DHCP DNS TCP HTTP"]
     OSLink["oslink OS-to-OS UDP"]
     TaskPrio["taskprio user priorities"]
     BootProf["bootprof profiles"]
     CrashLog["crashlog panic history"]
+    LPack["lpack packages"]
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
     VM["BOSL GASM LIL LML OSVM"]
@@ -77,6 +78,7 @@ flowchart TB
     Kmain --> Storage
     Storage --> BootProf
     Storage --> CrashLog
+    Storage --> LPack
     Kmain --> POST
     Kmain --> Net
     Net --> OSLink
@@ -172,6 +174,7 @@ messages, and sends automatic acknowledgements or pongs.
 | Power-On Self-Test | `os/kernel/post.c`, `os/include/post.h` |
 | Boot profiles | `os/kernel/bootprof.c`, `os/include/bootprof.h` |
 | Crash log | `os/kernel/crashlog.c`, `os/include/crashlog.h` |
+| LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
 | Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |
@@ -215,14 +218,20 @@ as an actionable control and can be listed with `larsform` or executed with
 `larsact`; `input name value` gives LARS a native field record without falling
 back to HTML.
 
+`lpack.c` owns the native LardPack package format. `LPACK 1` files are simple
+record streams with `FILE name` and `ENDFILE` blocks, parsed by freestanding C.
+LSH exposes `lpack info`, `lpack list`, and `lpack install`; installs target the
+writable RAM filesystem, so a package can update files such as `notes.txt`
+without depending on an external package manager.
+
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
 ScreenRAM scratch storage, OSLink packet framing, TaskPrio scheduling, BootProf
-profile flags, CrashLog writes, LARS form parsing, LPST metadata, LVCS hashing,
-containers, and LIL feature forms.
+profile flags, CrashLog writes, LARS form parsing, LardPack package parsing,
+LPST metadata, LVCS hashing, containers, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
@@ -230,10 +239,11 @@ CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
 OS-to-OS messaging (`oslink`), task priority control (`task`, `prio`, `nice`),
 boot profile control (`bootprof`), crash history (`crashlog`), POST reruns
 (`post`, `selftest`), native document rendering and form actions (`lars`,
-`lardd`, `doc`, `larsform`, `larsact`), native LIL script execution (`lil
-file`), writable RAM file editing (`write`, `append`, `copy`), LPST persistence
-(`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and
-SUM-only raw machine controls (`peek`, `poke`, `asm_`).
+`lardd`, `doc`, `larsform`, `larsact`), LardPack package inspection and install
+(`lpack`), native LIL script execution (`lil file`), writable RAM file editing
+(`write`, `append`, `copy`), LPST persistence (`sync`/`fssave`), LVCS, Lard
+containers, the language/runtime launchers, and SUM-only raw machine controls
+(`peek`, `poke`, `asm_`).
 
 `magic` is deliberately a prefix command rather than a global autocorrect mode.
 It uses a small edit-distance predictor over known built-ins and runs the

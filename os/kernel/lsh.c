@@ -15,6 +15,7 @@
 #include "lvcs.h"
 #include "drfl.h"
 #include "lcontainer.h"
+#include "lpack.h"
 #include "gui.h"
 #include "post.h"
 #include "cpumode.h"
@@ -246,6 +247,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
+    { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
     { "bosl", 1 }, { "lil", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
@@ -1099,6 +1101,7 @@ static void cmd_help(const char* args)
     out_append("Lard Shell commands\n");
     out_append("  help control status release ver post selftest magic mode oslink task bootprof crashlog cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
+    out_append("  lpack info|list|install file.lpack\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
@@ -1133,6 +1136,7 @@ static void cmd_control(const char* args)
     out_append("  task list           inspect and reprioritize queued tasks\n");
     out_append("  bootprof set netoff save a boot profile in bootprof.txt\n");
     out_append("  crashlog show       inspect panic and diagnostic history\n");
+    out_append("  lpack list sample.lpack inspect a native package\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
@@ -1610,6 +1614,80 @@ static void cmd_larsact(const char* args)
     out_append(a.command);
     out_append("\n");
     lsh_exec(a.command);
+}
+
+static void cmd_lpack_show(const char* file_arg, const uint8_t* data, uint32_t size, int verbose)
+{
+    int count = lpack_file_count(data, size);
+    if (count < 0) {
+        out_append("lpack: not an LPACK 1 file.\n");
+        return;
+    }
+    out_append("LPACK ");
+    out_append(file_arg);
+    out_append(": ");
+    out_append_u32((uint32_t)count);
+    out_append(count == 1 ? " file\n" : " files\n");
+    if (!verbose) return;
+    for (int i = 0; i < count; i++) {
+        lpack_file_info_t info;
+        if (lpack_file_at(data, size, (uint32_t)i, &info) == 0) {
+            out_append_u32((uint32_t)i);
+            out_append(" ");
+            out_append(info.name);
+            out_append(" ");
+            out_append_u32(info.size);
+            out_append(" bytes\n");
+        }
+    }
+}
+
+static void cmd_lpack_op(const char* op, const char* args)
+{
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: lpack info|list|install [drive:]file.lpack\n");
+        return;
+    }
+    if (strcmp(op, "info") == 0) {
+        cmd_lpack_show(file_arg, data, size, 0);
+        return;
+    }
+    if (strcmp(op, "list") == 0 || strcmp(op, "ls") == 0) {
+        cmd_lpack_show(file_arg, data, size, 1);
+        return;
+    }
+    if (strcmp(op, "install") == 0 || strcmp(op, "add") == 0) {
+        int installed = lpack_install(data, size);
+        if (installed < 0) {
+            out_append("lpack: install failed; invalid package.\n");
+            return;
+        }
+        out_append("lpack: installed ");
+        out_append_u32((uint32_t)installed);
+        out_append(installed == 1 ? " file.\n" : " files.\n");
+        if (installed == 0) out_append("lpack: no writable package targets matched this system.\n");
+        return;
+    }
+    out_append("Usage: lpack info|list|install [drive:]file.lpack\n");
+}
+
+static void cmd_lpack(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        out_append("Usage: lpack info|list|install|test [drive:]file.lpack\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lpack_selftest() == 0 ? "lpack: selftest OK\n" : "lpack: selftest failed\n");
+        return;
+    }
+    cmd_lpack_op(sub, args);
 }
 
 static const char* oslink_type_name(uint8_t type)
@@ -2943,6 +3021,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "doc") == 0) { cmd_larddoc(args, "Usage: doc [drive:]file.lars|file.lardd"); return; }
     if (strcmp(cmd, "larsform") == 0) { cmd_larsform(args); return; }
     if (strcmp(cmd, "larsact") == 0) { cmd_larsact(args); return; }
+    if (strcmp(cmd, "lpack") == 0) { cmd_lpack(args); return; }
+    if (strcmp(cmd, "lpackls") == 0) { cmd_lpack_op("list", args); return; }
+    if (strcmp(cmd, "lpackinstall") == 0) { cmd_lpack_op("install", args); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }
     if (strcmp(cmd, "append") == 0) { cmd_append(args); return; }

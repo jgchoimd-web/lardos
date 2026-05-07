@@ -16,6 +16,7 @@
 - `bootprof status|set` - inspect or select normal, safe, netoff, or dev boot profiles.
 - `crashlog show|clear|test` - inspect or write diagnostic crash history.
 - `larsform file` / `larsact file index` - list or run LARS form buttons.
+- `lpack info|list|install file.lpack` - inspect or install a native LardPack package.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

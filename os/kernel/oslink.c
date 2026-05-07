@@ -18,6 +18,7 @@ enum {
     OSLINK_TYPE_TEXT = 4,
     OSLINK_TYPE_ACK = 5,
     OSLINK_TYPE_EXEC = 6,
+    OSLINK_TYPE_LOCAL = 7,
 };
 
 typedef struct {
@@ -27,6 +28,7 @@ typedef struct {
     uint32_t ready;
     uint32_t seq;
     uint32_t sent;
+    uint32_t local_sent;
     uint32_t received;
     uint32_t dropped;
     uint32_t last_error;
@@ -172,7 +174,8 @@ static void remember_peer(ip4_t ip, const char* node)
     p->seen = 1;
 }
 
-static void queue_msg(ip4_t src, const char* src_node, uint8_t type, uint32_t seq, const char* text)
+static void queue_msg(ip4_t src, const char* src_node, const char* channel,
+                      uint8_t type, uint32_t seq, const char* text)
 {
     if (s_oslink.inbox_count >= OSLINK_INBOX_DEPTH) {
         s_oslink.dropped++;
@@ -184,6 +187,7 @@ static void queue_msg(ip4_t src, const char* src_node, uint8_t type, uint32_t se
     m->type = type;
     m->seq = seq;
     scopy(m->src_node, sizeof(m->src_node), src_node);
+    scopy(m->channel, sizeof(m->channel), channel);
     scopy(m->text, sizeof(m->text), text);
     s_oslink.inbox_tail = (s_oslink.inbox_tail + 1u) % OSLINK_INBOX_DEPTH;
     s_oslink.inbox_count++;
@@ -293,7 +297,7 @@ void oslink_poll(void)
         s_oslink.received++;
         if (type == OSLINK_TYPE_HELLO || type == OSLINK_TYPE_PING ||
             type == OSLINK_TYPE_TEXT || type == OSLINK_TYPE_EXEC) {
-            queue_msg(src, src_node, type, seq, text);
+            queue_msg(src, src_node, "", type, seq, text);
         }
         if (type == OSLINK_TYPE_HELLO) {
             (void)send_type(src, OSLINK_TYPE_ACK, "hello");
@@ -333,6 +337,21 @@ int oslink_send_exec(ip4_t dst, const char* command)
     return send_type(dst, OSLINK_TYPE_EXEC, command && command[0] ? command : "");
 }
 
+int oslink_emit_local(const char* channel, const char* text)
+{
+    ip4_t zero = {{0, 0, 0, 0}};
+    const char* ch = (channel && channel[0]) ? channel : "main";
+    const char* body = text ? text : "";
+    if (slen(ch, OSLINK_CHANNEL_MAX + 1u) == 0 || slen(body, OSLINK_TEXT_MAX + 1u) == 0) {
+        s_oslink.last_error = 3;
+        return -1;
+    }
+    queue_msg(zero, "local", ch, OSLINK_TYPE_LOCAL, ++s_oslink.seq, body);
+    s_oslink.local_sent++;
+    s_oslink.last_error = 0;
+    return 0;
+}
+
 int oslink_recv(oslink_msg_t* out)
 {
     if (!out || s_oslink.inbox_count == 0) return 0;
@@ -345,6 +364,17 @@ int oslink_recv(oslink_msg_t* out)
 uint32_t oslink_peer_count(void)
 {
     return s_oslink.peer_count;
+}
+
+uint32_t oslink_local_count(void)
+{
+    uint32_t count = 0;
+    uint32_t idx = s_oslink.inbox_head;
+    for (uint32_t i = 0; i < s_oslink.inbox_count; i++) {
+        if (s_oslink.inbox[idx].type == OSLINK_TYPE_LOCAL) count++;
+        idx = (idx + 1u) % OSLINK_INBOX_DEPTH;
+    }
+    return count;
 }
 
 int oslink_peer_at(uint32_t idx, oslink_peer_t* out)
@@ -363,6 +393,8 @@ void oslink_info(oslink_info_t* out)
     out->received = s_oslink.received;
     out->dropped = s_oslink.dropped;
     out->inbox_count = s_oslink.inbox_count;
+    out->local_count = oslink_local_count();
+    out->local_sent = s_oslink.local_sent;
     out->peer_count = s_oslink.peer_count;
     out->last_error = s_oslink.last_error;
     out->ip = s_oslink.cfg.ip;
@@ -371,7 +403,9 @@ void oslink_info(oslink_info_t* out)
 
 int oslink_selftest(void)
 {
+    oslink_state_t saved;
     uint8_t pkt[256];
+    oslink_msg_t msg;
     char src[OSLINK_NODE_MAX + 1u];
     char text[OSLINK_TEXT_MAX + 1u];
     uint8_t type;
@@ -383,5 +417,19 @@ int oslink_selftest(void)
     if (!streq(src, s_oslink.node)) return -4;
     if (!streq(text, "status")) return -5;
     if (!safe_exec_command("status") || safe_exec_command("poke 0 1 8")) return -6;
+    saved = s_oslink;
+    if (oslink_emit_local("self", "local-ok") != 0) {
+        s_oslink = saved;
+        return -7;
+    }
+    if (oslink_local_count() != 1u || oslink_recv(&msg) != 1 || msg.type != OSLINK_TYPE_LOCAL) {
+        s_oslink = saved;
+        return -8;
+    }
+    if (!streq(msg.src_node, "local") || !streq(msg.channel, "self") || !streq(msg.text, "local-ok")) {
+        s_oslink = saved;
+        return -9;
+    }
+    s_oslink = saved;
     return 0;
 }

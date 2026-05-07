@@ -121,7 +121,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lpst: dual-bank layout", lba == 2752u && sectors == 128u && bank_sectors == 64u, emit, user, &pass, &fail);
     post_check("lpst: driver string", driver && driver[0], emit, user, &pass, &fail);
     post_check("lvcs: hash engine", lvcs_hash(hash_data, sizeof(hash_data)) != 0, emit, user, &pass, &fail);
-    post_check("oslink: packet codec", oslink_selftest() == 0, emit, user, &pass, &fail);
+    post_check("oslink: packet and local bus", oslink_selftest() == 0, emit, user, &pass, &fail);
     post_check("taskprio: priority queue", taskprio_selftest() == 0, emit, user, &pass, &fail);
     post_check("bootprof: profile flags", bootprof_selftest() == 0, emit, user, &pass, &fail);
     post_check("crashlog: writable log", crashlog_selftest() == 0, emit, user, &pass, &fail);

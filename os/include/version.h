@@ -1,3 +1,3 @@
 #pragma once
 
-#define LARDOS_VERSION "v1.19.0a"
+#define LARDOS_VERSION "v1.20.0a"

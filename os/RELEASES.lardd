@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.20.0a
+ITEM Extended OSLink with a local in-kernel bus for LardOS-internal communication.
+ITEM Added oslink bus and oslink emit channel text commands in LSH.
+ITEM Local OSLink messages share the existing inbox and are labeled with lightweight channels.
+ITEM POST now checks both OSLink packet framing and the local bus path.
+
 SECTION v1.19.0a
 ITEM Added ScreenCheck, a structured framebuffer/layout diagnostic module.
 ITEM Added screencheck status, retro, and test commands in LSH.

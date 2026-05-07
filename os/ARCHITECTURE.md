@@ -161,7 +161,9 @@ POST only for 307/308.
 `oslink.c` is the small OS-to-OS communication layer. It uses public
 `net_udp_send` and `net_udp_recv` helpers, frames packets with an `OSLK`
 signature, remembers peers by IPv4/node name, queues inbound hello/ping/text
-messages, and sends automatic acknowledgements or pongs. EXEC packets carry
+messages, and sends automatic acknowledgements or pongs. It also owns a local
+in-kernel bus where modules can publish channel-labeled messages into the same
+inbox shape without touching the network. EXEC packets carry
 remote command requests; receivers filter them to safe read/diagnostic commands
 and queue accepted work through TaskPrio under the `remote` task name.
 
@@ -240,7 +242,7 @@ boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
-ScreenRAM scratch storage, OSLink packet framing and safe exec filtering,
+ScreenRAM scratch storage, OSLink packet framing, local bus, and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardPack package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS
 hashing, containers, and LIL feature forms.
@@ -249,7 +251,7 @@ hashing, containers, and LIL feature forms.
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
 visual screen diagnostics (`screencheck`),
-OS-to-OS messaging and safe remote command requests (`oslink`), task priority
+OS-to-OS messaging, local bus messages, and safe remote command requests (`oslink`), task priority
 control (`task`, `prio`, `nice`), boot profile control (`bootprof`), crash
 history (`crashlog`), POST reruns (`post`, `selftest`), native document
 rendering and form actions (`lars`, `lardd`, `doc`, `larsform`, `larsact`),

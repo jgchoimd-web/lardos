@@ -1133,7 +1133,7 @@ static void cmd_control(const char* args)
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
-    out_append("  oslink status       inspect OS-to-OS message link\n");
+    out_append("  oslink bus          inspect LardOS-internal OSLink messages\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
     out_append("  bootprof set netoff save a boot profile in bootprof.txt\n");
     out_append("  crashlog show       inspect panic and diagnostic history\n");
@@ -1747,6 +1747,7 @@ static const char* oslink_type_name(uint8_t type)
     if (type == 4) return "text";
     if (type == 5) return "ack";
     if (type == 6) return "exec";
+    if (type == 7) return "local";
     return "packet";
 }
 
@@ -1765,12 +1766,16 @@ static void cmd_oslink_status(void)
     out_append("\n");
     out_append("sent=");
     out_append_u32(info.sent);
+    out_append(" local=");
+    out_append_u32(info.local_sent);
     out_append(" recv=");
     out_append_u32(info.received);
     out_append(" dropped=");
     out_append_u32(info.dropped);
     out_append(" inbox=");
     out_append_u32(info.inbox_count);
+    out_append(" local-inbox=");
+    out_append_u32(info.local_count);
     out_append(" peers=");
     out_append_u32(info.peer_count);
     out_append(" err=");
@@ -1800,6 +1805,19 @@ static void cmd_oslink_peers(void)
     }
 }
 
+static void cmd_oslink_bus(void)
+{
+    oslink_info_t info;
+    oslink_info(&info);
+    out_append("OSLink local bus: queued=");
+    out_append_u32(info.local_count);
+    out_append(" emitted=");
+    out_append_u32(info.local_sent);
+    out_append(" total-inbox=");
+    out_append_u32(info.inbox_count);
+    out_append("\nChannels are lightweight labels carried inside the OSLink inbox.\n");
+}
+
 static void cmd_oslink_recv(void)
 {
     oslink_msg_t m;
@@ -1809,16 +1827,38 @@ static void cmd_oslink_recv(void)
         return;
     }
     out_append(oslink_type_name(m.type));
-    out_append(" from ");
-    out_append(m.src_node);
-    out_append(" ");
-    out_append_ip4(m.src_ip);
+    if (m.type == 7) {
+        out_append(" channel=");
+        out_append(m.channel[0] ? m.channel : "main");
+    } else {
+        out_append(" from ");
+        out_append(m.src_node);
+        out_append(" ");
+        out_append_ip4(m.src_ip);
+    }
     out_append(" seq=");
     out_append_u32(m.seq);
     out_append("\n");
     if (m.text[0]) {
         out_append(m.text);
         out_append("\n");
+    }
+}
+
+static void cmd_oslink_emit(const char* args)
+{
+    char channel[OSLINK_CHANNEL_MAX + 1u];
+    if (vcs_read_word(&args, channel, sizeof(channel)) != 0) {
+        out_append("Usage: oslink emit channel text\n");
+        return;
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    if (oslink_emit_local(channel, args) == 0) {
+        out_append("oslink: local ");
+        out_append(channel);
+        out_append(" emitted.\n");
+    } else {
+        out_append("oslink: emit failed.\n");
     }
 }
 
@@ -1863,6 +1903,14 @@ static void cmd_oslink(const char* args)
         cmd_oslink_peers();
         return;
     }
+    if (strcmp(sub, "bus") == 0 || strcmp(sub, "local") == 0) {
+        cmd_oslink_bus();
+        return;
+    }
+    if (strcmp(sub, "emit") == 0 || strcmp(sub, "pub") == 0) {
+        cmd_oslink_emit(args);
+        return;
+    }
     if (strcmp(sub, "poll") == 0) {
         oslink_poll();
         out_append("oslink: polled.\n");
@@ -1892,7 +1940,7 @@ static void cmd_oslink(const char* args)
         out_append(oslink_selftest() == 0 ? "oslink: selftest OK\n" : "oslink: selftest failed\n");
         return;
     }
-    out_append("Usage: oslink status|hello|ping|send|exec|recv|peers|poll|test\n");
+    out_append("Usage: oslink status|bus|emit|hello|ping|send|exec|recv|peers|poll|test\n");
 }
 
 static void cmd_task_list(void)

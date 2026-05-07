@@ -10,7 +10,7 @@
 - `mode [status|probe|real]` - inspect or run the controlled real16/long64 bridge.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
-- `oslink status|ping|send|exec|recv|peers` - OS-to-OS messages and safe remote commands over UDP.
+- `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.
 - `task list|set|default|run|boost|drop` - inspect and change task priority.
 - `tasktop` - show queued tasks with status and priority bars.
 - `nice priority command` - queue a command at a chosen priority.

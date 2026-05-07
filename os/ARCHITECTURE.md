@@ -64,6 +64,7 @@ flowchart TB
     BootProf["bootprof profiles"]
     CrashLog["crashlog panic history"]
     LPack["lpack packages"]
+    ScreenCheck["screencheck diagnostics"]
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
     VM["BOSL GASM LIL LML OSVM"]
@@ -84,6 +85,7 @@ flowchart TB
     Net --> OSLink
     Net --> TLS
     Kmain --> GUI
+    GUI --> ScreenCheck
     GUI --> TaskPrio
     GUI --> VM
 ```
@@ -177,6 +179,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Boot profiles | `os/kernel/bootprof.c`, `os/include/bootprof.h` |
 | Crash log | `os/kernel/crashlog.c`, `os/include/crashlog.h` |
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
+| Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
 | Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |
@@ -196,6 +199,12 @@ reserved framebuffer/backbuffer rectangle. The default is a quiet bottom-right
 corner; `sram rect x y w h` lets the user sacrifice a chosen screen area. GUI
 redraws restore the encoded bytes before blitting so the region behaves like
 small RAM while still visibly living in screen memory.
+
+`screencheck.c` wraps the GUI POST framebuffer/layout probe in a user-facing
+diagnostic module. `screencheck status` reports changed samples, tile counts,
+window bounds, and response-view health; `screencheck retro` draws a full-screen
+old boot/storage-style scan so visual glitches can be caught by looking at tile
+tracks, edges, and dot-lane visibility.
 
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a
@@ -233,12 +242,13 @@ real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
 ScreenRAM scratch storage, OSLink packet framing and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
-LardPack package parsing, LPST metadata, LVCS hashing, containers, and LIL
-feature forms.
+LardPack package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS
+hashing, containers, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
+visual screen diagnostics (`screencheck`),
 OS-to-OS messaging and safe remote command requests (`oslink`), task priority
 control (`task`, `prio`, `nice`), boot profile control (`bootprof`), crash
 history (`crashlog`), POST reruns (`post`, `selftest`), native document

@@ -19,6 +19,7 @@
 #include "gui.h"
 #include "post.h"
 #include "cpumode.h"
+#include "screencheck.h"
 #include "oslink.h"
 #include "taskprio.h"
 #include "bootprof.h"
@@ -255,7 +256,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
     { "vcslog", 1 }, { "vcsshow", 1 },
     { "drivers", 1 }, { "fsstat", 1 }, { "fsload", 1 }, { "fssave", 1 }, { "sync", 1 },
-    { "sram", 1 }, { "screenram", 1 }, { "sandbox", 1 }, { "exitsandbox", 1 },
+    { "sram", 1 }, { "screenram", 1 }, { "screencheck", 1 }, { "scrcheck", 1 }, { "sandbox", 1 }, { "exitsandbox", 1 },
     { "sum", 0 }, { "exitsum", 0 }, { "peek", 0 }, { "poke", 0 }, { "asm_", 0 },
 };
 
@@ -1108,7 +1109,7 @@ static void cmd_help(const char* args)
     out_append("  bosl file  lil file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
-    out_append("  drivers fsstat fsload fssave sync sram sandbox exitsandbox\n");
+    out_append("  drivers fsstat fsload fssave sync sram screencheck sandbox exitsandbox\n");
     out_append("  tasktop  task list|set|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  bootprof status|set normal|safe|netoff|dev\n");
     out_append("  crashlog show|clear|test\n");
@@ -1138,6 +1139,7 @@ static void cmd_control(const char* args)
     out_append("  crashlog show       inspect panic and diagnostic history\n");
     out_append("  lpack list sample.lpack inspect a native package\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
+    out_append("  screencheck retro   draw a retro boot/storage-style screen check\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
     out_append("  lcnt info           inspect syscall-cap containers\n");
@@ -1496,6 +1498,53 @@ static void cmd_sram(const char* args)
         return;
     }
     out_append("Usage: sram status|on|off|corner|rect|write|read|clear|test\n");
+}
+
+static void screencheck_report(const screencheck_info_t* info)
+{
+    out_append("ScreenCheck ");
+    out_append(info->bad_tiles == 0 ? "OK" : "CHECK");
+    out_append("\nsize=");
+    out_append_u32(info->width);
+    out_append("x");
+    out_append_u32(info->height);
+    out_append(" changed=");
+    out_append_u32(info->changed_samples);
+    out_append(" tiles=");
+    out_append_u32(info->tiles_checked);
+    out_append(" bad=");
+    out_append_u32(info->bad_tiles);
+    out_append("\nwindow=");
+    out_append(info->window_inside ? "inside" : "bad");
+    out_append(" response=");
+    out_append(info->response_view_ok ? "ok" : "bad");
+    out_append(" err=");
+    out_append_u32(info->last_error);
+    out_append("\n");
+}
+
+static void cmd_screencheck(const char* args)
+{
+    char sub[16];
+    screencheck_info_t info;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        if (screencheck_probe(&info) == 0) screencheck_report(&info);
+        else out_append("screencheck: no framebuffer.\n");
+        return;
+    }
+    if (strcmp(sub, "retro") == 0 || strcmp(sub, "run") == 0 || strcmp(sub, "draw") == 0) {
+        screencheck_draw_retro();
+        if (screencheck_probe(&info) == 0) screencheck_report(&info);
+        else out_append("screencheck: no framebuffer.\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(screencheck_selftest() == 0 ? "screencheck: selftest OK\n" : "screencheck: selftest failed\n");
+        return;
+    }
+    out_append("Usage: screencheck status|retro|test\n");
 }
 
 static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
@@ -3049,6 +3098,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'p' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 't' && cmd[4] == '\0') { cmd_selftest(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'r' && cmd[2] == 'a' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_sram(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'c' && cmd[2] == 'r' && cmd[3] == 'e' && cmd[4] == 'e' && cmd[5] == 'n' && cmd[6] == 'r' && cmd[7] == 'a' && cmd[8] == 'm' && cmd[9] == '\0') { cmd_sram(args); return; }
+    if (strcmp(cmd, "screencheck") == 0 || strcmp(cmd, "scrcheck") == 0) { cmd_screencheck(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'e' && cmd[2] == 'l' && cmd[3] == 'f' && cmd[4] == 't' && cmd[5] == 'e' && cmd[6] == 's' && cmd[7] == 't' && cmd[8] == '\0') { cmd_selftest(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'c' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == '\0') { cmd_lcnt(args); return; }
     if (cmd[0] == 'c' && cmd[1] == 'o' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == 'a' && cmd[5] == 'i' && cmd[6] == 'n' && cmd[7] == 'e' && cmd[8] == 'r' && cmd[9] == '\0') { cmd_lcnt(args); return; }

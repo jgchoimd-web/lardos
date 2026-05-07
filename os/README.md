@@ -78,6 +78,9 @@ commands:
 - `sram` / `screenram` turns a quiet framebuffer/backbuffer rectangle into
   scratch RAM. Use `sram on` for the default corner, `sram rect x y w h` for a
   user-selected area, then `sram write offset text` and `sram read offset len`.
+- `screencheck status|retro|test` probes framebuffer/layout health. `retro`
+  draws an old boot/storage-style screen scan with colored tile tracks and a
+  dot-lane visibility check.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
   command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered
@@ -120,7 +123,7 @@ descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
 scratch storage, OSLink packet framing and safe exec filtering, TaskPrio
 scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
-and LIL feature forms. The screen checks are there to catch visible boot/UI
+ScreenCheck visual diagnostics, and LIL feature forms. The screen checks are there to catch visible boot/UI
 regressions as well as code errors.
 
 Each feature addition gets a release: bump the kernel version, add an entry to

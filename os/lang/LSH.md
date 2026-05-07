@@ -9,6 +9,7 @@
 - `magic command [args]` - predict and run a mistyped safe built-in command.
 - `mode [status|probe|real]` - inspect or run the controlled real16/long64 bridge.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
+- `screencheck status|retro|test` - probe or draw the retro visual screen checker.
 - `oslink status|ping|send|exec|recv|peers` - OS-to-OS messages and safe remote commands over UDP.
 - `task list|set|default|run|boost|drop` - inspect and change task priority.
 - `tasktop` - show queued tasks with status and priority bars.

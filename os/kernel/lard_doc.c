@@ -27,6 +27,16 @@ static void out_s(char* out, uint32_t cap, uint32_t* pos, const char* s)
     while (*s) out_ch(out, cap, pos, *s++);
 }
 
+static void copy_range(char* out, uint32_t cap, const char* p, const char* end)
+{
+    uint32_t n = 0;
+    if (!out || cap == 0) return;
+    while (p < end && (*p == ' ' || *p == '\t')) p++;
+    while (end > p && (end[-1] == ' ' || end[-1] == '\t')) end--;
+    while (p < end && n + 1u < cap) out[n++] = *p++;
+    out[n] = '\0';
+}
+
 static const char* skip_ws(const char* p, const char* end)
 {
     while (p < end && (*p == ' ' || *p == '\t')) p++;
@@ -119,6 +129,20 @@ static void render_lars_line(char* out, uint32_t cap, uint32_t* pos,
         out_s(out, cap, pos, " > ");
         out_n(out, cap, pos, v, (uint32_t)(end - v));
         out_ch(out, cap, pos, '\n');
+    } else if (line_has_prefix(p, end, "button", &v)) {
+        const char* bar = v;
+        while (bar < end && *bar != '|') bar++;
+        out_s(out, cap, pos, " [button] ");
+        out_n(out, cap, pos, v, (uint32_t)(bar - v));
+        if (bar < end) {
+            out_s(out, cap, pos, " -> ");
+            out_n(out, cap, pos, bar + 1, (uint32_t)(end - bar - 1));
+        }
+        out_ch(out, cap, pos, '\n');
+    } else if (line_has_prefix(p, end, "input", &v)) {
+        out_s(out, cap, pos, " [input] ");
+        out_n(out, cap, pos, v, (uint32_t)(end - v));
+        out_ch(out, cap, pos, '\n');
     } else if (line_has_prefix(p, end, "note", &v)) {
         out_s(out, cap, pos, " ! ");
         out_n(out, cap, pos, v, (uint32_t)(end - v));
@@ -172,6 +196,34 @@ static int render_lardd_line(char* out, uint32_t cap, uint32_t* pos,
     return 0;
 }
 
+static int lars_action_from_line(const char* p, const char* end, lard_doc_action_t* out)
+{
+    const char* v;
+    p = skip_ws(p, end);
+    if (line_has_prefix(p, end, "button", &v)) {
+        const char* bar = v;
+        while (bar < end && *bar != '|') bar++;
+        if (!out) return 1;
+        copy_range(out->kind, sizeof(out->kind), "button", "button" + 6);
+        if (bar < end) {
+            copy_range(out->label, sizeof(out->label), v, bar);
+            copy_range(out->command, sizeof(out->command), bar + 1, end);
+        } else {
+            copy_range(out->label, sizeof(out->label), v, end);
+            out->command[0] = '\0';
+        }
+        return 1;
+    }
+    if (line_has_prefix(p, end, "input", &v)) {
+        if (!out) return 1;
+        copy_range(out->kind, sizeof(out->kind), "input", "input" + 5);
+        copy_range(out->label, sizeof(out->label), v, end);
+        out->command[0] = '\0';
+        return 1;
+    }
+    return 0;
+}
+
 int lard_doc_to_text(const char* input, uint32_t input_len, char* out, uint32_t out_cap)
 {
     uint32_t body_len;
@@ -206,3 +258,70 @@ int lard_doc_to_text(const char* input, uint32_t input_len, char* out, uint32_t 
     return 0;
 }
 
+int lard_doc_action_count(const char* input, uint32_t input_len)
+{
+    uint32_t body_len;
+    uint32_t count = 0;
+    const char* p;
+    const char* end;
+    if (!input) return -1;
+    input = find_body(input, input_len, &body_len);
+    if (detect_kind(input, body_len) != LARD_DOC_LARS) return 0;
+    p = input;
+    end = input + body_len;
+    while (p < end) {
+        const char* ls = p;
+        const char* le;
+        while (ls < end && (*ls == '\r' || *ls == '\n')) ls++;
+        le = ls;
+        while (le < end && *le != '\r' && *le != '\n') le++;
+        if (lars_action_from_line(ls, le, NULL)) count++;
+        p = le;
+        while (p < end && (*p == '\r' || *p == '\n')) p++;
+    }
+    return (int)count;
+}
+
+int lard_doc_action_at(const char* input, uint32_t input_len, uint32_t index, lard_doc_action_t* out)
+{
+    uint32_t body_len;
+    uint32_t count = 0;
+    const char* p;
+    const char* end;
+    if (!input || !out) return -1;
+    input = find_body(input, input_len, &body_len);
+    if (detect_kind(input, body_len) != LARD_DOC_LARS) return -2;
+    p = input;
+    end = input + body_len;
+    while (p < end) {
+        const char* ls = p;
+        const char* le;
+        while (ls < end && (*ls == '\r' || *ls == '\n')) ls++;
+        le = ls;
+        while (le < end && *le != '\r' && *le != '\n') le++;
+        if (lars_action_from_line(ls, le, NULL)) {
+            if (count == index) return lars_action_from_line(ls, le, out) ? 0 : -3;
+            count++;
+        }
+        p = le;
+        while (p < end && (*p == '\r' || *p == '\n')) p++;
+    }
+    return -4;
+}
+
+int lard_doc_selftest(void)
+{
+    static const char doc[] =
+        "LARS 1\n"
+        "title Demo\n"
+        "button Status | status\n"
+        "input name default\n"
+        "end\n";
+    char text[256];
+    lard_doc_action_t a;
+    if (lard_doc_to_text(doc, sizeof(doc) - 1, text, sizeof(text)) != 0) return -1;
+    if (lard_doc_action_count(doc, sizeof(doc) - 1) != 2) return -2;
+    if (lard_doc_action_at(doc, sizeof(doc) - 1, 0, &a) != 0) return -3;
+    if (a.kind[0] != 'b' || a.command[0] != 's') return -4;
+    return 0;
+}

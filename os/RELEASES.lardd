@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.16.0a
+ITEM Added LARS form records with button and input support in the native document renderer.
+ITEM Added larsform to list LARS actions and larsact to execute button commands from a LARS document.
+ITEM The built-in lardos.lars control room now includes button and input records.
+ITEM POST now checks LARS form/action parsing.
+
 SECTION v1.15.0a
 ITEM Added CrashLog, a persistent panic and diagnostic event log backed by crashlog.txt.
 ITEM panic and panic_u64 now record crash entries and try to save LPST before halting.

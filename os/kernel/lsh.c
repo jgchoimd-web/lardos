@@ -245,7 +245,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
-    { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 },
+    { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
     { "bosl", 1 }, { "lil", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
@@ -1098,7 +1098,7 @@ static void cmd_help(const char* args)
     (void)args;
     out_append("Lard Shell commands\n");
     out_append("  help control status release ver post selftest magic mode oslink task bootprof crashlog cls\n");
-    out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
+    out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
@@ -1526,6 +1526,90 @@ static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
     while (*p == ' ' || *p == '\t') p++;
     *args = p;
     return 0;
+}
+
+static int lsh_doc_data_from_arg(const char* file_arg, const uint8_t** data, uint32_t* size)
+{
+    char drv;
+    char name[64];
+    const FsFile* f;
+    FsWritableFile* w;
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    if (!name[0]) return -1;
+    f = lsh_open_read(drv, name);
+    w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    if (f) {
+        *data = f->data;
+        *size = f->size;
+        return 0;
+    }
+    if (w) {
+        *data = w->data;
+        *size = w->size;
+        return 0;
+    }
+    return -2;
+}
+
+static void cmd_larsform(const char* args)
+{
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: larsform [drive:]file.lars\n");
+        return;
+    }
+    int count = lard_doc_action_count((const char*)data, size);
+    if (count <= 0) {
+        out_append("larsform: no LARS actions.\n");
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        lard_doc_action_t a;
+        if (lard_doc_action_at((const char*)data, size, (uint32_t)i, &a) == 0) {
+            out_append_u32((uint32_t)i);
+            out_append(" ");
+            out_append(a.kind);
+            out_append(" ");
+            out_append(a.label);
+            if (a.command[0]) {
+                out_append(" -> ");
+                out_append(a.command);
+            }
+            out_append("\n");
+        }
+    }
+}
+
+static void cmd_larsact(const char* args)
+{
+    char file_arg[64];
+    uint32_t index;
+    const uint8_t* data;
+    uint32_t size;
+    lard_doc_action_t a;
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        vcs_parse_u32(&args, &index) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: larsact [drive:]file.lars index\n");
+        return;
+    }
+    if (lard_doc_action_at((const char*)data, size, index, &a) != 0) {
+        out_append("larsact: action not found.\n");
+        return;
+    }
+    if (!a.command[0]) {
+        out_append("larsact: input actions do not run commands.\n");
+        return;
+    }
+    out_append("larsact: ");
+    out_append(a.label);
+    out_append(" -> ");
+    out_append(a.command);
+    out_append("\n");
+    lsh_exec(a.command);
 }
 
 static const char* oslink_type_name(uint8_t type)
@@ -2857,6 +2941,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lars") == 0) { cmd_larddoc(args, "Usage: lars [drive:]file.lars"); return; }
     if (strcmp(cmd, "lardd") == 0) { cmd_larddoc(args, "Usage: lardd [drive:]file.lardd"); return; }
     if (strcmp(cmd, "doc") == 0) { cmd_larddoc(args, "Usage: doc [drive:]file.lars|file.lardd"); return; }
+    if (strcmp(cmd, "larsform") == 0) { cmd_larsform(args); return; }
+    if (strcmp(cmd, "larsact") == 0) { cmd_larsact(args); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }
     if (strcmp(cmd, "append") == 0) { cmd_append(args); return; }

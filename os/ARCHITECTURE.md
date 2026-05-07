@@ -210,23 +210,28 @@ through `bootprof status` and `bootprof set`.
 paths append an entry and attempt an LPST save before halting; LSH exposes the
 same log through `crashlog show`, `crashlog clear`, and `crashlog test`.
 
+`lard_doc.c` also parses LARS form records. `button label | command` is rendered
+as an actionable control and can be listed with `larsform` or executed with
+`larsact`; `input name value` gives LARS a native field record without falling
+back to HTML.
+
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
 ScreenRAM scratch storage, OSLink packet framing, TaskPrio scheduling, BootProf
-profile flags, CrashLog writes, LPST metadata, LVCS hashing, containers, and LIL
-feature forms.
+profile flags, CrashLog writes, LARS form parsing, LPST metadata, LVCS hashing,
+containers, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
 OS-to-OS messaging (`oslink`), task priority control (`task`, `prio`, `nice`),
 boot profile control (`bootprof`), crash history (`crashlog`), POST reruns
-(`post`, `selftest`), native document rendering (`lars`, `lardd`, `doc`), native
-LIL script execution (`lil file`), writable RAM file editing (`write`, `append`,
-`copy`), LPST persistence
+(`post`, `selftest`), native document rendering and form actions (`lars`,
+`lardd`, `doc`, `larsform`, `larsact`), native LIL script execution (`lil
+file`), writable RAM file editing (`write`, `append`, `copy`), LPST persistence
 (`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and
 SUM-only raw machine controls (`peek`, `poke`, `asm_`).
 

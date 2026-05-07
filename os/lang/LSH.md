@@ -15,6 +15,7 @@
 - `nice priority command` - queue a command at a chosen priority.
 - `bootprof status|set` - inspect or select normal, safe, netoff, or dev boot profiles.
 - `crashlog show|clear|test` - inspect or write diagnostic crash history.
+- `larsform file` / `larsact file index` - list or run LARS form buttons.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

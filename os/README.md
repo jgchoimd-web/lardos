@@ -71,6 +71,8 @@ commands:
 - `status` prints version, drive, LPST persistence, driver, and container state.
 - `post` / `selftest` reruns the same Power-On Self-Test diagnostics available
   from the boot option.
+- `magic command [args]` predicts a mistyped safe built-in command and executes
+  the predicted command directly, for example `magic statsu`.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has

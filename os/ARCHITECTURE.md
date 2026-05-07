@@ -166,11 +166,17 @@ framebuffer/layout state, LPST metadata, LVCS hashing, containers, and LIL
 feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
-system snapshot (`status`), POST reruns (`post`, `selftest`), native document
-rendering (`lars`, `lardd`, `doc`), native LIL script execution (`lil file`),
-writable RAM file editing (`write`, `append`, `copy`), LPST persistence
+system snapshot (`status`), predicted safe command execution (`magic command`),
+POST reruns (`post`, `selftest`), native document rendering (`lars`, `lardd`,
+`doc`), native LIL script execution (`lil file`), writable RAM file editing
+(`write`, `append`, `copy`), LPST persistence
 (`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and
 SUM-only raw machine controls (`peek`, `poke`, `asm_`).
+
+`magic` is deliberately a prefix command rather than a global autocorrect mode.
+It uses a small edit-distance predictor over known built-ins and runs the
+predicted safe command directly. Raw ring-0 controls such as `sum`, `peek`,
+`poke`, and `asm_` must still be typed explicitly.
 
 LIL is available in both the kernel and the host toolchain. Its control forms
 include assertions, `when`/`unless`, `repeat` with the `it` index, stepped

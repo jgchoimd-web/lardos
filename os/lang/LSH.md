@@ -6,6 +6,7 @@
 
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
+- `magic command [args]` - predict and run a mistyped safe built-in command.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

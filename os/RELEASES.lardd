@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.8.0a
+ITEM Added the magic prefix command for predicted safe command execution.
+ITEM magic command [args] corrects near-miss built-in commands and executes the predicted target directly.
+ITEM Raw-control commands such as sum, peek, poke, and asm_ are excluded from automatic magic execution.
+ITEM Updated LSH help and LARS control-room docs with the magic workflow.
+
 SECTION v1.7.0a
 ITEM Added a Doc tab GET/POST method option instead of forcing every HTTP request to GET.
 ITEM Added net_http_request and net_https_request so the in-kernel HTTP/TLS path can send POST bodies.

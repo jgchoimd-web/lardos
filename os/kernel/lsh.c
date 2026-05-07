@@ -48,8 +48,10 @@ static int s_in_sum_mode;
 
 /* Sandbox: run LARDX with restricted syscalls (no file/LDLL/network) */
 static int s_sandbox_mode;
+static int s_magic_depth;
 
 static void lsh_putc(char c, void* user);
+static void parse_and_run(const char* cmd, const char* args);
 
 static const char* env_get(const char* name)
 {
@@ -221,6 +223,161 @@ static const char* lardos_version_channel(void)
     if (suffix == 'b') return "beta-experimental";
     if (suffix == 'p') return "hotpatch";
     return "unknown";
+}
+
+typedef struct {
+    const char* name;
+    uint8_t magic_safe;
+} magic_cmd_entry_t;
+
+static const magic_cmd_entry_t s_magic_cmds[] = {
+    { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "cls", 1 },
+    { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 },
+    { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
+    { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
+    { "bosl", 1 }, { "lil", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
+    { "lcnt", 1 }, { "container", 1 },
+    { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
+    { "vcslog", 1 }, { "vcsshow", 1 },
+    { "drivers", 1 }, { "fsstat", 1 }, { "fsload", 1 }, { "fssave", 1 }, { "sync", 1 },
+    { "sandbox", 1 }, { "exitsandbox", 1 },
+    { "sum", 0 }, { "exitsum", 0 }, { "peek", 0 }, { "poke", 0 }, { "asm_", 0 },
+};
+
+static uint32_t magic_strlen(const char* s)
+{
+    uint32_t n = 0;
+    while (s && s[n]) n++;
+    return n;
+}
+
+static int magic_cmd_equals(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && a[i] == b[i]) i++;
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static uint32_t magic_min3(uint32_t a, uint32_t b, uint32_t c)
+{
+    uint32_t m = a < b ? a : b;
+    return m < c ? m : c;
+}
+
+static uint32_t magic_edit_distance(const char* a, const char* b)
+{
+    uint32_t la = magic_strlen(a);
+    uint32_t lb = magic_strlen(b);
+    uint32_t prev[33];
+    uint32_t cur[33];
+    if (la > 32u) la = 32u;
+    if (lb > 32u) lb = 32u;
+    for (uint32_t j = 0; j <= lb; j++) prev[j] = j;
+    for (uint32_t i = 1; i <= la; i++) {
+        cur[0] = i;
+        for (uint32_t j = 1; j <= lb; j++) {
+            uint32_t sub = prev[j - 1u] + (a[i - 1u] == b[j - 1u] ? 0u : 1u);
+            uint32_t del = prev[j] + 1u;
+            uint32_t ins = cur[j - 1u] + 1u;
+            cur[j] = magic_min3(sub, del, ins);
+        }
+        for (uint32_t j = 0; j <= lb; j++) prev[j] = cur[j];
+    }
+    return prev[lb];
+}
+
+static uint32_t magic_threshold(uint32_t len)
+{
+    if (len <= 3u) return 1u;
+    if (len <= 7u) return 2u;
+    return 3u;
+}
+
+static const magic_cmd_entry_t* magic_find_exact(const char* cmd)
+{
+    uint32_t count = sizeof(s_magic_cmds) / sizeof(s_magic_cmds[0]);
+    for (uint32_t i = 0; i < count; i++) {
+        if (magic_cmd_equals(cmd, s_magic_cmds[i].name)) return &s_magic_cmds[i];
+    }
+    return NULL;
+}
+
+static const magic_cmd_entry_t* magic_predict(const char* cmd)
+{
+    const magic_cmd_entry_t* best = NULL;
+    uint32_t best_score = 999u;
+    uint32_t best_len = 0;
+    uint32_t cmd_len = magic_strlen(cmd);
+    uint32_t count = sizeof(s_magic_cmds) / sizeof(s_magic_cmds[0]);
+    if (!cmd || !cmd[0]) return NULL;
+    for (uint32_t i = 0; i < count; i++) {
+        const magic_cmd_entry_t* c = &s_magic_cmds[i];
+        if (!c->magic_safe) continue;
+        uint32_t name_len = magic_strlen(c->name);
+        uint32_t score = magic_edit_distance(cmd, c->name);
+        if (cmd_len >= 2u && name_len >= cmd_len) {
+            int prefix = 1;
+            for (uint32_t j = 0; j < cmd_len; j++) {
+                if (cmd[j] != c->name[j]) {
+                    prefix = 0;
+                    break;
+                }
+            }
+            if (prefix && score > 0) score--;
+        }
+        if (score < best_score || (score == best_score && name_len > best_len)) {
+            best = c;
+            best_score = score;
+            best_len = name_len;
+        }
+    }
+    if (!best) return NULL;
+    if (best_score <= magic_threshold(cmd_len > best_len ? cmd_len : best_len)) return best;
+    return NULL;
+}
+
+static void cmd_magic(const char* args)
+{
+    char cmd[64];
+    char rest[192];
+    uint32_t i = 0;
+    uint32_t ci = 0;
+    uint32_t ri = 0;
+    while (args[i] == ' ' || args[i] == '\t') i++;
+    while (args[i] && args[i] != ' ' && args[i] != '\t' && ci + 1u < sizeof(cmd)) cmd[ci++] = args[i++];
+    cmd[ci] = '\0';
+    while (args[i] && ri + 1u < sizeof(rest)) rest[ri++] = args[i++];
+    rest[ri] = '\0';
+    if (!cmd[0]) {
+        out_append("Usage: magic command [args]\n");
+        return;
+    }
+    const magic_cmd_entry_t* exact = magic_find_exact(cmd);
+    const magic_cmd_entry_t* pick = exact ? exact : magic_predict(cmd);
+    if (!pick) {
+        out_append("magic: no confident command match for ");
+        out_append(cmd);
+        out_append("\n");
+        return;
+    }
+    if (!pick->magic_safe) {
+        out_append("magic: ");
+        out_append(pick->name);
+        out_append(" is raw-control; run it explicitly.\n");
+        return;
+    }
+    out_append("magic: ");
+    out_append(cmd);
+    if (!magic_cmd_equals(cmd, pick->name)) {
+        out_append(" -> ");
+        out_append(pick->name);
+    }
+    out_append("\n");
+    s_magic_depth++;
+    parse_and_run(pick->name, rest);
+    s_magic_depth--;
 }
 
 void lsh_enter_sum_shortcut(void)
@@ -928,7 +1085,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest cls\n");
+    out_append("  help control status release ver post selftest magic cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
@@ -955,6 +1112,7 @@ static void cmd_control(const char* args)
     out_append("\n");
     out_append("Start points:\n");
     out_append("  status              inspect version, drivers, storage, containers\n");
+    out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
     out_append("  lcnt info           inspect syscall-cap containers\n");
@@ -1862,6 +2020,14 @@ static void parse_and_run(const char* cmd, const char* args)
 {
     if (!cmd || !cmd[0]) return;
 
+    if (strcmp(cmd, "magic") == 0) {
+        if (s_magic_depth > 0) {
+            out_append("magic: nested magic ignored.\n");
+            return;
+        }
+        cmd_magic(args);
+        return;
+    }
     if (strcmp(cmd, "help") == 0 || (cmd[0] == '?' && cmd[1] == '\0')) { cmd_help(args); return; }
     if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }

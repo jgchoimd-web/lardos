@@ -3,6 +3,13 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.10.0a
+ITEM Added ScreenRAM, an optional framebuffer/backbuffer scratch RAM region.
+ITEM Added sram and screenram LSH commands for default corner storage, user-selected rectangles, reads, writes, clears, and self-tests.
+ITEM ScreenRAM preserves bytes across GUI redraws by restoring the reserved pixel rectangle before blitting.
+ITEM POST now checks the ScreenRAM scratch path so visible memory regressions are caught.
+ITEM Updated built-in LARS, README, architecture, and LSH docs with the ScreenRAM workflow.
+
 SECTION v1.9.0a
 ITEM Added a CPU mode bridge for controlled long64 to real16 and back roundtrips.
 ITEM Added cpumode.c and mode_switch.s with a low-memory trampoline at 0x6000.

@@ -8,6 +8,7 @@
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `magic command [args]` - predict and run a mistyped safe built-in command.
 - `mode [status|probe|real]` - inspect or run the controlled real16/long64 bridge.
+- `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

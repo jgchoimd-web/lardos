@@ -75,6 +75,9 @@ commands:
   the predicted command directly, for example `magic statsu`.
 - `mode [status|probe|real]` inspects the CPU mode bridge or runs a controlled
   real-mode window that returns to 64-bit long mode.
+- `sram` / `screenram` turns a quiet framebuffer/backbuffer rectangle into
+  scratch RAM. Use `sram on` for the default corner, `sram rect x y w h` for a
+  user-selected area, then `sram write offset text` and `sram read offset len`.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
@@ -92,10 +95,10 @@ means beta/experimental, and `p` means hotpatch.
 During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
 Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
-descriptors, expected PCI devices, GUI framebuffer/layout state, LPST
-persistence metadata, LVCS hashing, containers, and LIL feature forms. The
-screen checks are there to catch visible boot/UI regressions as well as code
-errors.
+descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
+scratch storage, LPST persistence metadata, LVCS hashing, containers, and LIL
+feature forms. The screen checks are there to catch visible boot/UI regressions
+as well as code errors.
 
 Each feature addition gets a release: bump the kernel version, add an entry to
 `os/RELEASES.lardd`, keep the embedded `releases.lardd` in sync so LSH can show

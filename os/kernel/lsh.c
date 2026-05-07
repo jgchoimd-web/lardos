@@ -242,7 +242,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
     { "vcslog", 1 }, { "vcsshow", 1 },
     { "drivers", 1 }, { "fsstat", 1 }, { "fsload", 1 }, { "fssave", 1 }, { "sync", 1 },
-    { "sandbox", 1 }, { "exitsandbox", 1 },
+    { "sram", 1 }, { "screenram", 1 }, { "sandbox", 1 }, { "exitsandbox", 1 },
     { "sum", 0 }, { "exitsum", 0 }, { "peek", 0 }, { "poke", 0 }, { "asm_", 0 },
 };
 
@@ -1094,7 +1094,7 @@ static void cmd_help(const char* args)
     out_append("  bosl file  lil file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
-    out_append("  drivers fsstat fsload fssave sync sandbox exitsandbox\n");
+    out_append("  drivers fsstat fsload fssave sync sram sandbox exitsandbox\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
 }
@@ -1115,6 +1115,7 @@ static void cmd_control(const char* args)
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
+    out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
     out_append("  lcnt info           inspect syscall-cap containers\n");
@@ -1203,6 +1204,16 @@ static void cmd_status(const char* args)
     out_append(", last=");
     out_append(mode.last_roundtrip_ok ? "ok" : "none");
     out_append("\n");
+
+    gui_screenram_info_t sram;
+    gui_screenram_info(&sram);
+    out_append("ScreenRAM: ");
+    out_append(sram.enabled ? "on" : "off");
+    out_append(", cap=");
+    out_append_u32(sram.capacity);
+    out_append(", used=");
+    out_append_u32(sram.used);
+    out_append("\n");
 }
 
 static int args_word_is(const char* args, const char* word)
@@ -1266,6 +1277,163 @@ static void cmd_mode(const char* args)
     out_append(", err=");
     out_append_u32(info.last_error);
     out_append("\n");
+}
+
+static void cmd_sram_status(void)
+{
+    gui_screenram_info_t info;
+    gui_screenram_info(&info);
+    out_append("ScreenRAM: ");
+    out_append(info.enabled ? "on" : "off");
+    out_append("\nrect ");
+    out_append_u32(info.x);
+    out_append(",");
+    out_append_u32(info.y);
+    out_append(" ");
+    out_append_u32(info.w);
+    out_append("x");
+    out_append_u32(info.h);
+    out_append(" cap=");
+    out_append_u32(info.capacity);
+    out_append("/");
+    out_append_u32(info.max_capacity);
+    out_append(" used=");
+    out_append_u32(info.used);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_sram_read(const char* args)
+{
+    uint64_t off;
+    uint64_t len;
+    uint8_t buf[128];
+    int r;
+    if (lsh_parse_u64(&args, &off) != 0 || lsh_parse_u64(&args, &len) != 0 || len == 0) {
+        out_append("Usage: sram read offset len\n");
+        return;
+    }
+    if (len > sizeof(buf)) {
+        out_append("sram: read capped to 128 bytes.\n");
+        len = sizeof(buf);
+    }
+    r = gui_screenram_read((uint32_t)off, buf, (uint32_t)len);
+    if (r < 0) {
+        out_append("sram: read failed. Try sram on first.\n");
+        return;
+    }
+    out_append("hex:");
+    for (int i = 0; i < r; i++) {
+        out_append_char(' ');
+        out_append_hex8(buf[i]);
+    }
+    out_append("\ntext: ");
+    for (int i = 0; i < r; i++) {
+        char c = (char)buf[i];
+        out_append_char((c >= 32 && c <= 126) ? c : '.');
+    }
+    out_append("\n");
+}
+
+static void cmd_sram_write(const char* args)
+{
+    uint64_t off;
+    const char* text;
+    uint32_t len = 0;
+    int r;
+    if (lsh_parse_u64(&args, &off) != 0) {
+        out_append("Usage: sram write offset text\n");
+        return;
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    text = args;
+    while (text[len]) len++;
+    r = gui_screenram_write((uint32_t)off, (const uint8_t*)text, len);
+    if (r < 0) {
+        out_append("sram: write failed. Try sram on first.\n");
+        return;
+    }
+    out_append("sram: wrote ");
+    out_append_u32((uint32_t)r);
+    out_append(" bytes\n");
+}
+
+static void cmd_sram(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        cmd_sram_status();
+        return;
+    }
+    if (strcmp(sub, "status") == 0) {
+        cmd_sram_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0) {
+        if (gui_screenram_enable(1) == 0) out_append("sram: enabled default quiet corner.\n");
+        else out_append("sram: no framebuffer available.\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        gui_screenram_enable(0);
+        out_append("sram: disabled.\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        gui_screenram_clear();
+        out_append("sram: cleared.\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(gui_screenram_selftest() == 0 ? "sram: selftest OK\n" : "sram: selftest failed\n");
+        return;
+    }
+    if (strcmp(sub, "corner") == 0) {
+        char corner[8];
+        uint64_t w = 0;
+        uint64_t h = 0;
+        if (vcs_read_word(&args, corner, sizeof(corner)) != 0) {
+            corner[0] = 'b'; corner[1] = 'r'; corner[2] = '\0';
+        }
+        (void)lsh_parse_u64(&args, &w);
+        (void)lsh_parse_u64(&args, &h);
+        if (gui_screenram_set_corner(corner, (uint32_t)w, (uint32_t)h) == 0) {
+            out_append("sram: corner ");
+            out_append(corner);
+            out_append(" enabled.\n");
+        } else {
+            out_append("Usage: sram corner tl|tr|bl|br [w h]\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "rect") == 0) {
+        uint64_t x;
+        uint64_t y;
+        uint64_t w;
+        uint64_t h;
+        if (lsh_parse_u64(&args, &x) != 0 || lsh_parse_u64(&args, &y) != 0 ||
+            lsh_parse_u64(&args, &w) != 0 || lsh_parse_u64(&args, &h) != 0) {
+            out_append("Usage: sram rect x y w h\n");
+            return;
+        }
+        if (gui_screenram_set_rect((uint32_t)x, (uint32_t)y, (uint32_t)w, (uint32_t)h) == 0) {
+            out_append("sram: selected rectangle enabled.\n");
+        } else {
+            out_append("sram: rectangle outside framebuffer.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "write") == 0) {
+        cmd_sram_write(args);
+        return;
+    }
+    if (strcmp(sub, "read") == 0) {
+        cmd_sram_read(args);
+        return;
+    }
+    out_append("Usage: sram status|on|off|corner|rect|write|read|clear|test\n");
 }
 
 static int lsh_require_sum(const char* cmd)
@@ -2131,6 +2299,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 'l' && cmd[3] == 'o' && cmd[4] == 'a' && cmd[5] == 'd' && cmd[6] == '\0') { cmd_fsload(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'y' && cmd[2] == 'n' && cmd[3] == 'c' && cmd[4] == '\0') { cmd_fssave(args); return; }
     if (cmd[0] == 'p' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 't' && cmd[4] == '\0') { cmd_selftest(args); return; }
+    if (cmd[0] == 's' && cmd[1] == 'r' && cmd[2] == 'a' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_sram(args); return; }
+    if (cmd[0] == 's' && cmd[1] == 'c' && cmd[2] == 'r' && cmd[3] == 'e' && cmd[4] == 'e' && cmd[5] == 'n' && cmd[6] == 'r' && cmd[7] == 'a' && cmd[8] == 'm' && cmd[9] == '\0') { cmd_sram(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'e' && cmd[2] == 'l' && cmd[3] == 'f' && cmd[4] == 't' && cmd[5] == 'e' && cmd[6] == 's' && cmd[7] == 't' && cmd[8] == '\0') { cmd_selftest(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'c' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == '\0') { cmd_lcnt(args); return; }
     if (cmd[0] == 'c' && cmd[1] == 'o' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == 'a' && cmd[5] == 'i' && cmd[6] == 'n' && cmd[7] == 'e' && cmd[8] == 'r' && cmd[9] == '\0') { cmd_lcnt(args); return; }

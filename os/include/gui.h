@@ -39,6 +39,28 @@ typedef struct {
 /* POST-visible screen sanity checks. Returns 0 when a framebuffer is present. */
 int gui_post_check(gui_post_info_t* out);
 
+typedef struct {
+    uint32_t enabled;
+    uint32_t x;
+    uint32_t y;
+    uint32_t w;
+    uint32_t h;
+    uint32_t capacity;
+    uint32_t used;
+    uint32_t max_capacity;
+    uint32_t last_error;
+} gui_screenram_info_t;
+
+/* Screen RAM stores bytes in a reserved framebuffer/backbuffer rectangle. */
+int gui_screenram_enable(int on);
+int gui_screenram_set_corner(const char* corner, uint32_t w, uint32_t h);
+int gui_screenram_set_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+int gui_screenram_write(uint32_t offset, const uint8_t* data, uint32_t len);
+int gui_screenram_read(uint32_t offset, uint8_t* data, uint32_t len);
+void gui_screenram_clear(void);
+void gui_screenram_info(gui_screenram_info_t* out);
+int gui_screenram_selftest(void);
+
 // Lafillo tab: set extracted + raw content (for View Source)
 void gui_lafillo_set_content(const char* extracted, const char* raw);
 

@@ -60,7 +60,7 @@ flowchart TB
     POST["post diagnostics"]
     Net["net DHCP DNS TCP HTTP"]
     TLS["lard_tls native TLS"]
-    GUI["gui / lafillo / lsh"]
+    GUI["gui / screenram / lafillo / lsh"]
     VM["BOSL GASM LIL LML OSVM"]
 
     Kmain --> GDT
@@ -167,17 +167,24 @@ tab and `lardd_guide.lardd` as the native document-format guide. LardOS uses
 Markdown for project documents. `kernel/lard_doc.c` renders both formats with a
 small freestanding C parser.
 
+`gui.c` also owns ScreenRAM, an optional scratch-memory layer backed by a
+reserved framebuffer/backbuffer rectangle. The default is a quiet bottom-right
+corner; `sram rect x y w h` lets the user sacrifice a chosen screen area. GUI
+redraws restore the encoded bytes before blitting so the region behaves like
+small RAM while still visibly living in screen memory.
+
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
-archives, DRFL descriptors, expected PCI devices, GUI
-framebuffer/layout state, LPST metadata, LVCS hashing, containers, and LIL
+archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
+ScreenRAM scratch storage, LPST metadata, LVCS hashing, containers, and LIL
 feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
-CPU mode bridge inspection (`mode`), POST reruns (`post`, `selftest`), native document rendering (`lars`, `lardd`,
+CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
+POST reruns (`post`, `selftest`), native document rendering (`lars`, `lardd`,
 `doc`), native LIL script execution (`lil file`), writable RAM file editing
 (`write`, `append`, `copy`), LPST persistence
 (`sync`/`fssave`), LVCS, Lard containers, the language/runtime launchers, and

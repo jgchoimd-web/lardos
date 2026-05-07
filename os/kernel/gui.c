@@ -39,6 +39,21 @@ static fb_t g_bb;
 static int g_have_bb;
 static const fb_t* g_syscall_target_override;
 
+#define SCREENRAM_MAX_BYTES 8192u
+#define SCREENRAM_DEFAULT_W 64u
+#define SCREENRAM_DEFAULT_H 16u
+
+static uint8_t g_screenram_shadow[SCREENRAM_MAX_BYTES];
+static uint8_t g_screenram_backup[SCREENRAM_MAX_BYTES];
+static uint32_t g_screenram_enabled;
+static uint32_t g_screenram_x;
+static uint32_t g_screenram_y;
+static uint32_t g_screenram_w;
+static uint32_t g_screenram_h;
+static uint32_t g_screenram_capacity;
+static uint32_t g_screenram_used;
+static uint32_t g_screenram_last_error;
+
 typedef struct {
     int mx;
     int my;
@@ -144,6 +159,71 @@ static int fb_from_bootinfo(fb_t* out)
 }
 
 static void fb_putpixel(const fb_t* f, uint16_t x, uint16_t y, uint32_t argb);
+
+static uint32_t screenram_rect_capacity(uint32_t w, uint32_t h)
+{
+    uint64_t cap = (uint64_t)w * (uint64_t)h * 3u;
+    if (cap > SCREENRAM_MAX_BYTES) cap = SCREENRAM_MAX_BYTES;
+    return (uint32_t)cap;
+}
+
+static void screenram_default_rect(uint32_t* x, uint32_t* y, uint32_t* w, uint32_t* h)
+{
+    uint32_t rw = SCREENRAM_DEFAULT_W;
+    uint32_t rh = SCREENRAM_DEFAULT_H;
+    uint32_t sw = g_have_fb ? g_fb.w : 0;
+    uint32_t sh = g_have_fb ? g_fb.h : 0;
+    if (sw == 0 || sh == 0) {
+        *x = *y = *w = *h = 0;
+        return;
+    }
+    if (rw > sw) rw = sw;
+    if (rh > sh) rh = sh;
+    *x = sw - rw;
+    *y = sh - rh;
+    *w = rw;
+    *h = rh;
+}
+
+static int screenram_rect_valid(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+    if (!g_have_fb || !g_fb.fb || w == 0 || h == 0) return 0;
+    if (x >= g_fb.w || y >= g_fb.h) return 0;
+    if (w > (uint32_t)g_fb.w - x || h > (uint32_t)g_fb.h - y) return 0;
+    return screenram_rect_capacity(w, h) > 0;
+}
+
+static void screenram_flush_to_target(const fb_t* tgt)
+{
+    if (!tgt || !g_screenram_enabled || g_screenram_capacity == 0) return;
+    for (uint32_t i = 0; i < g_screenram_capacity; i += 3u) {
+        uint32_t px = i / 3u;
+        uint32_t x = g_screenram_x + (px % g_screenram_w);
+        uint32_t y = g_screenram_y + (px / g_screenram_w);
+        uint32_t r = g_screenram_shadow[i];
+        uint32_t gch = (i + 1u < g_screenram_capacity) ? g_screenram_shadow[i + 1u] : 0u;
+        uint32_t b = (i + 2u < g_screenram_capacity) ? g_screenram_shadow[i + 2u] : 0u;
+        fb_putpixel(tgt, (uint16_t)x, (uint16_t)y, 0xFF000000u | (r << 16) | (gch << 8) | b);
+    }
+}
+
+static int screenram_configure(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+    uint32_t old_used = g_screenram_used;
+    if (!screenram_rect_valid(x, y, w, h)) {
+        g_screenram_last_error = 1;
+        return -1;
+    }
+    g_screenram_x = x;
+    g_screenram_y = y;
+    g_screenram_w = w;
+    g_screenram_h = h;
+    g_screenram_capacity = screenram_rect_capacity(w, h);
+    if (old_used > g_screenram_capacity) old_used = g_screenram_capacity;
+    g_screenram_used = old_used;
+    g_screenram_last_error = 0;
+    return 0;
+}
 
 static void fb_blit(const fb_t* dst, const fb_t* src)
 {
@@ -459,7 +539,160 @@ int gui_init(void)
     if (sf && ssav_decode(sf->data, sf->size, &g.ss_ssav) == 0) {
         g.ss_file = sf;
     }
+    screenram_default_rect(&g_screenram_x, &g_screenram_y, &g_screenram_w, &g_screenram_h);
+    g_screenram_capacity = screenram_rect_capacity(g_screenram_w, g_screenram_h);
+    g_screenram_used = 0;
+    g_screenram_enabled = 0;
+    g_screenram_last_error = 0;
     return 0;
+}
+
+int gui_screenram_enable(int on)
+{
+    if (on) {
+        if (!g_screenram_capacity) {
+            uint32_t x, y, w, h;
+            screenram_default_rect(&x, &y, &w, &h);
+            if (screenram_configure(x, y, w, h) != 0) return -1;
+        }
+        g_screenram_enabled = 1;
+    } else {
+        g_screenram_enabled = 0;
+    }
+    g_screenram_last_error = 0;
+    return 0;
+}
+
+int gui_screenram_set_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+    if (screenram_configure(x, y, w, h) != 0) return -1;
+    g_screenram_enabled = 1;
+    return 0;
+}
+
+static int screenram_corner_is(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && a[i] == b[i]) i++;
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+int gui_screenram_set_corner(const char* corner, uint32_t w, uint32_t h)
+{
+    uint32_t x = 0;
+    uint32_t y = 0;
+    if (!corner || !corner[0]) corner = "br";
+    if (w == 0) w = SCREENRAM_DEFAULT_W;
+    if (h == 0) h = SCREENRAM_DEFAULT_H;
+    if (!g_have_fb || !g_fb.fb) {
+        g_screenram_last_error = 1;
+        return -1;
+    }
+    if (w > g_fb.w) w = g_fb.w;
+    if (h > g_fb.h) h = g_fb.h;
+    if (screenram_corner_is(corner, "tr")) {
+        x = (uint32_t)g_fb.w - w;
+        y = 0;
+    } else if (screenram_corner_is(corner, "bl")) {
+        x = 0;
+        y = (uint32_t)g_fb.h - h;
+    } else if (screenram_corner_is(corner, "tl")) {
+        x = 0;
+        y = 0;
+    } else {
+        x = (uint32_t)g_fb.w - w;
+        y = (uint32_t)g_fb.h - h;
+    }
+    return gui_screenram_set_rect(x, y, w, h);
+}
+
+int gui_screenram_write(uint32_t offset, const uint8_t* data, uint32_t len)
+{
+    if (!g_screenram_enabled || !data || offset > g_screenram_capacity) {
+        g_screenram_last_error = 2;
+        return -1;
+    }
+    if (len > g_screenram_capacity - offset) len = g_screenram_capacity - offset;
+    for (uint32_t i = 0; i < len; i++) g_screenram_shadow[offset + i] = data[i];
+    if (offset + len > g_screenram_used) g_screenram_used = offset + len;
+    g_screenram_last_error = 0;
+    return (int)len;
+}
+
+int gui_screenram_read(uint32_t offset, uint8_t* data, uint32_t len)
+{
+    if (!g_screenram_enabled || !data || offset > g_screenram_capacity) {
+        g_screenram_last_error = 2;
+        return -1;
+    }
+    if (len > g_screenram_capacity - offset) len = g_screenram_capacity - offset;
+    for (uint32_t i = 0; i < len; i++) data[i] = g_screenram_shadow[offset + i];
+    g_screenram_last_error = 0;
+    return (int)len;
+}
+
+void gui_screenram_clear(void)
+{
+    for (uint32_t i = 0; i < g_screenram_capacity; i++) g_screenram_shadow[i] = 0;
+    g_screenram_used = 0;
+    g_screenram_last_error = 0;
+}
+
+void gui_screenram_info(gui_screenram_info_t* out)
+{
+    if (!out) return;
+    out->enabled = g_screenram_enabled;
+    out->x = g_screenram_x;
+    out->y = g_screenram_y;
+    out->w = g_screenram_w;
+    out->h = g_screenram_h;
+    out->capacity = g_screenram_capacity;
+    out->used = g_screenram_used;
+    out->max_capacity = SCREENRAM_MAX_BYTES;
+    out->last_error = g_screenram_last_error;
+}
+
+int gui_screenram_selftest(void)
+{
+    gui_screenram_info_t old;
+    int ok = 1;
+    uint8_t got[64];
+    uint32_t old_cap;
+    uint32_t old_used;
+    uint32_t old_enabled;
+
+    gui_screenram_info(&old);
+    old_cap = old.capacity;
+    old_used = old.used;
+    old_enabled = old.enabled;
+    for (uint32_t i = 0; i < old_cap && i < SCREENRAM_MAX_BYTES; i++) {
+        g_screenram_backup[i] = g_screenram_shadow[i];
+    }
+
+    if (gui_screenram_set_corner("br", 16u, 8u) != 0) ok = 0;
+    if (ok) {
+        for (uint32_t i = 0; i < sizeof(got); i++) got[i] = (uint8_t)(0x5Au ^ i);
+        if (gui_screenram_write(0, got, sizeof(got)) != (int)sizeof(got)) ok = 0;
+        for (uint32_t i = 0; i < sizeof(got); i++) got[i] = 0;
+        if (gui_screenram_read(0, got, sizeof(got)) != (int)sizeof(got)) ok = 0;
+        for (uint32_t i = 0; i < sizeof(got); i++) {
+            if (got[i] != (uint8_t)(0x5Au ^ i)) ok = 0;
+        }
+    }
+
+    g_screenram_enabled = old_enabled;
+    g_screenram_x = old.x;
+    g_screenram_y = old.y;
+    g_screenram_w = old.w;
+    g_screenram_h = old.h;
+    g_screenram_capacity = old_cap;
+    g_screenram_used = old_used;
+    for (uint32_t i = 0; i < old_cap && i < SCREENRAM_MAX_BYTES; i++) {
+        g_screenram_shadow[i] = g_screenram_backup[i];
+    }
+    g_screenram_last_error = ok ? 0u : 3u;
+    return ok ? 0 : -1;
 }
 
 static void gui_draw_cursor_at(int x, int y, uint32_t color)
@@ -1434,6 +1667,7 @@ void gui_render(void)
     g_syscall_target_override = tgt;
     if (g.ss_active) {
         render_screensaver();
+        screenram_flush_to_target(tgt);
         if (g_have_bb) fb_blit(&g_fb, &g_bb);
         g_syscall_target_override = 0;
         return;
@@ -1730,6 +1964,7 @@ void gui_render(void)
 
     // Cursor last
     gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
+    screenram_flush_to_target(tgt);
 
     if (g_have_bb) {
         fb_blit(&g_fb, &g_bb);

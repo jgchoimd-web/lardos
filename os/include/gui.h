@@ -34,6 +34,7 @@ typedef struct {
     uint32_t changed_samples;
     int window_inside;
     int response_view_ok;
+    int chrome_ok;
 } gui_post_info_t;
 
 /* POST-visible screen sanity checks. Returns 0 when a framebuffer is present. */

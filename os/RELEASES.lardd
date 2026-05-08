@@ -3,6 +3,11 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.23.0a
+ITEM Improved the classic GUI chrome without replacing the existing GUI.
+ITEM Added title/status text, compact safe tab labels, expanding input width, button hover/pressed feedback, and a framed output view.
+ITEM POST now checks the polished GUI chrome layout so visual regressions are caught with the boot diagnostics.
+
 SECTION v1.22.0a
 ITEM Added EXEXGUI, a sketch-driven split desktop shell.
 ITEM EXEXGUI keeps the existing GUI in the left DE/WM pane, mirrors LSH in the top-right terminal pane, and draws an info/status pane below it.

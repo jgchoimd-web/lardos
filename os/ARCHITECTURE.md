@@ -206,7 +206,9 @@ small freestanding C parser.
 reserved framebuffer/backbuffer rectangle. The default is a quiet bottom-right
 corner; `sram rect x y w h` lets the user sacrifice a chosen screen area. GUI
 redraws restore the encoded bytes before blitting so the region behaves like
-small RAM while still visibly living in screen memory.
+small RAM while still visibly living in screen memory. The same renderer owns
+the classic GUI chrome: title/status text, compact safe tab labels, expanding
+input fields, framed output views, and button hover/pressed feedback.
 
 `screencheck.c` wraps the GUI POST framebuffer/layout probe in a user-facing
 diagnostic module. `screencheck status` reports changed samples, tile counts,

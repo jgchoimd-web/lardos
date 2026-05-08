@@ -19,6 +19,7 @@
 #include "exexgui.h"
 #include "syscall.h"
 #include "lib3d_demo.h"
+#include "version.h"
 
 #define LARSH_VIEW_W 160
 #define LARSH_VIEW_H 120
@@ -743,6 +744,44 @@ static void gui_apply_exexgui_layout(void)
     g.dragging = 0;
 }
 
+static const char* gui_app_title(int app)
+{
+    static const char* names[] = {
+        "Doc Browser", "Calculator", "Notes", "Gallery", "LAR Package",
+        "User Run", "Shrine", "Lard Shell", "Play", "Editor",
+    };
+    if (app < 0 || app >= (int)(sizeof(names) / sizeof(names[0]))) return "LardOS";
+    return names[app];
+}
+
+static const char* gui_app_hint(int app)
+{
+    static const char* hints[] = {
+        "local LARS, HTTP GET/POST", "integer scratchpad", "RAM notes",
+        "images and scenes", "native archive tools", "sandboxable user task",
+        "LSS programs", "system commands", "KR BASIC", "Lafaelo text",
+    };
+    if (app < 0 || app >= (int)(sizeof(hints) / sizeof(hints[0]))) return "ready";
+    return hints[app];
+}
+
+static void fb_frame_rect(const fb_t* f, int x, int y, int w, int h, uint32_t c)
+{
+    if (w < 2 || h < 2) return;
+    fb_fill_rect(f, (uint16_t)x, (uint16_t)y, (uint16_t)w, 1, c);
+    fb_fill_rect(f, (uint16_t)x, (uint16_t)(y + h - 1), (uint16_t)w, 1, c);
+    fb_fill_rect(f, (uint16_t)x, (uint16_t)y, 1, (uint16_t)h, c);
+    fb_fill_rect(f, (uint16_t)(x + w - 1), (uint16_t)y, 1, (uint16_t)h, c);
+}
+
+static int gui_input_width(void)
+{
+    int w = g.win_w - 32;
+    if (w < 96) w = 96;
+    if (w > g.win_w - 8) w = g.win_w > 8 ? g.win_w - 8 : g.win_w;
+    return w;
+}
+
 static void gui_resp_clear(void)
 {
     g.resp[0] = '\0';
@@ -1262,7 +1301,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int content_y = g.win_y + 44;
     int tb_x = g.win_x + 16;
     int tb_y = content_y + 118;
-    int tb_w = 260;
+    int tb_w = gui_input_width();
     int tb_h = 24;
     int view_x_focus = g.win_x + 16;
     int view_y_focus = content_y_m + 168;
@@ -1602,6 +1641,10 @@ int gui_post_check(gui_post_info_t* out)
                               g.win_y + g.win_h <= (int)g_fb.h);
         out->response_view_ok = (g.win_w >= 320 && g.win_h >= 240 &&
                                  g.win_h - 190 >= 40 && g.win_w - 32 >= 160);
+        out->chrome_ok = (g.win_w / 10 >= 16 &&
+                          gui_input_width() >= 96 &&
+                          g.win_w - 32 >= 160 &&
+                          g.win_h >= 240);
         uint32_t step_x = g_fb.w >= 64 ? (uint32_t)g_fb.w / 32u : 1u;
         uint32_t step_y = g_fb.h >= 64 ? (uint32_t)g_fb.h / 24u : 1u;
         if (step_x == 0) step_x = 1;
@@ -1734,34 +1777,45 @@ void gui_render(void)
     // Window frame
     uint32_t win_bg = 0xFF202840;
     uint32_t title_bg = 0xFF304060;
-    uint32_t border = 0xFF000000;
+    uint32_t border = 0xFF05070Cu;
+    if (g.win_x + g.win_w + 5 < (int)g_fb.w && g.win_y + g.win_h + 5 < (int)g_fb.h) {
+        fb_fill_rect(tgt, (uint16_t)(g.win_x + 5), (uint16_t)(g.win_y + 5),
+                     (uint16_t)g.win_w, (uint16_t)g.win_h, 0x66000000u);
+    }
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, (uint16_t)g.win_h, win_bg);
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, 20, title_bg);
     int set_btn_x = g.win_x + g.win_w - 52;
     uint32_t set_btn_bg = (g.settings_open || (g.mx >= set_btn_x && g.mx < set_btn_x + 48 && g.my >= g.win_y && g.my < g.win_y + 20)) ? 0xFF506090 : 0xFF405070;
+    if (g.win_w > 150) fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(g.win_y + 6), "LardOS GUI", 0xFFFFFFFF, title_bg);
+    if (g.win_w > 300) fb_draw_text(tgt, (uint16_t)(g.win_x + 112), (uint16_t)(g.win_y + 6), gui_app_title(g.app_id), 0xFFE7F0FFu, title_bg);
     fb_fill_rect(tgt, (uint16_t)set_btn_x, (uint16_t)g.win_y, 48, 20, set_btn_bg);
     fb_draw_text(tgt, (uint16_t)(set_btn_x + 8), (uint16_t)(g.win_y + 6), "Set", 0xFFFFFFFF, set_btn_bg);
     // crude border
-    fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, 1, border);
-    fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)(g.win_y + g.win_h - 1), (uint16_t)g.win_w, 1, border);
-    fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, 1, (uint16_t)g.win_h, border);
-    fb_fill_rect(tgt, (uint16_t)(g.win_x + g.win_w - 1), (uint16_t)g.win_y, 1, (uint16_t)g.win_h, border);
+    fb_frame_rect(tgt, g.win_x, g.win_y, g.win_w, g.win_h, border);
 
     /* Tab bar */
     static const char* tab_names[] = { "Doc", "Calc", "Note", "Pix", "Pak", "User", "LSS", "LSH", "Play", "Edit" };
+    static const char* tab_short[] = { "D", "C", "N", "P", "K", "U", "S", "H", "R", "E" };
     int tab_y = g.win_y + 20;
     int tab_h = 24;
     int tab_w = g.win_w / 10;
     for (int t = 0; t < 10; t++) {
         int tx = g.win_x + t * tab_w;
-        uint32_t tab_bg = (g.app_id == t) ? 0xFF405070 : 0xFF282838;
-        fb_fill_rect(tgt, (uint16_t)tx, (uint16_t)tab_y, (uint16_t)tab_w, (uint16_t)tab_h, tab_bg);
-        fb_draw_text(tgt, (uint16_t)(tx + 4), (uint16_t)(tab_y + 8), tab_names[t], 0xFFFFFFFF, tab_bg);
+        int tw = (t == 9) ? (g.win_x + g.win_w - tx) : tab_w;
+        int hover = in_rect(g.mx, g.my, tx, tab_y, tw, tab_h);
+        uint32_t tab_bg = (g.app_id == t) ? 0xFF3E5F82u : (hover ? 0xFF343A50u : 0xFF282838u);
+        const char* label = tw >= 34 ? tab_names[t] : tab_short[t];
+        int label_x = tx + (tw >= 34 ? 4 : (tw > 8 ? (tw - 8) / 2 : 0));
+        fb_fill_rect(tgt, (uint16_t)tx, (uint16_t)tab_y, (uint16_t)tw, (uint16_t)tab_h, tab_bg);
+        if (g.app_id == t) fb_fill_rect(tgt, (uint16_t)tx, (uint16_t)(tab_y + tab_h - 3), (uint16_t)tw, 3, 0xFF72D6FFu);
+        fb_draw_text(tgt, (uint16_t)label_x, (uint16_t)(tab_y + 8), label, 0xFFFFFFFF, tab_bg);
     }
 
     int content_y = g.win_y + 20 + tab_h;
 
-    fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(content_y + 4), "lardos", 0xFFFFFFFF, win_bg);
+    fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)(content_y + 8), gui_app_title(g.app_id), 0xFFFFFFFF, win_bg);
+    if (g.win_w > 420) fb_draw_text(tgt, (uint16_t)(g.win_x + 176), (uint16_t)(content_y + 8), gui_app_hint(g.app_id), 0xFFAFC2D8u, win_bg);
+    if (g.win_w > 520) fb_draw_text(tgt, (uint16_t)(g.win_x + g.win_w - 112), (uint16_t)(content_y + 8), LARDOS_VERSION, 0xFFAFC2D8u, win_bg);
 
     // Button
     int btn_x = g.win_x + 16;
@@ -1774,33 +1828,44 @@ void gui_render(void)
         int dww[] = { 48, 64, 52, 56, 50 };
         for (int d = 0; d < 5; d++) {
             const char* label = (d == 2) ? (g.http_post_mode ? "POST" : "GET") : lafillo_labels[d];
-            uint32_t dbg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
+            int bx = btn_x + dx[d];
+            int hover = in_rect(g.mx, g.my, bx, btn_y, dww[d], btn_h);
+            uint32_t dbg = (g.btn_pressed && hover) ? 0xFF80A0FFu : (hover ? 0xFF6386E6u : 0xFF5070D0u);
             fb_fill_rect(tgt, (uint16_t)(btn_x + dx[d]), (uint16_t)btn_y, (uint16_t)dww[d], (uint16_t)btn_h, dbg);
+            fb_frame_rect(tgt, bx, btn_y, dww[d], btn_h, hover ? 0xFFD5E5FFu : 0xFF203060u);
             fb_draw_text(tgt, (uint16_t)(btn_x + dx[d] + 4), (uint16_t)(btn_y + 10), label, 0xFFFFFFFF, dbg);
         }
     } else if (g.app_id == 9) {
         static const char* lafaelo_labels[] = { "Open", "Save", "Run" };
         int lfb = 56;
         for (int d = 0; d < 3; d++) {
-            uint32_t dbg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
-            fb_fill_rect(tgt, (uint16_t)(btn_x + d * (lfb + 4)), (uint16_t)btn_y, (uint16_t)lfb, (uint16_t)btn_h, dbg);
-            fb_draw_text(tgt, (uint16_t)(btn_x + d * (lfb + 4) + 4), (uint16_t)(btn_y + 10), lafaelo_labels[d], 0xFFFFFFFF, dbg);
+            int bx = btn_x + d * (lfb + 4);
+            int hover = in_rect(g.mx, g.my, bx, btn_y, lfb, btn_h);
+            uint32_t dbg = (g.btn_pressed && hover) ? 0xFF80A0FFu : (hover ? 0xFF6386E6u : 0xFF5070D0u);
+            fb_fill_rect(tgt, (uint16_t)bx, (uint16_t)btn_y, (uint16_t)lfb, (uint16_t)btn_h, dbg);
+            fb_frame_rect(tgt, bx, btn_y, lfb, btn_h, hover ? 0xFFD5E5FFu : 0xFF203060u);
+            fb_draw_text(tgt, (uint16_t)(bx + 4), (uint16_t)(btn_y + 10), lafaelo_labels[d], 0xFFFFFFFF, dbg);
         }
     } else {
         const char* btn_label = (g.app_id == 1) ? "=" : (g.app_id == 2) ? "Save" : (g.app_id == 3) ? "View" : (g.app_id == 4) ? "Extract" : (g.app_id == 8) ? "Run" : "Run";
-        uint32_t btn_bg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
+        int hover = in_rect(g.mx, g.my, btn_x, btn_y, btn_w, btn_h);
+        uint32_t btn_bg = (g.btn_pressed && hover) ? 0xFF80A0FFu : (hover ? 0xFF6386E6u : 0xFF5070D0u);
         fb_fill_rect(tgt, (uint16_t)btn_x, (uint16_t)btn_y, (uint16_t)btn_w, (uint16_t)btn_h, btn_bg);
+        fb_frame_rect(tgt, btn_x, btn_y, btn_w, btn_h, hover ? 0xFFD5E5FFu : 0xFF203060u);
         fb_draw_text(tgt, (uint16_t)(btn_x + 12), (uint16_t)(btn_y + 10), btn_label, 0xFFFFFFFF, btn_bg);
         if (g.app_id == 5) {
+            int sb_hover = in_rect(g.mx, g.my, btn_x + btn_w + 8, btn_y, 70, btn_h);
             uint32_t sb_bg = g.user_sandbox ? 0xFF60A060 : 0xFF405040;
+            if (sb_hover) sb_bg = g.user_sandbox ? 0xFF70B070u : 0xFF506050u;
             fb_fill_rect(tgt, (uint16_t)(btn_x + btn_w + 8), (uint16_t)btn_y, 70, (uint16_t)btn_h, sb_bg);
+            fb_frame_rect(tgt, btn_x + btn_w + 8, btn_y, 70, btn_h, sb_hover ? 0xFFD5FFD5u : 0xFF203020u);
             fb_draw_text(tgt, (uint16_t)(btn_x + btn_w + 12), (uint16_t)(btn_y + 10), "Sandbox", 0xFFFFFFFF, sb_bg);
         }
     }
 
     int tb_x = g.win_x + 16;
     int tb_y = content_y + 118;
-    int tb_w = 260;
+    int tb_w = gui_input_width();
     int tb_h = 24;
     uint32_t tb_bg = 0xFF101020;
     uint32_t tb_bd = g.tb_focused ? 0xFFFFFF00 : 0xFF000000;
@@ -1827,6 +1892,12 @@ void gui_render(void)
     int view_y = g.win_y + 180;
     int view_w = g.win_w - 32;
     int view_h = g.win_h - 190;
+    uint32_t view_bg = 0xFF111827u;
+    uint32_t view_bd = 0xFF5A6B86u;
+    if (view_w > 2 && view_h > 2) {
+        fb_fill_rect(tgt, (uint16_t)view_x, (uint16_t)view_y, (uint16_t)view_w, (uint16_t)view_h, view_bg);
+        fb_frame_rect(tgt, view_x, view_y, view_w, view_h, view_bd);
+    }
     if ((g.tb_focused || (g.app_id == 9 && g.lafaelo_focus && !g.lafaelo_show_run)) && g.caret_on) {
         uint16_t cx, cy;
         if (g.app_id == 9 && g.lafaelo_focus) {
@@ -1835,8 +1906,8 @@ void gui_render(void)
                 if (g.lafaelo_buf[i] == '\n') { line++; col = 0; } else col++;
             }
             int row = line - g.resp_scroll;
-            cx = (uint16_t)(view_x + col * 8);
-            cy = (uint16_t)(view_y + row * 10);
+            cx = (uint16_t)(view_x + 4 + col * 8);
+            cy = (uint16_t)(view_y + 4 + row * 10);
             if (cx < (uint16_t)view_x) cx = (uint16_t)view_x;
             if (cx > (uint16_t)(view_x + view_w - 10)) cx = (uint16_t)(view_x + view_w - 10);
             if (cy < (uint16_t)view_y) cy = (uint16_t)view_y;
@@ -1862,13 +1933,13 @@ void gui_render(void)
     else if (g.app_id == 9) view_label = "Editor:";
     fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)(g.win_y + 168),
                  g.loading ? "Response: Fetching..." : view_label, 0xFFFFFFFF, win_bg);
-    int cols = (view_w - 12) / 8; // leave scrollbar space
-    int rows = view_h / 10;
+    int cols = (view_w - 18) / 8; // leave scrollbar and frame space
+    int rows = (view_h - 8) / 10;
     if (cols < 10) cols = 10;
     if (rows < 4) rows = 4;
 
-    uint16_t rx = (uint16_t)view_x;
-    uint16_t ry = (uint16_t)view_y;
+    uint16_t rx = (uint16_t)(view_x + 4);
+    uint16_t ry = (uint16_t)(view_y + 4);
     uint16_t col = 0;
     uint16_t row = 0;
     int line = 0;
@@ -1912,7 +1983,7 @@ void gui_render(void)
                     }
                 }
                 int cap_y = view_y + (int)br.h * scale + 6;
-                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)cap_y, "U+E000 = ", 0xFFFFFFFF, win_bg);
+                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)cap_y, "U+E000 = ", 0xFFFFFFFF, view_bg);
                 const uint32_t* gpx;
                 uint16_t gw, gh;
                 if (img_glyph_get(0xE000u, &gpx, &gw, &gh)) {
@@ -1953,7 +2024,7 @@ void gui_render(void)
 
             if (cp < 32 || cp > 127) cp = '?';
             if (on_screen) {
-                fb_draw_char(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), (char)cp, 0xFFFFFFFF, win_bg);
+                fb_draw_char(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), (char)cp, 0xFFFFFFFF, view_bg);
             }
             col++;
         }

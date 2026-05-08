@@ -95,6 +95,7 @@ static const uint8_t file_lardos_lars[] =
     "title LardOS Control Room\n"
     "p A TempleOS-inspired, user-owned system built from C, in-tree tools, native filesystems, and LardOS languages.\n"
     "p LardOS local documents use LARS instead of HTML so the system owns its own document surface.\n"
+    "p The classic GUI now has clearer title chrome, safer tab labels, a framed output view, and wider inputs.\n"
     "p The Doc tab can switch HTTP requests between GET and POST; POST reads the address as URL|body.\n"
     "section Full-control starts\n"
     "li Run control in LSH for the system control map.\n"

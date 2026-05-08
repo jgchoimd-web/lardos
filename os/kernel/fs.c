@@ -110,7 +110,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use exexgui on for the sketch split layout: GUI left, terminal top-right, info bottom-right.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use task list and task set id prio to inspect and change queued task priority.\n"
-    "li Priority lev.10 is OS-only urgent work; time aging and user commands can never reach it.\n"
+    "li Priority lev.10 is urgent work the user can grant with task urgent id, task set id 10, or nice 10 cmd.\n"
     "li Use tasktop to see runnable and paused task queues with priority bars.\n"
     "li Use bootprof set safe or bootprof set netoff to change the next boot profile.\n"
     "li Use bootprof set awakening for fast-surface boot: core first, extras quietly in the background.\n"

@@ -113,9 +113,10 @@ commands:
   `task default priority` changes new background work, and `task run priority
   command` queues a command at a chosen priority. `tasktop` renders a compact
   dashboard and `task pause`, `task resume`, `task up`, and `task down` adjust
-  queued work without hiding it from the user. User priorities stay in `0..9`;
-  priority `lev.10` is reserved for OS-granted urgent work, cannot be reached
-  by wait-time aging, and is dequeued before all normal work.
+  queued work without hiding it from the user. User priorities span `0..10`;
+  priority `lev.10` is user-grantable urgent work via `task urgent id`,
+  `task set id 10`, `prio id 10`, or `nice 10 command`; it cannot be reached
+  by wait-time aging and is dequeued before all normal work.
 - `bootprof` controls boot profiles stored in `bootprof.txt`. `normal` boots
   normally, `safe` forces POST and skips networking, `netoff` skips networking,
   `dev` keeps networking on while raising the default task priority, and

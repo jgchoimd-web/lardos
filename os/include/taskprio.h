@@ -6,7 +6,7 @@
 #define TASKPRIO_CMD_MAX 256u
 #define TASKPRIO_NAME_MAX 31u
 #define TASKPRIO_MIN 0
-#define TASKPRIO_MAX 9
+#define TASKPRIO_MAX 10
 #define TASKPRIO_OS_LEVEL 10
 #define TASKPRIO_DEFAULT 5
 
@@ -39,6 +39,7 @@ uint32_t taskprio_count(void);
 int taskprio_at(uint32_t idx, taskprio_task_t* out);
 int taskprio_set_priority(uint32_t id, int32_t priority);
 int taskprio_adjust_priority(uint32_t id, int32_t delta);
+int taskprio_grant_urgent_priority(uint32_t id);
 int taskprio_grant_os_priority(uint32_t id);
 int taskprio_pause(uint32_t id, int pause);
 int taskprio_remove(uint32_t id);

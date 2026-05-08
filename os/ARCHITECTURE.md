@@ -254,9 +254,10 @@ drop`, `task pause`, `task resume`, `task up`, `task down`, `prio`, and `nice`
 let the user change scheduling directly. `tasktop` renders the queue with
 priority bars, runnable/paused counts, and command names. The queue selects the
 highest effective priority and ages waiting tasks. User-visible priorities are
-`0..9`; `lev.10` is a reserved OS-only urgent level created through
-`taskprio_enqueue_os` or `taskprio_grant_os_priority`. It is not produced by
-aging and is selected before normal scoring whenever it is queued.
+`0..10`; `lev.10` is an urgent level the user can grant directly with
+`task urgent id`, `task set id 10`, `prio id 10`, `nice 10 command`,
+`task default 10`, or `task boost`. It is not produced by aging and is selected
+before normal scoring whenever it is queued.
 
 `bootprof.c` reads `bootprof.txt` after the writable filesystem is restored and
 turns it into boot behavior. `normal` uses the default path, `safe` forces POST

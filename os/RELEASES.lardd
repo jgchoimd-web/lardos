@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.28.0a
+ITEM Made TaskPrio lev.10 user-grantable to match LardOS full-control values.
+ITEM Users can now assign urgent priority with task urgent id, task set id 10, prio id 10, nice 10 command, task default 10, or task boost.
+ITEM lev.10 tasks can be lowered, paused, resumed, or dropped by the user; wait-time aging still cannot create lev.10.
+ITEM POST TaskPrio selftest now covers user-created lev.10 and demotion back to normal priority.
+
 SECTION v1.27.0a
 ITEM Added Awakening mode, a boot profile that shows the GUI/shell surface after essential core init.
 ITEM In awakening boot, drivers, LSS/language demo warmup, and networking continue through a quiet background loader.

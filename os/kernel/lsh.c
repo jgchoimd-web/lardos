@@ -1118,8 +1118,8 @@ static void cmd_help(const char* args)
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
     out_append("  drivers fsstat fsload fssave sync sram screencheck sandbox exitsandbox\n");
-    out_append("  tasktop  task list|set|up|down|pause|resume|drop  nice prio cmd\n");
-    out_append("  task priorities are 0..9; lev.10 is reserved for OS-granted urgent work\n");
+    out_append("  tasktop  task list|set|urgent|up|down|pause|resume|drop  nice prio cmd\n");
+    out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
     out_append("  crashlog show|clear|test\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
@@ -2306,7 +2306,7 @@ static void cmd_task_list(void)
 static void tasktop_bar(int32_t priority)
 {
     if (priority == TASKPRIO_OS_LEVEL) {
-        out_append("[OS-LEV10]");
+        out_append("[LEV10!!!]");
         return;
     }
     out_append("[");
@@ -2367,12 +2367,12 @@ static void cmd_task_run_like(const char* args)
     int32_t prio;
     uint32_t id;
     if (task_parse_priority(&args, &prio) != 0) {
-        out_append("Usage: task run priority command (0..9; lev.10 is OS-only)\n");
+        out_append("Usage: task run priority command (0..10; lev.10 urgent)\n");
         return;
     }
     while (*args == ' ' || *args == '\t') args++;
     if (!*args) {
-        out_append("Usage: task run priority command (0..9; lev.10 is OS-only)\n");
+        out_append("Usage: task run priority command (0..10; lev.10 urgent)\n");
         return;
     }
     if (taskprio_enqueue(NULL, args, prio, &id) == 0) {
@@ -2403,7 +2403,7 @@ static void cmd_task(const char* args)
         if (task_parse_priority(&args, &prio) != 0) {
             out_append("task: default-prio=");
             out_append_i32(taskprio_default_priority());
-            out_append("\nUsage: task default priority (0..9; lev.10 is OS-only)\n");
+            out_append("\nUsage: task default priority (0..10; lev.10 urgent)\n");
             return;
         }
         taskprio_set_default(prio);
@@ -2416,7 +2416,7 @@ static void cmd_task(const char* args)
         uint32_t id;
         int32_t prio;
         if (vcs_parse_u32(&args, &id) != 0 || task_parse_priority(&args, &prio) != 0) {
-            out_append("Usage: task set id priority (0..9; lev.10 is OS-only)\n");
+            out_append("Usage: task set id priority (0..10; lev.10 urgent)\n");
             return;
         }
         if (taskprio_set_priority(id, prio) == 0) {
@@ -2426,18 +2426,18 @@ static void cmd_task(const char* args)
             out_append_i32(prio);
             out_append("\n");
         } else {
-            out_append("task: id not found or OS-only.\n");
+            out_append("task: id not found.\n");
         }
         return;
     }
-    if (strcmp(sub, "boost") == 0) {
+    if (strcmp(sub, "boost") == 0 || strcmp(sub, "urgent") == 0 || strcmp(sub, "lev10") == 0) {
         uint32_t id;
         if (vcs_parse_u32(&args, &id) != 0) {
-            out_append("Usage: task boost id\n");
+            out_append("Usage: task boost|urgent|lev10 id\n");
             return;
         }
-        if (taskprio_set_priority(id, TASKPRIO_MAX) == 0) out_append("task: boosted.\n");
-        else out_append("task: id not found or OS-only.\n");
+        if (taskprio_grant_urgent_priority(id) == 0) out_append("task: lev.10 granted.\n");
+        else out_append("task: id not found.\n");
         return;
     }
     if (strcmp(sub, "up") == 0 || strcmp(sub, "+") == 0) {
@@ -2447,7 +2447,7 @@ static void cmd_task(const char* args)
             return;
         }
         if (taskprio_adjust_priority(id, 1) == 0) out_append("task: priority up.\n");
-        else out_append("task: id not found or OS-only.\n");
+        else out_append("task: id not found.\n");
         return;
     }
     if (strcmp(sub, "down") == 0 || strcmp(sub, "-") == 0) {
@@ -2457,7 +2457,7 @@ static void cmd_task(const char* args)
             return;
         }
         if (taskprio_adjust_priority(id, -1) == 0) out_append("task: priority down.\n");
-        else out_append("task: id not found or OS-only.\n");
+        else out_append("task: id not found.\n");
         return;
     }
     if (strcmp(sub, "pause") == 0 || strcmp(sub, "hold") == 0) {
@@ -2467,7 +2467,7 @@ static void cmd_task(const char* args)
             return;
         }
         if (taskprio_pause(id, 1) == 0) out_append("task: paused.\n");
-        else out_append("task: id not found or OS-only.\n");
+        else out_append("task: id not found.\n");
         return;
     }
     if (strcmp(sub, "resume") == 0 || strcmp(sub, "cont") == 0) {
@@ -2477,7 +2477,7 @@ static void cmd_task(const char* args)
             return;
         }
         if (taskprio_pause(id, 0) == 0) out_append("task: resumed.\n");
-        else out_append("task: id not found or OS-only.\n");
+        else out_append("task: id not found.\n");
         return;
     }
     if (strcmp(sub, "drop") == 0 || strcmp(sub, "kill") == 0 || strcmp(sub, "rm") == 0) {
@@ -2487,7 +2487,7 @@ static void cmd_task(const char* args)
             return;
         }
         if (taskprio_remove(id) == 0) out_append("task: dropped.\n");
-        else out_append("task: id not found or OS-only.\n");
+        else out_append("task: id not found.\n");
         return;
     }
     if (strcmp(sub, "run") == 0 || strcmp(sub, "queue") == 0) {
@@ -2498,8 +2498,8 @@ static void cmd_task(const char* args)
         out_append(taskprio_selftest() == 0 ? "task: selftest OK\n" : "task: selftest failed\n");
         return;
     }
-    out_append("Usage: task list|set|default|run|up|down|pause|resume|boost|drop|test\n");
-    out_append("Note: priority lev.10 is reserved for OS-granted urgent work.\n");
+    out_append("Usage: task list|set|default|run|up|down|pause|resume|boost|urgent|drop|test\n");
+    out_append("Note: lev.10 is urgent and user-grantable; wait-time aging still cannot create it.\n");
 }
 
 static void cmd_nice(const char* args)
@@ -2512,11 +2512,11 @@ static void cmd_prio(const char* args)
     uint32_t id;
     int32_t prio;
     if (vcs_parse_u32(&args, &id) != 0 || task_parse_priority(&args, &prio) != 0) {
-        out_append("Usage: prio id priority (0..9; lev.10 is OS-only)\n");
+        out_append("Usage: prio id priority (0..10; lev.10 urgent)\n");
         return;
     }
     if (taskprio_set_priority(id, prio) == 0) out_append("prio: updated.\n");
-    else out_append("prio: id not found or OS-only.\n");
+    else out_append("prio: id not found.\n");
 }
 
 static void cmd_awake_status(void)

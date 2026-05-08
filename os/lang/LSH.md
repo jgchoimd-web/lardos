@@ -15,7 +15,7 @@
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
 - `awake status|test` - inspect the Awakening fast-boot background loader.
 - `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.
-- `task list|set|default|run|boost|drop` - inspect and change task priority.
+- `task list|set|default|run|boost|urgent|drop` - inspect and change task priority.
 - `tasktop` - show queued tasks with status and priority bars.
 - `nice priority command` - queue a command at a chosen priority.
 - `bootprof status|set` - inspect or select normal, safe, netoff, dev, or awakening boot profiles.
@@ -43,6 +43,6 @@
 - `cmd &` — queue command, return immediately
 - Commands run one per `gui_tick`, highest effective priority first
 - Queue limit: 8 tasks
-- `task set id priority` changes queued work; priority range is 0..9
-- Priority `lev.10` is OS-only urgent work; users and wait-time aging cannot create it
+- `task set id priority` changes queued work; priority range is 0..10
+- Priority `lev.10` is user-grantable urgent work via `task urgent id`, `task set id 10`, or `nice 10 command`; wait-time aging cannot create it
 - `task pause id` keeps a task visible but skips it until `task resume id`

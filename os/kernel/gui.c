@@ -1594,6 +1594,16 @@ int gui_take_submit(gui_http_request_t* out)
     return 1;
 }
 
+void gui_http_set_post_mode(int on)
+{
+    g.http_post_mode = on ? 1 : 0;
+}
+
+int gui_http_post_mode(void)
+{
+    return g.http_post_mode ? 1 : 0;
+}
+
 int gui_post_check(gui_post_info_t* out)
 {
     if (!g_have_fb || !g_fb.fb) return -1;

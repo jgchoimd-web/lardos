@@ -12,6 +12,7 @@
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
 - `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
 - `exexgui on|off|focus|next` - sketch split GUI with GUI, terminal, and status panes.
+- `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
 - `awake on|off|status|test` - control the default-off Awakening fast-boot mode.
 - `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.
@@ -46,3 +47,10 @@
 - `task set id priority` changes queued work; priority range is 0..10
 - Priority `lev.10` is user-grantable urgent work via `task urgent id`, `task set id 10`, or `nice 10 command`; wait-time aging cannot create it
 - `task pause id` keeps a task visible but skips it until `task resume id`
+
+## Settings Shell
+
+- `cfgsh` enters the settings-focused `CFG#` prompt; `exitcfg` leaves it
+- Inside `CFG#`, use `setting value`: `awake on`, `style 2`, `layout 3`, `pane 1`, `http 2`, `boot 4`, `priority 10`
+- Outside `CFG#`, use `cfg setting value` for one-shot changes
+- Number maps: style 1=win 2=linux 3=mac; layout 1=float 2=tile 3=stack; pane 1=gui 2=term 3=info; http 1=GET 2=POST; boot 1=normal 2=safe 3=netoff 4=dev 5=awakening

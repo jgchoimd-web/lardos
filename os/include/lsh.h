@@ -50,3 +50,6 @@ int lsh_in_sum_mode(void);
 
 /* Global shortcut entry for SUM/ring-0 mode. */
 void lsh_enter_sum_shortcut(void);
+
+/* Non-mutating parser selftest for the settings shell. */
+int lsh_cfgsh_selftest(void);

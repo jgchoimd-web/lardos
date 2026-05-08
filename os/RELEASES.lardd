@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.30.0a
+ITEM Added CFGSH, a settings-focused shell that accepts mode-name value commands.
+ITEM cfgsh enters a CFG prompt for settings only; cfg and settings run one-shot changes from normal LSH.
+ITEM Added numeric setting maps for style, layout, pane, HTTP method, boot profile, and task priority.
+ITEM POST now checks the CFGSH grammar map so numbered settings stay covered.
+
 SECTION v1.29.0a
 ITEM Awakening mode is now explicitly default-off and controlled through awake on and awake off.
 ITEM awake on stores the awakening boot profile for the next boot without changing the current startup path.

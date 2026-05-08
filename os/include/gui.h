@@ -27,6 +27,8 @@ typedef struct {
 int gui_take_submit(gui_http_request_t* out); // returns 1 if got submit
 void gui_set_response(const char* text);
 void gui_set_loading(int on);
+void gui_http_set_post_mode(int on);
+int gui_http_post_mode(void);
 
 typedef struct {
     uint32_t width;

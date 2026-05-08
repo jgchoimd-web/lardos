@@ -268,6 +268,13 @@ drivers, language demos, and networking finish in the background. Awakening is
 off by default; LSH exposes it through `awake on`, `awake off`, `awake status`,
 `bootprof status`, and `bootprof set`.
 
+`cfgsh` is the settings-oriented face of LSH. `cfgsh` enters a `CFG#` prompt
+where each command is parsed as `setting value`: `awake on`, `style 2`,
+`layout 3`, `pane 1`, `http 2`, `boot 4`, `priority 10`, `sandbox off`, and
+`sum on`. The same parser is available outside the mode through `cfg` or
+`settings`, and POST checks the non-mutating grammar map so numeric setting
+aliases stay covered.
+
 `crashlog.c` owns `crashlog.txt`, a writable panic and diagnostic history. Panic
 paths append an entry and attempt an LPST save before halting; LSH exposes the
 same log through `crashlog show`, `crashlog clear`, and `crashlog test`.

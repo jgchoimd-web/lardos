@@ -55,6 +55,7 @@ static int s_in_sum_mode;
 
 /* Sandbox: run LARDX with restricted syscalls (no file/LDLL/network) */
 static int s_sandbox_mode;
+static int s_cfgsh_mode;
 static int s_magic_depth;
 
 static void lsh_putc(char c, void* user);
@@ -250,7 +251,8 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "awake", 1 }, { "awakening", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
+    { "oslink", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "awake", 1 }, { "awakening", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -1104,11 +1106,12 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode oslink exgui exexgui lguilib awake task bootprof crashlog cls\n");
+    out_append("  help control status release ver post selftest magic mode cfgsh oslink exgui exexgui lguilib awake task bootprof crashlog cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|install file.lpack\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
     out_append("  exexgui on|off|focus gui|term|info|next|test\n");
+    out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  lguilib status|show|use|test [file.lguilib]\n");
     out_append("  awake on|off|status|test\n");
     out_append("  write file text  append file text  copy src dst\n");
@@ -1145,6 +1148,8 @@ static void cmd_control(const char* args)
     out_append("  oslink bus          inspect LardOS-internal OSLink messages\n");
     out_append("  exgui style mac     enable familiar desktop/window chrome\n");
     out_append("  exexgui on          use sketch split: GUI, terminal, status\n");
+    out_append("  cfgsh               enter mode-name value settings shell\n");
+    out_append("  cfg style 2         set desktop style by number\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
     out_append("  awake on            enable fast screen boot for next boot\n");
     out_append("  awake off           return next boot to normal and stop loader\n");
@@ -1187,7 +1192,9 @@ static void cmd_status(const char* args)
     out_append_char(s_drive);
     out_append(":\\\n");
     out_append("Mode: ");
-    if (s_in_sum_mode) {
+    if (s_cfgsh_mode) {
+        out_append("settings shell\n");
+    } else if (s_in_sum_mode) {
         out_append("SUM ring0\n");
     } else if (s_sandbox_mode) {
         out_append("sandbox\n");
@@ -3444,6 +3451,359 @@ static void cmd_larsh(const char* args)
     out_append("Playing LARSH. Switch to Gallery tab to view.\n");
 }
 
+static int cfgsh_is_status_word(const char* value)
+{
+    return strcmp(value, "status") == 0 || strcmp(value, "info") == 0 || strcmp(value, "?") == 0;
+}
+
+static int cfgsh_bool_value(const char* value, int* out)
+{
+    if (strcmp(value, "on") == 0 || strcmp(value, "enable") == 0 ||
+        strcmp(value, "enabled") == 0 || strcmp(value, "yes") == 0 ||
+        strcmp(value, "true") == 0 || strcmp(value, "1") == 0) {
+        *out = 1;
+        return 0;
+    }
+    if (strcmp(value, "off") == 0 || strcmp(value, "disable") == 0 ||
+        strcmp(value, "disabled") == 0 || strcmp(value, "no") == 0 ||
+        strcmp(value, "false") == 0 || strcmp(value, "0") == 0) {
+        *out = 0;
+        return 0;
+    }
+    return -1;
+}
+
+static const char* cfgsh_style_value(const char* value)
+{
+    if (strcmp(value, "1") == 0) return "win";
+    if (strcmp(value, "2") == 0) return "linux";
+    if (strcmp(value, "3") == 0) return "mac";
+    if (strcmp(value, "win") == 0 || strcmp(value, "windows") == 0) return "win";
+    if (strcmp(value, "linux") == 0 || strcmp(value, "gnome") == 0 || strcmp(value, "kde") == 0) return "linux";
+    if (strcmp(value, "mac") == 0 || strcmp(value, "macos") == 0) return "mac";
+    return NULL;
+}
+
+static const char* cfgsh_layout_value(const char* value)
+{
+    if (strcmp(value, "1") == 0) return "float";
+    if (strcmp(value, "2") == 0) return "tile";
+    if (strcmp(value, "3") == 0) return "stack";
+    if (strcmp(value, "float") == 0 || strcmp(value, "floating") == 0) return "float";
+    if (strcmp(value, "tile") == 0 || strcmp(value, "tiling") == 0) return "tile";
+    if (strcmp(value, "stack") == 0 || strcmp(value, "stacked") == 0) return "stack";
+    return NULL;
+}
+
+static const char* cfgsh_focus_value(const char* value)
+{
+    if (strcmp(value, "1") == 0) return "gui";
+    if (strcmp(value, "2") == 0) return "term";
+    if (strcmp(value, "3") == 0) return "info";
+    if (strcmp(value, "gui") == 0 || strcmp(value, "de") == 0 || strcmp(value, "wm") == 0) return "gui";
+    if (strcmp(value, "term") == 0 || strcmp(value, "terminal") == 0 || strcmp(value, "shell") == 0) return "term";
+    if (strcmp(value, "info") == 0 || strcmp(value, "status") == 0) return "info";
+    return NULL;
+}
+
+static const char* cfgsh_boot_value(const char* value)
+{
+    if (strcmp(value, "1") == 0) return "normal";
+    if (strcmp(value, "2") == 0) return "safe";
+    if (strcmp(value, "3") == 0) return "netoff";
+    if (strcmp(value, "4") == 0) return "dev";
+    if (strcmp(value, "5") == 0) return "awakening";
+    if (strcmp(value, "awake") == 0) return "awakening";
+    if (strcmp(value, "normal") == 0 || strcmp(value, "safe") == 0 ||
+        strcmp(value, "netoff") == 0 || strcmp(value, "dev") == 0 ||
+        strcmp(value, "awakening") == 0) return value;
+    return NULL;
+}
+
+static void cfgsh_help(void)
+{
+    out_append("CFGSH settings shell\n");
+    out_append("  cfgsh              enter settings shell (CFG# prompt)\n");
+    out_append("  exitcfg            leave settings shell\n");
+    out_append("  setting value      e.g. awake on, style 2, layout 3, boot 4\n");
+    out_append("Settings:\n");
+    out_append("  awake on|off       next boot fast-surface mode\n");
+    out_append("  exgui on|off       extended desktop layer\n");
+    out_append("  style 1|2|3        win|linux|mac\n");
+    out_append("  layout 1|2|3       float|tile|stack\n");
+    out_append("  split on|off       EXEXGUI sketch split\n");
+    out_append("  pane 1|2|3         gui|term|info focus\n");
+    out_append("  sram on|off        screen scratch RAM\n");
+    out_append("  http 1|2           GET|POST mode\n");
+    out_append("  boot 1..5          normal|safe|netoff|dev|awakening\n");
+    out_append("  priority 0..10     default background task priority\n");
+    out_append("  sandbox on|off     default LARDX sandbox run mode\n");
+    out_append("  sum on|off         ring-0 full-control mode\n");
+    out_append("  sync               persist writable settings/files\n");
+}
+
+static void cfgsh_status(void)
+{
+    bootprof_info_t bp;
+    awake_info_t aw;
+    exgui_info_t eg;
+    exexgui_info_t xx;
+    gui_screenram_info_t sr;
+    taskprio_info_t tp;
+    bootprof_info(&bp);
+    awake_info(&aw);
+    exgui_info(&eg);
+    exexgui_info(&xx);
+    gui_screenram_info(&sr);
+    taskprio_info(&tp);
+    out_append("CFGSH status\n");
+    out_append("  boot=");
+    out_append(bp.name);
+    out_append(" awake=");
+    out_append(bp.awakening_mode ? "on" : "off");
+    out_append(" loader=");
+    out_append(aw.enabled ? (aw.done ? "done" : "background") : "off");
+    out_append("\n  exgui=");
+    out_append(eg.enabled ? "on" : "off");
+    out_append(" style=");
+    out_append(exgui_style_name(eg.style));
+    out_append(" layout=");
+    out_append(exgui_layout_name(eg.layout));
+    out_append(" split=");
+    out_append(xx.enabled ? "on" : "off");
+    out_append(" pane=");
+    out_append(exexgui_focus_name(xx.focus));
+    out_append("\n  sram=");
+    out_append(sr.enabled ? "on" : "off");
+    out_append(" http=");
+    out_append(gui_http_post_mode() ? "POST" : "GET");
+    out_append(" priority=");
+    out_append_i32(tp.default_priority);
+    out_append("\n  sandbox=");
+    out_append(s_sandbox_mode ? "on" : "off");
+    out_append(" sum=");
+    out_append(s_in_sum_mode ? "on" : "off");
+    out_append(" cfgsh=");
+    out_append(s_cfgsh_mode ? "on" : "off");
+    out_append("\n");
+}
+
+static void cfgsh_set_boot(const char* profile)
+{
+    if (bootprof_set(profile) == 0) {
+        out_append("cfgsh: boot=");
+        out_append(profile);
+        out_append(" (run sync to persist)\n");
+    } else {
+        out_append("cfgsh: boot profile failed.\n");
+    }
+}
+
+static int cfgsh_apply(const char* setting, const char* args)
+{
+    char value[32];
+    const char* rest = args ? args : "";
+    int have_value = vcs_read_word(&rest, value, sizeof(value)) == 0;
+    int on = 0;
+    const char* mapped;
+
+    if (!setting || !setting[0]) return 0;
+
+    if (strcmp(setting, "awake") == 0 || strcmp(setting, "awakening") == 0 || strcmp(setting, "fastboot") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_awake_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) cmd_awake(on ? "on" : "off");
+        else out_append("Usage: awake on|off\n");
+        return 1;
+    }
+    if (strcmp(setting, "exgui") == 0 || strcmp(setting, "desktop") == 0 || strcmp(setting, "de") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            exgui_enable(on);
+            out_append(on ? "cfgsh: exgui on\n" : "cfgsh: exgui off\n");
+            return 1;
+        }
+        mapped = cfgsh_style_value(value);
+        if (mapped && exgui_set_style(mapped) == 0) { cmd_exgui_status(); return 1; }
+        mapped = cfgsh_layout_value(value);
+        if (mapped && exgui_set_layout(mapped) == 0) { cmd_exgui_status(); return 1; }
+        out_append("Usage: exgui on|off or style/layout value\n");
+        return 1;
+    }
+    if (strcmp(setting, "style") == 0 || strcmp(setting, "theme") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
+        mapped = cfgsh_style_value(value);
+        if (mapped && exgui_set_style(mapped) == 0) cmd_exgui_status();
+        else out_append("Usage: style 1|2|3 (win|linux|mac)\n");
+        return 1;
+    }
+    if (strcmp(setting, "layout") == 0 || strcmp(setting, "wm") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
+        mapped = cfgsh_layout_value(value);
+        if (mapped && exgui_set_layout(mapped) == 0) cmd_exgui_status();
+        else out_append("Usage: layout 1|2|3 (float|tile|stack)\n");
+        return 1;
+    }
+    if (strcmp(setting, "split") == 0 || strcmp(setting, "exexgui") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exexgui_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            exexgui_enable(on);
+            out_append(on ? "cfgsh: split on\n" : "cfgsh: split off\n");
+        } else {
+            out_append("Usage: split on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "pane") == 0 || strcmp(setting, "focus") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exexgui_status(); return 1; }
+        mapped = cfgsh_focus_value(value);
+        if (mapped && exexgui_set_focus(mapped) == 0) cmd_exexgui_status();
+        else out_append("Usage: pane 1|2|3 (gui|term|info)\n");
+        return 1;
+    }
+    if (strcmp(setting, "sram") == 0 || strcmp(setting, "screenram") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_sram_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            if (on) (void)gui_screenram_enable(1);
+            else gui_screenram_enable(0);
+            cmd_sram_status();
+        } else if (strcmp(value, "clear") == 0) {
+            gui_screenram_clear();
+            out_append("cfgsh: sram cleared\n");
+        } else {
+            out_append("Usage: sram on|off|clear\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "http") == 0 || strcmp(setting, "method") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: http=");
+            out_append(gui_http_post_mode() ? "POST\n" : "GET\n");
+            return 1;
+        }
+        if (strcmp(value, "get") == 0 || strcmp(value, "1") == 0 || strcmp(value, "off") == 0) {
+            gui_http_set_post_mode(0);
+            out_append("cfgsh: http=GET\n");
+        } else if (strcmp(value, "post") == 0 || strcmp(value, "2") == 0 || strcmp(value, "on") == 0) {
+            gui_http_set_post_mode(1);
+            out_append("cfgsh: http=POST\n");
+        } else {
+            out_append("Usage: http get|post or 1|2\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "boot") == 0 || strcmp(setting, "bootprof") == 0 || strcmp(setting, "profile") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_bootprof_status(); return 1; }
+        mapped = cfgsh_boot_value(value);
+        if (mapped) cfgsh_set_boot(mapped);
+        else out_append("Usage: boot 1..5 (normal|safe|netoff|dev|awakening)\n");
+        return 1;
+    }
+    if (strcmp(setting, "priority") == 0 || strcmp(setting, "prio") == 0 ||
+        strcmp(setting, "taskprio") == 0 || strcmp(setting, "defaultprio") == 0) {
+        uint32_t pr;
+        const char* p = args ? args : "";
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: priority=");
+            out_append_i32(taskprio_default_priority());
+            out_append("\n");
+            return 1;
+        }
+        if (vcs_parse_u32(&p, &pr) == 0 && pr <= (uint32_t)TASKPRIO_MAX) {
+            taskprio_set_default((int32_t)pr);
+            out_append("cfgsh: priority=");
+            out_append_u32(pr);
+            out_append("\n");
+        } else {
+            out_append("Usage: priority 0..10\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "sandbox") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: sandbox=");
+            out_append(s_sandbox_mode ? "on\n" : "off\n");
+            return 1;
+        }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            s_sandbox_mode = on ? 1 : 0;
+            out_append(on ? "cfgsh: sandbox on\n" : "cfgsh: sandbox off\n");
+        } else {
+            out_append("Usage: sandbox on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "sum") == 0 || strcmp(setting, "ring0") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: sum=");
+            out_append(s_in_sum_mode ? "on\n" : "off\n");
+            return 1;
+        }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            if (on) cmd_sum("");
+            else cmd_exitsum("");
+        } else {
+            out_append("Usage: sum on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "sync") == 0 || strcmp(setting, "save") == 0 || strcmp(setting, "persist") == 0) {
+        cmd_fssave("");
+        return 1;
+    }
+    return 0;
+}
+
+static void cmd_cfgsh(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "on") == 0 || strcmp(sub, "enter") == 0 || strcmp(sub, "shell") == 0) {
+        s_cfgsh_mode = 1;
+        out_append("CFGSH ON. Use setting value; exitcfg to leave.\n");
+        cfgsh_help();
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "exit") == 0 || strcmp(sub, "quit") == 0) {
+        s_cfgsh_mode = 0;
+        out_append("CFGSH OFF.\n");
+        return;
+    }
+    if (strcmp(sub, "help") == 0 || strcmp(sub, "list") == 0 || strcmp(sub, "?") == 0) {
+        cfgsh_help();
+        return;
+    }
+    if (strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cfgsh_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lsh_cfgsh_selftest() == 0 ? "cfgsh: selftest OK\n" : "cfgsh: selftest failed\n");
+        return;
+    }
+    if (!cfgsh_apply(sub, args)) {
+        out_append("cfgsh: unknown setting. Try cfgsh help.\n");
+    }
+}
+
+int lsh_cfgsh_selftest(void)
+{
+    int on = -1;
+    const char* s;
+    if (cfgsh_bool_value("on", &on) != 0 || on != 1) return -1;
+    if (cfgsh_bool_value("0", &on) != 0 || on != 0) return -2;
+    s = cfgsh_style_value("2");
+    if (!s || strcmp(s, "linux") != 0) return -3;
+    s = cfgsh_layout_value("3");
+    if (!s || strcmp(s, "stack") != 0) return -4;
+    s = cfgsh_focus_value("1");
+    if (!s || strcmp(s, "gui") != 0) return -5;
+    s = cfgsh_boot_value("5");
+    if (!s || strcmp(s, "awakening") != 0) return -6;
+    if (cfgsh_style_value("bad") != NULL) return -7;
+    return 0;
+}
+
 static int run_lsh_cmd(const char* name, const char* argv)
 {
     (void)argv;
@@ -3488,6 +3848,33 @@ static void parse_and_run(const char* cmd, const char* args)
 {
     if (!cmd || !cmd[0]) return;
 
+    if (s_cfgsh_mode) {
+        if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "quit") == 0 || strcmp(cmd, "exitcfg") == 0) {
+            s_cfgsh_mode = 0;
+            out_append("CFGSH OFF.\n");
+            return;
+        }
+        if (strcmp(cmd, "help") == 0 || strcmp(cmd, "?") == 0 || strcmp(cmd, "list") == 0) {
+            cfgsh_help();
+            return;
+        }
+        if (strcmp(cmd, "status") == 0 || strcmp(cmd, "info") == 0) {
+            cfgsh_status();
+            return;
+        }
+        if (strcmp(cmd, "sync") == 0) {
+            cmd_fssave(args);
+            return;
+        }
+        if (strcmp(cmd, "cfgsh") == 0 || strcmp(cmd, "cfg") == 0 || strcmp(cmd, "settings") == 0) {
+            cmd_cfgsh(args);
+            return;
+        }
+        if (cfgsh_apply(cmd, args)) return;
+        out_append("cfgsh: unknown setting. Try help or exitcfg.\n");
+        return;
+    }
+
     if (strcmp(cmd, "magic") == 0) {
         if (s_magic_depth > 0) {
             out_append("magic: nested magic ignored.\n");
@@ -3499,6 +3886,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "help") == 0 || (cmd[0] == '?' && cmd[1] == '\0')) { cmd_help(args); return; }
     if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
+    if (strcmp(cmd, "cfgsh") == 0 || strcmp(cmd, "cfg") == 0 || strcmp(cmd, "settings") == 0) { cmd_cfgsh(args); return; }
+    if (strcmp(cmd, "exitcfg") == 0) { s_cfgsh_mode = 0; out_append("CFGSH OFF.\n"); return; }
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "exgui") == 0) { cmd_exgui(args); return; }
@@ -3593,6 +3982,7 @@ void lsh_init(void)
     s_nenv = 0;
     s_in_sum_mode = 0;
     s_sandbox_mode = 0;
+    s_cfgsh_mode = 0;
     taskprio_init();
     lcontainer_init();
     lvcs_init();
@@ -3641,7 +4031,9 @@ void lsh_exec(const char* line)
     if (background) {
         uint32_t task_id = 0;
         int enqueue_ok = taskprio_enqueue(NULL, buf, taskprio_default_priority(), &task_id) == 0;
-        if (s_in_sum_mode) {
+        if (s_cfgsh_mode) {
+            out_append("CFG# ");
+        } else if (s_in_sum_mode) {
             out_append("SUM# ");
         } else if (s_sandbox_mode) {
             out_append("[sandbox] ");
@@ -3671,7 +4063,9 @@ void lsh_exec(const char* line)
         return;
     }
 
-    if (s_in_sum_mode) {
+    if (s_cfgsh_mode) {
+        out_append("CFG# ");
+    } else if (s_in_sum_mode) {
         out_append("SUM# ");
     } else if (s_sandbox_mode) {
         out_append("[sandbox] ");

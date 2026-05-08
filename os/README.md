@@ -102,6 +102,11 @@ commands:
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.
+- `cfgsh`, `cfg`, and `settings` provide a settings-focused shell. Enter
+  `cfgsh` to get a `CFG#` prompt, then use `mode value` commands such as
+  `awake on`, `style 2`, `layout 3`, `pane 1`, `http 2`, `boot 4`,
+  `priority 10`, `sandbox off`, or `sum on`. Outside the mode, `cfg style 2`
+  runs one setting change directly.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
   command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered

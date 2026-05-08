@@ -3,6 +3,7 @@
 #include "rtl8139.h"
 #include "drfl.h"
 #include "lard_tls.h"
+#include "lardkit.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -291,7 +292,9 @@ int net_udp_send(net_stack_t* n,
         }
         for (int i = 0; i < 6; i++) mac[i] = s->gw_mac[i];
     }
-    return ip_send_udp(n, mac, cfg.ip, dst, src_port, dst_port, payload, (uint16_t)payload_len);
+    int r = ip_send_udp(n, mac, cfg.ip, dst, src_port, dst_port, payload, (uint16_t)payload_len);
+    if (r == 0) lardkit_netwatch_record("udp-send", "packet", (int32_t)payload_len);
+    return r;
 }
 
 int net_udp_recv(net_stack_t* n,
@@ -330,6 +333,7 @@ int net_udp_recv(net_stack_t* n,
         out_src->b[3] = (uint8_t)src;
     }
     if (out_src_port) *out_src_port = ntohs(udp->src_port);
+    lardkit_netwatch_record("udp-recv", "packet", (int32_t)pay_len);
     return (int)pay_len;
 }
 
@@ -1574,6 +1578,8 @@ int net_http_request(net_stack_t* n,
     // Follow up to 1 redirect.
     net_cfg_t cfg;
     int is_post = http_method_is_post(method);
+    lardkit_netwatch_record("http", is_post ? "POST" : "GET", (int32_t)body_len);
+    lardkit_trace_event("net", is_post ? "http POST" : "http GET", (int32_t)port);
     if (net_get_cfg(n, &cfg) != 0) {
         cfg.dns = (ip4_t){{10, 0, 2, 3}};
     }
@@ -1636,6 +1642,8 @@ int net_https_request(net_stack_t* n,
 {
     net_cfg_t cfg;
     int is_post = http_method_is_post(method);
+    lardkit_netwatch_record("https", is_post ? "POST" : "GET", (int32_t)body_len);
+    lardkit_trace_event("net", is_post ? "https POST" : "https GET", (int32_t)port);
     if (net_get_cfg(n, &cfg) != 0) cfg.dns = (ip4_t){{10, 0, 2, 3}};
     if (out && out_cap) out[0] = '\0';
 

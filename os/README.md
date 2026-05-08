@@ -84,8 +84,11 @@ commands:
   from the boot option.
 - `magic command [args]` predicts a mistyped safe built-in command and executes
   the predicted command directly, for example `magic statsu`.
+- `magic dryrun command [args]` shows the same prediction without executing it.
 - `mode [status|probe|real]` inspects the CPU mode bridge or runs a controlled
   real-mode window that returns to 64-bit long mode.
+- `mode guard` performs the real-mode roundtrip with a before/after guard and
+  reports restoration state.
 - `sram` / `screenram` turns a quiet framebuffer/backbuffer rectangle into
   scratch RAM. Use `sram on` for the default corner, `sram rect x y w h` for a
   user-selected area, then `sram write offset text` and `sram read offset len`.
@@ -96,10 +99,11 @@ commands:
   environment and window-manager layer. The classic GUI stays intact, while
   EXGUI adds familiar Windows-like, Linux-like, or Mac-like panels, docks,
   launchers, task lists, and floating/tile/stack window chrome.
-- `exexgui on|off|focus|next` enables the sketch-driven extended extended GUI:
+- `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
   is opt-in, so the previous classic GUI and EXGUI layer remain available.
+  Workspaces `1..3` remember the split shell enabled/focus state.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.
@@ -116,7 +120,12 @@ commands:
   top of the existing screen checks and writes `bugreport.lardd`.
 - `bugreplay status|last|show|clear` records BugEye scan frames so screen
   overlap, clipped text, color, and render-break reports can be replayed from
-  `bugreplay.lardd`.
+  `bugreplay.lardd`; `bugreplay draw` shows them as a small GUI panel.
+- `trace on|off|show|module name` turns on LardTrace, a small event ring for
+  kernel modules, shell commands, OSLink, TaskPrio, networking, and LPack.
+- `netwatch on|off|show` records readable UDP, OSLink, and HTTP/HTTPS GET/POST
+  activity into `netwatch.lardd`.
+- `journal show|add|clear` opens the automatic `journal.lardd` event log.
 - `rollback snap|last|apply` snapshots and restores user-visible settings such as
   GUI layers, HTTP method, boot profile, assistant, theme, and task priority.
 - `trust list|allow|deny|history` exposes a user-owned permission policy map for
@@ -127,13 +136,19 @@ commands:
 - `panic capsule` or `paniccapsule show` writes `paniccapsule.lardd`, a small
   recovery bundle that joins panic-room, crashlog, BugEye, Trust, LFSDoctor,
   priority, and BootMap state.
-- `bootmap`, `oldcheck draw`, and `awakemon` show the boot phase map, a retro
-  storage-check screen, and Awakening background loader progress.
+- `postbaseline show`, `bootreplay show`, `bootmap`, `oldcheck draw`, `devmap`,
+  and `awakemon` show POST drift, boot replay, boot phase map, retro storage
+  check, hardware map, and Awakening background loader progress.
 - `ltheme list|show|use name` selects native shell theme presets or parses
-  `.ltheme` files such as `default.ltheme`, while `oschat` sends local OSLink
-  chat-style messages between OS modules.
-- `larsview open file` tracks native document browsing state, and `notes
-  show|add|clear` edits the writable `notes.lardd` document.
+  `.ltheme` files such as `default.ltheme`; `ltheme preview file.ltheme` draws
+  a small preview panel before applying.
+- `cfgprof save name` and `cfgprof load name` store/load settings bundles, while
+  `userlaw show` opens the user-right policy file.
+- `larsview open file` tracks native document browsing state, `larsapp` treats
+  `.lars` as a small app surface, and `notes show|add|clear` edits the writable
+  `notes.lardd` document.
+- `lunit run tests.lunit` runs small feature tests from the native `LUNIT 1`
+  format.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
   command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered

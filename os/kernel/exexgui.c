@@ -8,9 +8,17 @@
 #include <stdint.h>
 
 typedef struct {
+    uint32_t saved;
+    uint32_t enabled;
+    exexgui_pane_t focus;
+} exexgui_workspace_t;
+
+typedef struct {
     uint32_t enabled;
     exexgui_pane_t focus;
     uint32_t last_error;
+    uint32_t workspace;
+    exexgui_workspace_t workspaces[3];
 } exexgui_state_t;
 
 static exexgui_state_t s_exexgui;
@@ -114,6 +122,12 @@ void exexgui_init(void)
     s_exexgui.enabled = 0;
     s_exexgui.focus = EXEXGUI_PANE_GUI;
     s_exexgui.last_error = 0;
+    s_exexgui.workspace = 1u;
+    for (uint32_t i = 0; i < 3u; i++) {
+        s_exexgui.workspaces[i].saved = 1u;
+        s_exexgui.workspaces[i].enabled = 0u;
+        s_exexgui.workspaces[i].focus = (exexgui_pane_t)(i % 3u);
+    }
 }
 
 int exexgui_enable(int on)
@@ -156,6 +170,39 @@ void exexgui_focus_next(void)
 {
     s_exexgui.focus = (exexgui_pane_t)(((uint32_t)s_exexgui.focus + 1u) % 3u);
     s_exexgui.enabled = 1;
+}
+
+int exexgui_workspace_save(uint32_t id)
+{
+    if (id < 1u || id > 3u) {
+        s_exexgui.last_error = 2u;
+        return -1;
+    }
+    s_exexgui.workspaces[id - 1u].saved = 1u;
+    s_exexgui.workspaces[id - 1u].enabled = s_exexgui.enabled;
+    s_exexgui.workspaces[id - 1u].focus = s_exexgui.focus;
+    s_exexgui.last_error = 0;
+    return 0;
+}
+
+int exexgui_workspace_load(uint32_t id)
+{
+    if (id < 1u || id > 3u || !s_exexgui.workspaces[id - 1u].saved) {
+        s_exexgui.last_error = 3u;
+        return -1;
+    }
+    s_exexgui.workspace = id;
+    s_exexgui.enabled = s_exexgui.workspaces[id - 1u].enabled;
+    s_exexgui.focus = s_exexgui.workspaces[id - 1u].focus;
+    s_exexgui.last_error = 0;
+    return 0;
+}
+
+int exexgui_workspace_select(uint32_t id)
+{
+    if (exexgui_workspace_save(s_exexgui.workspace ? s_exexgui.workspace : 1u) != 0) return -1;
+    if (exexgui_workspace_load(id) != 0) return -2;
+    return 0;
 }
 
 int exexgui_layout_for(uint32_t screen_w, uint32_t screen_h, exexgui_layout_t* out)
@@ -210,6 +257,7 @@ void exexgui_info(exexgui_info_t* out)
     out->enabled = s_exexgui.enabled;
     out->focus = (uint32_t)s_exexgui.focus;
     out->last_error = s_exexgui.last_error;
+    out->workspace = s_exexgui.workspace ? s_exexgui.workspace : 1u;
     if (exexgui_layout_for(gui_syscall_get_width(), gui_syscall_get_height(), &out->layout) != 0) {
         out->layout.outer.x = out->layout.outer.y = out->layout.outer.w = out->layout.outer.h = 0;
         out->layout.gui = out->layout.outer;

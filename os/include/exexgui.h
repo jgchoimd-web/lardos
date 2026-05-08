@@ -27,6 +27,7 @@ typedef struct {
     uint32_t enabled;
     uint32_t focus;
     uint32_t last_error;
+    uint32_t workspace;
     exexgui_layout_t layout;
 } exexgui_info_t;
 
@@ -34,6 +35,9 @@ void exexgui_init(void);
 int exexgui_enable(int on);
 int exexgui_set_focus(const char* name);
 void exexgui_focus_next(void);
+int exexgui_workspace_select(uint32_t id);
+int exexgui_workspace_save(uint32_t id);
+int exexgui_workspace_load(uint32_t id);
 int exexgui_is_enabled(void);
 void exexgui_info(exexgui_info_t* out);
 const char* exexgui_focus_name(uint32_t focus);

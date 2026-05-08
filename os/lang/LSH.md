@@ -7,24 +7,30 @@
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `magic command [args]` - predict and run a mistyped safe built-in command.
+- `magic dryrun command [args]` - show the Magic prediction without executing it.
 - `magic explain` - show why the last Magic prediction executed or stopped.
-- `mode [status|probe|real]` - inspect or run the controlled real16/long64 bridge.
+- `mode [status|probe|real|guard]` - inspect or run the controlled real16/long64 bridge.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
 - `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
-- `exexgui on|off|focus|next` - sketch split GUI with GUI, terminal, and status panes.
+- `exexgui on|off|focus|next|workspace|save|load` - sketch split GUI with GUI, terminal, status panes, and workspaces 1/2/3.
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
 - `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
 - `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.
-- `bugreplay status|last|show|clear` - replay BugEye scan frames from `bugreplay.lardd`.
+- `bugreplay status|last|show|draw|clear` - replay BugEye scan frames from `bugreplay.lardd`.
+- `trace on|off|show|module name` - LardTrace event timeline for shell/modules.
+- `netwatch on|off|show|clear` - readable network, OSLink, and HTTP GET/POST watcher.
+- `journal show|add|clear` - automatic `.lardd` OS journal.
 - `rollback snap|last|apply` - settings snapshot and restore.
 - `trust list|allow|deny|history` - user-owned permission policy map and audit log.
 - `lfsdoctor scan|repair|show` - filesystem and LPST persistence health report.
 - `panic capsule` / `paniccapsule show` - write and view a recovery bundle report.
-- `bootmap` / `oldcheck draw` / `awakemon` - boot phase map, retro storage check, and Awakening monitor.
-- `ltheme list|show|use name` - native shell theme presets and `.ltheme` files.
+- `bootmap` / `bootreplay show` / `postbaseline show` / `devmap draw` / `oldcheck draw` / `awakemon` - boot, POST, device, storage, and Awakening views.
+- `ltheme list|show|preview|use name` - native shell theme presets and `.ltheme` files.
+- `cfgprof save|load name` / `userlaw show` - settings profiles and user-right policy.
 - `oschat say|send|read` - local OSLink chat-style messages.
-- `larsview open file` / `notes show|add|clear` - native document browser state and writable `notes.lardd`.
+- `larsview open file` / `larsapp open|form|run` / `notes show|add|clear` - native document/app browser state and writable `notes.lardd`.
+- `lunit run tests.lunit` - run small native feature tests.
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
 - `awake on|off|status|test` - control the default-off Awakening fast-boot mode.
 - `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.

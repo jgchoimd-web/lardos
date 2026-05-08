@@ -35,6 +35,7 @@ static void post_check(const char* name, int ok, lard_post_emit_fn emit, void* u
                        uint32_t* pass, uint32_t* fail)
 {
     if (emit) emit(ok ? "PASS" : "FAIL", name, user);
+    lardkit_post_baseline_observe(name, ok);
     if (ok) (*pass)++;
     else (*fail)++;
 }
@@ -90,6 +91,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     int gui_ok;
     pci_addr_t pci_addr;
 
+    lardkit_post_baseline_begin();
     fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
     fs_persist_detail(NULL, &generation, &bank_sectors);
     gui_ok = (gui_post_check(&gui_info) == 0);
@@ -112,6 +114,14 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: bugreplay writable", fs_open_writable("bugreplay.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: panic capsule writable", fs_open_writable("paniccapsule.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: lfs doctor writable", fs_open_writable("lfsdoctor.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: trace writable", fs_open_writable("trace.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: netwatch writable", fs_open_writable("netwatch.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: journal writable", fs_open_writable("journal.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: post baseline writable", fs_open_writable("postbaseline.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: boot replay writable", fs_open_writable("bootreplay.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: cfg profile writable", fs_open_writable("cfgprof.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: user law writable", fs_open_writable("userlaw.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
     post_check("doc: LARDD renderer", post_doc_parse("lardd_guide.lardd"), emit, user, &pass, &fail);
@@ -149,6 +159,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lcnt: dev profile", (lcontainer_profile_caps("dev") & (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL)) == (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL), emit, user, &pass, &fail);
     post_check("lil: feature forms", lil_eval_int("(begin (assert (eq (pow 2 8) 256)) (assert (eq (clamp 99 0 10) 10)) (gcd 84 30))", &lil_value) == 0 && lil_value == 6, emit, user, &pass, &fail);
 
+    lardkit_post_baseline_finish();
     if (out) {
         out->pass = pass;
         out->fail = fail;

@@ -65,7 +65,7 @@ flowchart TB
     Awake["awake fast boot tracker"]
     CrashLog["crashlog panic history"]
     LardKit["lardkit user-control suite"]
-    BugReplay["bugreplay + panic capsule + lfsdoctor"]
+    BugReplay["bugreplay + trace + journal + recovery tools"]
     LPack["lpack packages"]
     ScreenCheck["screencheck diagnostics"]
     TLS["lard_tls native TLS"]
@@ -214,13 +214,16 @@ tab and `lardd_guide.lardd` as the native document-format guide. LardOS uses
 Markdown for project documents. `kernel/lard_doc.c` renders both formats with a
 small freestanding C parser.
 
-LardKit also owns the new local recovery/audit reports:
-`bugreplay.lardd` stores recent BugEye frame summaries, `paniccapsule.lardd`
-bundles panic-room, crashlog, screen, trust, priority, filesystem, and BootMap
-state for recovery, and `lfsdoctor.lardd` records filesystem plus LPST health.
-Trust history is kept in memory as a small user-readable permission audit log.
-LPack verification runs before install, reports package hash and structural
-warnings, and captures a bounded undo snapshot for the last package install.
+LardKit also owns the local recovery/audit reports. `bugreplay.lardd` stores
+recent BugEye frame summaries and `bugreplay draw` renders a small replay
+panel. `trace.lardd`, `netwatch.lardd`, and `journal.lardd` capture ordered
+module, network, and OS journal events. `postbaseline.lardd` stores the last
+POST check set so the next POST can report changes/regressions. `bootreplay.lardd`
+records a detailed boot timeline, `paniccapsule.lardd` bundles recovery state,
+and `lfsdoctor.lardd` records filesystem plus LPST health. Trust history is kept
+in memory as a user-readable permission audit log. LPack verification runs
+before install, reports package hash and structural warnings, and captures a
+bounded undo snapshot for the last package install.
 
 `gui.c` also owns ScreenRAM, an optional scratch-memory layer backed by a
 reserved framebuffer/backbuffer rectangle. The default is a quiet bottom-right

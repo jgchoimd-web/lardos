@@ -32,6 +32,7 @@
 #include "crashlog.h"
 #include "version.h"
 #include "io.h"
+#include "pci.h"
 #include "string.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -255,7 +256,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "larsview", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -395,6 +396,37 @@ static void cmd_magic(const char* args)
         out_append("\nreason=");
         out_append(info.reason);
         out_append("\n");
+        return;
+    }
+    if (magic_cmd_equals(cmd, "dryrun")) {
+        char dry[64];
+        uint32_t di = 0;
+        uint32_t rp = 0;
+        while (rest[rp] == ' ' || rest[rp] == '\t') rp++;
+        while (rest[rp] && rest[rp] != ' ' && rest[rp] != '\t' && di + 1u < sizeof(dry)) dry[di++] = rest[rp++];
+        dry[di] = '\0';
+        if (!dry[0]) {
+            out_append("Usage: magic dryrun command [args]\n");
+            return;
+        }
+        const magic_cmd_entry_t* exact_dry = magic_find_exact(dry);
+        const magic_cmd_entry_t* pick_dry = exact_dry ? exact_dry : magic_predict(dry);
+        if (!pick_dry || !pick_dry->magic_safe) {
+            lardkit_magic_record(dry, pick_dry ? pick_dry->name : "", 0, "dryrun found no safe executable prediction");
+            out_append("magic dryrun: would not execute ");
+            out_append(dry);
+            out_append("\n");
+            return;
+        }
+        lardkit_magic_record(dry, pick_dry->name, 0,
+                             exact_dry ? "dryrun exact safe command" : "dryrun edit-distance safe command prediction");
+        out_append("magic dryrun: ");
+        out_append(dry);
+        if (!magic_cmd_equals(dry, pick_dry->name)) {
+            out_append(" -> ");
+            out_append(pick_dry->name);
+        }
+        out_append(" (not executed)\n");
         return;
     }
     const magic_cmd_entry_t* exact = magic_find_exact(cmd);
@@ -1121,6 +1153,19 @@ static void cmd_selftest(const char* args)
     out_append(", gen=");
     out_append_u32(post.storage_generation);
     out_append("\n");
+    {
+        lardkit_post_baseline_info_t bi;
+        lardkit_post_baseline_info(&bi);
+        out_append("POST baseline: previous=");
+        out_append_u32(bi.previous_count);
+        out_append(" current=");
+        out_append_u32(bi.current_count);
+        out_append(" changes=");
+        out_append_u32(bi.changes);
+        out_append(" regressions=");
+        out_append_u32(bi.regressions);
+        out_append("\n");
+    }
 }
 
 static void cmd_ver(const char* args)
@@ -1137,18 +1182,20 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode cfgsh buddy bugeye bugreplay rollback trust oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap crashlog panicroom cls\n");
+    out_append("  help control status release ver post selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust trace netwatch journal oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
-    out_append("  lpack info|list|verify|install file.lpack; lpack undo last\n");
+    out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
-    out_append("  exexgui on|off|focus gui|term|info|next|test\n");
+    out_append("  exexgui on|off|focus gui|term|info|next|workspace 1|save 1|load 1|test\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
     out_append("  bugreplay status|last|show      replay last BugEye screen-health frames\n");
     out_append("  rollback snap|last|apply        save/restore user-visible settings\n");
     out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
-    out_append("  bootmap oldcheck lfsdoctor awakemon boot map, storage doctor, awake monitor\n");
+    out_append("  bootmap bootreplay oldcheck lfsdoctor devmap awakemon boot/device maps and storage doctor\n");
+    out_append("  trace on|show|module gui, netwatch on|show, journal show\n");
+    out_append("  lunit run tests.lunit, cfgprof save name/load name, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open file              native LARS/LARDD browser state\n");
@@ -1186,10 +1233,14 @@ static void cmd_control(const char* args)
     out_append("Start points:\n");
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
+    out_append("  magic dryrun statsu show what magic would execute without running it\n");
     out_append("  magic explain       show why magic executed or refused its last prediction\n");
-    out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
+    out_append("  mode guard          guarded real16 <-> long64 roundtrip with restore check\n");
+    out_append("  trace on            record shell/module/oslink/taskprio events in order\n");
+    out_append("  netwatch on         watch readable packet/oslink/HTTP activity\n");
+    out_append("  journal show        view automatic LARDD system journal\n");
     out_append("  bugeye scan         scan for visible bugs and write bugreport.lardd\n");
-    out_append("  bugreplay show      render the last BugEye replay frames from bugreplay.lardd\n");
+    out_append("  bugreplay draw      draw the last BugEye replay frames as a panel\n");
     out_append("  rollback snap       snapshot settings before experiments\n");
     out_append("  trust list          inspect user-controlled permission policy\n");
     out_append("  trust history       audit permission allow/deny changes\n");
@@ -1205,10 +1256,15 @@ static void cmd_control(const char* args)
     out_append("  awake on            enable fast screen boot for next boot\n");
     out_append("  awake off           return next boot to normal and stop loader\n");
     out_append("  bootmap             show the boot structure as numbered phases\n");
+    out_append("  bootreplay show     replay a detailed boot timeline from bootreplay.lardd\n");
+    out_append("  devmap draw         draw PCI/storage/network device map\n");
     out_append("  oldcheck draw       draw the retro storage check map\n");
     out_append("  lfsdoctor scan      diagnose writable files and LPST persistence state\n");
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
-    out_append("  ltheme list         list native theme presets\n");
+    out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
+    out_append("  cfgprof save safe-ui save/load a bundle of settings\n");
+    out_append("  userlaw show        inspect user-right policy principles\n");
+    out_append("  lunit run tests.lunit run small OS feature tests\n");
     out_append("  notes add text      append to notes.lardd\n");
     out_append("  crashlog show       inspect panic and diagnostic history\n");
     out_append("  lpack verify sample.lpack inspect package integrity before install\n");
@@ -1473,6 +1529,25 @@ static void cmd_mode(const char* args)
     if (!args) args = "";
     cpu_mode_info(&info);
 
+    if (args_word_is(args, "guard")) {
+        uint32_t before = info.roundtrip_count;
+        out_append("mode guard: checking bridge before/after real16 window...\n");
+        if (info.bridge_ready && cpu_mode_roundtrip_probe() == 0) {
+            cpu_mode_info(&info);
+            out_append("mode guard: OK, restored ");
+            out_append(cpu_mode_current_name());
+            out_append(" roundtrips=");
+            out_append_u32(info.roundtrip_count - before);
+            out_append("\n");
+        } else {
+            cpu_mode_info(&info);
+            out_append("mode guard: blocked or restored previous long64 state, err=");
+            out_append_u32(info.last_error);
+            out_append("\n");
+        }
+        return;
+    }
+
     if (args_word_is(args, "probe") || args_word_is(args, "real")) {
         out_append("mode: entering a controlled real16 window and returning to long64...\n");
         if (cpu_mode_roundtrip_probe() == 0) {
@@ -1487,7 +1562,7 @@ static void cmd_mode(const char* args)
     }
 
     if (args_has_text(args) && !args_word_is(args, "status")) {
-        out_append("Usage: mode [status|probe|real]\n");
+        out_append("Usage: mode [status|probe|real|guard]\n");
         return;
     }
 
@@ -1787,6 +1862,8 @@ static void cmd_exexgui_status(void)
     out_append(info.enabled ? "on" : "off");
     out_append(" focus=");
     out_append(exexgui_focus_name(info.focus));
+    out_append(" workspace=");
+    out_append_u32(info.workspace);
     out_append(" gui=");
     out_append_u32(info.layout.gui.w);
     out_append("x");
@@ -1838,11 +1915,38 @@ static void cmd_exexgui(const char* args)
         cmd_exexgui_status();
         return;
     }
+    if (strcmp(sub, "workspace") == 0 || strcmp(sub, "ws") == 0) {
+        uint64_t id;
+        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_select((uint32_t)id) != 0) {
+            out_append("Usage: exexgui workspace 1|2|3\n");
+            return;
+        }
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "save") == 0) {
+        uint64_t id;
+        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_save((uint32_t)id) != 0) {
+            out_append("Usage: exexgui save 1|2|3\n");
+            return;
+        }
+        out_append("exexgui: workspace saved.\n");
+        return;
+    }
+    if (strcmp(sub, "load") == 0) {
+        uint64_t id;
+        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_load((uint32_t)id) != 0) {
+            out_append("Usage: exexgui load 1|2|3\n");
+            return;
+        }
+        cmd_exexgui_status();
+        return;
+    }
     if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
         out_append(exexgui_selftest() == 0 ? "exexgui: selftest OK\n" : "exexgui: selftest failed\n");
         return;
     }
-    out_append("Usage: exexgui on|off|status|focus|next|test\n");
+    out_append("Usage: exexgui on|off|status|focus|next|workspace 1|save 1|load 1|test\n");
 }
 
 static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
@@ -2114,7 +2218,7 @@ static void cmd_lpack_op(const char* op, const char* args)
     uint32_t size;
     if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
         lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
-        out_append("Usage: lpack info|list|verify|install [drive:]file.lpack\n");
+        out_append("Usage: lpack info|list|verify|checksum|install [drive:]file.lpack\n");
         return;
     }
     if (strcmp(op, "info") == 0) {
@@ -2125,7 +2229,7 @@ static void cmd_lpack_op(const char* op, const char* args)
         cmd_lpack_show(file_arg, data, size, 1);
         return;
     }
-    if (strcmp(op, "verify") == 0 || strcmp(op, "check") == 0) {
+    if (strcmp(op, "verify") == 0 || strcmp(op, "check") == 0 || strcmp(op, "checksum") == 0) {
         lpack_verify_info_t info;
         int r = lpack_verify(data, size, &info);
         out_append("lpack verify ");
@@ -2168,7 +2272,7 @@ static void cmd_lpack(const char* args)
     if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
         lpack_undo_info_t undo;
         lpack_undo_info(&undo);
-        out_append("Usage: lpack info|list|verify|install file.lpack | lpack undo last | lpack test\n");
+        out_append("Usage: lpack info|list|verify|checksum|install file.lpack | lpack undo last | lpack test\n");
         out_append("undo=");
         out_append(undo.ready ? "ready" : "empty");
         out_append(" files=");
@@ -2516,12 +2620,16 @@ static void cmd_bugreplay(const char* args)
         cmd_larddoc("bugreplay.lardd", "Usage: bugreplay show");
         return;
     }
+    if (strcmp(sub, "draw") == 0) {
+        out_append(lardkit_bugreplay_draw() == 0 ? "bugreplay: drew frame log panel.\n" : "bugreplay: draw failed.\n");
+        return;
+    }
     if (strcmp(sub, "clear") == 0) {
         lardkit_bugreplay_clear();
         out_append("bugreplay: cleared.\n");
         return;
     }
-    out_append("Usage: bugreplay status|last|show|write|clear\n");
+    out_append("Usage: bugreplay status|last|show|draw|write|clear\n");
 }
 
 static void cmd_rollback_status(void)
@@ -2868,6 +2976,364 @@ static void cmd_lfsdoctor(const char* args)
     out_append("Usage: lfsdoctor status|scan|repair|show\n");
 }
 
+static void cmd_trace(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        lardkit_trace_info_t info;
+        lardkit_trace_info(&info);
+        out_append("LardTrace ");
+        out_append(info.enabled ? "on" : "off");
+        out_append(" events=");
+        out_append_u32(info.count);
+        out_append(" next=");
+        out_append_u32(info.next_seq);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "on") == 0) {
+        lardkit_trace_enable(1);
+        out_append("trace: on\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        lardkit_trace_enable(0);
+        out_append("trace: off\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        lardkit_trace_clear();
+        out_append("trace: cleared\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "log") == 0) {
+        (void)lardkit_trace_write();
+        cmd_larddoc("trace.lardd", "Usage: trace show");
+        return;
+    }
+    if (strcmp(sub, "module") == 0 || strcmp(sub, "mod") == 0) {
+        char module[32];
+        uint32_t count = lardkit_trace_count();
+        if (vcs_read_word(&args, module, sizeof(module)) != 0) {
+            out_append("Usage: trace module gui|shell|oslink|taskprio\n");
+            return;
+        }
+        for (uint32_t i = 0; i < count; i++) {
+            lardkit_trace_entry_t e;
+            if (lardkit_trace_at(i, &e) != 0 || strcmp(e.module, module) != 0) continue;
+            out_append("#");
+            out_append_u32(e.seq);
+            out_append(" ");
+            out_append(e.module);
+            out_append(" ");
+            out_append(e.text);
+            out_append(" ");
+            out_append_i32(e.value);
+            out_append("\n");
+        }
+        return;
+    }
+    out_append("Usage: trace on|off|status|show|module name|clear\n");
+}
+
+static void cmd_netwatch(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        lardkit_netwatch_info_t info;
+        lardkit_netwatch_info(&info);
+        out_append("NetWatch ");
+        out_append(info.enabled ? "on" : "off");
+        out_append(" events=");
+        out_append_u32(info.count);
+        out_append(" sent=");
+        out_append_u32(info.sent);
+        out_append(" recv=");
+        out_append_u32(info.received);
+        out_append(" http=");
+        out_append_u32(info.http);
+        out_append(" oslink=");
+        out_append_u32(info.oslink);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "on") == 0) {
+        lardkit_netwatch_enable(1);
+        out_append("netwatch: on\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        lardkit_netwatch_enable(0);
+        out_append("netwatch: off\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        lardkit_netwatch_clear();
+        out_append("netwatch: cleared\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "log") == 0) {
+        (void)lardkit_netwatch_write();
+        cmd_larddoc("netwatch.lardd", "Usage: netwatch show");
+        return;
+    }
+    out_append("Usage: netwatch on|off|status|show|clear\n");
+}
+
+static void cmd_journal(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        cmd_larddoc("journal.lardd", "Usage: journal show|clear|add text");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        out_append(lardkit_journal_clear() == 0 ? "journal: cleared\n" : "journal: clear failed\n");
+        return;
+    }
+    if (strcmp(sub, "add") == 0 || strcmp(sub, "write") == 0) {
+        while (*args == ' ' || *args == '\t') args++;
+        lardkit_journal_event("user", args && args[0] ? args : "manual event");
+        out_append("journal: added\n");
+        return;
+    }
+    out_append("Usage: journal show|clear|add text\n");
+}
+
+static void cmd_bootreplay(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        (void)lardkit_bootreplay_write();
+        cmd_larddoc("bootreplay.lardd", "Usage: bootreplay show");
+        return;
+    }
+    if (strcmp(sub, "write") == 0 || strcmp(sub, "capture") == 0) {
+        out_append(lardkit_bootreplay_write() == 0 ? "bootreplay: wrote bootreplay.lardd\n" : "bootreplay: write failed\n");
+        return;
+    }
+    out_append("Usage: bootreplay show|write\n");
+}
+
+static void cmd_postbaseline(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        cmd_larddoc("postbaseline.lardd", "Usage: postbaseline show");
+        return;
+    }
+    out_append("Usage: postbaseline show\n");
+}
+
+static void devmap_draw(void)
+{
+    gui_syscall_fill_rect(32, 72, 430, 180, 0xFF081018u);
+    gui_syscall_draw_text(44, 84, "DEVICE MAP", 0xFFFFFFFFu, 0xFF081018u);
+    gui_syscall_fill_rect(44, 112, 84, 28, 0xFF4DE1C1u);
+    gui_syscall_draw_text(50, 122, "PCI", 0xFF081018u, 0xFF4DE1C1u);
+    gui_syscall_fill_rect(144, 112, 110, 28, 0xFFFFD84Au);
+    gui_syscall_draw_text(150, 122, "STORAGE", 0xFF081018u, 0xFFFFD84Au);
+    gui_syscall_fill_rect(270, 112, 150, 28, 0xFF72D6FFu);
+    gui_syscall_draw_text(276, 122, "NETWORK", 0xFF081018u, 0xFF72D6FFu);
+    gui_syscall_draw_text(44, 158, "rtl8139 / piix3 / LPST / OSLink", 0xFFFFFFFFu, 0xFF081018u);
+}
+
+static void cmd_devmap(const char* args)
+{
+    pci_addr_t a;
+    uint32_t available = 0, dirty = 0, lba = 0, sectors = 0;
+    int last = 0;
+    const char* driver = NULL;
+    oslink_info_t oi;
+    if (args_word_is(args, "draw")) devmap_draw();
+    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
+    oslink_info(&oi);
+    out_append("Device Map\n");
+    out_append("pci rtl8139=");
+    out_append(pci_find_device(0x10ECu, 0x8139u, &a) == 0 ? "present" : "missing");
+    out_append(" piix3ide=");
+    out_append(pci_find_device(0x8086u, 0x7010u, &a) == 0 ? "present" : "missing");
+    out_append("\nstorage=");
+    out_append(available ? "online" : "offline");
+    out_append(" driver=");
+    out_append(driver ? driver : "none");
+    out_append(" dirty=");
+    out_append(dirty ? "yes" : "no");
+    out_append(" last=");
+    out_append_i32(last);
+    out_append("\noslink=");
+    out_append(oi.ready ? "ready" : "offline");
+    out_append(" peers=");
+    out_append_u32(oi.peer_count);
+    out_append(" inbox=");
+    out_append_u32(oi.inbox_count);
+    out_append("\n");
+}
+
+static void cmd_cfgprof(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "list") == 0 || strcmp(sub, "status") == 0) {
+        uint32_t count = lardkit_cfgprof_count();
+        out_append("CFG profiles=");
+        out_append_u32(count);
+        out_append("\n");
+        for (uint32_t i = 0; i < count; i++) {
+            lardkit_cfg_profile_t p;
+            if (lardkit_cfgprof_at(i, &p) != 0) continue;
+            out_append("  ");
+            out_append(p.name);
+            out_append(" boot=");
+            out_append(p.boot_profile);
+            out_append(" prio=");
+            out_append_i32(p.task_default);
+            out_append("\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "save") == 0) {
+        char name[32];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0 || lardkit_cfgprof_save(name) != 0) {
+            out_append("Usage: cfgprof save name\n");
+            return;
+        }
+        out_append("cfgprof: saved\n");
+        return;
+    }
+    if (strcmp(sub, "load") == 0) {
+        char name[32];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0 || lardkit_cfgprof_load(name) != 0) {
+            out_append("Usage: cfgprof load name\n");
+            return;
+        }
+        out_append("cfgprof: loaded\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0) {
+        (void)lardkit_cfgprof_write();
+        cmd_larddoc("cfgprof.lardd", "Usage: cfgprof show");
+        return;
+    }
+    out_append("Usage: cfgprof list|save name|load name|show\n");
+}
+
+static void cmd_userlaw(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        cmd_larddoc("userlaw.lardd", "Usage: userlaw show|reset|check");
+        return;
+    }
+    if (strcmp(sub, "reset") == 0) {
+        out_append(lardkit_userlaw_reset() == 0 ? "userlaw: reset\n" : "userlaw: reset failed\n");
+        return;
+    }
+    if (strcmp(sub, "check") == 0) {
+        out_append(lardkit_userlaw_check() == 0 ? "userlaw: valid\n" : "userlaw: invalid\n");
+        return;
+    }
+    out_append("Usage: userlaw show|reset|check\n");
+}
+
+static int lunit_prefix(const char* s, const char* end, const char* pfx, const char** rest)
+{
+    while (s < end && *pfx && *s == *pfx) {
+        s++;
+        pfx++;
+    }
+    if (*pfx) return 0;
+    if (rest) *rest = s;
+    return 1;
+}
+
+static void cmd_lunit(const char* args)
+{
+    char sub[16];
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    uint32_t pass = 0, fail = 0;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 || strcmp(sub, "run") != 0 ||
+        vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: lunit run tests.lunit\n");
+        return;
+    }
+    const char* p = (const char*)data;
+    const char* end = p + size;
+    if (size < 8u || data[0] != 'L' || data[1] != 'U' || data[2] != 'N' || data[3] != 'I' || data[4] != 'T') {
+        out_append("lunit: bad header\n");
+        return;
+    }
+    while (p < end) {
+        const char* ls = p;
+        const char* le;
+        const char* rest;
+        while (p < end && *p != '\n' && *p != '\r') p++;
+        le = p;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+        if (lunit_prefix(ls, le, "CHECK file ", &rest)) {
+            char name[64];
+            uint32_t i = 0;
+            while (rest < le && i + 1u < sizeof(name)) name[i++] = *rest++;
+            name[i] = '\0';
+            if (fs_open(name)) pass++; else fail++;
+        } else if (lunit_prefix(ls, le, "CHECK writable ", &rest)) {
+            char name[64];
+            uint32_t i = 0;
+            while (rest < le && i + 1u < sizeof(name)) name[i++] = *rest++;
+            name[i] = '\0';
+            if (fs_open_writable(name)) pass++; else fail++;
+        } else if (lunit_prefix(ls, le, "CHECK command ", &rest)) {
+            char name[64];
+            uint32_t i = 0;
+            while (rest < le && i + 1u < sizeof(name)) name[i++] = *rest++;
+            name[i] = '\0';
+            if (magic_find_exact(name)) pass++; else fail++;
+        }
+    }
+    out_append("lunit: ");
+    out_append_u32(pass);
+    out_append(" passed, ");
+    out_append_u32(fail);
+    out_append(" failed\n");
+}
+
+static void cmd_larsapp(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "open") == 0 || strcmp(sub, "show") == 0) {
+        cmd_larddoc(args && args[0] ? args : "lardos.lars", "Usage: larsapp open file.lars");
+        return;
+    }
+    if (strcmp(sub, "form") == 0 || strcmp(sub, "controls") == 0) {
+        cmd_larsform(args);
+        return;
+    }
+    if (strcmp(sub, "run") == 0 || strcmp(sub, "act") == 0) {
+        cmd_larsact(args);
+        return;
+    }
+    out_append("Usage: larsapp open file.lars | larsapp form file.lars | larsapp run file.lars index\n");
+}
+
 static void cmd_ltheme_status(void)
 {
     lardkit_theme_info_t info;
@@ -2933,6 +3399,21 @@ static void cmd_ltheme(const char* args)
         out_append("\n");
         return;
     }
+    if (strcmp(sub, "preview") == 0) {
+        const FsFile* f;
+        lardkit_theme_info_t info;
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: ltheme preview file.ltheme\n");
+            return;
+        }
+        f = fs_open(name);
+        if (!f || lardkit_theme_parse(f->data, f->size, &info) != 0) {
+            out_append("ltheme: not a LTHEME file.\n");
+            return;
+        }
+        out_append(lardkit_theme_preview_draw(&info) == 0 ? "ltheme: preview drawn.\n" : "ltheme: preview failed.\n");
+        return;
+    }
     if (strcmp(sub, "use") == 0 || strcmp(sub, "set") == 0) {
         const FsFile* f;
         if (vcs_read_word(&args, name, sizeof(name)) != 0) {
@@ -2949,7 +3430,7 @@ static void cmd_ltheme(const char* args)
         cmd_ltheme_status();
         return;
     }
-    out_append("Usage: ltheme status|list|show file|use name\n");
+    out_append("Usage: ltheme status|list|show file|preview file|use name\n");
 }
 
 static void cmd_awakemon(const char* args)
@@ -4853,6 +5334,11 @@ static int run_lsh_cmd(const char* name, const char* argv)
 static void parse_and_run(const char* cmd, const char* args)
 {
     if (!cmd || !cmd[0]) return;
+    lardkit_trace_event("shell", cmd, 0);
+    if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
+    if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
+        strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
+    if (strcmp(cmd, "exgui") == 0 || strcmp(cmd, "exexgui") == 0 || strcmp(cmd, "ltheme") == 0) lardkit_trace_event("gui", cmd, 0);
 
     if (s_cfgsh_mode) {
         if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "quit") == 0 || strcmp(cmd, "exitcfg") == 0) {
@@ -4896,6 +5382,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "exitcfg") == 0) { s_cfgsh_mode = 0; out_append("CFGSH OFF.\n"); return; }
     if (strcmp(cmd, "buddy") == 0 || strcmp(cmd, "assistant") == 0 || strcmp(cmd, "lardbuddy") == 0) { cmd_buddy(args); return; }
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
+    if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
+    if (strcmp(cmd, "netwatch") == 0) { cmd_netwatch(args); return; }
+    if (strcmp(cmd, "journal") == 0) { cmd_journal(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "oschat") == 0) { cmd_oschat(args); return; }
     if (strcmp(cmd, "exgui") == 0) { cmd_exgui(args); return; }
@@ -4908,6 +5397,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "tasktop") == 0) { cmd_tasktop(args); return; }
     if (strcmp(cmd, "bootprof") == 0) { cmd_bootprof(args); return; }
     if (strcmp(cmd, "bootmap") == 0) { cmd_bootmap(args); return; }
+    if (strcmp(cmd, "bootreplay") == 0) { cmd_bootreplay(args); return; }
+    if (strcmp(cmd, "postbaseline") == 0 || strcmp(cmd, "postbase") == 0) { cmd_postbaseline(args); return; }
+    if (strcmp(cmd, "devmap") == 0) { cmd_devmap(args); return; }
     if (strcmp(cmd, "crashlog") == 0) { cmd_crashlog(args); return; }
     if (strcmp(cmd, "panicroom") == 0 || strcmp(cmd, "panic") == 0) { cmd_panicroom(args); return; }
     if (strcmp(cmd, "paniccapsule") == 0) { cmd_paniccapsule(args); return; }
@@ -4917,6 +5409,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "bugreplay") == 0) { cmd_bugreplay(args); return; }
     if (strcmp(cmd, "oldcheck") == 0) { cmd_oldcheck(args); return; }
     if (strcmp(cmd, "lfsdoctor") == 0) { cmd_lfsdoctor(args); return; }
+    if (strcmp(cmd, "cfgprof") == 0) { cmd_cfgprof(args); return; }
+    if (strcmp(cmd, "userlaw") == 0) { cmd_userlaw(args); return; }
     if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
     if (strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) { cmd_prio(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
@@ -4926,13 +5420,16 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lardd") == 0) { cmd_larddoc(args, "Usage: lardd [drive:]file.lardd"); return; }
     if (strcmp(cmd, "doc") == 0) { cmd_larddoc(args, "Usage: doc [drive:]file.lars|file.lardd"); return; }
     if (strcmp(cmd, "larsview") == 0) { cmd_larsview(args); return; }
+    if (strcmp(cmd, "larsapp") == 0) { cmd_larsapp(args); return; }
     if (strcmp(cmd, "larddnotes") == 0 || strcmp(cmd, "notes") == 0) { cmd_larddnotes(args); return; }
     if (strcmp(cmd, "larsform") == 0) { cmd_larsform(args); return; }
     if (strcmp(cmd, "larsact") == 0) { cmd_larsact(args); return; }
+    if (strcmp(cmd, "lunit") == 0) { cmd_lunit(args); return; }
     if (strcmp(cmd, "lpack") == 0) { cmd_lpack(args); return; }
     if (strcmp(cmd, "lpackls") == 0) { cmd_lpack_op("list", args); return; }
     if (strcmp(cmd, "lpackinstall") == 0) { cmd_lpack_op("install", args); return; }
     if (strcmp(cmd, "lpackverify") == 0) { cmd_lpack_op("verify", args); return; }
+    if (strcmp(cmd, "lpackchecksum") == 0) { cmd_lpack_op("checksum", args); return; }
     if (strcmp(cmd, "lpackundo") == 0) { cmd_lpack("undo"); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }

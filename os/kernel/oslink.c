@@ -1,5 +1,6 @@
 #include "oslink.h"
 
+#include "lardkit.h"
 #include "taskprio.h"
 
 #include <stddef.h>
@@ -192,6 +193,8 @@ static void queue_msg(ip4_t src, const char* src_node, const char* channel,
     scopy(m->text, sizeof(m->text), text);
     s_oslink.inbox_tail = (s_oslink.inbox_tail + 1u) % OSLINK_INBOX_DEPTH;
     s_oslink.inbox_count++;
+    lardkit_trace_event("oslink", "queue", type);
+    lardkit_netwatch_record("oslink", channel && channel[0] ? channel : "inbox", (int32_t)seq);
 }
 
 static int build_packet(uint8_t type, uint32_t seq, const char* text, uint8_t* out, uint32_t cap)
@@ -255,6 +258,8 @@ static int send_type(ip4_t dst, uint8_t type, const char* text)
     if (r == 0) {
         s_oslink.sent++;
         s_oslink.last_error = 0;
+        lardkit_trace_event("oslink", "send", type);
+        lardkit_netwatch_record("oslink", "send", (int32_t)type);
     } else {
         s_oslink.last_error = 2;
     }

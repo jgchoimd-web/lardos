@@ -1,6 +1,7 @@
 #include "lpack.h"
 
 #include "fs.h"
+#include "lardkit.h"
 
 #include <stdint.h>
 
@@ -239,6 +240,10 @@ int lpack_verify(const uint8_t* data, uint32_t len, lpack_verify_info_t* out)
     if (info.files == 0u) info.errors++;
     if (!saw_end) info.warnings++;
     if (out) *out = info;
+    if (info.valid) {
+        lardkit_trace_event("lpack", "verify", (int32_t)info.hash);
+        lardkit_journal_event("lpack", info.errors ? "verify failed" : "verify ok");
+    }
     return info.errors ? -2 : 0;
 }
 
@@ -251,6 +256,7 @@ int lpack_install(const uint8_t* data, uint32_t len)
     int installed = 0;
     lpack_verify_info_t vi;
     if (lpack_verify(data, len, &vi) != 0) return -1;
+    lardkit_trace_event("lpack", "install", (int32_t)vi.hash);
     undo_reset();
     while (next_line(&p, end, &ls, &le)) {
         const char* v;
@@ -295,6 +301,7 @@ int lpack_install(const uint8_t* data, uint32_t len)
             p = q;
         }
     }
+    if (installed > 0) lardkit_journal_event("lpack", "installed package");
     return installed;
 }
 
@@ -311,6 +318,7 @@ int lpack_undo_last(void)
         restored++;
     }
     undo_reset();
+    if (restored) lardkit_journal_event("lpack", "undo restored files");
     return (int)restored;
 }
 

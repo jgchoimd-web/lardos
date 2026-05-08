@@ -9,6 +9,10 @@
 #define LARDKIT_TEXT_MAX 159u
 #define LARDKIT_BUGREPLAY_MAX 8u
 #define LARDKIT_TRUST_HISTORY_MAX 16u
+#define LARDKIT_TRACE_MAX 32u
+#define LARDKIT_NETWATCH_MAX 16u
+#define LARDKIT_POST_BASELINE_MAX 64u
+#define LARDKIT_CFGPROF_MAX 4u
 
 #define LARDKIT_TRUST_FS       0x01u
 #define LARDKIT_TRUST_SCREEN   0x02u
@@ -64,6 +68,60 @@ typedef struct {
     uint32_t allowed;
     uint32_t caps_after;
 } lardkit_trust_history_entry_t;
+
+typedef struct {
+    uint32_t seq;
+    uint32_t tick;
+    char module[LARDKIT_NAME_MAX + 1u];
+    char text[LARDKIT_TEXT_MAX + 1u];
+    int32_t value;
+} lardkit_trace_entry_t;
+
+typedef struct {
+    uint32_t enabled;
+    uint32_t count;
+    uint32_t next_seq;
+} lardkit_trace_info_t;
+
+typedef struct {
+    uint32_t seq;
+    char kind[LARDKIT_NAME_MAX + 1u];
+    char detail[LARDKIT_TEXT_MAX + 1u];
+    int32_t value;
+} lardkit_netwatch_entry_t;
+
+typedef struct {
+    uint32_t enabled;
+    uint32_t count;
+    uint32_t sent;
+    uint32_t received;
+    uint32_t http;
+    uint32_t oslink;
+} lardkit_netwatch_info_t;
+
+typedef struct {
+    uint32_t has_previous;
+    uint32_t previous_count;
+    uint32_t current_count;
+    uint32_t changes;
+    uint32_t regressions;
+} lardkit_post_baseline_info_t;
+
+typedef struct {
+    uint32_t valid;
+    char name[LARDKIT_NAME_MAX + 1u];
+    uint32_t exgui_enabled;
+    uint32_t exgui_style;
+    uint32_t exgui_layout;
+    uint32_t exexgui_enabled;
+    uint32_t exexgui_focus;
+    uint32_t buddy_enabled;
+    uint32_t http_post;
+    int32_t task_default;
+    char boot_profile[LARDKIT_NAME_MAX + 1u];
+    uint32_t awake_enabled;
+    uint32_t theme;
+} lardkit_cfg_profile_t;
 
 typedef struct {
     uint32_t count;
@@ -123,7 +181,34 @@ int lardkit_bugeye_write_report(void);
 uint32_t lardkit_bugreplay_count(void);
 int lardkit_bugreplay_at(uint32_t idx, lardkit_bugreplay_frame_t* out);
 int lardkit_bugreplay_write(void);
+int lardkit_bugreplay_draw(void);
 void lardkit_bugreplay_clear(void);
+
+void lardkit_trace_enable(int on);
+void lardkit_trace_event(const char* module, const char* text, int32_t value);
+void lardkit_trace_info(lardkit_trace_info_t* out);
+uint32_t lardkit_trace_count(void);
+int lardkit_trace_at(uint32_t idx, lardkit_trace_entry_t* out);
+void lardkit_trace_clear(void);
+int lardkit_trace_write(void);
+
+void lardkit_netwatch_enable(int on);
+void lardkit_netwatch_record(const char* kind, const char* detail, int32_t value);
+void lardkit_netwatch_info(lardkit_netwatch_info_t* out);
+uint32_t lardkit_netwatch_count(void);
+int lardkit_netwatch_at(uint32_t idx, lardkit_netwatch_entry_t* out);
+void lardkit_netwatch_clear(void);
+int lardkit_netwatch_write(void);
+
+void lardkit_journal_event(const char* area, const char* text);
+int lardkit_journal_clear(void);
+
+void lardkit_post_baseline_begin(void);
+void lardkit_post_baseline_observe(const char* name, int ok);
+void lardkit_post_baseline_finish(void);
+void lardkit_post_baseline_info(lardkit_post_baseline_info_t* out);
+
+int lardkit_bootreplay_write(void);
 
 int lardkit_snapshot(const char* label);
 int lardkit_rollback_apply(void);
@@ -154,6 +239,13 @@ int lardkit_theme_use(const char* name);
 int lardkit_theme_parse(const uint8_t* data, uint32_t len, lardkit_theme_info_t* out);
 int lardkit_theme_use_data(const uint8_t* data, uint32_t len);
 void lardkit_theme_info(lardkit_theme_info_t* out);
+int lardkit_theme_preview_draw(const lardkit_theme_info_t* theme);
+
+int lardkit_cfgprof_save(const char* name);
+int lardkit_cfgprof_load(const char* name);
+uint32_t lardkit_cfgprof_count(void);
+int lardkit_cfgprof_at(uint32_t idx, lardkit_cfg_profile_t* out);
+int lardkit_cfgprof_write(void);
 
 void lardkit_magic_record(const char* input, const char* predicted, int executed, const char* reason);
 void lardkit_magic_info(lardkit_magic_info_t* out);
@@ -169,5 +261,8 @@ int lardkit_notes_append(const char* text);
 int lardkit_panic_capsule_write(void);
 int lardkit_lfsdoctor_scan(int repair);
 void lardkit_lfsdoctor_info(lardkit_lfsdoctor_info_t* out);
+
+int lardkit_userlaw_reset(void);
+int lardkit_userlaw_check(void);
 
 int lardkit_selftest(void);

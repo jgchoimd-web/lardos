@@ -103,6 +103,67 @@ static const uint8_t lfsdoctor_init[] =
 static uint8_t ram_lfsdoctor_buf[LFSDOCTOR_CAP];
 static FsWritableFile ram_lfsdoctor = { "lfsdoctor.lardd", ram_lfsdoctor_buf, 0, LFSDOCTOR_CAP };
 
+#define TRACE_CAP 4096u
+static const uint8_t trace_init[] =
+    "LARDD 1\n"
+    "TITLE LardTrace\n"
+    "TEXT Trace is off. Use trace on.\n";
+static uint8_t ram_trace_buf[TRACE_CAP];
+static FsWritableFile ram_trace = { "trace.lardd", ram_trace_buf, 0, TRACE_CAP };
+
+#define NETWATCH_CAP 2048u
+static const uint8_t netwatch_init[] =
+    "LARDD 1\n"
+    "TITLE NetWatch\n"
+    "TEXT NetWatch is off. Use netwatch on.\n";
+static uint8_t ram_netwatch_buf[NETWATCH_CAP];
+static FsWritableFile ram_netwatch = { "netwatch.lardd", ram_netwatch_buf, 0, NETWATCH_CAP };
+
+#define JOURNAL_CAP 4096u
+static const uint8_t journal_init[] =
+    "LARDD 1\n"
+    "TITLE LardOS Journal\n"
+    "SECTION Events\n";
+static uint8_t ram_journal_buf[JOURNAL_CAP];
+static FsWritableFile ram_journal = { "journal.lardd", ram_journal_buf, 0, JOURNAL_CAP };
+
+#define POSTBASELINE_CAP 4096u
+static const uint8_t postbaseline_init[] =
+    "LARDD 1\n"
+    "TITLE POST Baseline\n"
+    "TEXT No POST baseline has been stored yet.\n";
+static uint8_t ram_postbaseline_buf[POSTBASELINE_CAP];
+static FsWritableFile ram_postbaseline = { "postbaseline.lardd", ram_postbaseline_buf, 0, POSTBASELINE_CAP };
+
+#define BOOTREPLAY_CAP 2048u
+static const uint8_t bootreplay_init[] =
+    "LARDD 1\n"
+    "TITLE Boot Replay\n"
+    "TEXT No boot replay has been captured yet.\n";
+static uint8_t ram_bootreplay_buf[BOOTREPLAY_CAP];
+static FsWritableFile ram_bootreplay = { "bootreplay.lardd", ram_bootreplay_buf, 0, BOOTREPLAY_CAP };
+
+#define CFGPROF_CAP 2048u
+static const uint8_t cfgprof_init[] =
+    "LARDD 1\n"
+    "TITLE CFG Profiles\n"
+    "TEXT No settings profile has been saved yet.\n";
+static uint8_t ram_cfgprof_buf[CFGPROF_CAP];
+static FsWritableFile ram_cfgprof = { "cfgprof.lardd", ram_cfgprof_buf, 0, CFGPROF_CAP };
+
+#define USERLAW_CAP 2048u
+static const uint8_t userlaw_init[] =
+    "LARDD 1\n"
+    "TITLE User Law\n"
+    "TEXT LardOS user-right principles live here.\n"
+    "SECTION Principles\n"
+    "ITEM user may grant priority lev.10\n"
+    "ITEM SUM/raw control is visible to the user\n"
+    "ITEM magic must explain automatic execution\n"
+    "END\n";
+static uint8_t ram_userlaw_buf[USERLAW_CAP];
+static FsWritableFile ram_userlaw = { "userlaw.lardd", ram_userlaw_buf, 0, USERLAW_CAP };
+
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
 #define LPST_VERSION     2u
 #define LPST_START_LBA   2752u
@@ -139,7 +200,9 @@ static const uint8_t file_lardos_lars[] =
     "li Run control in LSH for the system control map.\n"
     "li Run status to inspect version, storage, drivers, and containers.\n"
     "li Use magic before a command when LSH should predict and execute a mistyped safe command.\n"
+    "li Use magic dryrun statsu to see the prediction without executing it.\n"
     "li Run mode probe to enter a controlled real16 window and return to long64.\n"
+    "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
@@ -158,15 +221,22 @@ static const uint8_t file_lardos_lars[] =
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
     "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
     "li Use bugreplay show to review the last BugEye screen-health frames.\n"
+    "li Use bugreplay draw to draw the replay frames as a GUI panel.\n"
+    "li Use trace on and trace show to inspect LardTrace module and shell events.\n"
+    "li Use netwatch on and netwatch show to inspect readable UDP, OSLink, and HTTP GET/POST events.\n"
+    "li Use journal show to read the automatic LARDD system journal.\n"
     "li Use rollback snap and rollback last to save and restore user-visible settings.\n"
     "li Use priority history to audit who granted priority lev.10.\n"
     "li Use trust list and trust history to inspect the user-owned permission policy map.\n"
     "li Use lfsdoctor scan or lfsdoctor repair to inspect and repair LPST-backed writable files.\n"
     "li Use panic capsule to bundle crashlog, BugEye, boot, trust, priority, and filesystem state.\n"
-    "li Use bootmap, oldcheck draw, and awakemon to see boot structure, storage checks, and Awakening progress.\n"
-    "li Use ltheme list and ltheme use night for native shell theme presets.\n"
+    "li Use bootmap, bootreplay show, postbaseline show, devmap draw, oldcheck draw, and awakemon to see boot, POST, device, storage, and Awakening progress.\n"
+    "li Use ltheme preview default.ltheme and ltheme use night for native shell theme presets.\n"
+    "li Use cfgprof save safe-ui and cfgprof load safe-ui for settings profiles.\n"
+    "li Use userlaw show to inspect the OS policy principles that protect user control.\n"
+    "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
-    "li Use larsview open lardos.lars and notes add text for native document browsing and notes.lardd.\n"
+    "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
     "button System status | status\n"
     "button Task dashboard | tasktop\n"
     "button Crash history | crashlog show\n"
@@ -179,7 +249,9 @@ static const uint8_t file_lardos_lars[] =
     "li Use sum, peek, poke, and asm_ when you want raw ring-0 control.\n"
     "cmd release\n"
     "cmd magic statsu\n"
+    "cmd magic dryrun statsu\n"
     "cmd mode probe\n"
+    "cmd mode guard\n"
     "cmd sram on\n"
     "cmd oslink status\n"
     "cmd oslink emit shell hello-from-lardos\n"
@@ -204,6 +276,12 @@ static const uint8_t file_lardos_lars[] =
     "cmd screencheck retro\n"
     "cmd bugeye scan\n"
     "cmd bugreplay show\n"
+    "cmd bugreplay draw\n"
+    "cmd trace on\n"
+    "cmd trace show\n"
+    "cmd netwatch on\n"
+    "cmd netwatch show\n"
+    "cmd journal show\n"
     "cmd type bugreport.lardd\n"
     "cmd rollback snap demo\n"
     "cmd priority history\n"
@@ -211,11 +289,19 @@ static const uint8_t file_lardos_lars[] =
     "cmd trust history\n"
     "cmd bootmap\n"
     "cmd oldcheck draw\n"
+    "cmd bootreplay show\n"
+    "cmd postbaseline show\n"
+    "cmd devmap draw\n"
     "cmd lfsdoctor scan\n"
     "cmd panic capsule\n"
     "cmd awakemon\n"
     "cmd ltheme list\n"
+    "cmd ltheme preview default.ltheme\n"
     "cmd ltheme show default.ltheme\n"
+    "cmd cfgprof save safe-ui\n"
+    "cmd userlaw show\n"
+    "cmd lunit run tests.lunit\n"
+    "cmd larsapp form lardos.lars\n"
     "cmd oschat say hello-from-lardkit\n"
     "cmd notes add hello-from-lardos\n"
     "cmd larsview open notes.lardd\n"
@@ -305,6 +391,16 @@ static const uint8_t file_sample_lpack[] =
     "ENDFILE\n"
     "END\n";
 
+static const uint8_t file_tests_lunit[] =
+    "LUNIT 1\n"
+    "CHECK file lardos.lars\n"
+    "CHECK file default.ltheme\n"
+    "CHECK writable journal.lardd\n"
+    "CHECK writable userlaw.lardd\n"
+    "CHECK command trace\n"
+    "CHECK command netwatch\n"
+    "END\n";
+
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
 static const uint8_t file_bundle_lar[166] = {
     'L','A','R','1', 0x03,0x00, 0x4D,0x00,
@@ -386,6 +482,7 @@ static const FsFile FS_FILES[] = {
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
+    { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
     { "rtl8139.drfl",  file_rtl8139_drfl,  sizeof(file_rtl8139_drfl) },
@@ -464,7 +561,7 @@ static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
 
 static uint32_t writable_count(void)
 {
-    return 11u;
+    return 18u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -480,6 +577,13 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 8) return &ram_bugreplay;
     if (idx == 9) return &ram_panic_capsule;
     if (idx == 10) return &ram_lfsdoctor;
+    if (idx == 11) return &ram_trace;
+    if (idx == 12) return &ram_netwatch;
+    if (idx == 13) return &ram_journal;
+    if (idx == 14) return &ram_postbaseline;
+    if (idx == 15) return &ram_bootreplay;
+    if (idx == 16) return &ram_cfgprof;
+    if (idx == 17) return &ram_userlaw;
     return NULL;
 }
 
@@ -517,6 +621,34 @@ void fs_init(void)
         ram_lfsdoctor_buf[i] = lfsdoctor_init[i];
     }
     ram_lfsdoctor.size = sizeof(lfsdoctor_init) - 1;
+    for (uint32_t i = 0; i < sizeof(trace_init) - 1 && i < TRACE_CAP; i++) {
+        ram_trace_buf[i] = trace_init[i];
+    }
+    ram_trace.size = sizeof(trace_init) - 1;
+    for (uint32_t i = 0; i < sizeof(netwatch_init) - 1 && i < NETWATCH_CAP; i++) {
+        ram_netwatch_buf[i] = netwatch_init[i];
+    }
+    ram_netwatch.size = sizeof(netwatch_init) - 1;
+    for (uint32_t i = 0; i < sizeof(journal_init) - 1 && i < JOURNAL_CAP; i++) {
+        ram_journal_buf[i] = journal_init[i];
+    }
+    ram_journal.size = sizeof(journal_init) - 1;
+    for (uint32_t i = 0; i < sizeof(postbaseline_init) - 1 && i < POSTBASELINE_CAP; i++) {
+        ram_postbaseline_buf[i] = postbaseline_init[i];
+    }
+    ram_postbaseline.size = sizeof(postbaseline_init) - 1;
+    for (uint32_t i = 0; i < sizeof(bootreplay_init) - 1 && i < BOOTREPLAY_CAP; i++) {
+        ram_bootreplay_buf[i] = bootreplay_init[i];
+    }
+    ram_bootreplay.size = sizeof(bootreplay_init) - 1;
+    for (uint32_t i = 0; i < sizeof(cfgprof_init) - 1 && i < CFGPROF_CAP; i++) {
+        ram_cfgprof_buf[i] = cfgprof_init[i];
+    }
+    ram_cfgprof.size = sizeof(cfgprof_init) - 1;
+    for (uint32_t i = 0; i < sizeof(userlaw_init) - 1 && i < USERLAW_CAP; i++) {
+        ram_userlaw_buf[i] = userlaw_init[i];
+    }
+    ram_userlaw.size = sizeof(userlaw_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
 }
@@ -547,104 +679,15 @@ const FsFile* fs_open(const char* name)
             return &g_lfs_result;
         }
     }
-    {
-        uint32_t j = 0;
-        const char* n1 = "notes.txt";
-        while (n1[j] && name[j] && n1[j] == name[j]) j++;
-        if (n1[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_notes.name;
-            g_ram_result.data = ram_notes.data;
-            g_ram_result.size = ram_notes.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n1b = "notes.lardd";
-        while (n1b[j] && name[j] && n1b[j] == name[j]) j++;
-        if (n1b[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_lardd_notes.name;
-            g_ram_result.data = ram_lardd_notes.data;
-            g_ram_result.size = ram_lardd_notes.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n2 = "lafillo_saved.txt";
-        while (n2[j] && name[j] && n2[j] == name[j]) j++;
-        if (n2[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_lafillo_save.name;
-            g_ram_result.data = ram_lafillo_save.data;
-            g_ram_result.size = ram_lafillo_save.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n3 = "lar_extract.txt";
-        while (n3[j] && name[j] && n3[j] == name[j]) j++;
-        if (n3[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_lar_extract.name;
-            g_ram_result.data = ram_lar_extract.data;
-            g_ram_result.size = ram_lar_extract.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n4 = "vcs_restore.txt";
-        while (n4[j] && name[j] && n4[j] == name[j]) j++;
-        if (n4[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_vcs_restore.name;
-            g_ram_result.data = ram_vcs_restore.data;
-            g_ram_result.size = ram_vcs_restore.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n5 = "bootprof.txt";
-        while (n5[j] && name[j] && n5[j] == name[j]) j++;
-        if (n5[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_bootprof.name;
-            g_ram_result.data = ram_bootprof.data;
-            g_ram_result.size = ram_bootprof.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n6 = "crashlog.txt";
-        while (n6[j] && name[j] && n6[j] == name[j]) j++;
-        if (n6[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_crashlog.name;
-            g_ram_result.data = ram_crashlog.data;
-            g_ram_result.size = ram_crashlog.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n7 = "bugreport.lardd";
-        while (n7[j] && name[j] && n7[j] == name[j]) j++;
-        if (n7[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_bugreport.name;
-            g_ram_result.data = ram_bugreport.data;
-            g_ram_result.size = ram_bugreport.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n8 = "bugreplay.lardd";
-        while (n8[j] && name[j] && n8[j] == name[j]) j++;
-        if (n8[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_bugreplay.name;
-            g_ram_result.data = ram_bugreplay.data;
-            g_ram_result.size = ram_bugreplay.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n9 = "paniccapsule.lardd";
-        while (n9[j] && name[j] && n9[j] == name[j]) j++;
-        if (n9[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_panic_capsule.name;
-            g_ram_result.data = ram_panic_capsule.data;
-            g_ram_result.size = ram_panic_capsule.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n10 = "lfsdoctor.lardd";
-        while (n10[j] && name[j] && n10[j] == name[j]) j++;
-        if (n10[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_lfsdoctor.name;
-            g_ram_result.data = ram_lfsdoctor.data;
-            g_ram_result.size = ram_lfsdoctor.size;
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        const char* a = w ? w->name : "";
+        const char* b = name;
+        while (*a && *b && *a == *b) { a++; b++; }
+        if (*a == '\0' && *b == '\0') {
+            g_ram_result.name = w->name;
+            g_ram_result.data = w->data;
+            g_ram_result.size = w->size;
             return &g_ram_result;
         }
     }
@@ -676,17 +719,10 @@ void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user
         cb(FS_FILES[i].name, FS_FILES[i].size, user);
     }
     lfs_list(cb, user);
-    cb(ram_notes.name, ram_notes.size, user);
-    cb(ram_lardd_notes.name, ram_lardd_notes.size, user);
-    cb(ram_lafillo_save.name, ram_lafillo_save.size, user);
-    cb(ram_lar_extract.name, ram_lar_extract.size, user);
-    cb(ram_vcs_restore.name, ram_vcs_restore.size, user);
-    cb(ram_bootprof.name, ram_bootprof.size, user);
-    cb(ram_crashlog.name, ram_crashlog.size, user);
-    cb(ram_bugreport.name, ram_bugreport.size, user);
-    cb(ram_bugreplay.name, ram_bugreplay.size, user);
-    cb(ram_panic_capsule.name, ram_panic_capsule.size, user);
-    cb(ram_lfsdoctor.name, ram_lfsdoctor.size, user);
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        if (w) cb(w->name, w->size, user);
+    }
 }
 
 static int lpst_name_equals(const uint8_t* fixed_name, const char* name)
@@ -869,50 +905,13 @@ void fs_persist_detail(uint32_t* active_bank, uint32_t* generation, uint32_t* ba
 
 FsWritableFile* fs_open_writable(const char* name)
 {
-    const char* n1 = "notes.txt";
-    uint32_t i = 0;
-    while (n1[i] && name[i] && n1[i] == name[i]) i++;
-    if (n1[i] == '\0' && name[i] == '\0') return &ram_notes;
-    const char* n1b = "notes.lardd";
-    i = 0;
-    while (n1b[i] && name[i] && n1b[i] == name[i]) i++;
-    if (n1b[i] == '\0' && name[i] == '\0') return &ram_lardd_notes;
-    const char* n2 = "lafillo_saved.txt";
-    i = 0;
-    while (n2[i] && name[i] && n2[i] == name[i]) i++;
-    if (n2[i] == '\0' && name[i] == '\0') return &ram_lafillo_save;
-    const char* n3 = "lar_extract.txt";
-    i = 0;
-    while (n3[i] && name[i] && n3[i] == name[i]) i++;
-    if (n3[i] == '\0' && name[i] == '\0') return &ram_lar_extract;
-    const char* n4 = "vcs_restore.txt";
-    i = 0;
-    while (n4[i] && name[i] && n4[i] == name[i]) i++;
-    if (n4[i] == '\0' && name[i] == '\0') return &ram_vcs_restore;
-    const char* n5 = "bootprof.txt";
-    i = 0;
-    while (n5[i] && name[i] && n5[i] == name[i]) i++;
-    if (n5[i] == '\0' && name[i] == '\0') return &ram_bootprof;
-    const char* n6 = "crashlog.txt";
-    i = 0;
-    while (n6[i] && name[i] && n6[i] == name[i]) i++;
-    if (n6[i] == '\0' && name[i] == '\0') return &ram_crashlog;
-    const char* n7 = "bugreport.lardd";
-    i = 0;
-    while (n7[i] && name[i] && n7[i] == name[i]) i++;
-    if (n7[i] == '\0' && name[i] == '\0') return &ram_bugreport;
-    const char* n8 = "bugreplay.lardd";
-    i = 0;
-    while (n8[i] && name[i] && n8[i] == name[i]) i++;
-    if (n8[i] == '\0' && name[i] == '\0') return &ram_bugreplay;
-    const char* n9 = "paniccapsule.lardd";
-    i = 0;
-    while (n9[i] && name[i] && n9[i] == name[i]) i++;
-    if (n9[i] == '\0' && name[i] == '\0') return &ram_panic_capsule;
-    const char* n10 = "lfsdoctor.lardd";
-    i = 0;
-    while (n10[i] && name[i] && n10[i] == name[i]) i++;
-    if (n10[i] == '\0' && name[i] == '\0') return &ram_lfsdoctor;
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        const char* a = w ? w->name : "";
+        const char* b = name ? name : "";
+        while (*a && *b && *a == *b) { a++; b++; }
+        if (*a == '\0' && *b == '\0') return w;
+    }
     return NULL;
 }
 

@@ -22,10 +22,31 @@ typedef struct {
 } theme_state_t;
 
 typedef struct {
+    char name[64];
+    uint32_t ok;
+} post_baseline_entry_t;
+
+typedef struct {
     lardkit_bugeye_info_t bugeye;
     lardkit_bugreplay_frame_t bugreplay[LARDKIT_BUGREPLAY_MAX];
     uint32_t bugreplay_count;
     uint32_t bugreplay_next;
+    uint32_t trace_enabled;
+    lardkit_trace_entry_t trace[LARDKIT_TRACE_MAX];
+    uint32_t trace_count;
+    uint32_t trace_next;
+    uint32_t trace_tick;
+    uint32_t netwatch_enabled;
+    lardkit_netwatch_entry_t netwatch[LARDKIT_NETWATCH_MAX];
+    uint32_t netwatch_count;
+    uint32_t netwatch_next;
+    lardkit_netwatch_info_t netwatch_info;
+    uint32_t journal_next;
+    post_baseline_entry_t post_prev[LARDKIT_POST_BASELINE_MAX];
+    post_baseline_entry_t post_cur[LARDKIT_POST_BASELINE_MAX];
+    lardkit_post_baseline_info_t post_info;
+    uint32_t post_loaded;
+    lardkit_cfg_profile_t cfgprof[LARDKIT_CFGPROF_MAX];
     lardkit_rollback_info_t rollback;
     lardkit_trust_entry_t trust[5];
     lardkit_trust_history_entry_t trust_history[LARDKIT_TRUST_HISTORY_MAX];
@@ -44,6 +65,9 @@ typedef struct {
 } lardkit_state_t;
 
 static lardkit_state_t s_lardkit;
+
+static void draw_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color);
+static void draw_text(uint32_t x, uint32_t y, const char* s, uint32_t fg, uint32_t bg);
 
 static const theme_state_t s_themes[] = {
     { "classic", 0x00FFFFFFu, 0x00101820u, 0x0037A7FFu, 0u },
@@ -147,6 +171,9 @@ void lardkit_init(void)
 {
     for (uint32_t i = 0; i < sizeof(s_lardkit); i++) ((uint8_t*)&s_lardkit)[i] = 0;
     s_lardkit.bugreplay_next = 1u;
+    s_lardkit.trace_next = 1u;
+    s_lardkit.netwatch_next = 1u;
+    s_lardkit.journal_next = 1u;
     s_lardkit.trust_history_next = 1u;
     trust_default(0, "shell", LARDKIT_TRUST_FS | LARDKIT_TRUST_SCREEN | LARDKIT_TRUST_OSLINK);
     trust_default(1, "gui", LARDKIT_TRUST_SCREEN | LARDKIT_TRUST_NET);
@@ -270,6 +297,41 @@ int lardkit_bugreplay_write(void)
     return 0;
 }
 
+int lardkit_bugreplay_draw(void)
+{
+    uint32_t sw = gui_syscall_get_width();
+    uint32_t sh = gui_syscall_get_height();
+    uint32_t panel_w = sw > 420u ? 400u : (sw > 40u ? sw - 32u : sw);
+    uint32_t panel_h = 170u;
+    uint32_t x = sw > panel_w + 18u ? sw - panel_w - 18u : 8u;
+    uint32_t y = sh > panel_h + 18u ? sh - panel_h - 18u : 8u;
+    if (sw < 160u || sh < 100u) return -1;
+    draw_rect(x, y, panel_w, panel_h, 0xFF071016u);
+    draw_rect(x, y, panel_w, 2u, 0xFF72D6FFu);
+    draw_rect(x, y + panel_h - 2u, panel_w, 2u, 0xFF72D6FFu);
+    draw_text(x + 10u, y + 10u, "BUGREPLAY LAST GUI FRAMES", 0xFFFFFFFFu, 0xFF071016u);
+    if (s_lardkit.bugreplay_count == 0u) {
+        draw_text(x + 10u, y + 36u, "no frames yet - run bugeye scan", 0xFFFFD84Au, 0xFF071016u);
+        return 0;
+    }
+    for (uint32_t i = 0; i < s_lardkit.bugreplay_count; i++) {
+        lardkit_bugreplay_frame_t f;
+        uint32_t bar_x = x + 16u + i * 46u;
+        uint32_t bar_h;
+        uint32_t bad_h;
+        if (bar_x + 34u >= x + panel_w) break;
+        if (lardkit_bugreplay_at(i, &f) != 0) continue;
+        bar_h = f.changed_samples / 2048u;
+        if (bar_h > 84u) bar_h = 84u;
+        if (bar_h < 4u) bar_h = 4u;
+        bad_h = f.bad_tiles ? 14u : 4u;
+        draw_rect(bar_x, y + 136u - bar_h, 28u, bar_h, f.bad_tiles ? 0xFFFF6250u : 0xFF4DE1C1u);
+        draw_rect(bar_x, y + 142u, 28u, bad_h, f.bad_tiles ? 0xFFFFD84Au : 0xFF243640u);
+        draw_text(bar_x, y + 54u, "#", 0xFFFFFFFFu, 0xFF071016u);
+    }
+    return 0;
+}
+
 void lardkit_bugreplay_clear(void)
 {
     for (uint32_t i = 0; i < LARDKIT_BUGREPLAY_MAX; i++) {
@@ -278,6 +340,218 @@ void lardkit_bugreplay_clear(void)
     s_lardkit.bugreplay_count = 0;
     s_lardkit.bugreplay_next = 1u;
     (void)lardkit_bugreplay_write();
+}
+
+static uint32_t ring_start(uint32_t count, uint32_t max, uint32_t next)
+{
+    return count < max ? 0u : ((next - 1u) % max);
+}
+
+static void journal_header(FsWritableFile* w, const char* note)
+{
+    static const char header[] = "LARDD 1\nTITLE LardOS Journal\n";
+    if (!w) return;
+    w->size = 0;
+    (void)fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u);
+    if (note && note[0]) {
+        report_append(w, "TEXT ");
+        report_append(w, note);
+        report_append(w, "\n");
+    }
+    report_append(w, "SECTION Events\n");
+}
+
+void lardkit_journal_event(const char* area, const char* text)
+{
+    FsWritableFile* w = fs_open_writable("journal.lardd");
+    if (!w) return;
+    if (w->size < 8u) journal_header(w, "journal started");
+    if (w->cap - w->size < 128u) journal_header(w, "journal rotated because the RAM file filled");
+    report_append(w, "ITEM ");
+    report_append_u32(w, s_lardkit.journal_next++);
+    if (s_lardkit.journal_next == 0) s_lardkit.journal_next = 1u;
+    report_append(w, " ");
+    report_append(w, area && area[0] ? area : "os");
+    report_append(w, " ");
+    report_append(w, text && text[0] ? text : "event");
+    report_append(w, "\n");
+}
+
+int lardkit_journal_clear(void)
+{
+    FsWritableFile* w = fs_open_writable("journal.lardd");
+    if (!w) return -1;
+    s_lardkit.journal_next = 1u;
+    journal_header(w, "journal cleared by user");
+    return 0;
+}
+
+void lardkit_trace_enable(int on)
+{
+    s_lardkit.trace_enabled = on ? 1u : 0u;
+    if (s_lardkit.trace_enabled) {
+        lardkit_trace_event("trace", "enabled", 1);
+        lardkit_journal_event("trace", "enabled");
+    } else {
+        lardkit_journal_event("trace", "disabled");
+    }
+}
+
+void lardkit_trace_event(const char* module, const char* text, int32_t value)
+{
+    uint32_t idx;
+    lardkit_trace_entry_t* e;
+    if (!s_lardkit.trace_enabled) return;
+    idx = (s_lardkit.trace_next - 1u) % LARDKIT_TRACE_MAX;
+    e = &s_lardkit.trace[idx];
+    e->seq = s_lardkit.trace_next++;
+    if (s_lardkit.trace_next == 0) s_lardkit.trace_next = 1u;
+    e->tick = ++s_lardkit.trace_tick;
+    scopy(e->module, sizeof(e->module), module && module[0] ? module : "kernel");
+    scopy(e->text, sizeof(e->text), text && text[0] ? text : "event");
+    e->value = value;
+    if (s_lardkit.trace_count < LARDKIT_TRACE_MAX) s_lardkit.trace_count++;
+}
+
+void lardkit_trace_info(lardkit_trace_info_t* out)
+{
+    if (!out) return;
+    out->enabled = s_lardkit.trace_enabled;
+    out->count = s_lardkit.trace_count;
+    out->next_seq = s_lardkit.trace_next;
+}
+
+uint32_t lardkit_trace_count(void)
+{
+    return s_lardkit.trace_count;
+}
+
+int lardkit_trace_at(uint32_t idx, lardkit_trace_entry_t* out)
+{
+    uint32_t slot;
+    if (!out || idx >= s_lardkit.trace_count) return -1;
+    slot = (ring_start(s_lardkit.trace_count, LARDKIT_TRACE_MAX, s_lardkit.trace_next) + idx) % LARDKIT_TRACE_MAX;
+    *out = s_lardkit.trace[slot];
+    return 0;
+}
+
+void lardkit_trace_clear(void)
+{
+    for (uint32_t i = 0; i < LARDKIT_TRACE_MAX; i++) {
+        for (uint32_t j = 0; j < sizeof(s_lardkit.trace[i]); j++) ((uint8_t*)&s_lardkit.trace[i])[j] = 0;
+    }
+    s_lardkit.trace_count = 0;
+    s_lardkit.trace_next = 1u;
+    s_lardkit.trace_tick = 0;
+}
+
+int lardkit_trace_write(void)
+{
+    FsWritableFile* w = fs_open_writable("trace.lardd");
+    static const char header[] = "LARDD 1\nTITLE LardTrace\nSECTION Events\n";
+    if (!w) return -1;
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
+    for (uint32_t i = 0; i < s_lardkit.trace_count; i++) {
+        lardkit_trace_entry_t e;
+        if (lardkit_trace_at(i, &e) != 0) continue;
+        report_append(w, "ITEM #");
+        report_append_u32(w, e.seq);
+        report_append(w, " t");
+        report_append_u32(w, e.tick);
+        report_append(w, " ");
+        report_append(w, e.module);
+        report_append(w, " ");
+        report_append(w, e.text);
+        report_append(w, " value ");
+        report_append_i32(w, e.value);
+        report_append(w, "\n");
+    }
+    report_append(w, "END\n");
+    return 0;
+}
+
+void lardkit_netwatch_enable(int on)
+{
+    s_lardkit.netwatch_enabled = on ? 1u : 0u;
+    s_lardkit.netwatch_info.enabled = s_lardkit.netwatch_enabled;
+    lardkit_journal_event("netwatch", on ? "enabled" : "disabled");
+}
+
+void lardkit_netwatch_record(const char* kind, const char* detail, int32_t value)
+{
+    uint32_t idx;
+    lardkit_netwatch_entry_t* e;
+    if (!s_lardkit.netwatch_enabled) return;
+    idx = (s_lardkit.netwatch_next - 1u) % LARDKIT_NETWATCH_MAX;
+    e = &s_lardkit.netwatch[idx];
+    e->seq = s_lardkit.netwatch_next++;
+    if (s_lardkit.netwatch_next == 0) s_lardkit.netwatch_next = 1u;
+    scopy(e->kind, sizeof(e->kind), kind && kind[0] ? kind : "net");
+    scopy(e->detail, sizeof(e->detail), detail && detail[0] ? detail : "packet");
+    e->value = value;
+    if (s_lardkit.netwatch_count < LARDKIT_NETWATCH_MAX) s_lardkit.netwatch_count++;
+    s_lardkit.netwatch_info.count = s_lardkit.netwatch_count;
+    if (streq(e->kind, "udp-send") || streq(e->kind, "http") || streq(e->kind, "https")) s_lardkit.netwatch_info.sent++;
+    if (streq(e->kind, "udp-recv")) s_lardkit.netwatch_info.received++;
+    if (streq(e->kind, "http") || streq(e->kind, "https")) s_lardkit.netwatch_info.http++;
+    if (streq(e->kind, "oslink")) s_lardkit.netwatch_info.oslink++;
+}
+
+void lardkit_netwatch_info(lardkit_netwatch_info_t* out)
+{
+    if (!out) return;
+    s_lardkit.netwatch_info.enabled = s_lardkit.netwatch_enabled;
+    s_lardkit.netwatch_info.count = s_lardkit.netwatch_count;
+    *out = s_lardkit.netwatch_info;
+}
+
+uint32_t lardkit_netwatch_count(void)
+{
+    return s_lardkit.netwatch_count;
+}
+
+int lardkit_netwatch_at(uint32_t idx, lardkit_netwatch_entry_t* out)
+{
+    uint32_t slot;
+    if (!out || idx >= s_lardkit.netwatch_count) return -1;
+    slot = (ring_start(s_lardkit.netwatch_count, LARDKIT_NETWATCH_MAX, s_lardkit.netwatch_next) + idx) % LARDKIT_NETWATCH_MAX;
+    *out = s_lardkit.netwatch[slot];
+    return 0;
+}
+
+void lardkit_netwatch_clear(void)
+{
+    for (uint32_t i = 0; i < LARDKIT_NETWATCH_MAX; i++) {
+        for (uint32_t j = 0; j < sizeof(s_lardkit.netwatch[i]); j++) ((uint8_t*)&s_lardkit.netwatch[i])[j] = 0;
+    }
+    s_lardkit.netwatch_count = 0;
+    s_lardkit.netwatch_next = 1u;
+    s_lardkit.netwatch_info.count = 0;
+}
+
+int lardkit_netwatch_write(void)
+{
+    FsWritableFile* w = fs_open_writable("netwatch.lardd");
+    static const char header[] = "LARDD 1\nTITLE NetWatch\nSECTION Events\n";
+    if (!w) return -1;
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
+    for (uint32_t i = 0; i < s_lardkit.netwatch_count; i++) {
+        lardkit_netwatch_entry_t e;
+        if (lardkit_netwatch_at(i, &e) != 0) continue;
+        report_append(w, "ITEM #");
+        report_append_u32(w, e.seq);
+        report_append(w, " ");
+        report_append(w, e.kind);
+        report_append(w, " ");
+        report_append(w, e.detail);
+        report_append(w, " bytes ");
+        report_append_i32(w, e.value);
+        report_append(w, "\n");
+    }
+    report_append(w, "END\n");
+    return 0;
 }
 
 int lardkit_bugeye_scan(void)
@@ -338,6 +612,7 @@ int lardkit_snapshot(const char* label)
     scopy(s_lardkit.rollback.boot_profile, sizeof(s_lardkit.rollback.boot_profile), bp.name);
     s_lardkit.rollback.awake_enabled = aw.enabled;
     s_lardkit.rollback.theme = s_lardkit.active_theme;
+    lardkit_journal_event("rollback", "snapshot saved");
     return 0;
 }
 
@@ -428,6 +703,8 @@ int lardkit_trust_set(const char* subject, uint32_t cap, int allow)
             if (allow) s_lardkit.trust[i].caps |= cap;
             else s_lardkit.trust[i].caps &= ~cap;
             trust_history_log(subject, cap, allow, s_lardkit.trust[i].caps);
+            lardkit_trace_event("trust", allow ? "allow" : "deny", (int32_t)cap);
+            lardkit_journal_event("trust", allow ? "allowed capability" : "denied capability");
             return 0;
         }
     }
@@ -631,6 +908,145 @@ void lardkit_lfsdoctor_info(lardkit_lfsdoctor_info_t* out)
     *out = s_lardkit.lfsdoctor;
 }
 
+static int line_starts(const char* s, const char* end, const char* prefix, const char** rest)
+{
+    while (s < end && *prefix && *s == *prefix) {
+        s++;
+        prefix++;
+    }
+    if (*prefix) return 0;
+    if (rest) *rest = s;
+    return 1;
+}
+
+static void post_copy_name(char* dst, uint32_t cap, const char* s, const char* end)
+{
+    uint32_t i = 0;
+    if (!dst || cap == 0) return;
+    while (s < end && (*s == ' ' || *s == '\t')) s++;
+    while (s < end && *s != '\r' && *s != '\n' && i + 1u < cap) dst[i++] = *s++;
+    dst[i] = '\0';
+}
+
+static void post_baseline_parse_file(void)
+{
+    const FsFile* f = fs_open("postbaseline.lardd");
+    const char* p;
+    const char* end;
+    s_lardkit.post_info.has_previous = 0;
+    s_lardkit.post_info.previous_count = 0;
+    if (!f || !f->data || f->size == 0) return;
+    p = (const char*)f->data;
+    end = p + f->size;
+    while (p < end && s_lardkit.post_info.previous_count < LARDKIT_POST_BASELINE_MAX) {
+        const char* ls = p;
+        const char* le;
+        const char* rest;
+        while (p < end && *p != '\n' && *p != '\r') p++;
+        le = p;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+        if (line_starts(ls, le, "ITEM PASS ", &rest) || line_starts(ls, le, "ITEM FAIL ", &rest)) {
+            uint32_t idx = s_lardkit.post_info.previous_count++;
+            s_lardkit.post_prev[idx].ok = (ls[5] == 'P') ? 1u : 0u;
+            post_copy_name(s_lardkit.post_prev[idx].name, sizeof(s_lardkit.post_prev[idx].name), rest, le);
+        }
+    }
+    s_lardkit.post_info.has_previous = s_lardkit.post_info.previous_count ? 1u : 0u;
+}
+
+void lardkit_post_baseline_begin(void)
+{
+    for (uint32_t i = 0; i < LARDKIT_POST_BASELINE_MAX; i++) {
+        s_lardkit.post_cur[i].name[0] = '\0';
+        s_lardkit.post_cur[i].ok = 0;
+    }
+    s_lardkit.post_info.current_count = 0;
+    s_lardkit.post_info.changes = 0;
+    s_lardkit.post_info.regressions = 0;
+    post_baseline_parse_file();
+    s_lardkit.post_loaded = 1u;
+}
+
+void lardkit_post_baseline_observe(const char* name, int ok)
+{
+    uint32_t idx;
+    if (!s_lardkit.post_loaded) lardkit_post_baseline_begin();
+    if (s_lardkit.post_info.current_count >= LARDKIT_POST_BASELINE_MAX) return;
+    idx = s_lardkit.post_info.current_count++;
+    scopy(s_lardkit.post_cur[idx].name, sizeof(s_lardkit.post_cur[idx].name), name && name[0] ? name : "check");
+    s_lardkit.post_cur[idx].ok = ok ? 1u : 0u;
+    for (uint32_t i = 0; i < s_lardkit.post_info.previous_count; i++) {
+        if (streq(s_lardkit.post_prev[i].name, s_lardkit.post_cur[idx].name)) {
+            if (s_lardkit.post_prev[i].ok != s_lardkit.post_cur[idx].ok) {
+                s_lardkit.post_info.changes++;
+                if (s_lardkit.post_prev[i].ok && !s_lardkit.post_cur[idx].ok) s_lardkit.post_info.regressions++;
+            }
+            break;
+        }
+    }
+}
+
+void lardkit_post_baseline_finish(void)
+{
+    FsWritableFile* w = fs_open_writable("postbaseline.lardd");
+    static const char header[] = "LARDD 1\nTITLE POST Baseline\n";
+    if (!w) return;
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return;
+    report_append(w, "TEXT Last normal POST result is used as the next baseline.\n");
+    report_append(w, "SECTION Summary\nITEM previous ");
+    report_append_u32(w, s_lardkit.post_info.previous_count);
+    report_append(w, "\nITEM current ");
+    report_append_u32(w, s_lardkit.post_info.current_count);
+    report_append(w, "\nITEM changes ");
+    report_append_u32(w, s_lardkit.post_info.changes);
+    report_append(w, "\nITEM regressions ");
+    report_append_u32(w, s_lardkit.post_info.regressions);
+    report_append(w, "\nSECTION Checks\n");
+    for (uint32_t i = 0; i < s_lardkit.post_info.current_count; i++) {
+        report_append(w, s_lardkit.post_cur[i].ok ? "ITEM PASS " : "ITEM FAIL ");
+        report_append(w, s_lardkit.post_cur[i].name);
+        report_append(w, "\n");
+    }
+    report_append(w, "END\n");
+    if (s_lardkit.post_info.regressions) lardkit_journal_event("post", "baseline regression detected");
+}
+
+void lardkit_post_baseline_info(lardkit_post_baseline_info_t* out)
+{
+    if (!out) return;
+    *out = s_lardkit.post_info;
+}
+
+int lardkit_bootreplay_write(void)
+{
+    static const char* const detail[] = {
+        "BIOS loads stage1 and LardOS begins its own path",
+        "stage1 loads stage2 and locates the kernel payload",
+        "protected32 is used as a small bridge, not as the final home",
+        "long64 entry takes over and the C kernel becomes the owner",
+        "memory, filesystem, LPST, and crashlog are made visible",
+        "boot profile chooses normal, safe, netoff, dev, or awakening",
+        "LSH, GUI, LARS, LARDD, and user-control surfaces come online",
+        "drivers, languages, network, OSLink, and background work settle",
+    };
+    FsWritableFile* w = fs_open_writable("bootreplay.lardd");
+    static const char header[] = "LARDD 1\nTITLE Boot Replay\nSECTION Timeline\n";
+    if (!w) return -1;
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
+    for (uint32_t i = 0; i < sizeof(detail) / sizeof(detail[0]); i++) {
+        report_append(w, "ITEM ");
+        report_append_u32(w, i);
+        report_append(w, " ");
+        report_append(w, detail[i]);
+        report_append(w, "\n");
+    }
+    report_append(w, "END\n");
+    lardkit_journal_event("bootreplay", "timeline captured");
+    return 0;
+}
+
 int lardkit_panic_capsule_write(void)
 {
     FsWritableFile* w = fs_open_writable("paniccapsule.lardd");
@@ -664,6 +1080,12 @@ int lardkit_panic_capsule_write(void)
     report_append_u32(w, s_lardkit.trust_history_count);
     report_append(w, "\nITEM priority-lev10-events ");
     report_append_u32(w, taskprio_history_count());
+    report_append(w, "\nITEM trace-events ");
+    report_append_u32(w, s_lardkit.trace_count);
+    report_append(w, "\nITEM netwatch-events ");
+    report_append_u32(w, s_lardkit.netwatch_count);
+    report_append(w, "\nITEM post-regressions ");
+    report_append_u32(w, s_lardkit.post_info.regressions);
     report_append(w, "\nITEM files ");
     report_append_u32(w, lf.files);
     report_append(w, "\nITEM storage ");
@@ -675,6 +1097,11 @@ int lardkit_panic_capsule_write(void)
     report_append(w, "ITEM bugreport.lardd\n");
     report_append(w, "ITEM bugreplay.lardd\n");
     report_append(w, "ITEM lfsdoctor.lardd\n");
+    report_append(w, "ITEM postbaseline.lardd\n");
+    report_append(w, "ITEM bootreplay.lardd\n");
+    report_append(w, "ITEM journal.lardd\n");
+    report_append(w, "ITEM trace.lardd\n");
+    report_append(w, "ITEM netwatch.lardd\n");
     report_append(w, "SECTION BootMap\n");
     for (uint32_t i = 0; i < lardkit_bootmap_count(); i++) {
         report_append(w, "ITEM ");
@@ -828,6 +1255,149 @@ void lardkit_theme_info(lardkit_theme_info_t* out)
     (void)lardkit_theme_at(s_lardkit.active_theme, out);
 }
 
+int lardkit_theme_preview_draw(const lardkit_theme_info_t* theme)
+{
+    uint32_t sw = gui_syscall_get_width();
+    uint32_t x = sw > 360u ? 24u : 8u;
+    uint32_t y = 56u;
+    uint32_t fg;
+    uint32_t bg;
+    uint32_t accent;
+    if (!theme) return -1;
+    fg = 0xFF000000u | theme->fg;
+    bg = 0xFF000000u | theme->bg;
+    accent = 0xFF000000u | theme->accent;
+    draw_rect(x, y, 320u, 140u, bg);
+    draw_rect(x, y, 320u, 4u, accent);
+    draw_rect(x, y + 136u, 320u, 4u, accent);
+    draw_text(x + 12u, y + 16u, "LTHEME PREVIEW", fg, bg);
+    draw_rect(x + 12u, y + 44u, 120u, 32u, accent);
+    draw_text(x + 20u, y + 56u, "active", bg, accent);
+    draw_rect(x + 146u, y + 44u, 148u, 32u, 0xFF222830u);
+    draw_text(x + 154u, y + 56u, "inactive", fg, 0xFF222830u);
+    draw_text(x + 12u, y + 96u, theme->name, fg, bg);
+    return 0;
+}
+
+static void cfg_profile_from_current(lardkit_cfg_profile_t* p, const char* name)
+{
+    exgui_info_t eg;
+    exexgui_info_t xg;
+    bootprof_info_t bp;
+    awake_info_t aw;
+    lassist_info_t bi;
+    if (!p) return;
+    exgui_info(&eg);
+    exexgui_info(&xg);
+    bootprof_info(&bp);
+    awake_info(&aw);
+    lassist_info(&bi);
+    p->valid = 1u;
+    scopy(p->name, sizeof(p->name), name && name[0] ? name : "profile");
+    p->exgui_enabled = eg.enabled;
+    p->exgui_style = eg.style;
+    p->exgui_layout = eg.layout;
+    p->exexgui_enabled = xg.enabled;
+    p->exexgui_focus = xg.focus;
+    p->buddy_enabled = bi.enabled;
+    p->http_post = (uint32_t)gui_http_post_mode();
+    p->task_default = taskprio_default_priority();
+    scopy(p->boot_profile, sizeof(p->boot_profile), bp.name);
+    p->awake_enabled = aw.enabled;
+    p->theme = s_lardkit.active_theme;
+}
+
+static int cfg_profile_apply(const lardkit_cfg_profile_t* p)
+{
+    if (!p || !p->valid) return -1;
+    exgui_enable((int)p->exgui_enabled);
+    (void)exgui_set_style(style_name(p->exgui_style));
+    (void)exgui_set_layout(layout_name(p->exgui_layout));
+    exexgui_enable((int)p->exexgui_enabled);
+    (void)exexgui_set_focus(focus_name(p->exexgui_focus));
+    lassist_enable((int)p->buddy_enabled);
+    gui_http_set_post_mode((int)p->http_post);
+    taskprio_set_default(p->task_default);
+    (void)bootprof_set(p->boot_profile);
+    if (p->awake_enabled) awake_enable(1, 3u);
+    else awake_enable(0, 0);
+    s_lardkit.active_theme = p->theme;
+    return 0;
+}
+
+int lardkit_cfgprof_save(const char* name)
+{
+    uint32_t slot = 0xFFFFFFFFu;
+    if (!name || !name[0]) return -1;
+    for (uint32_t i = 0; i < LARDKIT_CFGPROF_MAX; i++) {
+        if (s_lardkit.cfgprof[i].valid && streq(s_lardkit.cfgprof[i].name, name)) {
+            slot = i;
+            break;
+        }
+        if (slot == 0xFFFFFFFFu && !s_lardkit.cfgprof[i].valid) slot = i;
+    }
+    if (slot == 0xFFFFFFFFu) slot = 0u;
+    cfg_profile_from_current(&s_lardkit.cfgprof[slot], name);
+    (void)lardkit_cfgprof_write();
+    lardkit_journal_event("cfgprof", "saved profile");
+    return 0;
+}
+
+int lardkit_cfgprof_load(const char* name)
+{
+    for (uint32_t i = 0; i < LARDKIT_CFGPROF_MAX; i++) {
+        if (s_lardkit.cfgprof[i].valid && streq(s_lardkit.cfgprof[i].name, name)) {
+            int r = cfg_profile_apply(&s_lardkit.cfgprof[i]);
+            if (r == 0) lardkit_journal_event("cfgprof", "loaded profile");
+            return r;
+        }
+    }
+    return -1;
+}
+
+uint32_t lardkit_cfgprof_count(void)
+{
+    uint32_t n = 0;
+    for (uint32_t i = 0; i < LARDKIT_CFGPROF_MAX; i++) if (s_lardkit.cfgprof[i].valid) n++;
+    return n;
+}
+
+int lardkit_cfgprof_at(uint32_t idx, lardkit_cfg_profile_t* out)
+{
+    uint32_t seen = 0;
+    if (!out) return -1;
+    for (uint32_t i = 0; i < LARDKIT_CFGPROF_MAX; i++) {
+        if (!s_lardkit.cfgprof[i].valid) continue;
+        if (seen == idx) {
+            *out = s_lardkit.cfgprof[i];
+            return 0;
+        }
+        seen++;
+    }
+    return -1;
+}
+
+int lardkit_cfgprof_write(void)
+{
+    FsWritableFile* w = fs_open_writable("cfgprof.lardd");
+    static const char header[] = "LARDD 1\nTITLE CFG Profiles\nSECTION Profiles\n";
+    if (!w) return -1;
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
+    for (uint32_t i = 0; i < LARDKIT_CFGPROF_MAX; i++) {
+        if (!s_lardkit.cfgprof[i].valid) continue;
+        report_append(w, "ITEM ");
+        report_append(w, s_lardkit.cfgprof[i].name);
+        report_append(w, " boot ");
+        report_append(w, s_lardkit.cfgprof[i].boot_profile);
+        report_append(w, " priority ");
+        report_append_i32(w, s_lardkit.cfgprof[i].task_default);
+        report_append(w, "\n");
+    }
+    report_append(w, "END\n");
+    return 0;
+}
+
 void lardkit_magic_record(const char* input, const char* predicted, int executed, const char* reason)
 {
     s_lardkit.magic.has_record = 1u;
@@ -906,6 +1476,33 @@ int lardkit_notes_append(const char* text)
     return fs_append(w, (const uint8_t*)nl, sizeof(nl) - 1u) == sizeof(nl) - 1u ? 0 : -5;
 }
 
+int lardkit_userlaw_reset(void)
+{
+    FsWritableFile* w = fs_open_writable("userlaw.lardd");
+    static const char law[] =
+        "LARDD 1\n"
+        "TITLE User Law\n"
+        "TEXT LardOS policy is stored as user-visible law, not hidden magic.\n"
+        "SECTION Principles\n"
+        "ITEM user may grant priority lev.10\n"
+        "ITEM SUM/raw control is visible to the user\n"
+        "ITEM magic must explain automatic execution\n"
+        "ITEM packages must be verifiable and undoable\n"
+        "ITEM operating systems should communicate through OSLink\n"
+        "END\n";
+    if (!w) return -1;
+    w->size = 0;
+    return fs_write(w, 0, (const uint8_t*)law, sizeof(law) - 1u) == sizeof(law) - 1u ? 0 : -2;
+}
+
+int lardkit_userlaw_check(void)
+{
+    const FsFile* f = fs_open("userlaw.lardd");
+    if (!f || !f->data || f->size < 16u) return -1;
+    if (f->data[0] != 'L' || f->data[1] != 'A' || f->data[2] != 'R' || f->data[3] != 'D') return -2;
+    return 0;
+}
+
 int lardkit_selftest(void)
 {
     lardkit_state_t saved = s_lardkit;
@@ -922,6 +1519,34 @@ int lardkit_selftest(void)
     if (lardkit_bugreplay_count() == 0u || !fs_open("bugreplay.lardd")) {
         s_lardkit = saved;
         return -11;
+    }
+    lardkit_trace_enable(1);
+    lardkit_trace_event("selftest", "trace", 7);
+    if (lardkit_trace_count() == 0u || lardkit_trace_write() != 0 || !fs_open("trace.lardd")) {
+        s_lardkit = saved;
+        return -14;
+    }
+    lardkit_netwatch_enable(1);
+    lardkit_netwatch_record("http", "GET selftest", 4);
+    if (lardkit_netwatch_count() == 0u || lardkit_netwatch_write() != 0 || !fs_open("netwatch.lardd")) {
+        s_lardkit = saved;
+        return -15;
+    }
+    lardkit_journal_event("selftest", "journal");
+    if (!fs_open("journal.lardd")) {
+        s_lardkit = saved;
+        return -16;
+    }
+    lardkit_post_baseline_begin();
+    lardkit_post_baseline_observe("selftest", 1);
+    lardkit_post_baseline_finish();
+    if (!fs_open("postbaseline.lardd")) {
+        s_lardkit = saved;
+        return -17;
+    }
+    if (lardkit_bootreplay_write() != 0 || !fs_open("bootreplay.lardd")) {
+        s_lardkit = saved;
+        return -18;
     }
     if (lardkit_snapshot("selftest") != 0 || !s_lardkit.rollback.valid) {
         s_lardkit = saved;
@@ -946,6 +1571,14 @@ int lardkit_selftest(void)
     if (lardkit_theme_parse(theme, sizeof(theme) - 1u, &ti) != 0 || ti.style_hint != 1u) {
         s_lardkit = saved;
         return -9;
+    }
+    if (lardkit_cfgprof_save("selftest") != 0 || lardkit_cfgprof_count() == 0u || !fs_open("cfgprof.lardd")) {
+        s_lardkit = saved;
+        return -19;
+    }
+    if (lardkit_userlaw_reset() != 0 || lardkit_userlaw_check() != 0 || !fs_open("userlaw.lardd")) {
+        s_lardkit = saved;
+        return -20;
     }
     lardkit_magic_record("statsu", "status", 1, "edit-distance safe command");
     lardkit_magic_info(&mi);
@@ -972,7 +1605,7 @@ int lardkit_selftest(void)
     }
     if (lardkit_panic_capsule_write() != 0 || !fs_open("paniccapsule.lardd")) {
         s_lardkit = saved;
-        return -14;
+        return -21;
     }
     s_lardkit = saved;
     return 0;

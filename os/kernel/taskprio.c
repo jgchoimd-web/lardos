@@ -1,5 +1,7 @@
 #include "taskprio.h"
 
+#include "lardkit.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -49,6 +51,7 @@ static void history_log(uint32_t id, const char* name, int32_t old_priority,
     scopy(e->actor, sizeof(e->actor), actor && actor[0] ? actor : "user");
     scopy(e->action, sizeof(e->action), action && action[0] ? action : "set");
     if (s_taskprio.history_count < TASKPRIO_HISTORY_MAX) s_taskprio.history_count++;
+    lardkit_trace_event("taskprio", action && action[0] ? action : "priority", new_priority);
 }
 
 static uint32_t slen(const char* s, uint32_t cap)
@@ -129,6 +132,7 @@ static int enqueue_with_priority(const char* name, const char* command, int32_t 
     t->runs = 0;
     t->paused = 0;
     s_taskprio.last_id = t->id;
+    lardkit_trace_event("taskprio", "queue", priority);
     history_log(t->id, t->name, -1, t->priority, actor, action);
     if (out_id) *out_id = t->id;
     return 0;

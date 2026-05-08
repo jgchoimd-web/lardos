@@ -3,6 +3,14 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.34.0a
+ITEM Added LardTrace with trace on, trace show, and trace module filters for shell, GUI, OSLink, TaskPrio, network, and package events.
+ITEM Added NetWatch, POST baseline reports, BootReplay, LARDD journal, Device Map, CFG profiles, User Law, and LUNIT tests.
+ITEM Expanded BugReplay with a draw panel and Magic with dryrun mode.
+ITEM Added EXEXGUI workspaces 1/2/3, LTheme preview, LARS app command aliases, and mode guard.
+ITEM Added writable trace.lardd, netwatch.lardd, journal.lardd, postbaseline.lardd, bootreplay.lardd, cfgprof.lardd, userlaw.lardd, plus tests.lunit.
+ITEM POST now checks the new native recovery, audit, policy, and test files.
+
 SECTION v1.33.0a
 ITEM Added BugReplay, a native screen-bug replay log that records BugEye scan frames and writes bugreplay.lardd.
 ITEM Added Trust history so permission allow/deny changes are auditable without taking control away from the user.

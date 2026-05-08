@@ -69,6 +69,7 @@ flowchart TB
     GUI["gui / screenram / lafillo / lsh"]
     EXGUI["exgui DE + WM layer"]
     EXEXGUI["exexgui split DE shell"]
+    LGUILIB["lguilib GUI library format"]
     VM["BOSL GASM LIL LML OSVM"]
 
     Kmain --> GDT
@@ -89,6 +90,7 @@ flowchart TB
     Kmain --> GUI
     GUI --> EXGUI
     GUI --> EXEXGUI
+    GUI --> LGUILIB
     GUI --> ScreenCheck
     GUI --> TaskPrio
     GUI --> VM
@@ -188,6 +190,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
 | Extended GUI shell | `os/kernel/exgui.c`, `os/include/exgui.h` |
 | Sketch split GUI shell | `os/kernel/exexgui.c`, `os/include/exexgui.h` |
+| LardOS GUI library format | `os/kernel/lguilib.c`, `os/include/lguilib.h` |
 | GUI overlay chrome | `os/kernel/guioverlay.c`, `os/include/guioverlay.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
@@ -213,6 +216,13 @@ small RAM while still visibly living in screen memory.
 controls render. It can repaint compact safe tabs, active-app labels, button
 feedback, shadows, and output frames without changing the underlying GUI hit
 testing or app state.
+
+`lguilib.c` owns the `.lguilib` GUI library/theme format. Files begin with
+`LGUILIB 1` and use `NAME`, `COLOR`, `WIDGET`, and `END` records. The active
+theme is consumed by `guioverlay.c`, so the drawn chrome can change while the
+classic GUI, EXGUI, and EXEXGUI behavior stays in place. `default.lguilib` is
+embedded in the filesystem and LSH exposes `lguilib show`, `lguilib use`, and
+`lguilib test`.
 
 `screencheck.c` wraps the GUI POST framebuffer/layout probe in a user-facing
 diagnostic module. `screencheck status` reports changed samples, tile counts,

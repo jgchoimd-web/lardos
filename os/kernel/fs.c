@@ -96,6 +96,7 @@ static const uint8_t file_lardos_lars[] =
     "p A TempleOS-inspired, user-owned system built from C, in-tree tools, native filesystems, and LardOS languages.\n"
     "p LardOS local documents use LARS instead of HTML so the system owns its own document surface.\n"
     "p A GUI overlay chrome layer now draws clearer titles, safer tabs, button feedback, and output frames above the classic GUI.\n"
+    "p LGUILIB files are native GUI library records that theme the overlay without external libraries.\n"
     "p The Doc tab can switch HTTP requests between GET and POST; POST reads the address as URL|body.\n"
     "section Full-control starts\n"
     "li Run control in LSH for the system control map.\n"
@@ -107,6 +108,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
     "li Use exgui on and exgui style win linux mac for an extended desktop/window manager layer.\n"
     "li Use exexgui on for the sketch split layout: GUI left, terminal top-right, info bottom-right.\n"
+    "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use task list and task set id prio to inspect and change queued task priority.\n"
     "li Use tasktop to see runnable and paused task queues with priority bars.\n"
     "li Use bootprof set safe or bootprof set netoff to change the next boot profile.\n"
@@ -132,6 +134,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd exgui style linux\n"
     "cmd exgui layout tile\n"
     "cmd exexgui on\n"
+    "cmd lguilib show default.lguilib\n"
     "cmd oslink exec 10.0.2.15 status\n"
     "cmd task list\n"
     "cmd tasktop\n"
@@ -144,6 +147,31 @@ static const uint8_t file_lardos_lars[] =
     "cmd lardd lardd_guide.lardd\n"
     "note Release suffixes: a=official, b=beta-experimental, p=hotpatch.\n"
     "end\n";
+
+static const uint8_t file_default_lguilib[] =
+    "LGUILIB 1\n"
+    "NAME lardos-overlay\n"
+    "COLOR title_bg 0x304060\n"
+    "COLOR title_fg 0xffffff\n"
+    "COLOR title_accent 0xe7f0ff\n"
+    "COLOR panel_bg 0x202840\n"
+    "COLOR border 0x05070c\n"
+    "COLOR tab_active 0x3e5f82\n"
+    "COLOR tab_idle 0x282838\n"
+    "COLOR tab_hover 0x343a50\n"
+    "COLOR tab_accent 0x72d6ff\n"
+    "COLOR button_border 0x203060\n"
+    "COLOR button_hover 0xd5e5ff\n"
+    "COLOR button_inner 0x6680a0ff\n"
+    "COLOR output_frame 0x5a6b86\n"
+    "COLOR hint_fg 0xafc2d8\n"
+    "COLOR shadow 0x33000000\n"
+    "WIDGET title chrome\n"
+    "WIDGET tab compact\n"
+    "WIDGET button feedback\n"
+    "WIDGET output frame\n"
+    "WIDGET status badge\n"
+    "END\n";
 
 static const uint8_t file_lardd_guide[] =
     "LARDD 1\n"
@@ -266,6 +294,7 @@ static const FsFile FS_FILES[] = {
     { "hello.txt",     file_hello_txt,     sizeof(file_hello_txt) - 1 },
     { "readme.txt",    file_readme_txt,    sizeof(file_readme_txt) - 1 },
     { "lardos.lars",   file_lardos_lars,   sizeof(file_lardos_lars) - 1 },
+    { "default.lguilib", file_default_lguilib, sizeof(file_default_lguilib) - 1 },
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },

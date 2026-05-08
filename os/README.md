@@ -54,6 +54,8 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
 
 - `LARS` (`.lars`) replaces HTML for structured local OS pages.
 - `LARDD` (`.lardd`) replaces Markdown for project notes and guides.
+- `LGUILIB` (`.lguilib`) stores native GUI library/theme records for the
+  overlay chrome.
 
 Both are record-based, readable without a renderer, and parsed by freestanding C
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
@@ -67,6 +69,9 @@ The classic GUI stays as the main surface. A separate GUI overlay chrome layer
 is drawn above it to show the active app, repaint compact-safe tabs when space
 is tight, add button hover/pressed feedback, and frame the output area so
 screen-layout bugs are easier to spot without rewriting the base controls.
+The overlay can be themed by the in-kernel LGUILIB parser. The built-in
+`default.lguilib` file shows the record format: `LGUILIB 1`, `NAME`, `COLOR`,
+`WIDGET`, and `END`.
 
 The Lard Shell (`LSH` tab) includes command discovery and RAM-file workflow
 commands:
@@ -94,6 +99,9 @@ commands:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
   is opt-in, so the previous classic GUI and EXGUI layer remain available.
+- `lguilib status|show|use|test [file.lguilib]` inspects or applies native
+  GUI library theme files. `lguilib use default.lguilib` reloads the built-in
+  overlay theme without leaving LardOS.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
   command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered
@@ -139,8 +147,9 @@ scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec fi
 scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
 ScreenCheck visual diagnostics, and LIL feature forms. The screen checks are there to catch visible boot/UI
-regressions as well as code errors. POST also checks the GUI overlay chrome and
-EXEXGUI's split layout math so the drawn regions do not collapse.
+regressions as well as code errors. POST also checks the LGUILIB parser, GUI
+overlay chrome, and EXEXGUI's split layout math so the drawn regions do not
+collapse.
 
 Each feature addition gets a release: bump the kernel version, add an entry to
 `os/RELEASES.lardd`, keep the embedded `releases.lardd` in sync so LSH can show

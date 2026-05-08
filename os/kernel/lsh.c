@@ -22,6 +22,7 @@
 #include "screencheck.h"
 #include "exgui.h"
 #include "exexgui.h"
+#include "lguilib.h"
 #include "oslink.h"
 #include "taskprio.h"
 #include "bootprof.h"
@@ -248,7 +249,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -1102,11 +1103,12 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode oslink exgui exexgui task bootprof crashlog cls\n");
+    out_append("  help control status release ver post selftest magic mode oslink exgui exexgui lguilib task bootprof crashlog cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|install file.lpack\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
     out_append("  exexgui on|off|focus gui|term|info|next|test\n");
+    out_append("  lguilib status|show|use|test [file.lguilib]\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
@@ -1269,6 +1271,18 @@ static void cmd_status(const char* args)
     out_append_u32(xxg.layout.term.w);
     out_append("x");
     out_append_u32(xxg.layout.term.h);
+    out_append("\n");
+
+    lguilib_info_t lgui;
+    lguilib_active(&lgui);
+    out_append("LGUILIB: ");
+    out_append(lgui.valid ? "active" : "inactive");
+    out_append(", name=");
+    out_append(lgui.theme.name);
+    out_append(", widgets=");
+    out_append_u32(lgui.theme.widget_count);
+    out_append(", err=");
+    out_append(lguilib_error_name(lgui.theme.last_error));
     out_append("\n");
 
     oslink_info_t link;
@@ -1767,6 +1781,124 @@ static int lsh_doc_data_from_arg(const char* file_arg, const uint8_t** data, uin
         return 0;
     }
     return -2;
+}
+
+static void copy_lsh_literal(char* out, uint32_t cap, const char* s)
+{
+    uint32_t i = 0;
+    if (!out || cap == 0) return;
+    while (s && s[i] && i + 1u < cap) {
+        out[i] = s[i];
+        i++;
+    }
+    out[i] = '\0';
+}
+
+static void cmd_lguilib_print_theme(const char* label, const lguilib_theme_t* t)
+{
+    out_append(label);
+    out_append(": ");
+    out_append(t->name);
+    out_append(" widgets=");
+    out_append_u32(t->widget_count);
+    out_append(" err=");
+    out_append(lguilib_error_name(t->last_error));
+    out_append("\n");
+    out_append("  title_bg=");
+    out_append_hex32(t->title_bg);
+    out_append(" title_fg=");
+    out_append_hex32(t->title_fg);
+    out_append(" panel=");
+    out_append_hex32(t->panel_bg);
+    out_append(" border=");
+    out_append_hex32(t->border);
+    out_append("\n");
+    out_append("  tab=");
+    out_append_hex32(t->tab_active);
+    out_append("/");
+    out_append_hex32(t->tab_idle);
+    out_append("/");
+    out_append_hex32(t->tab_hover);
+    out_append(" accent=");
+    out_append_hex32(t->tab_accent);
+    out_append("\n");
+    out_append("  button=");
+    out_append_hex32(t->button_border);
+    out_append("/");
+    out_append_hex32(t->button_hover);
+    out_append(" output=");
+    out_append_hex32(t->output_frame);
+    out_append(" shadow=");
+    out_append_hex32(t->shadow);
+    out_append("\n");
+}
+
+static void cmd_lguilib_status(void)
+{
+    lguilib_info_t info;
+    lguilib_active(&info);
+    cmd_lguilib_print_theme(info.valid ? "LGUILIB active" : "LGUILIB inactive", &info.theme);
+}
+
+static void cmd_lguilib_file(const char* action, const char* args)
+{
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    lguilib_theme_t parsed;
+    int r;
+
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+        copy_lsh_literal(file_arg, sizeof(file_arg), "default.lguilib");
+    }
+    if (lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("lguilib: file not found: ");
+        out_append(file_arg);
+        out_append("\n");
+        return;
+    }
+    r = lguilib_parse(data, size, &parsed);
+    if (r != 0) {
+        out_append("lguilib: invalid ");
+        out_append(file_arg);
+        out_append(" err=");
+        out_append(lguilib_error_name(parsed.last_error));
+        out_append("\n");
+        return;
+    }
+    if (strcmp(action, "use") == 0 || strcmp(action, "load") == 0) {
+        if (lguilib_load_active(data, size) != 0) {
+            out_append("lguilib: load failed.\n");
+            return;
+        }
+        out_append("lguilib: active theme loaded from ");
+        out_append(file_arg);
+        out_append("\n");
+        cmd_lguilib_status();
+        return;
+    }
+    cmd_lguilib_print_theme(file_arg, &parsed);
+}
+
+static void cmd_lguilib(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_lguilib_status();
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "cat") == 0 ||
+        strcmp(sub, "use") == 0 || strcmp(sub, "load") == 0) {
+        cmd_lguilib_file(sub, args);
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lguilib_selftest() == 0 ? "lguilib: selftest OK\n" : "lguilib: selftest failed\n");
+        return;
+    }
+    out_append("Usage: lguilib status|show|use|test [file.lguilib]\n");
 }
 
 static void cmd_larsform(const char* args)
@@ -3278,6 +3410,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "exgui") == 0) { cmd_exgui(args); return; }
     if (strcmp(cmd, "exexgui") == 0) { cmd_exexgui(args); return; }
+    if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }
     if (strcmp(cmd, "tasktop") == 0) { cmd_tasktop(args); return; }
     if (strcmp(cmd, "bootprof") == 0) { cmd_bootprof(args); return; }

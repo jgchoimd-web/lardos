@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.25.0a
+ITEM Added LGUILIB, a native LardOS GUI library file format stored as .lguilib records.
+ITEM Added default.lguilib to the embedded filesystem with NAME, COLOR, WIDGET, and END records.
+ITEM GUIOverlay now reads its colors and widget hints from the active LGUILIB theme instead of only hardcoded constants.
+ITEM Added lguilib status, show, use, and test commands in LSH, plus POST coverage for the parser and built-in file.
+
 SECTION v1.24.0a
 ITEM Added GUIOverlay, a separate chrome layer drawn above the classic GUI.
 ITEM Moved title/status text, compact safe tab repainting, button feedback, shadows, and output framing into the overlay path.

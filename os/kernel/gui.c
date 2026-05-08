@@ -18,6 +18,7 @@
 #include "exgui.h"
 #include "exexgui.h"
 #include "guioverlay.h"
+#include "lguilib.h"
 #include "syscall.h"
 #include "lib3d_demo.h"
 
@@ -455,6 +456,9 @@ int gui_init(void)
     g_have_fb = (fb_from_bootinfo(&g_fb) == 0);
     if (!g_have_fb) return -1;
     g_bg = 0xFF101020;
+    lguilib_init();
+    const FsFile* lguilib_file = fs_open("default.lguilib");
+    if (lguilib_file) (void)lguilib_load_active(lguilib_file->data, lguilib_file->size);
     exgui_init();
     exexgui_init();
     if (g_fb.w <= 1024 && g_fb.h <= 768) {

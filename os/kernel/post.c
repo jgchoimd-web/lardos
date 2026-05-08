@@ -12,6 +12,7 @@
 #include "lard_doc.h"
 #include "lcontainer.h"
 #include "lil.h"
+#include "lguilib.h"
 #include "lpack.h"
 #include "lvcs.h"
 #include "mem.h"
@@ -100,12 +101,14 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: lardd guide", fs_open("lardd_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: releases", fs_open("releases.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: features.lil", fs_open("features.lil") != NULL, emit, user, &pass, &fail);
+    post_check("fs: default.lguilib", fs_open("default.lguilib") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
     post_check("doc: LARDD renderer", post_doc_parse("lardd_guide.lardd"), emit, user, &pass, &fail);
     post_check("doc: LARS form actions", lard_doc_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
+    post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);
     post_check("version: suffix policy", post_version_suffix_known(), emit, user, &pass, &fail);

@@ -188,6 +188,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
 | Extended GUI shell | `os/kernel/exgui.c`, `os/include/exgui.h` |
 | Sketch split GUI shell | `os/kernel/exexgui.c`, `os/include/exexgui.h` |
+| GUI overlay chrome | `os/kernel/guioverlay.c`, `os/include/guioverlay.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
 | Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |
@@ -206,9 +207,12 @@ small freestanding C parser.
 reserved framebuffer/backbuffer rectangle. The default is a quiet bottom-right
 corner; `sram rect x y w h` lets the user sacrifice a chosen screen area. GUI
 redraws restore the encoded bytes before blitting so the region behaves like
-small RAM while still visibly living in screen memory. The same renderer owns
-the classic GUI chrome: title/status text, compact safe tab labels, expanding
-input fields, framed output views, and button hover/pressed feedback.
+small RAM while still visibly living in screen memory.
+
+`guioverlay.c` draws a visual chrome layer above the classic GUI after the base
+controls render. It can repaint compact safe tabs, active-app labels, button
+feedback, shadows, and output frames without changing the underlying GUI hit
+testing or app state.
 
 `screencheck.c` wraps the GUI POST framebuffer/layout probe in a user-facing
 diagnostic module. `screencheck status` reports changed samples, tile counts,

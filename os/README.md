@@ -63,11 +63,10 @@ The Doc tab can choose GET or POST for HTTP/HTTPS requests. In POST mode, type
 `URL|body` in the address field; the in-kernel request builder sends the body
 with `Content-Length` and `application/x-www-form-urlencoded`.
 
-The classic GUI has been kept as the main surface and polished rather than
-replaced: the active app is visible in the title chrome, tabs get compact labels
-when space is tight, the input field expands with the window, buttons show
-hover/pressed state, and the output area is framed so screen-layout bugs are
-easier to spot.
+The classic GUI stays as the main surface. A separate GUI overlay chrome layer
+is drawn above it to show the active app, repaint compact-safe tabs when space
+is tight, add button hover/pressed feedback, and frame the output area so
+screen-layout bugs are easier to spot without rewriting the base controls.
 
 The Lard Shell (`LSH` tab) includes command discovery and RAM-file workflow
 commands:
@@ -140,8 +139,8 @@ scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec fi
 scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
 ScreenCheck visual diagnostics, and LIL feature forms. The screen checks are there to catch visible boot/UI
-regressions as well as code errors. POST also checks the polished classic GUI
-chrome and EXEXGUI's split layout math so the drawn regions do not collapse.
+regressions as well as code errors. POST also checks the GUI overlay chrome and
+EXEXGUI's split layout math so the drawn regions do not collapse.
 
 Each feature addition gets a release: bump the kernel version, add an entry to
 `os/RELEASES.lardd`, keep the embedded `releases.lardd` in sync so LSH can show

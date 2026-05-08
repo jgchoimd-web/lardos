@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.24.0a
+ITEM Added GUIOverlay, a separate chrome layer drawn above the classic GUI.
+ITEM Moved title/status text, compact safe tab repainting, button feedback, shadows, and output framing into the overlay path.
+ITEM Restored the base GUI hitboxes and fixed controls while keeping the visual improvements as an overlaid layer.
+ITEM POST now checks the GUIOverlay layout selftest through the GUI chrome check.
+
 SECTION v1.23.0a
 ITEM Improved the classic GUI chrome without replacing the existing GUI.
 ITEM Added title/status text, compact safe tab labels, expanding input width, button hover/pressed feedback, and a framed output view.

@@ -10,6 +10,7 @@ typedef struct {
     uint32_t network;
     uint32_t dev_mode;
     uint32_t safe_mode;
+    uint32_t awakening_mode;
 } bootprof_state_t;
 
 static bootprof_state_t s_bootprof;
@@ -42,6 +43,7 @@ static int apply_profile(const char* name)
         s_bootprof.network = 1;
         s_bootprof.dev_mode = 0;
         s_bootprof.safe_mode = 0;
+        s_bootprof.awakening_mode = 0;
         return 0;
     }
     if (streq(name, "safe")) {
@@ -50,6 +52,7 @@ static int apply_profile(const char* name)
         s_bootprof.network = 0;
         s_bootprof.dev_mode = 0;
         s_bootprof.safe_mode = 1;
+        s_bootprof.awakening_mode = 0;
         return 0;
     }
     if (streq(name, "netoff")) {
@@ -58,6 +61,7 @@ static int apply_profile(const char* name)
         s_bootprof.network = 0;
         s_bootprof.dev_mode = 0;
         s_bootprof.safe_mode = 0;
+        s_bootprof.awakening_mode = 0;
         return 0;
     }
     if (streq(name, "dev")) {
@@ -66,6 +70,16 @@ static int apply_profile(const char* name)
         s_bootprof.network = 1;
         s_bootprof.dev_mode = 1;
         s_bootprof.safe_mode = 0;
+        s_bootprof.awakening_mode = 0;
+        return 0;
+    }
+    if (streq(name, "awake") || streq(name, "awakening")) {
+        scopy(s_bootprof.name, sizeof(s_bootprof.name), "awakening");
+        s_bootprof.force_post = 0;
+        s_bootprof.network = 1;
+        s_bootprof.dev_mode = 0;
+        s_bootprof.safe_mode = 0;
+        s_bootprof.awakening_mode = 1;
         return 0;
     }
     return -1;
@@ -112,6 +126,7 @@ void bootprof_info(bootprof_info_t* out)
     out->network = s_bootprof.network;
     out->dev_mode = s_bootprof.dev_mode;
     out->safe_mode = s_bootprof.safe_mode;
+    out->awakening_mode = s_bootprof.awakening_mode;
 }
 
 int bootprof_network_enabled(void)
@@ -134,6 +149,11 @@ int bootprof_safe_mode(void)
     return s_bootprof.safe_mode != 0;
 }
 
+int bootprof_awakening_mode(void)
+{
+    return s_bootprof.awakening_mode != 0;
+}
+
 int bootprof_selftest(void)
 {
     bootprof_state_t saved = s_bootprof;
@@ -152,6 +172,10 @@ int bootprof_selftest(void)
     if (apply_profile("normal") != 0 || !bootprof_network_enabled() || bootprof_safe_mode()) {
         s_bootprof = saved;
         return -4;
+    }
+    if (apply_profile("awakening") != 0 || !bootprof_awakening_mode() || !bootprof_network_enabled() || bootprof_force_post()) {
+        s_bootprof = saved;
+        return -5;
     }
     s_bootprof = saved;
     return 0;

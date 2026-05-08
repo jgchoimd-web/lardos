@@ -10,6 +10,7 @@ typedef struct {
     uint32_t network;
     uint32_t dev_mode;
     uint32_t safe_mode;
+    uint32_t awakening_mode;
 } bootprof_info_t;
 
 void bootprof_init(void);
@@ -20,4 +21,5 @@ int bootprof_network_enabled(void);
 int bootprof_force_post(void);
 int bootprof_dev_mode(void);
 int bootprof_safe_mode(void);
+int bootprof_awakening_mode(void);
 int bootprof_selftest(void);

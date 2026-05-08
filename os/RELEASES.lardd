@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.27.0a
+ITEM Added Awakening mode, a boot profile that shows the GUI/shell surface after essential core init.
+ITEM In awakening boot, drivers, LSS/language demo warmup, and networking continue through a quiet background loader.
+ITEM Added awake status and awake test commands, plus status/BootProf reporting for the background phase.
+ITEM POST now checks the Awakening tracker and bootprof supports bootprof set awakening.
+
 SECTION v1.26.0a
 ITEM Added TaskPrio priority lev.10 as an OS-only urgent scheduling level.
 ITEM User commands and wait-time aging still stop at priorities 0..9; lev.10 can only be granted by the OS.

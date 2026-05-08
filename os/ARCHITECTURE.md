@@ -62,6 +62,7 @@ flowchart TB
     OSLink["oslink OS-to-OS UDP"]
     TaskPrio["taskprio user priorities"]
     BootProf["bootprof profiles"]
+    Awake["awake fast boot tracker"]
     CrashLog["crashlog panic history"]
     LPack["lpack packages"]
     ScreenCheck["screencheck diagnostics"]
@@ -93,6 +94,7 @@ flowchart TB
     GUI --> LGUILIB
     GUI --> ScreenCheck
     GUI --> TaskPrio
+    BootProf --> Awake
     GUI --> VM
 ```
 
@@ -185,6 +187,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | SMP | `os/kernel/smp.c`, `os/kernel/ap_trampoline.s`, `os/kernel/aux_kernel.s` |
 | Power-On Self-Test | `os/kernel/post.c`, `os/include/post.h` |
 | Boot profiles | `os/kernel/bootprof.c`, `os/include/bootprof.h` |
+| Awakening boot mode | `os/kernel/awake.c`, `os/include/awake.h` |
 | Crash log | `os/kernel/crashlog.c`, `os/include/crashlog.h` |
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
@@ -258,8 +261,10 @@ aging and is selected before normal scoring whenever it is queued.
 `bootprof.c` reads `bootprof.txt` after the writable filesystem is restored and
 turns it into boot behavior. `normal` uses the default path, `safe` forces POST
 and disables networking, `netoff` skips networking without forcing POST, and
-`dev` keeps networking while raising the default task priority. LSH exposes this
-through `bootprof status` and `bootprof set`.
+`dev` keeps networking while raising the default task priority. `awakening`
+shows the GUI/shell surface as soon as the essential core is up and lets
+drivers, language demos, and networking finish in the background. LSH exposes
+this through `bootprof status`, `bootprof set`, and `awake status`.
 
 `crashlog.c` owns `crashlog.txt`, a writable panic and diagnostic history. Panic
 paths append an entry and attempt an LPST save before halting; LSH exposes the

@@ -118,7 +118,10 @@ commands:
   by wait-time aging, and is dequeued before all normal work.
 - `bootprof` controls boot profiles stored in `bootprof.txt`. `normal` boots
   normally, `safe` forces POST and skips networking, `netoff` skips networking,
-  and `dev` keeps networking on while raising the default task priority.
+  `dev` keeps networking on while raising the default task priority, and
+  `awakening` shows the GUI/shell surface after the essential core is ready
+  while drivers, demos, and networking finish quietly in the background.
+- `awake status|test` reports the Awakening background loader phase.
 - `crashlog` shows panic and diagnostic events stored in `crashlog.txt`.
   `panic` paths append to it before halting, and `crashlog test` adds a manual
   diagnostic entry.
@@ -150,8 +153,8 @@ scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
 ScreenCheck visual diagnostics, and LIL feature forms. The screen checks are there to catch visible boot/UI
 regressions as well as code errors. POST also checks the LGUILIB parser, GUI
-overlay chrome, and EXEXGUI's split layout math so the drawn regions do not
-collapse.
+overlay chrome, Awakening background loader tracker, and EXEXGUI's split layout
+math so the drawn regions do not collapse.
 
 Each feature addition gets a release: bump the kernel version, add an entry to
 `os/RELEASES.lardd`, keep the embedded `releases.lardd` in sync so LSH can show

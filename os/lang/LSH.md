@@ -13,11 +13,12 @@
 - `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
 - `exexgui on|off|focus|next` - sketch split GUI with GUI, terminal, and status panes.
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
+- `awake status|test` - inspect the Awakening fast-boot background loader.
 - `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.
 - `task list|set|default|run|boost|drop` - inspect and change task priority.
 - `tasktop` - show queued tasks with status and priority bars.
 - `nice priority command` - queue a command at a chosen priority.
-- `bootprof status|set` - inspect or select normal, safe, netoff, or dev boot profiles.
+- `bootprof status|set` - inspect or select normal, safe, netoff, dev, or awakening boot profiles.
 - `crashlog show|clear|test` - inspect or write diagnostic crash history.
 - `larsform file` / `larsact file index` - list or run LARS form buttons.
 - `lpack info|list|install file.lpack` - inspect or install a native LardPack package.

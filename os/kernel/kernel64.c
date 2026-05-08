@@ -3,6 +3,7 @@
 #include "unicode.h"
 #include "net.h"
 #include "oslink.h"
+#include "awake.h"
 #include "bootprof.h"
 #include "taskprio.h"
 #include "crashlog.h"
@@ -40,6 +41,12 @@
 static volatile uint16_t* const VGA = (volatile uint16_t*)0xB8000;
 
 static size_t vga_pos;
+static net_stack_t s_net;
+static net_cfg_t s_cfg;
+static int s_net_ready;
+static char s_http_resp[4096];
+static char s_boot_report[768];
+static uint32_t s_awake_background_phase;
 
 static void vga_put_byte(uint8_t b, void* userdata)
 {
@@ -156,6 +163,99 @@ static int boot_post_offer(void)
     gui_set_response(msg);
     gui_render();
     return boot_post_wait_key(4u, 240000000u, 1);
+}
+
+static void run_language_demos_report(int publish)
+{
+    char bosl_out[256];
+    char lil_out[256];
+    char gasm_out[256];
+    int64_t lval;
+
+    bosl_out[0] = '\0';
+    lil_out[0] = '\0';
+    gasm_out[0] = '\0';
+    s_boot_report[0] = '\0';
+    if (bosl_demo_hello(bosl_out, sizeof(bosl_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "BOSL: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "BOSL: ");
+        append_line(s_boot_report, sizeof(s_boot_report), bosl_out);
+    }
+    if (bosl_demo_inline(bosl_out, sizeof(bosl_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "BOSL_ASM: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "BOSL_ASM: ");
+        append_line(s_boot_report, sizeof(s_boot_report), bosl_out);
+    }
+    if (lil_demo_hello(lil_out, sizeof(lil_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "LIL: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "LIL: ");
+        append_line(s_boot_report, sizeof(s_boot_report), lil_out);
+    }
+    if (lil_demo_inline(lil_out, sizeof(lil_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "LIL_ASM: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "LIL_ASM: ");
+        append_line(s_boot_report, sizeof(s_boot_report), lil_out);
+    }
+    if (gasm_demo_hello(gasm_out, sizeof(gasm_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "GASM: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "GASM: ");
+        append_line(s_boot_report, sizeof(s_boot_report), gasm_out);
+    }
+    if (gasm_demo_inline(gasm_out, sizeof(gasm_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "GASM_ASM: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "GASM_ASM: ");
+        append_line(s_boot_report, sizeof(s_boot_report), gasm_out);
+    }
+    if (gasm_demo_oop(gasm_out, sizeof(gasm_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "GASM_OOP: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "GASM_OOP: ");
+        append_line(s_boot_report, sizeof(s_boot_report), gasm_out);
+    }
+    if (lafillo_demo_html(gasm_out, sizeof(gasm_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "LAFILLO_VM: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "LAFILLO_VM: ");
+        append_line(s_boot_report, sizeof(s_boot_report), gasm_out);
+    }
+    if (os_demo_hello(gasm_out, sizeof(gasm_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "OS_VM: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "OS_VM: ");
+        append_line(s_boot_report, sizeof(s_boot_report), gasm_out);
+    }
+    if (lml_demo(gasm_out, sizeof(gasm_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "LML: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "LML: ");
+        append_line(s_boot_report, sizeof(s_boot_report), gasm_out);
+        append_line(s_boot_report, sizeof(s_boot_report), "\n");
+    }
+    if (gc_demo(gasm_out, sizeof(gasm_out)) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "GC: (failed)\n");
+    } else {
+        append_line(s_boot_report, sizeof(s_boot_report), "GC: ");
+        append_line(s_boot_report, sizeof(s_boot_report), gasm_out);
+    }
+    if (lil_eval_int("(+ 40 2)", &lval) != 0) {
+        append_line(s_boot_report, sizeof(s_boot_report), "LIL_EXPR: (failed)\n");
+    } else {
+        char lbuf[32];
+        snprintf(lbuf, sizeof(lbuf), "%lld", (long long)lval);
+        append_line(s_boot_report, sizeof(s_boot_report), "LIL_EXPR: ");
+        append_line(s_boot_report, sizeof(s_boot_report), lbuf);
+        append_line(s_boot_report, sizeof(s_boot_report), "\n");
+    }
+    if (publish) {
+        gui_set_response(s_boot_report);
+        gui_render();
+    }
 }
 
 static void boot_mode_run_screen(void)
@@ -322,6 +422,66 @@ static int parse_url(const char* url,
     return 0;
 }
 
+static void boot_network_start(int foreground)
+{
+    if (s_net_ready) return;
+    if (!bootprof_network_enabled()) {
+        if (foreground) vga_puts("Network skipped by boot profile\n", 0x2F);
+        return;
+    }
+    if (net_init(&s_net) != 0) {
+        awake_fail(10u, "net init");
+        if (foreground) panic("NET init failed");
+        return;
+    }
+    if (net_dhcp(&s_net, &s_cfg) != 0) {
+        awake_fail(11u, "dhcp");
+        if (foreground) panic("DHCP failed");
+        return;
+    }
+    s_net_ready = 1;
+    oslink_init(&s_net, &s_cfg, "lardos");
+    if (foreground) vga_puts("DHCP OK\n", 0x2F);
+
+    ip4_t ip;
+    if (net_dns_a(&s_net, s_cfg.dns, "example.com", &ip) != 0) {
+        awake_fail(12u, "dns");
+        if (foreground) panic("DNS failed");
+        return;
+    }
+    if (foreground) vga_puts("DNS OK\n", 0x2F);
+
+    if (net_http_get(&s_net, ip, 80, "example.com", "/", s_http_resp, sizeof(s_http_resp)) == 0) {
+        if (foreground) vga_puts("HTTP OK\n", 0x2F);
+    } else if (foreground) {
+        vga_puts("HTTP unavailable\n", 0x4F);
+    }
+}
+
+static void awakening_background_poll(void)
+{
+    if (!bootprof_awakening_mode()) return;
+    if (s_awake_background_phase == 0u) {
+        awake_mark(1u, "drivers");
+        drfl_load_all();
+        lss_init();
+        s_awake_background_phase = 1u;
+        return;
+    }
+    if (s_awake_background_phase == 1u) {
+        awake_mark(2u, "languages");
+        run_language_demos_report(0);
+        s_awake_background_phase = 2u;
+        return;
+    }
+    if (s_awake_background_phase == 2u) {
+        awake_mark(3u, "network");
+        boot_network_start(0);
+        s_awake_background_phase = 3u;
+        awake_finish();
+    }
+}
+
 void kmain(void)
 {
     vga_pos = 0;
@@ -343,141 +503,45 @@ void kmain(void)
     crashlog_init();
     bootprof_load();
     lsh_init();
+    awake_enable(bootprof_awakening_mode(), 3u);
     if (bootprof_dev_mode()) taskprio_set_default(7);
-    drfl_load_all();
-    lss_init();
-    char bosl_out[256];
-    char lil_out[256];
-    char gasm_out[256];
-    char combined[640];
-    bosl_out[0] = '\0';
-    lil_out[0] = '\0';
-    gasm_out[0] = '\0';
-    combined[0] = '\0';
-    if (bosl_demo_hello(bosl_out, sizeof(bosl_out)) != 0) {
-        append_line(combined, sizeof(combined), "BOSL: (failed)\n");
+    if (bootprof_awakening_mode()) {
+        gui_set_response("LardOS ready.\n");
+        gui_render();
+        vga_puts("Awakening mode: fast surface ready\n", 0x2F);
     } else {
-        append_line(combined, sizeof(combined), "BOSL: ");
-        append_line(combined, sizeof(combined), bosl_out);
+        drfl_load_all();
+        lss_init();
+        run_language_demos_report(1);
     }
-    if (bosl_demo_inline(bosl_out, sizeof(bosl_out)) != 0) {
-        append_line(combined, sizeof(combined), "BOSL_ASM: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "BOSL_ASM: ");
-        append_line(combined, sizeof(combined), bosl_out);
-    }
-    if (lil_demo_hello(lil_out, sizeof(lil_out)) != 0) {
-        append_line(combined, sizeof(combined), "LIL: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "LIL: ");
-        append_line(combined, sizeof(combined), lil_out);
-    }
-    if (lil_demo_inline(lil_out, sizeof(lil_out)) != 0) {
-        append_line(combined, sizeof(combined), "LIL_ASM: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "LIL_ASM: ");
-        append_line(combined, sizeof(combined), lil_out);
-    }
-    if (gasm_demo_hello(gasm_out, sizeof(gasm_out)) != 0) {
-        append_line(combined, sizeof(combined), "GASM: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "GASM: ");
-        append_line(combined, sizeof(combined), gasm_out);
-    }
-    if (gasm_demo_inline(gasm_out, sizeof(gasm_out)) != 0) {
-        append_line(combined, sizeof(combined), "GASM_ASM: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "GASM_ASM: ");
-        append_line(combined, sizeof(combined), gasm_out);
-    }
-    if (gasm_demo_oop(gasm_out, sizeof(gasm_out)) != 0) {
-        append_line(combined, sizeof(combined), "GASM_OOP: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "GASM_OOP: ");
-        append_line(combined, sizeof(combined), gasm_out);
-    }
-    if (lafillo_demo_html(gasm_out, sizeof(gasm_out)) != 0) {
-        append_line(combined, sizeof(combined), "LAFILLO_VM: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "LAFILLO_VM: ");
-        append_line(combined, sizeof(combined), gasm_out);
-    }
-    if (os_demo_hello(gasm_out, sizeof(gasm_out)) != 0) {
-        append_line(combined, sizeof(combined), "OS_VM: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "OS_VM: ");
-        append_line(combined, sizeof(combined), gasm_out);
-    }
-    if (lml_demo(gasm_out, sizeof(gasm_out)) != 0) {
-        append_line(combined, sizeof(combined), "LML: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "LML: ");
-        append_line(combined, sizeof(combined), gasm_out);
-        append_line(combined, sizeof(combined), "\n");
-    }
-    if (gc_demo(gasm_out, sizeof(gasm_out)) != 0) {
-        append_line(combined, sizeof(combined), "GC: (failed)\n");
-    } else {
-        append_line(combined, sizeof(combined), "GC: ");
-        append_line(combined, sizeof(combined), gasm_out);
-    }
-    int64_t lval;
-    if (lil_eval_int("(+ 40 2)", &lval) != 0) {
-        append_line(combined, sizeof(combined), "LIL_EXPR: (failed)\n");
-    } else {
-        char lbuf[32];
-        snprintf(lbuf, sizeof(lbuf), "%lld", (long long)lval);
-        append_line(combined, sizeof(combined), "LIL_EXPR: ");
-        append_line(combined, sizeof(combined), lbuf);
-        append_line(combined, sizeof(combined), "\n");
-    }
-    gui_set_response(combined);
-    gui_render();
 
     int ps2_ready = ps2_init();
     if (ps2_ready == 0) {
-        int boot_choice = boot_post_offer();
-        if (boot_choice == 1 || bootprof_force_post()) {
-            boot_post_run_screen();
-        } else if (boot_choice == 2) {
-            boot_mode_run_screen();
+        if (bootprof_awakening_mode()) {
+            vga_puts("Awakening mode: POST prompt deferred\n", 0x2F);
         } else {
-            gui_set_response(combined);
-            gui_render();
+            int boot_choice = boot_post_offer();
+            if (boot_choice == 1 || bootprof_force_post()) {
+                boot_post_run_screen();
+            } else if (boot_choice == 2) {
+                boot_mode_run_screen();
+            } else {
+                gui_set_response(s_boot_report);
+                gui_render();
+            }
         }
+    } else if (bootprof_awakening_mode()) {
+        vga_puts("Awakening mode: PS/2 unavailable, continuing\n", 0x2F);
     } else {
         vga_puts("PS/2 unavailable for POST option\n", 0x4F);
     }
     ps2_mouse_init();
 
-    net_stack_t net;
-    net_cfg_t cfg;
-    int net_ready = 0;
-    static char resp[4096];
-    if (bootprof_network_enabled()) {
-        if (net_init(&net) != 0) {
-            panic("NET init failed");
-        }
-        if (net_dhcp(&net, &cfg) != 0) {
-            panic("DHCP failed");
-        }
-        net_ready = 1;
-        oslink_init(&net, &cfg, "lardos");
-        vga_puts("DHCP OK\n", 0x2F);
-
-        ip4_t ip;
-        if (net_dns_a(&net, cfg.dns, "example.com", &ip) != 0) {
-            panic("DNS failed");
-        }
-        vga_puts("DNS OK\n", 0x2F);
-
-        if (net_http_get(&net, ip, 80, "example.com", "/", resp, sizeof(resp)) == 0) {
-            vga_puts("HTTP OK\n", 0x2F);
-        } else {
-            vga_puts("HTTP unavailable\n", 0x4F);
-        }
+    char* resp = s_http_resp;
+    if (bootprof_awakening_mode()) {
+        vga_puts("Awakening mode: loaders continue in background\n", 0x2F);
     } else {
-        vga_puts("Network skipped by boot profile\n", 0x2F);
+        boot_network_start(1);
     }
     vga_puts("Native TLS loaded (external TLS removed)\n", 0x2F);
 
@@ -516,7 +580,7 @@ void kmain(void)
                     FsWritableFile* w = fs_open_writable(path);
                     const uint8_t* d = f ? f->data : (w ? w->data : NULL);
                     uint32_t sz = f ? f->size : (w ? w->size : 0);
-                    if (d && sz < sizeof(resp)) {
+                    if (d && sz < sizeof(s_http_resp)) {
                         uint32_t i;
                         for (i = 0; i < sz; i++) resp[i] = (char)d[i];
                         resp[i] = '\0';
@@ -536,7 +600,7 @@ void kmain(void)
                 }
             }
             if (!is_file) {
-                if (!net_ready) {
+                if (!s_net_ready) {
                     gui_set_response("Network disabled by boot profile");
                 } else {
                     char host[128];
@@ -551,15 +615,15 @@ void kmain(void)
                         int have_ip = 0;
                         if (parse_ipv4_host(host, &dip) == 0) {
                             have_ip = 1;
-                        } else if (net_dns_a(&net, cfg.dns, host, &dip) == 0) {
+                        } else if (net_dns_a(&s_net, s_cfg.dns, host, &dip) == 0) {
                             have_ip = 1;
                         } else {
                             gui_set_response("DNS failed");
                         }
                         if (have_ip) {
                             resp[0] = '\0';
-                            int r = is_https ? net_https_request(&net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(resp))
-                                             : net_http_request(&net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(resp));
+                            int r = is_https ? net_https_request(&s_net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(s_http_resp))
+                                             : net_http_request(&s_net, dip, url_port, host_hdr, path, http_req.method, http_req.body, http_req.body_len, resp, sizeof(s_http_resp));
                             if (r != 0) {
                                 gui_set_response((is_https && resp[0]) ? resp : (is_https ? "HTTPS failed" : "HTTP failed"));
                             } else {
@@ -581,6 +645,7 @@ void kmain(void)
         }
 
         gui_tick();
+        awakening_background_poll();
         oslink_poll();
         if (gui_screensaver_active()) gui_render();
         __asm__ __volatile__("pause");

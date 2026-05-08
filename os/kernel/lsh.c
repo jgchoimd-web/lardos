@@ -25,6 +25,7 @@
 #include "lguilib.h"
 #include "oslink.h"
 #include "taskprio.h"
+#include "awake.h"
 #include "bootprof.h"
 #include "crashlog.h"
 #include "version.h"
@@ -249,7 +250,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "awake", 1 }, { "awakening", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -1103,12 +1104,13 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode oslink exgui exexgui lguilib task bootprof crashlog cls\n");
+    out_append("  help control status release ver post selftest magic mode oslink exgui exexgui lguilib awake task bootprof crashlog cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|install file.lpack\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
     out_append("  exexgui on|off|focus gui|term|info|next|test\n");
     out_append("  lguilib status|show|use|test [file.lguilib]\n");
+    out_append("  awake status|test\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
@@ -1118,7 +1120,7 @@ static void cmd_help(const char* args)
     out_append("  drivers fsstat fsload fssave sync sram screencheck sandbox exitsandbox\n");
     out_append("  tasktop  task list|set|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  task priorities are 0..9; lev.10 is reserved for OS-granted urgent work\n");
-    out_append("  bootprof status|set normal|safe|netoff|dev\n");
+    out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
     out_append("  crashlog show|clear|test\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
@@ -1144,7 +1146,7 @@ static void cmd_control(const char* args)
     out_append("  exgui style mac     enable familiar desktop/window chrome\n");
     out_append("  exexgui on          use sketch split: GUI, terminal, status\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
-    out_append("  bootprof set netoff save a boot profile in bootprof.txt\n");
+    out_append("  bootprof set awakening fast screen, background loaders\n");
     out_append("  crashlog show       inspect panic and diagnostic history\n");
     out_append("  lpack list sample.lpack inspect a native package\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
@@ -1322,6 +1324,24 @@ static void cmd_status(const char* args)
     out_append(bp.force_post ? "on" : "off");
     out_append(", dev=");
     out_append(bp.dev_mode ? "on" : "off");
+    out_append(", awake=");
+    out_append(bp.awakening_mode ? "on" : "off");
+    out_append("\n");
+
+    awake_info_t ai;
+    awake_info(&ai);
+    out_append("Awakening: ");
+    out_append(ai.enabled ? (ai.done ? "complete" : "loading") : "off");
+    out_append(", phase=");
+    out_append_u32(ai.phase);
+    out_append("/");
+    out_append_u32(ai.total);
+    out_append(", current=");
+    out_append(ai.current);
+    out_append(", runs=");
+    out_append_u32(ai.background_runs);
+    out_append(", err=");
+    out_append_u32(ai.last_error);
     out_append("\n");
 
     out_append("CrashLog: events=");
@@ -2499,6 +2519,45 @@ static void cmd_prio(const char* args)
     else out_append("prio: id not found or OS-only.\n");
 }
 
+static void cmd_awake_status(void)
+{
+    bootprof_info_t bp;
+    awake_info_t info;
+    bootprof_info(&bp);
+    awake_info(&info);
+    out_append("Awakening mode: ");
+    out_append(bp.awakening_mode ? "profile-on" : "profile-off");
+    out_append(", loader=");
+    out_append(info.enabled ? (info.done ? "complete" : "background") : "off");
+    out_append("\nphase=");
+    out_append_u32(info.phase);
+    out_append("/");
+    out_append_u32(info.total);
+    out_append(" current=");
+    out_append(info.current);
+    out_append(" runs=");
+    out_append_u32(info.background_runs);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_awake(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_awake_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(awake_selftest() == 0 ? "awake: selftest OK\n" : "awake: selftest failed\n");
+        return;
+    }
+    out_append("Usage: awake status|test\n");
+}
+
 static void cmd_bootprof_status(void)
 {
     bootprof_info_t info;
@@ -2514,7 +2573,9 @@ static void cmd_bootprof_status(void)
     out_append(info.safe_mode ? "on" : "off");
     out_append(" dev=");
     out_append(info.dev_mode ? "on" : "off");
-    out_append("\nProfiles: normal safe netoff dev\n");
+    out_append(" awake=");
+    out_append(info.awakening_mode ? "on" : "off");
+    out_append("\nProfiles: normal safe netoff dev awakening\n");
     out_append("Stored in bootprof.txt. Use sync to persist it.\n");
 }
 
@@ -2531,7 +2592,7 @@ static void cmd_bootprof(const char* args)
     }
     if (strcmp(sub, "set") == 0 || strcmp(sub, "use") == 0) {
         if (vcs_read_word(&args, name, sizeof(name)) != 0) {
-            out_append("Usage: bootprof set normal|safe|netoff|dev\n");
+            out_append("Usage: bootprof set normal|safe|netoff|dev|awakening\n");
             return;
         }
         int r = bootprof_set(name);
@@ -3423,6 +3484,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "exgui") == 0) { cmd_exgui(args); return; }
     if (strcmp(cmd, "exexgui") == 0) { cmd_exexgui(args); return; }
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
+    if (strcmp(cmd, "awake") == 0 || strcmp(cmd, "awakening") == 0) { cmd_awake(args); return; }
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }
     if (strcmp(cmd, "tasktop") == 0) { cmd_tasktop(args); return; }
     if (strcmp(cmd, "bootprof") == 0) { cmd_bootprof(args); return; }

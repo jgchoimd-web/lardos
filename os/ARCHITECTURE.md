@@ -275,6 +275,12 @@ where each command is parsed as `setting value`: `awake on`, `style 2`,
 `settings`, and POST checks the non-mutating grammar map so numeric setting
 aliases stay covered.
 
+`lassist.c` owns Lard Buddy, the optional roaming assistant. It is off by
+default, can be toggled with `buddy on` / `buddy off` or through CFGSH, and is
+drawn as a small native overlay after the desktop layers so it follows the user
+across tabs, split views, and screensaver rendering. `buddy joke` and `buddy
+next` rotate its casual messages.
+
 `crashlog.c` owns `crashlog.txt`, a writable panic and diagnostic history. Panic
 paths append an entry and attempt an LPST save before halting; LSH exposes the
 same log through `crashlog show`, `crashlog clear`, and `crashlog test`.

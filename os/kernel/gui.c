@@ -19,6 +19,7 @@
 #include "exexgui.h"
 #include "guioverlay.h"
 #include "lguilib.h"
+#include "lassist.h"
 #include "syscall.h"
 #include "lib3d_demo.h"
 
@@ -553,6 +554,7 @@ int gui_init(void)
     g_screenram_used = 0;
     g_screenram_enabled = 0;
     g_screenram_last_error = 0;
+    lassist_init();
     return 0;
 }
 
@@ -1508,6 +1510,7 @@ void gui_handle_key_nav(int kind)
 void gui_tick(void)
 {
     if (!g_have_fb) return;
+    lassist_tick((uint32_t)g.app_id);
     if (lsh_poll_background() && g.app_id == 7) {
         const char* out = lsh_get_output();
         uint32_t i = 0;
@@ -1738,6 +1741,7 @@ void gui_render(void)
     g_syscall_target_override = tgt;
     if (g.ss_active) {
         render_screensaver();
+        lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my, 8u, 8u, 220u, 160u);
         screenram_flush_to_target(tgt);
         if (g_have_bb) fb_blit(&g_fb, &g_bb);
         g_syscall_target_override = 0;
@@ -2046,6 +2050,8 @@ void gui_render(void)
 
     exgui_draw_overlay();
     exexgui_draw_overlay();
+    lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my,
+                 (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h);
 
     // Cursor last
     gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);

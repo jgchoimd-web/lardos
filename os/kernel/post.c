@@ -14,6 +14,7 @@
 #include "lcontainer.h"
 #include "lil.h"
 #include "lguilib.h"
+#include "lassist.h"
 #include "lpack.h"
 #include "lsh.h"
 #include "lvcs.h"
@@ -126,6 +127,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("gui: retro screencheck", screencheck_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: exgui desktop layer", exgui_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: exexgui split layout", exexgui_selftest() == 0, emit, user, &pass, &fail);
+    post_check("gui: lard buddy assistant", lassist_selftest() == 0, emit, user, &pass, &fail);
 
     post_check("lcnt: defaults", lcontainer_count() >= 3u, emit, user, &pass, &fail);
     post_check("lpst: dual-bank layout", lba == 2752u && sectors == 128u && bank_sectors == 64u, emit, user, &pass, &fail);

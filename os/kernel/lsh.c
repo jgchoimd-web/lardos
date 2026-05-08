@@ -23,6 +23,7 @@
 #include "exgui.h"
 #include "exexgui.h"
 #include "lguilib.h"
+#include "lassist.h"
 #include "oslink.h"
 #include "taskprio.h"
 #include "awake.h"
@@ -252,6 +253,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
     { "oslink", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "awake", 1 }, { "awakening", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 },
@@ -1106,12 +1108,13 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode cfgsh oslink exgui exexgui lguilib awake task bootprof crashlog cls\n");
+    out_append("  help control status release ver post selftest magic mode cfgsh buddy oslink exgui exexgui lguilib awake task bootprof crashlog cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|install file.lpack\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
     out_append("  exexgui on|off|focus gui|term|info|next|test\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
+    out_append("  buddy on|off|joke|next|status   optional easygoing helper overlay\n");
     out_append("  lguilib status|show|use|test [file.lguilib]\n");
     out_append("  awake on|off|status|test\n");
     out_append("  write file text  append file text  copy src dst\n");
@@ -1150,6 +1153,7 @@ static void cmd_control(const char* args)
     out_append("  exexgui on          use sketch split: GUI, terminal, status\n");
     out_append("  cfgsh               enter mode-name value settings shell\n");
     out_append("  cfg style 2         set desktop style by number\n");
+    out_append("  buddy on            enable the roaming casual assistant\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
     out_append("  awake on            enable fast screen boot for next boot\n");
     out_append("  awake off           return next boot to normal and stop loader\n");
@@ -1294,6 +1298,16 @@ static void cmd_status(const char* args)
     out_append_u32(lgui.theme.widget_count);
     out_append(", err=");
     out_append(lguilib_error_name(lgui.theme.last_error));
+    out_append("\n");
+
+    lassist_info_t buddy;
+    lassist_info(&buddy);
+    out_append("Lard Buddy: ");
+    out_append(buddy.enabled ? "on" : "off");
+    out_append(", jokes=");
+    out_append_u32(buddy.jokes);
+    out_append(", msg=");
+    out_append(buddy.message);
     out_append("\n");
 
     oslink_info_t link;
@@ -2585,6 +2599,59 @@ static void cmd_awake(const char* args)
     out_append("Usage: awake on|off|status|test\n");
 }
 
+static void cmd_buddy_status(void)
+{
+    lassist_info_t info;
+    lassist_info(&info);
+    out_append("Lard Buddy: ");
+    out_append(info.enabled ? "on" : "off");
+    out_append(", mood=");
+    out_append_u32(info.mood);
+    out_append(", jokes=");
+    out_append_u32(info.jokes);
+    out_append(", tick=");
+    out_append_u32(info.tick);
+    out_append("\n\"");
+    out_append(info.message);
+    out_append("\"\n");
+}
+
+static void cmd_buddy(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_buddy_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0 || strcmp(sub, "enable") == 0 || strcmp(sub, "start") == 0) {
+        lassist_enable(1);
+        out_append("buddy: on. I will hover politely and pretend this was my idea.\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "disable") == 0 || strcmp(sub, "stop") == 0) {
+        lassist_enable(0);
+        out_append("buddy: off. I will be emotionally available off-screen.\n");
+        return;
+    }
+    if (strcmp(sub, "joke") == 0 || strcmp(sub, "fun") == 0) {
+        lassist_joke();
+        cmd_buddy_status();
+        return;
+    }
+    if (strcmp(sub, "next") == 0 || strcmp(sub, "tip") == 0) {
+        lassist_next(0);
+        cmd_buddy_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lassist_selftest() == 0 ? "buddy: selftest OK\n" : "buddy: selftest failed\n");
+        return;
+    }
+    out_append("Usage: buddy on|off|status|joke|next|test\n");
+}
+
 static void cmd_bootprof_status(void)
 {
     bootprof_info_t info;
@@ -3532,6 +3599,7 @@ static void cfgsh_help(void)
     out_append("  style 1|2|3        win|linux|mac\n");
     out_append("  layout 1|2|3       float|tile|stack\n");
     out_append("  split on|off       EXEXGUI sketch split\n");
+    out_append("  buddy on|off       roaming easygoing assistant\n");
     out_append("  pane 1|2|3         gui|term|info focus\n");
     out_append("  sram on|off        screen scratch RAM\n");
     out_append("  http 1|2           GET|POST mode\n");
@@ -3550,12 +3618,14 @@ static void cfgsh_status(void)
     exexgui_info_t xx;
     gui_screenram_info_t sr;
     taskprio_info_t tp;
+    lassist_info_t buddy;
     bootprof_info(&bp);
     awake_info(&aw);
     exgui_info(&eg);
     exexgui_info(&xx);
     gui_screenram_info(&sr);
     taskprio_info(&tp);
+    lassist_info(&buddy);
     out_append("CFGSH status\n");
     out_append("  boot=");
     out_append(bp.name);
@@ -3573,6 +3643,8 @@ static void cfgsh_status(void)
     out_append(xx.enabled ? "on" : "off");
     out_append(" pane=");
     out_append(exexgui_focus_name(xx.focus));
+    out_append(" buddy=");
+    out_append(buddy.enabled ? "on" : "off");
     out_append("\n  sram=");
     out_append(sr.enabled ? "on" : "off");
     out_append(" http=");
@@ -3650,6 +3722,23 @@ static int cfgsh_apply(const char* setting, const char* args)
             out_append(on ? "cfgsh: split on\n" : "cfgsh: split off\n");
         } else {
             out_append("Usage: split on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "buddy") == 0 || strcmp(setting, "assistant") == 0 ||
+        strcmp(setting, "helper") == 0 || strcmp(setting, "lardbuddy") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_buddy_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            lassist_enable(on);
+            out_append(on ? "cfgsh: buddy on\n" : "cfgsh: buddy off\n");
+        } else if (strcmp(value, "joke") == 0) {
+            lassist_joke();
+            cmd_buddy_status();
+        } else if (strcmp(value, "next") == 0 || strcmp(value, "tip") == 0) {
+            lassist_next(0);
+            cmd_buddy_status();
+        } else {
+            out_append("Usage: buddy on|off|joke|next\n");
         }
         return 1;
     }
@@ -3888,6 +3977,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
     if (strcmp(cmd, "cfgsh") == 0 || strcmp(cmd, "cfg") == 0 || strcmp(cmd, "settings") == 0) { cmd_cfgsh(args); return; }
     if (strcmp(cmd, "exitcfg") == 0) { s_cfgsh_mode = 0; out_append("CFGSH OFF.\n"); return; }
+    if (strcmp(cmd, "buddy") == 0 || strcmp(cmd, "assistant") == 0 || strcmp(cmd, "lardbuddy") == 0) { cmd_buddy(args); return; }
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "exgui") == 0) { cmd_exgui(args); return; }

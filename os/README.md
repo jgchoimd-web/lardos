@@ -107,6 +107,9 @@ commands:
   `awake on`, `style 2`, `layout 3`, `pane 1`, `http 2`, `boot 4`,
   `priority 10`, `sandbox off`, or `sum on`. Outside the mode, `cfg style 2`
   runs one setting change directly.
+- `buddy on|off|status|joke|next` controls Lard Buddy, an optional roaming
+  assistant overlay. It follows the GUI surface, offers casual tips, and tells
+  small jokes without replacing the user's control.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
   command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered

@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.21.0a
+ITEM Added EXGUI, an optional extended desktop environment and window-manager layer.
+ITEM EXGUI can draw Windows-like, Linux-like, and Mac-like shell chrome without replacing the classic GUI.
+ITEM Added exgui on, off, status, style, layout, next, and test commands in LSH.
+ITEM POST now checks the EXGUI state machine and the built-in LARS control room links to EXGUI.
+
 SECTION v1.20.0a
 ITEM Extended OSLink with a local in-kernel bus for LardOS-internal communication.
 ITEM Added oslink bus and oslink emit channel text commands in LSH.

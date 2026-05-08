@@ -67,6 +67,7 @@ flowchart TB
     ScreenCheck["screencheck diagnostics"]
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
+    EXGUI["exgui DE + WM layer"]
     VM["BOSL GASM LIL LML OSVM"]
 
     Kmain --> GDT
@@ -85,6 +86,7 @@ flowchart TB
     Net --> OSLink
     Net --> TLS
     Kmain --> GUI
+    GUI --> EXGUI
     GUI --> ScreenCheck
     GUI --> TaskPrio
     GUI --> VM
@@ -182,6 +184,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Crash log | `os/kernel/crashlog.c`, `os/include/crashlog.h` |
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
+| Extended GUI shell | `os/kernel/exgui.c`, `os/include/exgui.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
 | Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |
@@ -207,6 +210,13 @@ diagnostic module. `screencheck status` reports changed samples, tile counts,
 window bounds, and response-view health; `screencheck retro` draws a full-screen
 old boot/storage-style scan so visual glitches can be caught by looking at tile
 tracks, edges, and dot-lane visibility.
+
+`exgui.c` is an optional desktop-environment and window-manager layer drawn by
+the existing GUI renderer. It keeps the original single-window GUI available and
+adds familiar shell chrome for users arriving from Windows, Linux, or macOS:
+taskbars, top panels, docks, launchers, focus indicators, and float/tile/stack
+window layouts. LSH controls it with `exgui on`, `exgui style`, `exgui layout`,
+and `exgui next`.
 
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a
@@ -242,7 +252,7 @@ boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
-ScreenRAM scratch storage, OSLink packet framing, local bus, and safe exec filtering,
+ScreenRAM scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardPack package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS
 hashing, containers, and LIL feature forms.
@@ -251,6 +261,7 @@ hashing, containers, and LIL feature forms.
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
 visual screen diagnostics (`screencheck`),
+extended desktop/window-manager chrome (`exgui`),
 OS-to-OS messaging, local bus messages, and safe remote command requests (`oslink`), task priority
 control (`task`, `prio`, `nice`), boot profile control (`bootprof`), crash
 history (`crashlog`), POST reruns (`post`, `selftest`), native document

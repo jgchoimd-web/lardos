@@ -4,6 +4,7 @@
 #include "bootprof.h"
 #include "cpumode.h"
 #include "crashlog.h"
+#include "exgui.h"
 #include "fs.h"
 #include "gui.h"
 #include "lar.h"
@@ -116,6 +117,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("gui: response view layout", gui_ok && gui_info.response_view_ok, emit, user, &pass, &fail);
     post_check("gui: screenram scratch", gui_screenram_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: retro screencheck", screencheck_selftest() == 0, emit, user, &pass, &fail);
+    post_check("gui: exgui desktop layer", exgui_selftest() == 0, emit, user, &pass, &fail);
 
     post_check("lcnt: defaults", lcontainer_count() >= 3u, emit, user, &pass, &fail);
     post_check("lpst: dual-bank layout", lba == 2752u && sectors == 128u && bank_sectors == 64u, emit, user, &pass, &fail);

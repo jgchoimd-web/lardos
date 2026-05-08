@@ -15,6 +15,7 @@
 #include "lar.h"
 #include "ps2.h"
 #include "kr_basic.h"
+#include "exgui.h"
 #include "syscall.h"
 #include "lib3d_demo.h"
 
@@ -452,6 +453,7 @@ int gui_init(void)
     g_have_fb = (fb_from_bootinfo(&g_fb) == 0);
     if (!g_have_fb) return -1;
     g_bg = 0xFF101020;
+    exgui_init();
     if (g_fb.w <= 1024 && g_fb.h <= 768) {
         g_bb.fb = g_backbuf;
         g_bb.w = g_fb.w;
@@ -1675,6 +1677,7 @@ void gui_render(void)
 
     // Full redraw for simplicity & correctness.
     fb_clear(tgt, g_bg);
+    exgui_draw_desktop();
 
     // Window frame
     uint32_t win_bg = 0xFF202840;
@@ -1961,6 +1964,8 @@ void gui_render(void)
         if (q_pos > track_w - 6) q_pos = track_w - 6;
         fb_fill_rect(tgt, (uint16_t)(track_x + q_pos), (uint16_t)(panel_y + 10 + row_h * 2), 6, 12, 0xFF8090A0);
     }
+
+    exgui_draw_overlay();
 
     // Cursor last
     gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);

@@ -81,6 +81,10 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `exgui on|off|style|layout|next` enables an optional extended desktop
+  environment and window-manager layer. The classic GUI stays intact, while
+  EXGUI adds familiar Windows-like, Linux-like, or Mac-like panels, docks,
+  launchers, task lists, and floating/tile/stack window chrome.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
   command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered
@@ -122,7 +126,7 @@ During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
 Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
 descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
-scratch storage, OSLink packet framing, local bus, and safe exec filtering, TaskPrio
+scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec filtering, TaskPrio
 scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
 ScreenCheck visual diagnostics, and LIL feature forms. The screen checks are there to catch visible boot/UI

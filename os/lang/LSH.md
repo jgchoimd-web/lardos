@@ -13,7 +13,7 @@
 - `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
 - `exexgui on|off|focus|next` - sketch split GUI with GUI, terminal, and status panes.
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
-- `awake status|test` - inspect the Awakening fast-boot background loader.
+- `awake on|off|status|test` - control the default-off Awakening fast-boot mode.
 - `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.
 - `task list|set|default|run|boost|urgent|drop` - inspect and change task priority.
 - `tasktop` - show queued tasks with status and priority bars.

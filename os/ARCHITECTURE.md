@@ -264,8 +264,9 @@ turns it into boot behavior. `normal` uses the default path, `safe` forces POST
 and disables networking, `netoff` skips networking without forcing POST, and
 `dev` keeps networking while raising the default task priority. `awakening`
 shows the GUI/shell surface as soon as the essential core is up and lets
-drivers, language demos, and networking finish in the background. LSH exposes
-this through `bootprof status`, `bootprof set`, and `awake status`.
+drivers, language demos, and networking finish in the background. Awakening is
+off by default; LSH exposes it through `awake on`, `awake off`, `awake status`,
+`bootprof status`, and `bootprof set`.
 
 `crashlog.c` owns `crashlog.txt`, a writable panic and diagnostic history. Panic
 paths append an entry and attempt an LPST save before halting; LSH exposes the

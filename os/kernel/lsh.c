@@ -1110,7 +1110,7 @@ static void cmd_help(const char* args)
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
     out_append("  exexgui on|off|focus gui|term|info|next|test\n");
     out_append("  lguilib status|show|use|test [file.lguilib]\n");
-    out_append("  awake status|test\n");
+    out_append("  awake on|off|status|test\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
@@ -1146,7 +1146,8 @@ static void cmd_control(const char* args)
     out_append("  exgui style mac     enable familiar desktop/window chrome\n");
     out_append("  exexgui on          use sketch split: GUI, terminal, status\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
-    out_append("  bootprof set awakening fast screen, background loaders\n");
+    out_append("  awake on            enable fast screen boot for next boot\n");
+    out_append("  awake off           return next boot to normal and stop loader\n");
     out_append("  crashlog show       inspect panic and diagnostic history\n");
     out_append("  lpack list sample.lpack inspect a native package\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
@@ -2551,11 +2552,30 @@ static void cmd_awake(const char* args)
         cmd_awake_status();
         return;
     }
+    if (strcmp(sub, "on") == 0 || strcmp(sub, "enable") == 0 || strcmp(sub, "start") == 0) {
+        int r = bootprof_set("awakening");
+        if (r == 0) {
+            out_append("awake: on for next boot. Run sync to persist. Current boot keeps its startup path.\n");
+        } else {
+            out_append("awake: failed to store awakening profile.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "disable") == 0 || strcmp(sub, "stop") == 0) {
+        int r = bootprof_set("normal");
+        awake_enable(0, 0);
+        if (r == 0) {
+            out_append("awake: off. Run sync to persist. Next boot is normal; current background loader stopped.\n");
+        } else {
+            out_append("awake: failed to store normal profile.\n");
+        }
+        return;
+    }
     if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
         out_append(awake_selftest() == 0 ? "awake: selftest OK\n" : "awake: selftest failed\n");
         return;
     }
-    out_append("Usage: awake status|test\n");
+    out_append("Usage: awake on|off|status|test\n");
 }
 
 static void cmd_bootprof_status(void)

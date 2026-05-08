@@ -46,6 +46,7 @@ static net_cfg_t s_cfg;
 static int s_net_ready;
 static char s_http_resp[4096];
 static char s_boot_report[768];
+static int s_boot_awakening_mode;
 static uint32_t s_awake_background_phase;
 
 static void vga_put_byte(uint8_t b, void* userdata)
@@ -460,7 +461,10 @@ static void boot_network_start(int foreground)
 
 static void awakening_background_poll(void)
 {
-    if (!bootprof_awakening_mode()) return;
+    awake_info_t info;
+    if (!s_boot_awakening_mode) return;
+    awake_info(&info);
+    if (!info.enabled || info.done) return;
     if (s_awake_background_phase == 0u) {
         awake_mark(1u, "drivers");
         drfl_load_all();
@@ -503,9 +507,10 @@ void kmain(void)
     crashlog_init();
     bootprof_load();
     lsh_init();
-    awake_enable(bootprof_awakening_mode(), 3u);
+    s_boot_awakening_mode = bootprof_awakening_mode();
+    awake_enable(s_boot_awakening_mode, 3u);
     if (bootprof_dev_mode()) taskprio_set_default(7);
-    if (bootprof_awakening_mode()) {
+    if (s_boot_awakening_mode) {
         gui_set_response("LardOS ready.\n");
         gui_render();
         vga_puts("Awakening mode: fast surface ready\n", 0x2F);
@@ -517,7 +522,7 @@ void kmain(void)
 
     int ps2_ready = ps2_init();
     if (ps2_ready == 0) {
-        if (bootprof_awakening_mode()) {
+        if (s_boot_awakening_mode) {
             vga_puts("Awakening mode: POST prompt deferred\n", 0x2F);
         } else {
             int boot_choice = boot_post_offer();
@@ -530,7 +535,7 @@ void kmain(void)
                 gui_render();
             }
         }
-    } else if (bootprof_awakening_mode()) {
+    } else if (s_boot_awakening_mode) {
         vga_puts("Awakening mode: PS/2 unavailable, continuing\n", 0x2F);
     } else {
         vga_puts("PS/2 unavailable for POST option\n", 0x4F);
@@ -538,7 +543,7 @@ void kmain(void)
     ps2_mouse_init();
 
     char* resp = s_http_resp;
-    if (bootprof_awakening_mode()) {
+    if (s_boot_awakening_mode) {
         vga_puts("Awakening mode: loaders continue in background\n", 0x2F);
     } else {
         boot_network_start(1);

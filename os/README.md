@@ -122,7 +122,10 @@ commands:
   `dev` keeps networking on while raising the default task priority, and
   `awakening` shows the GUI/shell surface after the essential core is ready
   while drivers, demos, and networking finish quietly in the background.
-- `awake status|test` reports the Awakening background loader phase.
+- `awake on|off|status|test` controls the default-off Awakening boot mode.
+  `awake on` selects fast-surface boot for the next boot, while `awake off`
+  returns the next boot to normal and stops the current background loader if it
+  is still running.
 - `crashlog` shows panic and diagnostic events stored in `crashlog.txt`.
   `panic` paths append to it before halting, and `crashlog test` adds a manual
   diagnostic entry.

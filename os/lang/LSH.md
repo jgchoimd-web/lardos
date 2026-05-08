@@ -7,6 +7,7 @@
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
 - `release policy` - show when to use `a`, `b`, or `p` release suffixes.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
+- `post baseline` / `postbaseline show` - show the saved POST baseline report.
 - `magic command [args]` - predict and run a mistyped safe built-in command.
 - `magic dryrun command [args]` - show the Magic prediction without executing it.
 - `magic explain` - show why the last Magic prediction executed or stopped.
@@ -19,16 +20,16 @@
 - `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
 - `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.
 - `bugreplay status|last|show|draw|clear` - replay BugEye scan frames from `bugreplay.lardd`.
-- `trace on|off|show|module name` - LardTrace event timeline for shell/modules.
+- `lardtrace on|off|show|module name` / `trace ...` - LardTrace event timeline for shell/modules.
 - `netwatch on|off|show|clear` - readable network, OSLink, and HTTP GET/POST watcher.
 - `journal show|add|clear` - automatic `.lardd` OS journal.
 - `rollback snap|last|apply` - settings snapshot and restore.
 - `trust list|allow|deny|history` - user-owned permission policy map and audit log.
 - `lfsdoctor scan|repair|show` - filesystem and LPST persistence health report.
 - `panic capsule` / `paniccapsule show` - write and view a recovery bundle report.
-- `bootmap` / `bootreplay show` / `postbaseline show` / `devmap draw` / `oldcheck draw` / `awakemon` - boot, POST, device, storage, and Awakening views.
+- `bootmap` / `bootreplay show` / `post baseline` / `postbaseline show` / `devmap draw` / `oldcheck draw` / `awakemon` - boot, POST, device, storage, and Awakening views.
 - `ltheme list|show|preview|use name` - native shell theme presets and `.ltheme` files.
-- `cfgprof save|load name` / `userlaw show` - settings profiles and user-right policy.
+- `cfgprof save|load name` / `cfg profile` in the feature map / `userlaw show` - settings profiles and user-right policy.
 - `oschat say|send|read` - local OSLink chat-style messages.
 - `larsview open file` / `larsapp open|form|run` / `notes show|add|clear` - native document/app browser state and writable `notes.lardd`.
 - `lunit run tests.lunit` - run small native feature tests.

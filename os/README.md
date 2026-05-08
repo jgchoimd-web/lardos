@@ -81,7 +81,7 @@ commands:
 - `control` prints the system control map and the full-control entry points.
 - `status` prints version, drive, LPST persistence, driver, and container state.
 - `post` / `selftest` reruns the same Power-On Self-Test diagnostics available
-  from the boot option.
+  from the boot option. `post baseline` opens the saved POST baseline report.
 - `magic command [args]` predicts a mistyped safe built-in command and executes
   the predicted command directly, for example `magic statsu`.
 - `magic dryrun command [args]` shows the same prediction without executing it.
@@ -118,11 +118,12 @@ commands:
 - `buddy mood calm|funny|strict|silent` changes the assistant personality.
 - `bugeye on|off|scan` runs a user-visible framebuffer/layout bug monitor on
   top of the existing screen checks and writes `bugreport.lardd`.
-- `bugreplay status|last|show|clear` records BugEye scan frames so screen
+- `bugreplay status|last|show|draw|clear` records BugEye scan frames so screen
   overlap, clipped text, color, and render-break reports can be replayed from
   `bugreplay.lardd`; `bugreplay draw` shows them as a small GUI panel.
-- `trace on|off|show|module name` turns on LardTrace, a small event ring for
-  kernel modules, shell commands, OSLink, TaskPrio, networking, and LPack.
+- `lardtrace on|off|show|module name` and the shorter `trace` alias turn on
+  LardTrace, a small event ring for kernel modules, shell commands, OSLink,
+  TaskPrio, networking, and LPack.
 - `netwatch on|off|show` records readable UDP, OSLink, and HTTP/HTTPS GET/POST
   activity into `netwatch.lardd`.
 - `journal show|add|clear` opens the automatic `journal.lardd` event log.
@@ -136,14 +137,16 @@ commands:
 - `panic capsule` or `paniccapsule show` writes `paniccapsule.lardd`, a small
   recovery bundle that joins panic-room, crashlog, BugEye, Trust, LFSDoctor,
   priority, and BootMap state.
-- `postbaseline show`, `bootreplay show`, `bootmap`, `oldcheck draw`, `devmap`,
-  and `awakemon` show POST drift, boot replay, boot phase map, retro storage
-  check, hardware map, and Awakening background loader progress.
+- `post baseline`, `postbaseline show`, `bootreplay show`, `bootmap`,
+  `oldcheck draw`, `devmap`, and `awakemon` show POST drift, boot replay, boot
+  phase map, retro storage check, hardware map, and Awakening background loader
+  progress.
 - `ltheme list|show|use name` selects native shell theme presets or parses
   `.ltheme` files such as `default.ltheme`; `ltheme preview file.ltheme` draws
   a small preview panel before applying.
-- `cfgprof save name` and `cfgprof load name` store/load settings bundles, while
-  `userlaw show` opens the user-right policy file.
+- `cfgprof save name` and `cfgprof load name` store/load settings bundles
+  (`cfg profile` in the feature map), while `userlaw show` opens the user-right
+  policy file.
 - `larsview open file` tracks native document browsing state, `larsapp` treats
   `.lars` as a small app surface, and `notes show|add|clear` edits the writable
   `notes.lardd` document.

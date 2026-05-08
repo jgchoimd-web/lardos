@@ -1199,7 +1199,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release [policy] ver post selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust trace netwatch journal oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control status release [policy] ver post baseline selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
@@ -1207,11 +1207,11 @@ static void cmd_help(const char* args)
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
-    out_append("  bugreplay status|last|show      replay last BugEye screen-health frames\n");
+    out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
     out_append("  rollback snap|last|apply        save/restore user-visible settings\n");
     out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
-    out_append("  bootmap bootreplay oldcheck lfsdoctor devmap awakemon boot/device maps and storage doctor\n");
-    out_append("  trace on|show|module gui, netwatch on|show, journal show\n");
+    out_append("  post baseline, bootreplay show, bootmap, oldcheck, devmap boot/POST/device views\n");
+    out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
@@ -5464,7 +5464,17 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == 'a' && cmd[4] == 'v' && cmd[5] == 'e' && cmd[6] == '\0') { cmd_fssave(args); return; }
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 'l' && cmd[3] == 'o' && cmd[4] == 'a' && cmd[5] == 'd' && cmd[6] == '\0') { cmd_fsload(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'y' && cmd[2] == 'n' && cmd[3] == 'c' && cmd[4] == '\0') { cmd_fssave(args); return; }
-    if (cmd[0] == 'p' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 't' && cmd[4] == '\0') { cmd_selftest(args); return; }
+    if (cmd[0] == 'p' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 't' && cmd[4] == '\0') {
+        const char* rest = args;
+        char sub[16];
+        if (vcs_read_word(&rest, sub, sizeof(sub)) == 0 &&
+            (strcmp(sub, "baseline") == 0 || strcmp(sub, "base") == 0)) {
+            cmd_postbaseline(rest);
+            return;
+        }
+        cmd_selftest(args);
+        return;
+    }
     if (cmd[0] == 's' && cmd[1] == 'r' && cmd[2] == 'a' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_sram(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'c' && cmd[2] == 'r' && cmd[3] == 'e' && cmd[4] == 'e' && cmd[5] == 'n' && cmd[6] == 'r' && cmd[7] == 'a' && cmd[8] == 'm' && cmd[9] == '\0') { cmd_sram(args); return; }
     if (strcmp(cmd, "screencheck") == 0 || strcmp(cmd, "scrcheck") == 0) { cmd_screencheck(args); return; }

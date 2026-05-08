@@ -1,0 +1,227 @@
+LARDD 1
+TITLE LardOS Releases
+TEXT Every feature addition gets a release entry. The running kernel version is the active release.
+TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
+TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
+
+SECTION v1.35.1b
+ITEM Beta polish: added exact user-facing command spelling for post baseline as an alias of postbaseline show.
+ITEM Updated help and native docs so lardtrace, post baseline, boot replay, cfg profile, and bugreplay draw are visible by the requested names.
+ITEM Kept the recovery/audit feature suite in the beta channel while the broad tools continue to stabilize.
+
+SECTION v1.35.0b
+ITEM Beta release channel split: LardOS no longer treats every feature release as an official a build by default.
+ITEM Added release policy so the shell explains a, b, and p channel use inside the OS.
+ITEM Documented that large experimental kernel, GUI, filesystem, or shell bundles should ship as b until promoted.
+ITEM Kept p reserved for narrow emergency hotpatches and a reserved for verified official builds.
+
+SECTION v1.34.0a
+ITEM Added LardTrace with trace on, trace show, and trace module filters for shell, GUI, OSLink, TaskPrio, network, and package events.
+ITEM Added NetWatch, POST baseline reports, BootReplay, LARDD journal, Device Map, CFG profiles, User Law, and LUNIT tests.
+ITEM Expanded BugReplay with a draw panel and Magic with dryrun mode.
+ITEM Added EXEXGUI workspaces 1/2/3, LTheme preview, LARS app command aliases, and mode guard.
+ITEM Added writable trace.lardd, netwatch.lardd, journal.lardd, postbaseline.lardd, bootreplay.lardd, cfgprof.lardd, userlaw.lardd, plus tests.lunit.
+ITEM POST now checks the new native recovery, audit, policy, and test files.
+
+SECTION v1.33.0a
+ITEM Added BugReplay, a native screen-bug replay log that records BugEye scan frames and writes bugreplay.lardd.
+ITEM Added Trust history so permission allow/deny changes are auditable without taking control away from the user.
+ITEM Added LPack verify and undo: packages now report structure, hash, installable targets, warnings, and can roll back the last install snapshot.
+ITEM Added Panic Capsule, a recovery bundle report that gathers panic, crashlog, BugEye, BugReplay, Trust, TaskPrio, LFSDoctor, and BootMap state into paniccapsule.lardd.
+ITEM Added LFSDoctor scan/repair reports for the built-in filesystem and LPST persistence state.
+ITEM Added POST/selftest coverage for the new writable report files and recovery-control paths.
+
+SECTION v1.32.1p
+ITEM Hotpatch: BugEye now writes every scan to writable bugreport.lardd as a native LARDD report.
+ITEM Added priority history, task history, and prio history for tracking who granted priority lev.10 and in what sequence.
+ITEM Added POST coverage for bugreport.lardd and TaskPrio lev.10 history.
+
+SECTION v1.32.0a
+ITEM Added LardKit, a native C feature suite for BugEye, Rollback, Trust, BootMap, PanicRoom, OldCheck, LTheme, AwakeMonitor, OSChat, LARSView, and LARDD notes.
+ITEM Added magic explain so the shell records why Magic executed, refused, or failed a prediction.
+ITEM Added assistant mood controls with calm, funny, strict, and silent modes.
+ITEM Added writable notes.lardd and POST coverage for the new user-control feature suite.
+
+SECTION v1.31.0a
+ITEM Added Lard Buddy, an optional roaming assistant overlay with casual tips and jokes.
+ITEM Added buddy on, buddy off, buddy status, buddy joke, and buddy next commands plus assistant/lardbuddy aliases.
+ITEM CFGSH can now toggle the assistant with buddy on or buddy off.
+ITEM POST now checks the Lard Buddy assistant state machine.
+
+SECTION v1.30.0a
+ITEM Added CFGSH, a settings-focused shell that accepts mode-name value commands.
+ITEM cfgsh enters a CFG prompt for settings only; cfg and settings run one-shot changes from normal LSH.
+ITEM Added numeric setting maps for style, layout, pane, HTTP method, boot profile, and task priority.
+ITEM POST now checks the CFGSH grammar map so numbered settings stay covered.
+
+SECTION v1.29.0a
+ITEM Awakening mode is now explicitly default-off and controlled through awake on and awake off.
+ITEM awake on stores the awakening boot profile for the next boot without changing the current startup path.
+ITEM awake off stores the normal boot profile and stops the current Awakening background loader if it is still running.
+ITEM The kernel now snapshots the boot-time Awakening choice so runtime profile edits do not accidentally start boot-only loaders.
+
+SECTION v1.28.0a
+ITEM Made TaskPrio lev.10 user-grantable to match LardOS full-control values.
+ITEM Users can now assign urgent priority with task urgent id, task set id 10, prio id 10, nice 10 command, task default 10, or task boost.
+ITEM lev.10 tasks can be lowered, paused, resumed, or dropped by the user; wait-time aging still cannot create lev.10.
+ITEM POST TaskPrio selftest now covers user-created lev.10 and demotion back to normal priority.
+
+SECTION v1.27.0a
+ITEM Added Awakening mode, a boot profile that shows the GUI/shell surface after essential core init.
+ITEM In awakening boot, drivers, LSS/language demo warmup, and networking continue through a quiet background loader.
+ITEM Added awake status and awake test commands, plus status/BootProf reporting for the background phase.
+ITEM POST now checks the Awakening tracker and bootprof supports bootprof set awakening.
+
+SECTION v1.26.0a
+ITEM Added TaskPrio priority lev.10 as an OS-only urgent scheduling level.
+ITEM User commands and wait-time aging still stop at priorities 0..9; lev.10 can only be granted by the OS.
+ITEM The scheduler now picks an unpaused lev.10 task before all normal task scoring, matching the stop-and-handle-first rule.
+ITEM tasktop, status, docs, and POST selftest now cover the reserved lev.10 path.
+
+SECTION v1.25.0a
+ITEM Added LGUILIB, a native LardOS GUI library file format stored as .lguilib records.
+ITEM Added default.lguilib to the embedded filesystem with NAME, COLOR, WIDGET, and END records.
+ITEM GUIOverlay now reads its colors and widget hints from the active LGUILIB theme instead of only hardcoded constants.
+ITEM Added lguilib status, show, use, and test commands in LSH, plus POST coverage for the parser and built-in file.
+
+SECTION v1.24.0a
+ITEM Added GUIOverlay, a separate chrome layer drawn above the classic GUI.
+ITEM Moved title/status text, compact safe tab repainting, button feedback, shadows, and output framing into the overlay path.
+ITEM Restored the base GUI hitboxes and fixed controls while keeping the visual improvements as an overlaid layer.
+ITEM POST now checks the GUIOverlay layout selftest through the GUI chrome check.
+
+SECTION v1.23.0a
+ITEM Improved the classic GUI chrome without replacing the existing GUI.
+ITEM Added title/status text, compact safe tab labels, expanding input width, button hover/pressed feedback, and a framed output view.
+ITEM POST now checks the polished GUI chrome layout so visual regressions are caught with the boot diagnostics.
+
+SECTION v1.22.0a
+ITEM Added EXEXGUI, a sketch-driven split desktop shell.
+ITEM EXEXGUI keeps the existing GUI in the left DE/WM pane, mirrors LSH in the top-right terminal pane, and draws an info/status pane below it.
+ITEM Added exexgui on, off, status, focus, next, and test commands in LSH.
+ITEM POST now checks EXEXGUI layout math so the split GUI regions are covered by boot diagnostics.
+
+SECTION v1.21.0a
+ITEM Added EXGUI, an optional extended desktop environment and window-manager layer.
+ITEM EXGUI can draw Windows-like, Linux-like, and Mac-like shell chrome without replacing the classic GUI.
+ITEM Added exgui on, off, status, style, layout, next, and test commands in LSH.
+ITEM POST now checks the EXGUI state machine and the built-in LARS control room links to EXGUI.
+
+SECTION v1.20.0a
+ITEM Extended OSLink with a local in-kernel bus for LardOS-internal communication.
+ITEM Added oslink bus and oslink emit channel text commands in LSH.
+ITEM Local OSLink messages share the existing inbox and are labeled with lightweight channels.
+ITEM POST now checks both OSLink packet framing and the local bus path.
+
+SECTION v1.19.0a
+ITEM Added ScreenCheck, a structured framebuffer/layout diagnostic module.
+ITEM Added screencheck status, retro, and test commands in LSH.
+ITEM screencheck retro draws an old boot/storage-style visual scan with colored tiles and a dot-lane visibility check.
+ITEM POST now checks ScreenCheck so visible screen regressions are covered by the boot diagnostics.
+
+SECTION v1.18.0a
+ITEM Added OSLink EXEC packets for OS-to-OS safe remote command requests.
+ITEM Added oslink exec ip command in LSH; receivers queue allowed diagnostics through TaskPrio as remote tasks.
+ITEM Remote execution is whitelist-filtered and blocks raw-control commands, pipes, background control, and writes.
+ITEM OSLink selftest now covers EXEC packet framing and safe-command filtering.
+
+SECTION v1.17.0a
+ITEM Added LardPack, a native LPACK 1 package format parsed and installed by freestanding kernel C.
+ITEM Added sample.lpack to the embedded filesystem and lpack info, list, install, and test commands.
+ITEM Packages can install files into writable RAM filesystem targets such as notes.txt.
+ITEM POST now checks the LardPack parser.
+
+SECTION v1.16.0a
+ITEM Added LARS form records with button and input support in the native document renderer.
+ITEM Added larsform to list LARS actions and larsact to execute button commands from a LARS document.
+ITEM The built-in lardos.lars control room now includes button and input records.
+ITEM POST now checks LARS form/action parsing.
+
+SECTION v1.15.0a
+ITEM Added CrashLog, a persistent panic and diagnostic event log backed by crashlog.txt.
+ITEM panic and panic_u64 now record crash entries and try to save LPST before halting.
+ITEM Added crashlog show, clear, test, and selftest commands in LSH.
+ITEM status now reports crashlog event count and POST checks that the log is writable.
+
+SECTION v1.14.0a
+ITEM Added BootProf, a user-editable boot profile system backed by bootprof.txt.
+ITEM Added bootprof status, set, and test commands for normal, safe, netoff, and dev profiles.
+ITEM safe forces POST and disables network; netoff skips network; dev raises the default task priority.
+ITEM The Doc tab reports network-disabled when a profile intentionally skips networking.
+ITEM POST now checks BootProf profile flag behavior.
+
+SECTION v1.13.0a
+ITEM Added tasktop, a dashboard-style task manager for the TaskPrio queue.
+ITEM Added task up, task down, task pause, and task resume for direct user scheduling control.
+ITEM Paused tasks stay visible but are skipped by the background scheduler until resumed.
+ITEM Task listings now show runnable and paused counts plus a compact priority bar.
+
+SECTION v1.12.0a
+ITEM Added TaskPrio, a user-changeable task priority queue for LSH background work.
+ITEM Added task list, task set, task default, task run, task boost, task drop, prio, and nice commands.
+ITEM Background commands submitted with & now become numbered tasks with visible priorities.
+ITEM The scheduler chooses the highest effective priority and ages waiting tasks so low-priority work is not starved.
+ITEM POST now checks the TaskPrio priority queue.
+
+SECTION v1.11.0a
+ITEM Added OSLink, a small OS-to-OS communication module over the native UDP stack.
+ITEM Added public net_udp_send and net_udp_recv helpers for in-kernel datagram protocols.
+ITEM Added oslink status, hello, ping, send, recv, peers, poll, and test commands in LSH.
+ITEM OSLink tracks peer nodes, queues incoming messages, and replies to hello, ping, and text packets.
+ITEM POST now checks the OSLink packet codec.
+
+SECTION v1.10.0a
+ITEM Added ScreenRAM, an optional framebuffer/backbuffer scratch RAM region.
+ITEM Added sram and screenram LSH commands for default corner storage, user-selected rectangles, reads, writes, clears, and self-tests.
+ITEM ScreenRAM preserves bytes across GUI redraws by restoring the reserved pixel rectangle before blitting.
+ITEM POST now checks the ScreenRAM scratch path so visible memory regressions are caught.
+ITEM Updated built-in LARS, README, architecture, and LSH docs with the ScreenRAM workflow.
+
+SECTION v1.9.0a
+ITEM Added a CPU mode bridge for controlled long64 to real16 and back roundtrips.
+ITEM Added cpumode.c and mode_switch.s with a low-memory trampoline at 0x6000.
+ITEM Added the LSH mode command with status, probe, and real aliases for explicit bridge tests.
+ITEM Added a boot-time M option and POST coverage for CPU mode bridge diagnostics.
+ITEM Updated GDT/MMU setup with a 32-bit protected-mode bridge selector and executable low trampoline page.
+
+SECTION v1.8.0a
+ITEM Added the magic prefix command for predicted safe command execution.
+ITEM magic command [args] corrects near-miss built-in commands and executes the predicted target directly.
+ITEM Raw-control commands such as sum, peek, poke, and asm_ are excluded from automatic magic execution.
+ITEM Updated LSH help and LARS control-room docs with the magic workflow.
+
+SECTION v1.7.0a
+ITEM Added a Doc tab GET/POST method option instead of forcing every HTTP request to GET.
+ITEM Added net_http_request and net_https_request so the in-kernel HTTP/TLS path can send POST bodies.
+ITEM POST mode reads the Doc address as URL|body, sends Content-Length and application/x-www-form-urlencoded, and keeps GET wrappers for older callers.
+ITEM POST redirects are kept conservative: 307/308 preserve POST, while 301/302 leave the original response visible.
+
+SECTION v1.6.0a
+ITEM Added an optional Power-On Self-Test prompt during boot.
+ITEM Added shared POST diagnostics for CPU mode, heap, native FS docs, LARS/LARDD rendering, LAR archives, DRFL descriptors, PCI options, GUI framebuffer/layout, LPST, LVCS, containers, and LIL feature forms.
+ITEM Added the LSH post command as an alias for selftest, using the same POST engine.
+ITEM Added GUI framebuffer sampling so POST can catch visible screen/layout failures, not just syntax errors.
+
+SECTION v1.5.0a
+ITEM Added C-only mkiso host tooling for bootable El Torito ISO release artifacts.
+ITEM Added make release to publish versioned IMG and ISO files under os/release.
+ITEM Added run-iso for checking the ISO boot path in QEMU.
+
+SECTION v1.4.0a
+ITEM Added LSH lil file execution for native LIL scripts in the in-memory filesystem.
+ITEM Added features.lil as an embedded script tour for LIL.
+ITEM Extended LIL with assert, when, unless, repeat, stepped for loops, clamp, between, within, pow, gcd, and lcm.
+ITEM Updated the host LIL runner to match kernel LIL semantics for printn, emit, defun, for, and new feature forms.
+
+SECTION v1.3.0a
+ITEM Added LARS as the native replacement for HTML local documents.
+ITEM Added LARDD as the native replacement for Markdown-style project docs.
+ITEM Added the kernel lard_doc renderer plus lars, lardd, doc, and release shell commands.
+ITEM Switched the Doc tab home file to file://lardos.lars.
+
+SECTION v1.2.0a
+ITEM Added full-control LSH surface commands: control, status, peek, poke, write, append, and copy.
+ITEM Added SUM-only raw memory controls for user-owned system inspection.
+ITEM Removed stale checked-in kernel object files from the build path.
+
+END

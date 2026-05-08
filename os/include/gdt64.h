@@ -11,3 +11,4 @@ void gdt64_init(void);
 #define GDT64_SEL_UCODE  0x23   /* index 4, RPL 3 */
 #define GDT64_SEL_UDATA  0x2B   /* index 5, RPL 3 */
 #define GDT64_SEL_TSS    0x30   /* index 6 */
+#define GDT64_SEL_PCODE32 0x40  /* index 8, 32-bit protected-mode bridge */

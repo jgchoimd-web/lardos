@@ -15,6 +15,11 @@
 #include "lar.h"
 #include "ps2.h"
 #include "kr_basic.h"
+#include "exgui.h"
+#include "exexgui.h"
+#include "guioverlay.h"
+#include "lguilib.h"
+#include "lassist.h"
 #include "syscall.h"
 #include "lib3d_demo.h"
 
@@ -38,6 +43,21 @@ static uint32_t g_backbuf[1024u * 768u];
 static fb_t g_bb;
 static int g_have_bb;
 static const fb_t* g_syscall_target_override;
+
+#define SCREENRAM_MAX_BYTES 8192u
+#define SCREENRAM_DEFAULT_W 64u
+#define SCREENRAM_DEFAULT_H 16u
+
+static uint8_t g_screenram_shadow[SCREENRAM_MAX_BYTES];
+static uint8_t g_screenram_backup[SCREENRAM_MAX_BYTES];
+static uint32_t g_screenram_enabled;
+static uint32_t g_screenram_x;
+static uint32_t g_screenram_y;
+static uint32_t g_screenram_w;
+static uint32_t g_screenram_h;
+static uint32_t g_screenram_capacity;
+static uint32_t g_screenram_used;
+static uint32_t g_screenram_last_error;
 
 typedef struct {
     int mx;
@@ -91,6 +111,7 @@ typedef struct {
     int user_sandbox;  /* User tab: run with sandbox */
 
     /* Lafillo: View Source, Save */
+    int http_post_mode;
     int lafillo_src_mode;
     char lafillo_raw[4096];
     char lafillo_extracted[4096];
@@ -143,6 +164,71 @@ static int fb_from_bootinfo(fb_t* out)
 }
 
 static void fb_putpixel(const fb_t* f, uint16_t x, uint16_t y, uint32_t argb);
+
+static uint32_t screenram_rect_capacity(uint32_t w, uint32_t h)
+{
+    uint64_t cap = (uint64_t)w * (uint64_t)h * 3u;
+    if (cap > SCREENRAM_MAX_BYTES) cap = SCREENRAM_MAX_BYTES;
+    return (uint32_t)cap;
+}
+
+static void screenram_default_rect(uint32_t* x, uint32_t* y, uint32_t* w, uint32_t* h)
+{
+    uint32_t rw = SCREENRAM_DEFAULT_W;
+    uint32_t rh = SCREENRAM_DEFAULT_H;
+    uint32_t sw = g_have_fb ? g_fb.w : 0;
+    uint32_t sh = g_have_fb ? g_fb.h : 0;
+    if (sw == 0 || sh == 0) {
+        *x = *y = *w = *h = 0;
+        return;
+    }
+    if (rw > sw) rw = sw;
+    if (rh > sh) rh = sh;
+    *x = sw - rw;
+    *y = sh - rh;
+    *w = rw;
+    *h = rh;
+}
+
+static int screenram_rect_valid(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+    if (!g_have_fb || !g_fb.fb || w == 0 || h == 0) return 0;
+    if (x >= g_fb.w || y >= g_fb.h) return 0;
+    if (w > (uint32_t)g_fb.w - x || h > (uint32_t)g_fb.h - y) return 0;
+    return screenram_rect_capacity(w, h) > 0;
+}
+
+static void screenram_flush_to_target(const fb_t* tgt)
+{
+    if (!tgt || !g_screenram_enabled || g_screenram_capacity == 0) return;
+    for (uint32_t i = 0; i < g_screenram_capacity; i += 3u) {
+        uint32_t px = i / 3u;
+        uint32_t x = g_screenram_x + (px % g_screenram_w);
+        uint32_t y = g_screenram_y + (px / g_screenram_w);
+        uint32_t r = g_screenram_shadow[i];
+        uint32_t gch = (i + 1u < g_screenram_capacity) ? g_screenram_shadow[i + 1u] : 0u;
+        uint32_t b = (i + 2u < g_screenram_capacity) ? g_screenram_shadow[i + 2u] : 0u;
+        fb_putpixel(tgt, (uint16_t)x, (uint16_t)y, 0xFF000000u | (r << 16) | (gch << 8) | b);
+    }
+}
+
+static int screenram_configure(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+    uint32_t old_used = g_screenram_used;
+    if (!screenram_rect_valid(x, y, w, h)) {
+        g_screenram_last_error = 1;
+        return -1;
+    }
+    g_screenram_x = x;
+    g_screenram_y = y;
+    g_screenram_w = w;
+    g_screenram_h = h;
+    g_screenram_capacity = screenram_rect_capacity(w, h);
+    if (old_used > g_screenram_capacity) old_used = g_screenram_capacity;
+    g_screenram_used = old_used;
+    g_screenram_last_error = 0;
+    return 0;
+}
 
 static void fb_blit(const fb_t* dst, const fb_t* src)
 {
@@ -371,6 +457,11 @@ int gui_init(void)
     g_have_fb = (fb_from_bootinfo(&g_fb) == 0);
     if (!g_have_fb) return -1;
     g_bg = 0xFF101020;
+    lguilib_init();
+    const FsFile* lguilib_file = fs_open("default.lguilib");
+    if (lguilib_file) (void)lguilib_load_active(lguilib_file->data, lguilib_file->size);
+    exgui_init();
+    exexgui_init();
     if (g_fb.w <= 1024 && g_fb.h <= 768) {
         g_bb.fb = g_backbuf;
         g_bb.w = g_fb.w;
@@ -418,6 +509,7 @@ int gui_init(void)
     g.resp_total_lines = 0;
     g.scroll_drag = 0;
     g.scroll_drag_off_y = 0;
+    g.http_post_mode = 0;
     g.app_id = 0;
     g.calc_display[0] = '0';
     g.calc_display[1] = '\0';
@@ -438,7 +530,7 @@ int gui_init(void)
     g.lafillo_extracted[0] = '\0';
 
     // Default URL
-    const char* def = "example.com/";
+    const char* def = "file://lardos.lars";
     for (g.tb_len = 0; def[g.tb_len] && g.tb_len + 1 < sizeof(g.tb); g.tb_len++) g.tb[g.tb_len] = def[g.tb_len];
     g.tb[g.tb_len] = '\0';
     g.tb_cur = g.tb_len;
@@ -457,7 +549,161 @@ int gui_init(void)
     if (sf && ssav_decode(sf->data, sf->size, &g.ss_ssav) == 0) {
         g.ss_file = sf;
     }
+    screenram_default_rect(&g_screenram_x, &g_screenram_y, &g_screenram_w, &g_screenram_h);
+    g_screenram_capacity = screenram_rect_capacity(g_screenram_w, g_screenram_h);
+    g_screenram_used = 0;
+    g_screenram_enabled = 0;
+    g_screenram_last_error = 0;
+    lassist_init();
     return 0;
+}
+
+int gui_screenram_enable(int on)
+{
+    if (on) {
+        if (!g_screenram_capacity) {
+            uint32_t x, y, w, h;
+            screenram_default_rect(&x, &y, &w, &h);
+            if (screenram_configure(x, y, w, h) != 0) return -1;
+        }
+        g_screenram_enabled = 1;
+    } else {
+        g_screenram_enabled = 0;
+    }
+    g_screenram_last_error = 0;
+    return 0;
+}
+
+int gui_screenram_set_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+    if (screenram_configure(x, y, w, h) != 0) return -1;
+    g_screenram_enabled = 1;
+    return 0;
+}
+
+static int screenram_corner_is(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && a[i] == b[i]) i++;
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+int gui_screenram_set_corner(const char* corner, uint32_t w, uint32_t h)
+{
+    uint32_t x = 0;
+    uint32_t y = 0;
+    if (!corner || !corner[0]) corner = "br";
+    if (w == 0) w = SCREENRAM_DEFAULT_W;
+    if (h == 0) h = SCREENRAM_DEFAULT_H;
+    if (!g_have_fb || !g_fb.fb) {
+        g_screenram_last_error = 1;
+        return -1;
+    }
+    if (w > g_fb.w) w = g_fb.w;
+    if (h > g_fb.h) h = g_fb.h;
+    if (screenram_corner_is(corner, "tr")) {
+        x = (uint32_t)g_fb.w - w;
+        y = 0;
+    } else if (screenram_corner_is(corner, "bl")) {
+        x = 0;
+        y = (uint32_t)g_fb.h - h;
+    } else if (screenram_corner_is(corner, "tl")) {
+        x = 0;
+        y = 0;
+    } else {
+        x = (uint32_t)g_fb.w - w;
+        y = (uint32_t)g_fb.h - h;
+    }
+    return gui_screenram_set_rect(x, y, w, h);
+}
+
+int gui_screenram_write(uint32_t offset, const uint8_t* data, uint32_t len)
+{
+    if (!g_screenram_enabled || !data || offset > g_screenram_capacity) {
+        g_screenram_last_error = 2;
+        return -1;
+    }
+    if (len > g_screenram_capacity - offset) len = g_screenram_capacity - offset;
+    for (uint32_t i = 0; i < len; i++) g_screenram_shadow[offset + i] = data[i];
+    if (offset + len > g_screenram_used) g_screenram_used = offset + len;
+    g_screenram_last_error = 0;
+    return (int)len;
+}
+
+int gui_screenram_read(uint32_t offset, uint8_t* data, uint32_t len)
+{
+    if (!g_screenram_enabled || !data || offset > g_screenram_capacity) {
+        g_screenram_last_error = 2;
+        return -1;
+    }
+    if (len > g_screenram_capacity - offset) len = g_screenram_capacity - offset;
+    for (uint32_t i = 0; i < len; i++) data[i] = g_screenram_shadow[offset + i];
+    g_screenram_last_error = 0;
+    return (int)len;
+}
+
+void gui_screenram_clear(void)
+{
+    for (uint32_t i = 0; i < g_screenram_capacity; i++) g_screenram_shadow[i] = 0;
+    g_screenram_used = 0;
+    g_screenram_last_error = 0;
+}
+
+void gui_screenram_info(gui_screenram_info_t* out)
+{
+    if (!out) return;
+    out->enabled = g_screenram_enabled;
+    out->x = g_screenram_x;
+    out->y = g_screenram_y;
+    out->w = g_screenram_w;
+    out->h = g_screenram_h;
+    out->capacity = g_screenram_capacity;
+    out->used = g_screenram_used;
+    out->max_capacity = SCREENRAM_MAX_BYTES;
+    out->last_error = g_screenram_last_error;
+}
+
+int gui_screenram_selftest(void)
+{
+    gui_screenram_info_t old;
+    int ok = 1;
+    uint8_t got[64];
+    uint32_t old_cap;
+    uint32_t old_used;
+    uint32_t old_enabled;
+
+    gui_screenram_info(&old);
+    old_cap = old.capacity;
+    old_used = old.used;
+    old_enabled = old.enabled;
+    for (uint32_t i = 0; i < old_cap && i < SCREENRAM_MAX_BYTES; i++) {
+        g_screenram_backup[i] = g_screenram_shadow[i];
+    }
+
+    if (gui_screenram_set_corner("br", 16u, 8u) != 0) ok = 0;
+    if (ok) {
+        for (uint32_t i = 0; i < sizeof(got); i++) got[i] = (uint8_t)(0x5Au ^ i);
+        if (gui_screenram_write(0, got, sizeof(got)) != (int)sizeof(got)) ok = 0;
+        for (uint32_t i = 0; i < sizeof(got); i++) got[i] = 0;
+        if (gui_screenram_read(0, got, sizeof(got)) != (int)sizeof(got)) ok = 0;
+        for (uint32_t i = 0; i < sizeof(got); i++) {
+            if (got[i] != (uint8_t)(0x5Au ^ i)) ok = 0;
+        }
+    }
+
+    g_screenram_enabled = old_enabled;
+    g_screenram_x = old.x;
+    g_screenram_y = old.y;
+    g_screenram_w = old.w;
+    g_screenram_h = old.h;
+    g_screenram_capacity = old_cap;
+    g_screenram_used = old_used;
+    for (uint32_t i = 0; i < old_cap && i < SCREENRAM_MAX_BYTES; i++) {
+        g_screenram_shadow[i] = g_screenram_backup[i];
+    }
+    g_screenram_last_error = ok ? 0u : 3u;
+    return ok ? 0 : -1;
 }
 
 static void gui_draw_cursor_at(int x, int y, uint32_t color)
@@ -474,6 +720,34 @@ static void gui_draw_cursor_at(int x, int y, uint32_t color)
 static int in_rect(int x, int y, int rx, int ry, int rw, int rh)
 {
     return x >= rx && y >= ry && x < (rx + rw) && y < (ry + rh);
+}
+
+static void gui_apply_exexgui_layout(void)
+{
+    exexgui_layout_t l;
+    int pad = 6;
+    int label_h = 30;
+    int ww;
+    int wh;
+    if (!g_have_fb || !exexgui_is_enabled()) return;
+    if (exexgui_layout_for(g_fb.w, g_fb.h, &l) != 0) return;
+
+    ww = (int)l.gui.w - pad * 2;
+    wh = (int)l.gui.h - label_h - pad;
+    if (ww < 220) ww = (int)l.gui.w > 8 ? (int)l.gui.w - 8 : (int)l.gui.w;
+    if (wh < 170) wh = (int)l.gui.h > 8 ? (int)l.gui.h - 8 : (int)l.gui.h;
+
+    g.win_x = (int)l.gui.x + pad;
+    g.win_y = (int)l.gui.y + label_h;
+    g.win_w = ww;
+    g.win_h = wh;
+    if (g.win_x < (int)l.gui.x) g.win_x = (int)l.gui.x;
+    if (g.win_y < (int)l.gui.y) g.win_y = (int)l.gui.y;
+    if (g.win_x + g.win_w > (int)(l.gui.x + l.gui.w)) g.win_w = (int)(l.gui.x + l.gui.w) - g.win_x;
+    if (g.win_y + g.win_h > (int)(l.gui.y + l.gui.h)) g.win_h = (int)(l.gui.y + l.gui.h) - g.win_y;
+    if (g.win_w < 1) g.win_w = 1;
+    if (g.win_h < 1) g.win_h = 1;
+    g.dragging = 0;
 }
 
 static void gui_resp_clear(void)
@@ -655,6 +929,24 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int l_pressed = l_down && !l_prev;
     int l_released = !l_down && l_prev;
 
+    gui_apply_exexgui_layout();
+    if (l_pressed && exexgui_is_enabled()) {
+        exexgui_layout_t xl;
+        if (exexgui_layout_for(g_fb.w, g_fb.h, &xl) == 0) {
+            if (in_rect(g.mx, g.my, (int)xl.term.x, (int)xl.term.y, (int)xl.term.w, (int)xl.term.h)) {
+                exexgui_set_focus("term");
+                g.app_id = 7;
+                g.tb_focused = 1;
+                g.lafaelo_focus = 0;
+                gui_lsh_sync_output();
+            } else if (in_rect(g.mx, g.my, (int)xl.info.x, (int)xl.info.y, (int)xl.info.w, (int)xl.info.h)) {
+                exexgui_set_focus("info");
+            } else if (in_rect(g.mx, g.my, (int)xl.gui.x, (int)xl.gui.y, (int)xl.gui.w, (int)xl.gui.h)) {
+                exexgui_set_focus("gui");
+            }
+        }
+    }
+
     // Settings button (top-right of title bar)
     int set_btn_x = g.win_x + g.win_w - 52;
     int set_btn_w = 48;
@@ -700,7 +992,8 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     if (l_released) g.slider_drag = 0;
 
     // Title bar drag (top 20px of window, exclude settings button)
-    if (l_pressed && in_rect(g.mx, g.my, g.win_x, g.win_y, g.win_w - set_btn_w - 4, title_h)) {
+    if (!exexgui_is_enabled() &&
+        l_pressed && in_rect(g.mx, g.my, g.win_x, g.win_y, g.win_w - set_btn_w - 4, title_h)) {
         g.dragging = 1;
         g.drag_off_x = g.mx - g.win_x;
         g.drag_off_y = g.my - g.win_y;
@@ -792,15 +1085,15 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int btn_y = content_y_m + 36;
     int btn_w = 120;
     int btn_h = 28;
-    int lafillo_btn_w = 64;
-    int lafillo_src_w = 50;
+    int lafillo_w[] = { 48, 64, 52, 56, 50 };
     int lafaelo_btn_w = 56;
     if (l_pressed) {
         if (g.app_id == 0) {
-            if (in_rect(g.mx, g.my, btn_x, btn_y, lafillo_btn_w, btn_h)) g.btn_pressed = 1;
-            else if (in_rect(g.mx, g.my, btn_x + lafillo_btn_w + 4, btn_y, lafillo_btn_w, btn_h)) g.btn_pressed = 1;
-            else if (in_rect(g.mx, g.my, btn_x + (lafillo_btn_w + 4) * 2, btn_y, lafillo_btn_w, btn_h)) g.btn_pressed = 1;
-            else if (in_rect(g.mx, g.my, btn_x + (lafillo_btn_w + 4) * 3, btn_y, lafillo_src_w, btn_h)) g.btn_pressed = 1;
+            int x = btn_x;
+            for (int d = 0; d < 5; d++) {
+                if (in_rect(g.mx, g.my, x, btn_y, lafillo_w[d], btn_h)) g.btn_pressed = 1;
+                x += lafillo_w[d] + 4;
+            }
         } else if (g.app_id == 9) {
             if (in_rect(g.mx, g.my, btn_x, btn_y, lafaelo_btn_w, btn_h)) g.btn_pressed = 1;
             else if (in_rect(g.mx, g.my, btn_x + lafaelo_btn_w + 4, btn_y, lafaelo_btn_w, btn_h)) g.btn_pressed = 1;
@@ -813,18 +1106,29 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     }
     if (l_released) {
         if (g.btn_pressed && g.app_id == 0) {
-            if (in_rect(g.mx, g.my, btn_x, btn_y, lafillo_btn_w, btn_h)) {
+            int x = btn_x;
+            int hit = -1;
+            for (int d = 0; d < 5; d++) {
+                if (in_rect(g.mx, g.my, x, btn_y, lafillo_w[d], btn_h)) {
+                    hit = d;
+                    break;
+                }
+                x += lafillo_w[d] + 4;
+            }
+            if (hit == 0) {
                 g.submit_pending = 1;
-            } else if (in_rect(g.mx, g.my, btn_x + lafillo_btn_w + 4, btn_y, lafillo_btn_w, btn_h)) {
+            } else if (hit == 1) {
                 g.submit_pending = 1;
-            } else if (in_rect(g.mx, g.my, btn_x + (lafillo_btn_w + 4) * 2, btn_y, lafillo_btn_w, btn_h)) {
+            } else if (hit == 2) {
+                g.http_post_mode = 1 - g.http_post_mode;
+            } else if (hit == 3) {
                 FsWritableFile* w = fs_open_writable("lafillo_saved.txt");
                 if (w) {
                     uint32_t n = 0;
                     while (g.resp[n] && n < sizeof(g.resp) - 1) n++;
                     fs_write(w, 0, (const uint8_t*)g.resp, n);
                 }
-            } else if (in_rect(g.mx, g.my, btn_x + (lafillo_btn_w + 4) * 3, btn_y, lafillo_src_w, btn_h)) {
+            } else if (hit == 4) {
                 g.lafillo_src_mode = 1 - g.lafillo_src_mode;
                 g.resp_scroll = 0;
                 if (g.lafillo_src_mode) {
@@ -1206,6 +1510,7 @@ void gui_handle_key_nav(int kind)
 void gui_tick(void)
 {
     if (!g_have_fb) return;
+    lassist_tick((uint32_t)g.app_id);
     if (lsh_poll_background() && g.app_id == 7) {
         const char* out = lsh_get_output();
         uint32_t i = 0;
@@ -1231,17 +1536,106 @@ int gui_screensaver_active(void)
     return g.ss_active ? 1 : 0;
 }
 
-int gui_take_submit(char* out_url, unsigned out_cap)
+static int gui_is_space(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+static uint32_t gui_copy_trim(char* out, uint32_t cap, const char* src, uint32_t start, uint32_t end)
+{
+    if (!out || cap == 0 || !src) return 0;
+    while (start < end && gui_is_space(src[start])) start++;
+    while (end > start && gui_is_space(src[end - 1u])) end--;
+    uint32_t n = 0;
+    while (start < end && n + 1u < cap) {
+        out[n++] = src[start++];
+    }
+    out[n] = '\0';
+    return n;
+}
+
+int gui_take_submit(gui_http_request_t* out)
 {
     if (!g_have_fb) return 0;
     if (!g.submit_pending) return 0;
     g.submit_pending = 0;
-    if (!out_url || out_cap == 0) return 1;
-    unsigned n = (unsigned)g.tb_len;
-    if (n >= out_cap) n = out_cap - 1;
-    for (unsigned i = 0; i < n; i++) out_url[i] = g.tb[i];
-    out_url[n] = '\0';
+    if (!out) return 1;
+
+    out->method[0] = g.http_post_mode ? 'P' : 'G';
+    out->method[1] = g.http_post_mode ? 'O' : 'E';
+    out->method[2] = g.http_post_mode ? 'S' : 'T';
+    out->method[3] = g.http_post_mode ? 'T' : '\0';
+    out->method[4] = '\0';
+    out->body[0] = '\0';
+    out->body_len = 0;
+
+    uint32_t split = g.tb_len;
+    int have_split = 0;
+    if (g.http_post_mode) {
+        for (uint32_t i = 0; i < g.tb_len; i++) {
+            if (g.tb[i] == '|') {
+                split = i;
+                have_split = 1;
+                break;
+            }
+        }
+        if (!have_split) {
+            for (uint32_t i = 0; i < g.tb_len; i++) {
+                if (gui_is_space(g.tb[i])) {
+                    split = i;
+                    have_split = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    gui_copy_trim(out->url, GUI_HTTP_URL_MAX, g.tb, 0, split);
+    if (g.http_post_mode && have_split && split + 1u < g.tb_len) {
+        out->body_len = gui_copy_trim(out->body, GUI_HTTP_BODY_MAX, g.tb, split + 1u, g.tb_len);
+    }
     return 1;
+}
+
+void gui_http_set_post_mode(int on)
+{
+    g.http_post_mode = on ? 1 : 0;
+}
+
+int gui_http_post_mode(void)
+{
+    return g.http_post_mode ? 1 : 0;
+}
+
+int gui_post_check(gui_post_info_t* out)
+{
+    if (!g_have_fb || !g_fb.fb) return -1;
+    gui_apply_exexgui_layout();
+    if (out) {
+        out->width = g_fb.w;
+        out->height = g_fb.h;
+        out->changed_samples = 0;
+        out->window_inside = (g.win_x >= 0 && g.win_y >= 0 &&
+                              g.win_x + g.win_w <= (int)g_fb.w &&
+                              g.win_y + g.win_h <= (int)g_fb.h);
+        out->response_view_ok = (g.win_w >= 320 && g.win_h >= 240 &&
+                                 g.win_h - 190 >= 40 && g.win_w - 32 >= 160);
+        out->chrome_ok = (guioverlay_selftest() == 0 &&
+                          g.win_w / 10 >= 16 &&
+                          g.win_w - 32 >= 160 &&
+                          g.win_h >= 240);
+        uint32_t step_x = g_fb.w >= 64 ? (uint32_t)g_fb.w / 32u : 1u;
+        uint32_t step_y = g_fb.h >= 64 ? (uint32_t)g_fb.h / 24u : 1u;
+        if (step_x == 0) step_x = 1;
+        if (step_y == 0) step_y = 1;
+        for (uint32_t y = 0; y < g_fb.h; y += step_y) {
+            uint32_t row = y * (uint32_t)(g_fb.pitch_bytes / 4u);
+            for (uint32_t x = 0; x < g_fb.w; x += step_x) {
+                if (g_fb.fb[row + x] != g_bg) out->changed_samples++;
+            }
+        }
+    }
+    return 0;
 }
 
 void gui_set_response(const char* text)
@@ -1347,6 +1741,8 @@ void gui_render(void)
     g_syscall_target_override = tgt;
     if (g.ss_active) {
         render_screensaver();
+        lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my, 8u, 8u, 220u, 160u);
+        screenram_flush_to_target(tgt);
         if (g_have_bb) fb_blit(&g_fb, &g_bb);
         g_syscall_target_override = 0;
         return;
@@ -1354,6 +1750,9 @@ void gui_render(void)
 
     // Full redraw for simplicity & correctness.
     fb_clear(tgt, g_bg);
+    exgui_draw_desktop();
+    exexgui_draw_desktop();
+    gui_apply_exexgui_layout();
 
     // Window frame
     uint32_t win_bg = 0xFF202840;
@@ -1372,7 +1771,7 @@ void gui_render(void)
     fb_fill_rect(tgt, (uint16_t)(g.win_x + g.win_w - 1), (uint16_t)g.win_y, 1, (uint16_t)g.win_h, border);
 
     /* Tab bar */
-    static const char* tab_names[] = { "Web", "Calc", "Note", "Pix", "Pak", "User", "LSS", "LSH", "Play", "Edit" };
+    static const char* tab_names[] = { "Doc", "Calc", "Note", "Pix", "Pak", "User", "LSS", "LSH", "Play", "Edit" };
     int tab_y = g.win_y + 20;
     int tab_h = 24;
     int tab_w = g.win_w / 10;
@@ -1393,14 +1792,14 @@ void gui_render(void)
     int btn_w = 120;
     int btn_h = 28;
     if (g.app_id == 0) {
-        static const char* lafillo_labels[] = { "Go", "Refresh", "Save", "Src" };
-        int dw = 64, dw2 = 50;
-        int dx[] = { 0, dw + 4, (dw + 4) * 2, (dw + 4) * 3 };
-        int dww[] = { dw, dw, dw, dw2 };
-        for (int d = 0; d < 4; d++) {
+        static const char* lafillo_labels[] = { "Go", "Refresh", "", "Save", "Src" };
+        int dx[] = { 0, 52, 120, 176, 236 };
+        int dww[] = { 48, 64, 52, 56, 50 };
+        for (int d = 0; d < 5; d++) {
+            const char* label = (d == 2) ? (g.http_post_mode ? "POST" : "GET") : lafillo_labels[d];
             uint32_t dbg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
             fb_fill_rect(tgt, (uint16_t)(btn_x + dx[d]), (uint16_t)btn_y, (uint16_t)dww[d], (uint16_t)btn_h, dbg);
-            fb_draw_text(tgt, (uint16_t)(btn_x + dx[d] + 4), (uint16_t)(btn_y + 10), lafillo_labels[d], 0xFFFFFFFF, dbg);
+            fb_draw_text(tgt, (uint16_t)(btn_x + dx[d] + 4), (uint16_t)(btn_y + 10), label, 0xFFFFFFFF, dbg);
         }
     } else if (g.app_id == 9) {
         static const char* lafaelo_labels[] = { "Open", "Save", "Run" };
@@ -1436,6 +1835,7 @@ void gui_render(void)
     const char* input_text = (g.app_id == 1) ? g.calc_display : g.tb;
     uint32_t input_cur = (g.app_id == 1) ? g.calc_cur : g.tb_cur;
     const char* input_label = "URL:";
+    if (g.app_id == 0 && g.http_post_mode) input_label = "URL|Body:";
     if (g.app_id == 1) input_label = "Expr:";
     else if (g.app_id == 2) input_label = "Add line:";
     else if (g.app_id == 4) input_label = "File:";
@@ -1558,14 +1958,15 @@ void gui_render(void)
                 col = 0;
                 if (cp == '\n') continue;
             }
-            row = (uint16_t)(line - g.resp_scroll);
-            if (row >= (uint16_t)rows) break;
+            int visible_row = line - g.resp_scroll;
+            int on_screen = visible_row >= 0 && visible_row < rows;
+            if (on_screen) row = (uint16_t)visible_row;
 
             if (cp >= IMG_GLYPH_PUA_START && cp <= IMG_GLYPH_PUA_END) {
                 const uint32_t* px;
                 uint16_t gw, gh;
                 if (img_glyph_get(cp, &px, &gw, &gh)) {
-                    if (line >= g.resp_scroll && row < (uint16_t)rows) {
+                    if (on_screen) {
                         fb_draw_image(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), px, gw, gh);
                     }
                     col++;
@@ -1574,7 +1975,7 @@ void gui_render(void)
             }
 
             if (cp < 32 || cp > 127) cp = '?';
-            if (line >= g.resp_scroll && row < (uint16_t)rows) {
+            if (on_screen) {
                 fb_draw_char(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), (char)cp, 0xFFFFFFFF, win_bg);
             }
             col++;
@@ -1608,6 +2009,14 @@ void gui_render(void)
     }
     fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)thumb_y, (uint16_t)(sb_w - 2), (uint16_t)thumb_h, sb_th);
 
+    guioverlay_state_t overlay = {
+        (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h,
+        (uint32_t)g.mx, (uint32_t)g.my, (uint32_t)g.app_id, (uint32_t)g.settings_open,
+        (uint32_t)g.btn_pressed, (uint32_t)g.tb_focused, (uint32_t)g.loading,
+        (uint32_t)g.http_post_mode, (uint32_t)g.user_sandbox,
+    };
+    guioverlay_draw(&overlay);
+
     /* Settings overlay */
     if (g.settings_open) {
         int panel_x = g.win_x + g.win_w - 200;
@@ -1639,8 +2048,14 @@ void gui_render(void)
         fb_fill_rect(tgt, (uint16_t)(track_x + q_pos), (uint16_t)(panel_y + 10 + row_h * 2), 6, 12, 0xFF8090A0);
     }
 
+    exgui_draw_overlay();
+    exexgui_draw_overlay();
+    lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my,
+                 (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h);
+
     // Cursor last
     gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
+    screenram_flush_to_target(tgt);
 
     if (g_have_bb) {
         fb_blit(&g_fb, &g_bb);

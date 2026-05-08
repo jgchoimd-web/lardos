@@ -1,4 +1,5 @@
 #include "panic.h"
+#include "crashlog.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -33,6 +34,7 @@ static void vga_clear(uint8_t color)
 
 __attribute__((noreturn)) void panic(const char* msg)
 {
+    crashlog_record_panic(msg);
     vga_clear(0x4F);
     vga_puts_at(0, 0, "KERNEL PANIC", 0x4F);
     vga_puts_at(2, 0, msg ? msg : "(null)", 0x4F);
@@ -45,6 +47,7 @@ __attribute__((noreturn)) void panic_u64(const char* msg, uint64_t v)
 {
     char hex[17];
     u64_hex(hex, v);
+    crashlog_record_panic_u64(msg, v);
     vga_clear(0x4F);
     vga_puts_at(0, 0, "KERNEL PANIC", 0x4F);
     vga_puts_at(2, 0, msg ? msg : "(null)", 0x4F);
@@ -53,4 +56,3 @@ __attribute__((noreturn)) void panic_u64(const char* msg, uint64_t v)
         __asm__ __volatile__("cli; hlt");
     }
 }
-

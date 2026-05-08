@@ -9,18 +9,35 @@
 #include "os_vm.h"
 #include "lardx_load.h"
 #include "lafillo.h"
+#include "lard_doc.h"
+#include "lil.h"
 #include "lar.h"
 #include "lvcs.h"
 #include "drfl.h"
 #include "lcontainer.h"
+#include "lpack.h"
+#include "lardkit.h"
 #include "gui.h"
+#include "post.h"
+#include "cpumode.h"
+#include "screencheck.h"
+#include "exgui.h"
+#include "exexgui.h"
+#include "lguilib.h"
+#include "lassist.h"
+#include "oslink.h"
+#include "taskprio.h"
+#include "awake.h"
+#include "bootprof.h"
+#include "crashlog.h"
+#include "version.h"
 #include "io.h"
+#include "pci.h"
 #include "string.h"
 #include <stddef.h>
 #include <stdint.h>
 
 #define LSH_MAGIC  0x0048534Cu  /* "LSH\0" LE */
-#define LARDOS_VERSION "v1.0.0a"
 
 static char s_drive = 'X';
 static char s_output[LSH_MAX_OUTPUT];
@@ -36,17 +53,16 @@ static uint32_t s_pipe_len;
 static int s_redirect_to_pipe;  /* 1 = out_append goes to pipe */
 static int s_pipe_has_input;    /* 1 = segment 2, stdin is s_pipe_buf */
 
-/* Background: queue of command lines */
-static char s_bg_queue[LSH_MAX_BG][LSH_MAX_LINE];
-static uint32_t s_bg_count;
-
 /* SUM (Super User Mode): ring 0, full permissions, asm_ for hardware I/O */
 static int s_in_sum_mode;
 
 /* Sandbox: run LARDX with restricted syscalls (no file/LDLL/network) */
 static int s_sandbox_mode;
+static int s_cfgsh_mode;
+static int s_magic_depth;
 
 static void lsh_putc(char c, void* user);
+static void parse_and_run(const char* cmd, const char* args);
 
 static const char* env_get(const char* name)
 {
@@ -188,6 +204,33 @@ static void out_append_hex32(uint32_t v)
     }
 }
 
+static void out_append_hex64(uint64_t v)
+{
+    static const char hex[] = "0123456789abcdef";
+    out_append("0x");
+    for (int i = 15; i >= 0; i--) {
+        out_append_char(hex[(v >> (uint32_t)(i * 4)) & 0xFu]);
+    }
+}
+
+static void out_append_hex8(uint8_t v)
+{
+    static const char hex[] = "0123456789abcdef";
+    out_append_char(hex[(v >> 4) & 0xFu]);
+    out_append_char(hex[v & 0xFu]);
+}
+
+static void out_append_ip4(ip4_t ip)
+{
+    out_append_u32(ip.b[0]);
+    out_append_char('.');
+    out_append_u32(ip.b[1]);
+    out_append_char('.');
+    out_append_u32(ip.b[2]);
+    out_append_char('.');
+    out_append_u32(ip.b[3]);
+}
+
 static char lardos_version_suffix(void)
 {
     uint32_t i = 0;
@@ -199,15 +242,221 @@ static const char* lardos_version_channel(void)
 {
     char suffix = lardos_version_suffix();
     if (suffix == 'a') return "official";
-    if (suffix == 'b') return "beta";
+    if (suffix == 'b') return "beta-experimental";
     if (suffix == 'p') return "hotpatch";
     return "unknown";
 }
 
-static int lardos_version_suffix_known(void)
+typedef struct {
+    const char* name;
+    uint8_t magic_safe;
+} magic_cmd_entry_t;
+
+static const magic_cmd_entry_t s_magic_cmds[] = {
+    { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
+    { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
+    { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
+    { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
+    { "bosl", 1 }, { "lil", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
+    { "lcnt", 1 }, { "container", 1 },
+    { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
+    { "vcslog", 1 }, { "vcsshow", 1 },
+    { "drivers", 1 }, { "fsstat", 1 }, { "fsload", 1 }, { "fssave", 1 }, { "sync", 1 },
+    { "sram", 1 }, { "screenram", 1 }, { "screencheck", 1 }, { "scrcheck", 1 }, { "sandbox", 1 }, { "exitsandbox", 1 },
+    { "sum", 0 }, { "exitsum", 0 }, { "peek", 0 }, { "poke", 0 }, { "asm_", 0 },
+};
+
+static uint32_t magic_strlen(const char* s)
 {
-    char suffix = lardos_version_suffix();
-    return suffix == 'a' || suffix == 'b' || suffix == 'p';
+    uint32_t n = 0;
+    while (s && s[n]) n++;
+    return n;
+}
+
+static int magic_cmd_equals(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && a[i] == b[i]) i++;
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static uint32_t magic_min3(uint32_t a, uint32_t b, uint32_t c)
+{
+    uint32_t m = a < b ? a : b;
+    return m < c ? m : c;
+}
+
+static uint32_t magic_edit_distance(const char* a, const char* b)
+{
+    uint32_t la = magic_strlen(a);
+    uint32_t lb = magic_strlen(b);
+    uint32_t prev[33];
+    uint32_t cur[33];
+    if (la > 32u) la = 32u;
+    if (lb > 32u) lb = 32u;
+    for (uint32_t j = 0; j <= lb; j++) prev[j] = j;
+    for (uint32_t i = 1; i <= la; i++) {
+        cur[0] = i;
+        for (uint32_t j = 1; j <= lb; j++) {
+            uint32_t sub = prev[j - 1u] + (a[i - 1u] == b[j - 1u] ? 0u : 1u);
+            uint32_t del = prev[j] + 1u;
+            uint32_t ins = cur[j - 1u] + 1u;
+            cur[j] = magic_min3(sub, del, ins);
+        }
+        for (uint32_t j = 0; j <= lb; j++) prev[j] = cur[j];
+    }
+    return prev[lb];
+}
+
+static uint32_t magic_threshold(uint32_t len)
+{
+    if (len <= 3u) return 1u;
+    if (len <= 7u) return 2u;
+    return 3u;
+}
+
+static const magic_cmd_entry_t* magic_find_exact(const char* cmd)
+{
+    uint32_t count = sizeof(s_magic_cmds) / sizeof(s_magic_cmds[0]);
+    for (uint32_t i = 0; i < count; i++) {
+        if (magic_cmd_equals(cmd, s_magic_cmds[i].name)) return &s_magic_cmds[i];
+    }
+    return NULL;
+}
+
+static const magic_cmd_entry_t* magic_predict(const char* cmd)
+{
+    const magic_cmd_entry_t* best = NULL;
+    uint32_t best_score = 999u;
+    uint32_t best_len = 0;
+    uint32_t cmd_len = magic_strlen(cmd);
+    uint32_t count = sizeof(s_magic_cmds) / sizeof(s_magic_cmds[0]);
+    if (!cmd || !cmd[0]) return NULL;
+    for (uint32_t i = 0; i < count; i++) {
+        const magic_cmd_entry_t* c = &s_magic_cmds[i];
+        if (!c->magic_safe) continue;
+        uint32_t name_len = magic_strlen(c->name);
+        uint32_t score = magic_edit_distance(cmd, c->name);
+        if (cmd_len >= 2u && name_len >= cmd_len) {
+            int prefix = 1;
+            for (uint32_t j = 0; j < cmd_len; j++) {
+                if (cmd[j] != c->name[j]) {
+                    prefix = 0;
+                    break;
+                }
+            }
+            if (prefix && score > 0) score--;
+        }
+        if (score < best_score || (score == best_score && name_len > best_len)) {
+            best = c;
+            best_score = score;
+            best_len = name_len;
+        }
+    }
+    if (!best) return NULL;
+    if (best_score <= magic_threshold(cmd_len > best_len ? cmd_len : best_len)) return best;
+    return NULL;
+}
+
+static void cmd_magic(const char* args)
+{
+    char cmd[64];
+    char rest[192];
+    uint32_t i = 0;
+    uint32_t ci = 0;
+    uint32_t ri = 0;
+    while (args[i] == ' ' || args[i] == '\t') i++;
+    while (args[i] && args[i] != ' ' && args[i] != '\t' && ci + 1u < sizeof(cmd)) cmd[ci++] = args[i++];
+    cmd[ci] = '\0';
+    while (args[i] && ri + 1u < sizeof(rest)) rest[ri++] = args[i++];
+    rest[ri] = '\0';
+    if (!cmd[0]) {
+        out_append("Usage: magic command [args] | magic explain\n");
+        return;
+    }
+    if (magic_cmd_equals(cmd, "explain")) {
+        lardkit_magic_info_t info;
+        lardkit_magic_info(&info);
+        if (!info.has_record) {
+            out_append("magic: no recorded prediction yet.\n");
+            return;
+        }
+        out_append("magic explain\n");
+        out_append("input=");
+        out_append(info.input);
+        out_append(" predicted=");
+        out_append(info.predicted[0] ? info.predicted : "none");
+        out_append(" executed=");
+        out_append(info.executed ? "yes" : "no");
+        out_append("\nreason=");
+        out_append(info.reason);
+        out_append("\n");
+        return;
+    }
+    if (magic_cmd_equals(cmd, "dryrun")) {
+        char dry[64];
+        uint32_t di = 0;
+        uint32_t rp = 0;
+        while (rest[rp] == ' ' || rest[rp] == '\t') rp++;
+        while (rest[rp] && rest[rp] != ' ' && rest[rp] != '\t' && di + 1u < sizeof(dry)) dry[di++] = rest[rp++];
+        dry[di] = '\0';
+        if (!dry[0]) {
+            out_append("Usage: magic dryrun command [args]\n");
+            return;
+        }
+        const magic_cmd_entry_t* exact_dry = magic_find_exact(dry);
+        const magic_cmd_entry_t* pick_dry = exact_dry ? exact_dry : magic_predict(dry);
+        if (!pick_dry || !pick_dry->magic_safe) {
+            lardkit_magic_record(dry, pick_dry ? pick_dry->name : "", 0, "dryrun found no safe executable prediction");
+            out_append("magic dryrun: would not execute ");
+            out_append(dry);
+            out_append("\n");
+            return;
+        }
+        lardkit_magic_record(dry, pick_dry->name, 0,
+                             exact_dry ? "dryrun exact safe command" : "dryrun edit-distance safe command prediction");
+        out_append("magic dryrun: ");
+        out_append(dry);
+        if (!magic_cmd_equals(dry, pick_dry->name)) {
+            out_append(" -> ");
+            out_append(pick_dry->name);
+        }
+        out_append(" (not executed)\n");
+        return;
+    }
+    const magic_cmd_entry_t* exact = magic_find_exact(cmd);
+    const magic_cmd_entry_t* pick = exact ? exact : magic_predict(cmd);
+    if (!pick) {
+        lardkit_magic_record(cmd, "", 0, "no confident safe command match");
+        out_append("magic: no confident command match for ");
+        out_append(cmd);
+        out_append("\n");
+        return;
+    }
+    if (!pick->magic_safe) {
+        lardkit_magic_record(cmd, pick->name, 0, "matched raw-control command; explicit run required");
+        out_append("magic: ");
+        out_append(pick->name);
+        out_append(" is raw-control; run it explicitly.\n");
+        return;
+    }
+    out_append("magic: ");
+    out_append(cmd);
+    if (!magic_cmd_equals(cmd, pick->name)) {
+        out_append(" -> ");
+        out_append(pick->name);
+    }
+    out_append("\n");
+    lardkit_magic_record(cmd, pick->name, 1,
+                         exact ? "exact safe command" : "edit-distance safe command prediction");
+    s_magic_depth++;
+    parse_and_run(pick->name, rest);
+    s_magic_depth--;
 }
 
 void lsh_enter_sum_shortcut(void)
@@ -228,6 +477,10 @@ static void dir_cb(const char* nm, uint32_t sz, void* u)
     if (s_dir_skip_ram) {
         if (nm[0] == 'n' && nm[1] == 'o' && nm[2] == 't' && nm[3] == 'e' &&
             nm[4] == 's' && nm[5] == '.' && nm[6] == 't' && nm[7] == 'x' && nm[8] == 't' && nm[9] == '\0')
+            return;
+        if (nm[0] == 'n' && nm[1] == 'o' && nm[2] == 't' && nm[3] == 'e' &&
+            nm[4] == 's' && nm[5] == '.' && nm[6] == 'l' && nm[7] == 'a' && nm[8] == 'r' &&
+            nm[9] == 'd' && nm[10] == 'd' && nm[11] == '\0')
             return;
     }
     char ln[96];
@@ -318,6 +571,7 @@ static void cmd_dir(const char* args)
         s_dir_skip_ram = 0;
     } else {
         dir_ram_name("notes.txt");
+        dir_ram_name("notes.lardd");
         dir_ram_name("lafillo_saved.txt");
         dir_ram_name("lar_extract.txt");
         dir_ram_name("vcs_restore.txt");
@@ -374,6 +628,63 @@ static void cmd_lafillo(const char* args)
     }
     out_append(out);
     out_append("\n");
+}
+
+static void cmd_larddoc(const char* args, const char* usage)
+{
+    char drv;
+    char name[64];
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    char out[2048];
+    resolve_path(args, &drv, name, sizeof(name));
+    if (!name[0]) {
+        out_append(usage);
+        out_append("\n");
+        return;
+    }
+    const FsFile* f = lsh_open_read(drv, name);
+    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    if (f) {
+        data = f->data;
+        size = f->size;
+    } else if (w) {
+        data = w->data;
+        size = w->size;
+    }
+    if (!data || size == 0 || size >= 4096) {
+        out_append("doc: file not found or too large.\n");
+        return;
+    }
+    if (lard_doc_to_text((const char*)data, size, out, sizeof(out)) != 0) {
+        out_append("doc: not a LARS/LARDD document.\n");
+        return;
+    }
+    out_append(out);
+    out_append("\n");
+}
+
+static void cmd_release(const char* args)
+{
+    while (args && (*args == ' ' || *args == '\t')) args++;
+    if (args && (strcmp(args, "policy") == 0 || strcmp(args, "channel") == 0 || strcmp(args, "channels") == 0)) {
+        out_append("Release channel policy\n");
+        out_append("  current: ");
+        out_append(LARDOS_VERSION);
+        out_append(" (");
+        out_append(lardos_version_channel());
+        out_append(")\n");
+        out_append("  a = official: promoted stable builds after boot, POST, GUI, and media checks.\n");
+        out_append("  b = beta-experimental: new or risky feature bundles before promotion.\n");
+        out_append("  p = hotpatch: narrow emergency fixes for an existing release line.\n");
+        out_append("  Do not use a just because a feature was added; choose the channel by risk.\n");
+        return;
+    }
+    if (args && args[0]) {
+        out_append("Usage: release [policy]\n");
+        return;
+    }
+    cmd_larddoc("releases.lardd", "Usage: release");
 }
 
 static void lar_list_lsh_cb(const lar_entry_t* entry, void* user)
@@ -494,6 +805,38 @@ static int vcs_parse_u32(const char** args, uint32_t* out)
         v = v * 10u + (uint32_t)(*p - '0');
         p++;
     }
+    while (*p == ' ' || *p == '\t') p++;
+    *args = p;
+    *out = v;
+    return 0;
+}
+
+static int lsh_parse_u64(const char** args, uint64_t* out)
+{
+    const char* p = *args;
+    uint64_t v = 0;
+    int any = 0;
+    int hex = 0;
+    while (*p == ' ' || *p == '\t') p++;
+    if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+        hex = 1;
+        p += 2;
+    }
+    while (*p) {
+        uint32_t d;
+        uint64_t next;
+        if (*p >= '0' && *p <= '9') d = (uint32_t)(*p - '0');
+        else if (hex && *p >= 'a' && *p <= 'f') d = (uint32_t)(*p - 'a' + 10);
+        else if (hex && *p >= 'A' && *p <= 'F') d = (uint32_t)(*p - 'A' + 10);
+        else break;
+        if (!hex && d > 9u) break;
+        next = hex ? ((v << 4) | (uint64_t)d) : (v * 10u + (uint64_t)d);
+        if (next < v) return -2;
+        v = next;
+        any = 1;
+        p++;
+    }
+    if (!any) return -1;
     while (*p == ' ' || *p == '\t') p++;
     *args = p;
     *out = v;
@@ -789,69 +1132,57 @@ static void cmd_fsload(const char* args)
     }
 }
 
-static void selftest_check(const char* name, int ok, uint32_t* pass, uint32_t* fail)
+static void selftest_emit(const char* status, const char* name, void* user)
 {
-    out_append(ok ? "PASS " : "FAIL ");
+    (void)user;
+    out_append(status);
+    out_append(" ");
     out_append(name);
     out_append("\n");
-    if (ok) (*pass)++;
-    else (*fail)++;
 }
 
 static void cmd_selftest(const char* args)
 {
-    uint32_t pass = 0;
-    uint32_t fail = 0;
-    uint32_t available;
-    uint32_t dirty;
-    uint32_t lba;
-    uint32_t sectors;
-    uint32_t bank;
-    uint32_t generation;
-    uint32_t bank_sectors;
-    int last;
-    const char* driver;
-    const FsFile* bundle;
-    const uint8_t hash_data[3] = { 'a', 'b', 'c' };
+    lard_post_result_t post;
     (void)args;
 
     out_append("LardOS ");
     out_append(LARDOS_VERSION);
     out_append(" ");
     out_append(lardos_version_channel());
-    out_append(" selftest\n");
+    out_append(" Power-On Self-Test\n");
 
-    bundle = fs_open("bundle.lar");
-    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
-    fs_persist_detail(&bank, &generation, &bank_sectors);
+    lard_post_run(selftest_emit, NULL, &post);
 
-    selftest_check("fs: hello.txt", fs_open("hello.txt") != NULL, &pass, &fail);
-    selftest_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, &pass, &fail);
-    selftest_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, &pass, &fail);
-    selftest_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, &pass, &fail);
-    selftest_check("lcnt: defaults", lcontainer_count() >= 3u, &pass, &fail);
-    selftest_check("version: suffix policy", lardos_version_suffix_known(), &pass, &fail);
-    selftest_check("lpst: dual-bank layout", lba == 2752u && sectors == 128u && bank_sectors == 64u, &pass, &fail);
-    selftest_check("lpst: driver string", driver && driver[0], &pass, &fail);
-    selftest_check("lvcs: hash engine", lvcs_hash(hash_data, sizeof(hash_data)) != 0, &pass, &fail);
-    selftest_check("lcnt: dev profile", (lcontainer_profile_caps("dev") & (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL)) == (SYSCALL_CAP_FS | SYSCALL_CAP_LDLL), &pass, &fail);
-
-    out_append("Selftest: ");
-    out_append_u32(pass);
+    out_append("POST: ");
+    out_append_u32(post.pass);
     out_append(" passed, ");
-    out_append_u32(fail);
+    out_append_u32(post.fail);
     out_append(" failed");
-    if (available) {
+    if (post.storage_available) {
         out_append(", storage online");
-        out_append(dirty ? ", dirty" : ", clean");
+        out_append(post.storage_dirty ? ", dirty" : ", clean");
     } else {
         out_append(", storage offline");
     }
     out_append(", last=");
-    out_append_i32(last);
+    out_append_i32(post.storage_last_result);
     out_append(", gen=");
-    out_append_u32(generation);
+    out_append_u32(post.storage_generation);
     out_append("\n");
+    {
+        lardkit_post_baseline_info_t bi;
+        lardkit_post_baseline_info(&bi);
+        out_append("POST baseline: previous=");
+        out_append_u32(bi.previous_count);
+        out_append(" current=");
+        out_append_u32(bi.current_count);
+        out_append(" changes=");
+        out_append_u32(bi.changes);
+        out_append(" regressions=");
+        out_append_u32(bi.regressions);
+        out_append("\n");
+    }
 }
 
 static void cmd_ver(const char* args)
@@ -862,6 +1193,3100 @@ static void cmd_ver(const char* args)
     out_append(" (");
     out_append(lardos_version_channel());
     out_append(")\n");
+}
+
+static void cmd_help(const char* args)
+{
+    (void)args;
+    out_append("Lard Shell commands\n");
+    out_append("  help control status release [policy] ver post baseline selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
+    out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
+    out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
+    out_append("  exexgui on|off|focus gui|term|info|next|workspace 1|save 1|load 1|test\n");
+    out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
+    out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
+    out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
+    out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
+    out_append("  rollback snap|last|apply        save/restore user-visible settings\n");
+    out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
+    out_append("  post baseline, bootreplay show, bootmap, oldcheck, devmap boot/POST/device views\n");
+    out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
+    out_append("  lunit run tests.lunit, cfgprof save name/load name, userlaw show\n");
+    out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
+    out_append("  oschat say|send|read            local OSLink chat-style messages\n");
+    out_append("  larsview open file              native LARS/LARDD browser state\n");
+    out_append("  notes show|add|clear            writable notes.lardd document\n");
+    out_append("  lguilib status|show|use|test [file.lguilib]\n");
+    out_append("  awake on|off|status|test\n");
+    out_append("  write file text  append file text  copy src dst\n");
+    out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
+    out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
+    out_append("  bosl file  lil file  lafvm file  osvm file  run file.bosx [args]\n");
+    out_append("  lcnt list|create|rm|use|exit|run|info\n");
+    out_append("  vcs init|status|add|commit|log|show\n");
+    out_append("  drivers fsstat fsload fssave sync sram screencheck sandbox exitsandbox\n");
+    out_append("  tasktop  task list|set|urgent|history|up|down|pause|resume|drop  nice prio cmd\n");
+    out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
+    out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
+    out_append("  panic capsule / paniccapsule    collect crashlog, BugEye, boot, trust, priority state\n");
+    out_append("  crashlog show|clear|test\n");
+    out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
+    out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
+}
+
+static void cmd_control(const char* args)
+{
+    (void)args;
+    out_append("LardOS control surface\n");
+    out_append("  Kernel and host tools are C. Runtime features stay in-tree.\n");
+    out_append("  Files live in LFS, RAM files, LPST persistence, and embedded FS tables.\n");
+    out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
+    out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
+    out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
+    out_append("  Release suffix: a=official, b=beta-experimental, p=hotpatch.\n");
+    out_append("  Do not default to a: risky or broad feature bundles ship as b first.\n");
+    out_append("  Each feature addition gets a version bump and releases.lardd entry.\n");
+    out_append("\n");
+    out_append("Start points:\n");
+    out_append("  status              inspect version, drivers, storage, containers\n");
+    out_append("  magic statsu        predict and execute the intended safe command\n");
+    out_append("  magic dryrun statsu show what magic would execute without running it\n");
+    out_append("  magic explain       show why magic executed or refused its last prediction\n");
+    out_append("  mode guard          guarded real16 <-> long64 roundtrip with restore check\n");
+    out_append("  trace on            record shell/module/oslink/taskprio events in order\n");
+    out_append("  netwatch on         watch readable packet/oslink/HTTP activity\n");
+    out_append("  journal show        view automatic LARDD system journal\n");
+    out_append("  bugeye scan         scan for visible bugs and write bugreport.lardd\n");
+    out_append("  bugreplay draw      draw the last BugEye replay frames as a panel\n");
+    out_append("  rollback snap       snapshot settings before experiments\n");
+    out_append("  trust list          inspect user-controlled permission policy\n");
+    out_append("  trust history       audit permission allow/deny changes\n");
+    out_append("  oslink bus          inspect LardOS-internal OSLink messages\n");
+    out_append("  oschat say hello    send a local OSLink chat-style message\n");
+    out_append("  exgui style mac     enable familiar desktop/window chrome\n");
+    out_append("  exexgui on          use sketch split: GUI, terminal, status\n");
+    out_append("  cfgsh               enter mode-name value settings shell\n");
+    out_append("  cfg style 2         set desktop style by number\n");
+    out_append("  buddy on            enable the roaming casual assistant\n");
+    out_append("  task list           inspect and reprioritize queued tasks\n");
+    out_append("  priority history    show who granted priority lev.10 and when\n");
+    out_append("  awake on            enable fast screen boot for next boot\n");
+    out_append("  awake off           return next boot to normal and stop loader\n");
+    out_append("  bootmap             show the boot structure as numbered phases\n");
+    out_append("  bootreplay show     replay a detailed boot timeline from bootreplay.lardd\n");
+    out_append("  devmap draw         draw PCI/storage/network device map\n");
+    out_append("  oldcheck draw       draw the retro storage check map\n");
+    out_append("  lfsdoctor scan      diagnose writable files and LPST persistence state\n");
+    out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
+    out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
+    out_append("  cfgprof save safe-ui save/load a bundle of settings\n");
+    out_append("  userlaw show        inspect user-right policy principles\n");
+    out_append("  lunit run tests.lunit run small OS feature tests\n");
+    out_append("  notes add text      append to notes.lardd\n");
+    out_append("  crashlog show       inspect panic and diagnostic history\n");
+    out_append("  lpack verify sample.lpack inspect package integrity before install\n");
+    out_append("  lpack undo last     restore files changed by the last install\n");
+    out_append("  sram on             use a quiet screen corner as scratch RAM\n");
+    out_append("  screencheck retro   draw a retro boot/storage-style screen check\n");
+    out_append("  write notes.txt ... edit the writable RAM filesystem\n");
+    out_append("  vcs status          inspect the in-OS source/history layer\n");
+    out_append("  lcnt info           inspect syscall-cap containers\n");
+    out_append("  sum                 enter full-control ring-0 mode\n");
+    out_append("  peek 0xb8000 32     read raw memory in SUM\n");
+    out_append("  poke addr val 8     write raw memory in SUM\n");
+}
+
+static void cmd_status(const char* args)
+{
+    uint32_t available;
+    uint32_t dirty;
+    uint32_t lba;
+    uint32_t sectors;
+    uint32_t bank;
+    uint32_t generation;
+    uint32_t bank_sectors;
+    uint32_t drivers;
+    int last;
+    const char* driver;
+    (void)args;
+
+    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
+    fs_persist_detail(&bank, &generation, &bank_sectors);
+    drivers = drfl_list(NULL, NULL);
+
+    out_append("LardOS ");
+    out_append(LARDOS_VERSION);
+    out_append(" (");
+    out_append(lardos_version_channel());
+    out_append(")\n");
+    out_append("Drive: ");
+    out_append_char(s_drive);
+    out_append(":\\\n");
+    out_append("Mode: ");
+    if (s_cfgsh_mode) {
+        out_append("settings shell\n");
+    } else if (s_in_sum_mode) {
+        out_append("SUM ring0\n");
+    } else if (s_sandbox_mode) {
+        out_append("sandbox\n");
+    } else if (lcontainer_has_active()) {
+        out_append("container ");
+        out_append(lcontainer_active_name());
+        out_append("\n");
+    } else {
+        out_append("normal\n");
+    }
+    out_append("LPST: ");
+    out_append(available ? "online" : "offline");
+    out_append(dirty ? ", dirty" : ", clean");
+    out_append(", driver=");
+    out_append(driver && driver[0] ? driver : "none");
+    out_append(", last=");
+    out_append_i32(last);
+    out_append("\n");
+    out_append("LPST layout: lba=");
+    out_append_u32(lba);
+    out_append(", sectors=");
+    out_append_u32(sectors);
+    out_append(", bank_sectors=");
+    out_append_u32(bank_sectors);
+    out_append(", active_bank=");
+    if (bank == 0xFFFFFFFFu) out_append("none");
+    else out_append_u32(bank);
+    out_append(", gen=");
+    out_append_u32(generation);
+    out_append("\n");
+    out_append("Drivers: ");
+    out_append_u32(drivers);
+    out_append(" DRFL entries\n");
+    out_append("Containers: ");
+    out_append_u32(lcontainer_count());
+    if (lcontainer_has_active()) {
+        out_append(", active=");
+        out_append(lcontainer_active_name());
+    }
+    out_append("\n");
+
+    cpu_mode_info_t mode;
+    cpu_mode_info(&mode);
+    out_append("CPU: ");
+    out_append(cpu_mode_current_name());
+    out_append(", bridge=");
+    out_append(mode.bridge_ready ? "ready" : "offline");
+    out_append(", trips=");
+    out_append_u32(mode.roundtrip_count);
+    out_append(", last=");
+    out_append(mode.last_roundtrip_ok ? "ok" : "none");
+    out_append("\n");
+
+    gui_screenram_info_t sram;
+    gui_screenram_info(&sram);
+    out_append("ScreenRAM: ");
+    out_append(sram.enabled ? "on" : "off");
+    out_append(", cap=");
+    out_append_u32(sram.capacity);
+    out_append(", used=");
+    out_append_u32(sram.used);
+    out_append("\n");
+
+    exgui_info_t xg;
+    exgui_info(&xg);
+    out_append("EXGUI: ");
+    out_append(xg.enabled ? "on" : "off");
+    out_append(", style=");
+    out_append(exgui_style_name(xg.style));
+    out_append(", layout=");
+    out_append(exgui_layout_name(xg.layout));
+    out_append("\n");
+
+    exexgui_info_t xxg;
+    exexgui_info(&xxg);
+    out_append("EXEXGUI: ");
+    out_append(xxg.enabled ? "on" : "off");
+    out_append(", focus=");
+    out_append(exexgui_focus_name(xxg.focus));
+    out_append(", gui=");
+    out_append_u32(xxg.layout.gui.w);
+    out_append("x");
+    out_append_u32(xxg.layout.gui.h);
+    out_append(", term=");
+    out_append_u32(xxg.layout.term.w);
+    out_append("x");
+    out_append_u32(xxg.layout.term.h);
+    out_append("\n");
+
+    lguilib_info_t lgui;
+    lguilib_active(&lgui);
+    out_append("LGUILIB: ");
+    out_append(lgui.valid ? "active" : "inactive");
+    out_append(", name=");
+    out_append(lgui.theme.name);
+    out_append(", widgets=");
+    out_append_u32(lgui.theme.widget_count);
+    out_append(", err=");
+    out_append(lguilib_error_name(lgui.theme.last_error));
+    out_append("\n");
+
+    lassist_info_t buddy;
+    lassist_info(&buddy);
+    out_append("Lard Buddy: ");
+    out_append(buddy.enabled ? "on" : "off");
+    out_append(", mood=");
+    out_append(lassist_mood_name(buddy.mood));
+    out_append(", jokes=");
+    out_append_u32(buddy.jokes);
+    out_append(", msg=");
+    out_append(buddy.message);
+    out_append("\n");
+
+    lardkit_bugeye_info_t be;
+    lardkit_rollback_info_t rb;
+    lardkit_theme_info_t th;
+    lardkit_bugeye_info(&be);
+    lardkit_rollback_info(&rb);
+    lardkit_theme_info(&th);
+    out_append("LardKit: bugeye=");
+    out_append(be.enabled ? "on" : "off");
+    out_append(", bugs=");
+    out_append_u32(be.bug_count);
+    out_append(", rollback=");
+    out_append(rb.valid ? rb.label : "empty");
+    out_append(", theme=");
+    out_append(th.name);
+    out_append(", panicroom=");
+    out_append(lardkit_panicroom_active() ? "entered" : "standby");
+    out_append("\n");
+
+    oslink_info_t link;
+    oslink_info(&link);
+    out_append("OSLink: ");
+    out_append(link.ready ? "ready" : "offline");
+    out_append(", inbox=");
+    out_append_u32(link.inbox_count);
+    out_append(", peers=");
+    out_append_u32(link.peer_count);
+    out_append("\n");
+
+    taskprio_info_t tasks;
+    taskprio_info(&tasks);
+    out_append("Tasks: queued=");
+    out_append_u32(tasks.queued);
+    out_append(", runnable=");
+    out_append_u32(tasks.runnable);
+    out_append(", paused=");
+    out_append_u32(tasks.paused);
+    out_append(", lev10=");
+    out_append_u32(tasks.os_urgent);
+    out_append(", default-prio=");
+    out_append_i32(tasks.default_priority);
+    out_append(", completed=");
+    out_append_u32(tasks.completed);
+    out_append("\n");
+
+    bootprof_info_t bp;
+    bootprof_info(&bp);
+    out_append("BootProf: ");
+    out_append(bp.name);
+    out_append(", net=");
+    out_append(bp.network ? "on" : "off");
+    out_append(", post=");
+    out_append(bp.force_post ? "on" : "off");
+    out_append(", dev=");
+    out_append(bp.dev_mode ? "on" : "off");
+    out_append(", awake=");
+    out_append(bp.awakening_mode ? "on" : "off");
+    out_append("\n");
+
+    awake_info_t ai;
+    awake_info(&ai);
+    out_append("Awakening: ");
+    out_append(ai.enabled ? (ai.done ? "complete" : "loading") : "off");
+    out_append(", phase=");
+    out_append_u32(ai.phase);
+    out_append("/");
+    out_append_u32(ai.total);
+    out_append(", current=");
+    out_append(ai.current);
+    out_append(", runs=");
+    out_append_u32(ai.background_runs);
+    out_append(", err=");
+    out_append_u32(ai.last_error);
+    out_append("\n");
+
+    out_append("CrashLog: events=");
+    out_append_u32(crashlog_count());
+    out_append("\n");
+}
+
+static int args_word_is(const char* args, const char* word)
+{
+    uint32_t i = 0;
+    if (!args || !word) return 0;
+    while (args[i] == ' ' || args[i] == '\t') i++;
+    uint32_t j = 0;
+    while (word[j]) {
+        if (args[i + j] != word[j]) return 0;
+        j++;
+    }
+    char tail = args[i + j];
+    return tail == '\0' || tail == ' ' || tail == '\t';
+}
+
+static int args_has_text(const char* args)
+{
+    uint32_t i = 0;
+    if (!args) return 0;
+    while (args[i] == ' ' || args[i] == '\t') i++;
+    return args[i] != '\0';
+}
+
+static void cmd_mode(const char* args)
+{
+    cpu_mode_info_t info;
+    if (!args) args = "";
+    cpu_mode_info(&info);
+
+    if (args_word_is(args, "guard")) {
+        uint32_t before = info.roundtrip_count;
+        out_append("mode guard: checking bridge before/after real16 window...\n");
+        if (info.bridge_ready && cpu_mode_roundtrip_probe() == 0) {
+            cpu_mode_info(&info);
+            out_append("mode guard: OK, restored ");
+            out_append(cpu_mode_current_name());
+            out_append(" roundtrips=");
+            out_append_u32(info.roundtrip_count - before);
+            out_append("\n");
+        } else {
+            cpu_mode_info(&info);
+            out_append("mode guard: blocked or restored previous long64 state, err=");
+            out_append_u32(info.last_error);
+            out_append("\n");
+        }
+        return;
+    }
+
+    if (args_word_is(args, "probe") || args_word_is(args, "real")) {
+        out_append("mode: entering a controlled real16 window and returning to long64...\n");
+        if (cpu_mode_roundtrip_probe() == 0) {
+            out_append("mode: real16 -> long64 roundtrip OK\n");
+        } else {
+            cpu_mode_info(&info);
+            out_append("mode: roundtrip failed, err=");
+            out_append_u32(info.last_error);
+            out_append("\n");
+        }
+        return;
+    }
+
+    if (args_has_text(args) && !args_word_is(args, "status")) {
+        out_append("Usage: mode [status|probe|real|guard]\n");
+        return;
+    }
+
+    out_append("CPU mode: ");
+    out_append(cpu_mode_current_name());
+    out_append("\nBridge: ");
+    out_append(info.bridge_ready ? "ready" : "offline");
+    out_append(" at ");
+    out_append_hex32(info.trampoline_pa);
+    out_append(", size=");
+    out_append_u32(info.trampoline_size);
+    out_append("\nRoundtrips: ");
+    out_append_u32(info.roundtrip_count);
+    out_append(", last=");
+    out_append(info.last_roundtrip_ok ? "ok" : "none");
+    out_append(", err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_sram_status(void)
+{
+    gui_screenram_info_t info;
+    gui_screenram_info(&info);
+    out_append("ScreenRAM: ");
+    out_append(info.enabled ? "on" : "off");
+    out_append("\nrect ");
+    out_append_u32(info.x);
+    out_append(",");
+    out_append_u32(info.y);
+    out_append(" ");
+    out_append_u32(info.w);
+    out_append("x");
+    out_append_u32(info.h);
+    out_append(" cap=");
+    out_append_u32(info.capacity);
+    out_append("/");
+    out_append_u32(info.max_capacity);
+    out_append(" used=");
+    out_append_u32(info.used);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_sram_read(const char* args)
+{
+    uint64_t off;
+    uint64_t len;
+    uint8_t buf[128];
+    int r;
+    if (lsh_parse_u64(&args, &off) != 0 || lsh_parse_u64(&args, &len) != 0 || len == 0) {
+        out_append("Usage: sram read offset len\n");
+        return;
+    }
+    if (len > sizeof(buf)) {
+        out_append("sram: read capped to 128 bytes.\n");
+        len = sizeof(buf);
+    }
+    r = gui_screenram_read((uint32_t)off, buf, (uint32_t)len);
+    if (r < 0) {
+        out_append("sram: read failed. Try sram on first.\n");
+        return;
+    }
+    out_append("hex:");
+    for (int i = 0; i < r; i++) {
+        out_append_char(' ');
+        out_append_hex8(buf[i]);
+    }
+    out_append("\ntext: ");
+    for (int i = 0; i < r; i++) {
+        char c = (char)buf[i];
+        out_append_char((c >= 32 && c <= 126) ? c : '.');
+    }
+    out_append("\n");
+}
+
+static void cmd_sram_write(const char* args)
+{
+    uint64_t off;
+    const char* text;
+    uint32_t len = 0;
+    int r;
+    if (lsh_parse_u64(&args, &off) != 0) {
+        out_append("Usage: sram write offset text\n");
+        return;
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    text = args;
+    while (text[len]) len++;
+    r = gui_screenram_write((uint32_t)off, (const uint8_t*)text, len);
+    if (r < 0) {
+        out_append("sram: write failed. Try sram on first.\n");
+        return;
+    }
+    out_append("sram: wrote ");
+    out_append_u32((uint32_t)r);
+    out_append(" bytes\n");
+}
+
+static void cmd_sram(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        cmd_sram_status();
+        return;
+    }
+    if (strcmp(sub, "status") == 0) {
+        cmd_sram_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0) {
+        if (gui_screenram_enable(1) == 0) out_append("sram: enabled default quiet corner.\n");
+        else out_append("sram: no framebuffer available.\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        gui_screenram_enable(0);
+        out_append("sram: disabled.\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        gui_screenram_clear();
+        out_append("sram: cleared.\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(gui_screenram_selftest() == 0 ? "sram: selftest OK\n" : "sram: selftest failed\n");
+        return;
+    }
+    if (strcmp(sub, "corner") == 0) {
+        char corner[8];
+        uint64_t w = 0;
+        uint64_t h = 0;
+        if (vcs_read_word(&args, corner, sizeof(corner)) != 0) {
+            corner[0] = 'b'; corner[1] = 'r'; corner[2] = '\0';
+        }
+        (void)lsh_parse_u64(&args, &w);
+        (void)lsh_parse_u64(&args, &h);
+        if (gui_screenram_set_corner(corner, (uint32_t)w, (uint32_t)h) == 0) {
+            out_append("sram: corner ");
+            out_append(corner);
+            out_append(" enabled.\n");
+        } else {
+            out_append("Usage: sram corner tl|tr|bl|br [w h]\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "rect") == 0) {
+        uint64_t x;
+        uint64_t y;
+        uint64_t w;
+        uint64_t h;
+        if (lsh_parse_u64(&args, &x) != 0 || lsh_parse_u64(&args, &y) != 0 ||
+            lsh_parse_u64(&args, &w) != 0 || lsh_parse_u64(&args, &h) != 0) {
+            out_append("Usage: sram rect x y w h\n");
+            return;
+        }
+        if (gui_screenram_set_rect((uint32_t)x, (uint32_t)y, (uint32_t)w, (uint32_t)h) == 0) {
+            out_append("sram: selected rectangle enabled.\n");
+        } else {
+            out_append("sram: rectangle outside framebuffer.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "write") == 0) {
+        cmd_sram_write(args);
+        return;
+    }
+    if (strcmp(sub, "read") == 0) {
+        cmd_sram_read(args);
+        return;
+    }
+    out_append("Usage: sram status|on|off|corner|rect|write|read|clear|test\n");
+}
+
+static void screencheck_report(const screencheck_info_t* info)
+{
+    out_append("ScreenCheck ");
+    out_append(info->bad_tiles == 0 ? "OK" : "CHECK");
+    out_append("\nsize=");
+    out_append_u32(info->width);
+    out_append("x");
+    out_append_u32(info->height);
+    out_append(" changed=");
+    out_append_u32(info->changed_samples);
+    out_append(" tiles=");
+    out_append_u32(info->tiles_checked);
+    out_append(" bad=");
+    out_append_u32(info->bad_tiles);
+    out_append("\nwindow=");
+    out_append(info->window_inside ? "inside" : "bad");
+    out_append(" response=");
+    out_append(info->response_view_ok ? "ok" : "bad");
+    out_append(" err=");
+    out_append_u32(info->last_error);
+    out_append("\n");
+}
+
+static void cmd_screencheck(const char* args)
+{
+    char sub[16];
+    screencheck_info_t info;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        if (screencheck_probe(&info) == 0) screencheck_report(&info);
+        else out_append("screencheck: no framebuffer.\n");
+        return;
+    }
+    if (strcmp(sub, "retro") == 0 || strcmp(sub, "run") == 0 || strcmp(sub, "draw") == 0) {
+        screencheck_draw_retro();
+        if (screencheck_probe(&info) == 0) screencheck_report(&info);
+        else out_append("screencheck: no framebuffer.\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(screencheck_selftest() == 0 ? "screencheck: selftest OK\n" : "screencheck: selftest failed\n");
+        return;
+    }
+    out_append("Usage: screencheck status|retro|test\n");
+}
+
+static void cmd_exgui_status(void)
+{
+    exgui_info_t info;
+    exgui_info(&info);
+    out_append("EXGUI ");
+    out_append(info.enabled ? "on" : "off");
+    out_append(" style=");
+    out_append(exgui_style_name(info.style));
+    out_append(" layout=");
+    out_append(exgui_layout_name(info.layout));
+    out_append(" focused=");
+    out_append_u32(info.focused);
+    out_append("/");
+    out_append_u32(info.window_count);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_exgui(const char* args)
+{
+    char sub[16];
+    char value[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_exgui_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0) {
+        exgui_enable(1);
+        out_append("exgui: enabled.\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        exgui_enable(0);
+        out_append("exgui: disabled; classic GUI remains active.\n");
+        return;
+    }
+    if (strcmp(sub, "style") == 0 || strcmp(sub, "theme") == 0) {
+        if (vcs_read_word(&args, value, sizeof(value)) != 0 || exgui_set_style(value) != 0) {
+            out_append("Usage: exgui style win|linux|mac\n");
+            return;
+        }
+        cmd_exgui_status();
+        return;
+    }
+    if (strcmp(sub, "layout") == 0 || strcmp(sub, "wm") == 0) {
+        if (vcs_read_word(&args, value, sizeof(value)) != 0 || exgui_set_layout(value) != 0) {
+            out_append("Usage: exgui layout float|tile|stack\n");
+            return;
+        }
+        cmd_exgui_status();
+        return;
+    }
+    if (strcmp(sub, "next") == 0 || strcmp(sub, "focus") == 0) {
+        exgui_focus_next();
+        cmd_exgui_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(exgui_selftest() == 0 ? "exgui: selftest OK\n" : "exgui: selftest failed\n");
+        return;
+    }
+    out_append("Usage: exgui on|off|status|style|layout|next|test\n");
+}
+
+static void cmd_exexgui_status(void)
+{
+    exexgui_info_t info;
+    exexgui_info(&info);
+    out_append("EXEXGUI ");
+    out_append(info.enabled ? "on" : "off");
+    out_append(" focus=");
+    out_append(exexgui_focus_name(info.focus));
+    out_append(" workspace=");
+    out_append_u32(info.workspace);
+    out_append(" gui=");
+    out_append_u32(info.layout.gui.w);
+    out_append("x");
+    out_append_u32(info.layout.gui.h);
+    out_append(" term=");
+    out_append_u32(info.layout.term.w);
+    out_append("x");
+    out_append_u32(info.layout.term.h);
+    out_append(" info=");
+    out_append_u32(info.layout.info.w);
+    out_append("x");
+    out_append_u32(info.layout.info.h);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_exexgui(const char* args)
+{
+    char sub[16];
+    char value[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0 || strcmp(sub, "apply") == 0 || strcmp(sub, "sketch") == 0) {
+        exexgui_enable(1);
+        out_append("exexgui: enabled sketch split layout.\n");
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        exexgui_enable(0);
+        out_append("exexgui: disabled; classic GUI and EXGUI stay available.\n");
+        return;
+    }
+    if (strcmp(sub, "focus") == 0 || strcmp(sub, "pane") == 0) {
+        if (vcs_read_word(&args, value, sizeof(value)) != 0 || exexgui_set_focus(value) != 0) {
+            out_append("Usage: exexgui focus gui|term|info\n");
+            return;
+        }
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "next") == 0) {
+        exexgui_focus_next();
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "workspace") == 0 || strcmp(sub, "ws") == 0) {
+        uint64_t id;
+        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_select((uint32_t)id) != 0) {
+            out_append("Usage: exexgui workspace 1|2|3\n");
+            return;
+        }
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "save") == 0) {
+        uint64_t id;
+        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_save((uint32_t)id) != 0) {
+            out_append("Usage: exexgui save 1|2|3\n");
+            return;
+        }
+        out_append("exexgui: workspace saved.\n");
+        return;
+    }
+    if (strcmp(sub, "load") == 0) {
+        uint64_t id;
+        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_load((uint32_t)id) != 0) {
+            out_append("Usage: exexgui load 1|2|3\n");
+            return;
+        }
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(exexgui_selftest() == 0 ? "exexgui: selftest OK\n" : "exexgui: selftest failed\n");
+        return;
+    }
+    out_append("Usage: exexgui on|off|status|focus|next|workspace 1|save 1|load 1|test\n");
+}
+
+static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
+{
+    const char* p = *args;
+    uint32_t seg = 0;
+    uint32_t val = 0;
+    int have = 0;
+    while (*p == ' ' || *p == '\t') p++;
+    for (;;) {
+        char c = *p;
+        if (c >= '0' && c <= '9') {
+            val = val * 10u + (uint32_t)(c - '0');
+            if (val > 255u) return -1;
+            have = 1;
+            p++;
+        } else if (c == '.' || c == '\0' || c == ' ' || c == '\t') {
+            if (!have || seg >= 4u) return -1;
+            out->b[seg++] = (uint8_t)val;
+            val = 0;
+            have = 0;
+            if (c == '.') {
+                p++;
+                continue;
+            }
+            break;
+        } else {
+            return -1;
+        }
+    }
+    if (seg != 4u) return -1;
+    while (*p == ' ' || *p == '\t') p++;
+    *args = p;
+    return 0;
+}
+
+static int lsh_doc_data_from_arg(const char* file_arg, const uint8_t** data, uint32_t* size)
+{
+    char drv;
+    char name[64];
+    const FsFile* f;
+    FsWritableFile* w;
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    if (!name[0]) return -1;
+    f = lsh_open_read(drv, name);
+    w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    if (f) {
+        *data = f->data;
+        *size = f->size;
+        return 0;
+    }
+    if (w) {
+        *data = w->data;
+        *size = w->size;
+        return 0;
+    }
+    return -2;
+}
+
+static void copy_lsh_literal(char* out, uint32_t cap, const char* s)
+{
+    uint32_t i = 0;
+    if (!out || cap == 0) return;
+    while (s && s[i] && i + 1u < cap) {
+        out[i] = s[i];
+        i++;
+    }
+    out[i] = '\0';
+}
+
+static void cmd_lguilib_print_theme(const char* label, const lguilib_theme_t* t)
+{
+    out_append(label);
+    out_append(": ");
+    out_append(t->name);
+    out_append(" widgets=");
+    out_append_u32(t->widget_count);
+    out_append(" err=");
+    out_append(lguilib_error_name(t->last_error));
+    out_append("\n");
+    out_append("  title_bg=");
+    out_append_hex32(t->title_bg);
+    out_append(" title_fg=");
+    out_append_hex32(t->title_fg);
+    out_append(" panel=");
+    out_append_hex32(t->panel_bg);
+    out_append(" border=");
+    out_append_hex32(t->border);
+    out_append("\n");
+    out_append("  tab=");
+    out_append_hex32(t->tab_active);
+    out_append("/");
+    out_append_hex32(t->tab_idle);
+    out_append("/");
+    out_append_hex32(t->tab_hover);
+    out_append(" accent=");
+    out_append_hex32(t->tab_accent);
+    out_append("\n");
+    out_append("  button=");
+    out_append_hex32(t->button_border);
+    out_append("/");
+    out_append_hex32(t->button_hover);
+    out_append(" output=");
+    out_append_hex32(t->output_frame);
+    out_append(" shadow=");
+    out_append_hex32(t->shadow);
+    out_append("\n");
+}
+
+static void cmd_lguilib_status(void)
+{
+    lguilib_info_t info;
+    lguilib_active(&info);
+    cmd_lguilib_print_theme(info.valid ? "LGUILIB active" : "LGUILIB inactive", &info.theme);
+}
+
+static void cmd_lguilib_file(const char* action, const char* args)
+{
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    lguilib_theme_t parsed;
+    int r;
+
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+        copy_lsh_literal(file_arg, sizeof(file_arg), "default.lguilib");
+    }
+    if (lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("lguilib: file not found: ");
+        out_append(file_arg);
+        out_append("\n");
+        return;
+    }
+    r = lguilib_parse(data, size, &parsed);
+    if (r != 0) {
+        out_append("lguilib: invalid ");
+        out_append(file_arg);
+        out_append(" err=");
+        out_append(lguilib_error_name(parsed.last_error));
+        out_append("\n");
+        return;
+    }
+    if (strcmp(action, "use") == 0 || strcmp(action, "load") == 0) {
+        if (lguilib_load_active(data, size) != 0) {
+            out_append("lguilib: load failed.\n");
+            return;
+        }
+        out_append("lguilib: active theme loaded from ");
+        out_append(file_arg);
+        out_append("\n");
+        cmd_lguilib_status();
+        return;
+    }
+    cmd_lguilib_print_theme(file_arg, &parsed);
+}
+
+static void cmd_lguilib(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_lguilib_status();
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "cat") == 0 ||
+        strcmp(sub, "use") == 0 || strcmp(sub, "load") == 0) {
+        cmd_lguilib_file(sub, args);
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lguilib_selftest() == 0 ? "lguilib: selftest OK\n" : "lguilib: selftest failed\n");
+        return;
+    }
+    out_append("Usage: lguilib status|show|use|test [file.lguilib]\n");
+}
+
+static void cmd_larsform(const char* args)
+{
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: larsform [drive:]file.lars\n");
+        return;
+    }
+    int count = lard_doc_action_count((const char*)data, size);
+    if (count <= 0) {
+        out_append("larsform: no LARS actions.\n");
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        lard_doc_action_t a;
+        if (lard_doc_action_at((const char*)data, size, (uint32_t)i, &a) == 0) {
+            out_append_u32((uint32_t)i);
+            out_append(" ");
+            out_append(a.kind);
+            out_append(" ");
+            out_append(a.label);
+            if (a.command[0]) {
+                out_append(" -> ");
+                out_append(a.command);
+            }
+            out_append("\n");
+        }
+    }
+}
+
+static void cmd_larsact(const char* args)
+{
+    char file_arg[64];
+    uint32_t index;
+    const uint8_t* data;
+    uint32_t size;
+    lard_doc_action_t a;
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        vcs_parse_u32(&args, &index) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: larsact [drive:]file.lars index\n");
+        return;
+    }
+    if (lard_doc_action_at((const char*)data, size, index, &a) != 0) {
+        out_append("larsact: action not found.\n");
+        return;
+    }
+    if (!a.command[0]) {
+        out_append("larsact: input actions do not run commands.\n");
+        return;
+    }
+    out_append("larsact: ");
+    out_append(a.label);
+    out_append(" -> ");
+    out_append(a.command);
+    out_append("\n");
+    lsh_exec(a.command);
+}
+
+static void cmd_lpack_show(const char* file_arg, const uint8_t* data, uint32_t size, int verbose)
+{
+    int count = lpack_file_count(data, size);
+    if (count < 0) {
+        out_append("lpack: not an LPACK 1 file.\n");
+        return;
+    }
+    out_append("LPACK ");
+    out_append(file_arg);
+    out_append(": ");
+    out_append_u32((uint32_t)count);
+    out_append(count == 1 ? " file\n" : " files\n");
+    if (!verbose) return;
+    for (int i = 0; i < count; i++) {
+        lpack_file_info_t info;
+        if (lpack_file_at(data, size, (uint32_t)i, &info) == 0) {
+            out_append_u32((uint32_t)i);
+            out_append(" ");
+            out_append(info.name);
+            out_append(" ");
+            out_append_u32(info.size);
+            out_append(" bytes\n");
+        }
+    }
+}
+
+static void cmd_lpack_op(const char* op, const char* args)
+{
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: lpack info|list|verify|checksum|install [drive:]file.lpack\n");
+        return;
+    }
+    if (strcmp(op, "info") == 0) {
+        cmd_lpack_show(file_arg, data, size, 0);
+        return;
+    }
+    if (strcmp(op, "list") == 0 || strcmp(op, "ls") == 0) {
+        cmd_lpack_show(file_arg, data, size, 1);
+        return;
+    }
+    if (strcmp(op, "verify") == 0 || strcmp(op, "check") == 0 || strcmp(op, "checksum") == 0) {
+        lpack_verify_info_t info;
+        int r = lpack_verify(data, size, &info);
+        out_append("lpack verify ");
+        out_append(file_arg);
+        out_append(r == 0 ? ": OK\n" : ": CHECK\n");
+        out_append("files=");
+        out_append_u32(info.files);
+        out_append(" installable=");
+        out_append_u32(info.installable);
+        out_append(" bytes=");
+        out_append_u32(info.total_bytes);
+        out_append(" hash=");
+        out_append_hex32(info.hash);
+        out_append(" warnings=");
+        out_append_u32(info.warnings);
+        out_append(" errors=");
+        out_append_u32(info.errors);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(op, "install") == 0 || strcmp(op, "add") == 0) {
+        int installed = lpack_install(data, size);
+        if (installed < 0) {
+            out_append("lpack: install failed; invalid package.\n");
+            return;
+        }
+        out_append("lpack: installed ");
+        out_append_u32((uint32_t)installed);
+        out_append(installed == 1 ? " file.\n" : " files.\n");
+        if (installed == 0) out_append("lpack: no writable package targets matched this system.\n");
+        return;
+    }
+    out_append("Usage: lpack info|list|verify|install [drive:]file.lpack\n");
+}
+
+static void cmd_lpack(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        lpack_undo_info_t undo;
+        lpack_undo_info(&undo);
+        out_append("Usage: lpack info|list|verify|checksum|install file.lpack | lpack undo last | lpack test\n");
+        out_append("undo=");
+        out_append(undo.ready ? "ready" : "empty");
+        out_append(" files=");
+        out_append_u32(undo.files);
+        out_append(" bytes=");
+        out_append_u32(undo.bytes);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "undo") == 0 || strcmp(sub, "rollback") == 0) {
+        int r = lpack_undo_last();
+        if (r < 0) out_append("lpack: no install snapshot to undo.\n");
+        else {
+            out_append("lpack: restored ");
+            out_append_u32((uint32_t)r);
+            out_append(r == 1 ? " file.\n" : " files.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lpack_selftest() == 0 ? "lpack: selftest OK\n" : "lpack: selftest failed\n");
+        return;
+    }
+    cmd_lpack_op(sub, args);
+}
+
+static const char* oslink_type_name(uint8_t type)
+{
+    if (type == 1) return "hello";
+    if (type == 2) return "ping";
+    if (type == 3) return "pong";
+    if (type == 4) return "text";
+    if (type == 5) return "ack";
+    if (type == 6) return "exec";
+    if (type == 7) return "local";
+    return "packet";
+}
+
+static void cmd_oslink_status(void)
+{
+    oslink_info_t info;
+    oslink_info(&info);
+    out_append("OSLink ");
+    out_append(info.ready ? "ready" : "offline");
+    out_append(" node=");
+    out_append(info.node);
+    out_append(" ip=");
+    out_append_ip4(info.ip);
+    out_append(" port=");
+    out_append_u32(info.port);
+    out_append("\n");
+    out_append("sent=");
+    out_append_u32(info.sent);
+    out_append(" local=");
+    out_append_u32(info.local_sent);
+    out_append(" recv=");
+    out_append_u32(info.received);
+    out_append(" dropped=");
+    out_append_u32(info.dropped);
+    out_append(" inbox=");
+    out_append_u32(info.inbox_count);
+    out_append(" local-inbox=");
+    out_append_u32(info.local_count);
+    out_append(" peers=");
+    out_append_u32(info.peer_count);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_oslink_peers(void)
+{
+    uint32_t count = oslink_peer_count();
+    if (count == 0) {
+        out_append("oslink: no peers yet.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        oslink_peer_t p;
+        if (oslink_peer_at(i, &p) == 0) {
+            out_append_u32(i);
+            out_append(" ");
+            out_append_ip4(p.ip);
+            out_append(" ");
+            out_append(p.node);
+            out_append(" seen=");
+            out_append_u32(p.seen);
+            out_append("\n");
+        }
+    }
+}
+
+static void cmd_oslink_bus(void)
+{
+    oslink_info_t info;
+    oslink_info(&info);
+    out_append("OSLink local bus: queued=");
+    out_append_u32(info.local_count);
+    out_append(" emitted=");
+    out_append_u32(info.local_sent);
+    out_append(" total-inbox=");
+    out_append_u32(info.inbox_count);
+    out_append("\nChannels are lightweight labels carried inside the OSLink inbox.\n");
+}
+
+static void cmd_oslink_recv(void)
+{
+    oslink_msg_t m;
+    oslink_poll();
+    if (oslink_recv(&m) == 0) {
+        out_append("oslink: inbox empty.\n");
+        return;
+    }
+    out_append(oslink_type_name(m.type));
+    if (m.type == 7) {
+        out_append(" channel=");
+        out_append(m.channel[0] ? m.channel : "main");
+    } else {
+        out_append(" from ");
+        out_append(m.src_node);
+        out_append(" ");
+        out_append_ip4(m.src_ip);
+    }
+    out_append(" seq=");
+    out_append_u32(m.seq);
+    out_append("\n");
+    if (m.text[0]) {
+        out_append(m.text);
+        out_append("\n");
+    }
+}
+
+static void cmd_oslink_emit(const char* args)
+{
+    char channel[OSLINK_CHANNEL_MAX + 1u];
+    if (vcs_read_word(&args, channel, sizeof(channel)) != 0) {
+        out_append("Usage: oslink emit channel text\n");
+        return;
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    if (oslink_emit_local(channel, args) == 0) {
+        out_append("oslink: local ");
+        out_append(channel);
+        out_append(" emitted.\n");
+    } else {
+        out_append("oslink: emit failed.\n");
+    }
+}
+
+static void cmd_oslink_send_like(const char* args, int kind)
+{
+    ip4_t dst;
+    int r;
+    if (lsh_parse_ip4_arg(&args, &dst) != 0) {
+        out_append(kind == 1 ? "Usage: oslink hello ip\n" :
+                   kind == 2 ? "Usage: oslink ping ip [text]\n" :
+                   kind == 3 ? "Usage: oslink send ip text\n" :
+                               "Usage: oslink exec ip command\n");
+        return;
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    if (kind == 1) r = oslink_send_hello(dst);
+    else if (kind == 2) r = oslink_send_ping(dst, args);
+    else if (kind == 3) r = oslink_send_text(dst, args);
+    else r = oslink_send_exec(dst, args);
+    if (r == 0) {
+        out_append("oslink: sent to ");
+        out_append_ip4(dst);
+        out_append("\n");
+    } else {
+        out_append("oslink: send failed.\n");
+    }
+}
+
+static void cmd_oslink(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        cmd_oslink_status();
+        return;
+    }
+    if (strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_oslink_status();
+        return;
+    }
+    if (strcmp(sub, "peers") == 0) {
+        cmd_oslink_peers();
+        return;
+    }
+    if (strcmp(sub, "bus") == 0 || strcmp(sub, "local") == 0) {
+        cmd_oslink_bus();
+        return;
+    }
+    if (strcmp(sub, "emit") == 0 || strcmp(sub, "pub") == 0) {
+        cmd_oslink_emit(args);
+        return;
+    }
+    if (strcmp(sub, "poll") == 0) {
+        oslink_poll();
+        out_append("oslink: polled.\n");
+        return;
+    }
+    if (strcmp(sub, "recv") == 0 || strcmp(sub, "inbox") == 0) {
+        cmd_oslink_recv();
+        return;
+    }
+    if (strcmp(sub, "hello") == 0) {
+        cmd_oslink_send_like(args, 1);
+        return;
+    }
+    if (strcmp(sub, "ping") == 0) {
+        cmd_oslink_send_like(args, 2);
+        return;
+    }
+    if (strcmp(sub, "send") == 0 || strcmp(sub, "msg") == 0) {
+        cmd_oslink_send_like(args, 3);
+        return;
+    }
+    if (strcmp(sub, "exec") == 0 || strcmp(sub, "run") == 0) {
+        cmd_oslink_send_like(args, 4);
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(oslink_selftest() == 0 ? "oslink: selftest OK\n" : "oslink: selftest failed\n");
+        return;
+    }
+    out_append("Usage: oslink status|bus|emit|hello|ping|send|exec|recv|peers|poll|test\n");
+}
+
+static void cmd_bugeye_status(void)
+{
+    lardkit_bugeye_info_t info;
+    lardkit_bugeye_info(&info);
+    out_append("BugEye ");
+    out_append(info.enabled ? "on" : "off");
+    out_append(" scans=");
+    out_append_u32(info.scans);
+    out_append(" bugs=");
+    out_append_u32(info.bug_count);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+    if (info.scans) screencheck_report(&info.screen);
+}
+
+static void cmd_bugeye(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_bugeye_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0) {
+        lardkit_bugeye_enable(1);
+        (void)lardkit_bugeye_scan();
+        cmd_bugeye_status();
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        lardkit_bugeye_enable(0);
+        cmd_bugeye_status();
+        return;
+    }
+    if (strcmp(sub, "scan") == 0 || strcmp(sub, "run") == 0) {
+        int r = lardkit_bugeye_scan();
+        out_append(r == 0 ? "bugeye: no visible layout bugs found.\n" : "bugeye: check report.\n");
+        out_append("bugeye: wrote bugreport.lardd\n");
+        cmd_bugeye_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(lardkit_bugeye_scan() >= 0 ? "bugeye: selftest OK\n" : "bugeye: selftest failed\n");
+        return;
+    }
+    out_append("Usage: bugeye on|off|status|scan|test\n");
+}
+
+static void cmd_bugreplay_list(void)
+{
+    uint32_t count = lardkit_bugreplay_count();
+    out_append("BugReplay frames=");
+    out_append_u32(count);
+    out_append("\n");
+    if (count == 0) {
+        out_append("bugreplay: no frames. Run bugeye scan first.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lardkit_bugreplay_frame_t f;
+        if (lardkit_bugreplay_at(i, &f) != 0) continue;
+        out_append("#");
+        out_append_u32(f.seq);
+        out_append(" scan=");
+        out_append_u32(f.scan);
+        out_append(" ");
+        out_append_u32(f.width);
+        out_append("x");
+        out_append_u32(f.height);
+        out_append(" changed=");
+        out_append_u32(f.changed_samples);
+        out_append(" bad=");
+        out_append_u32(f.bad_tiles);
+        out_append(" err=");
+        out_append_u32(f.last_error);
+        out_append("\n");
+    }
+}
+
+static void cmd_bugreplay(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0) {
+        cmd_bugreplay_list();
+        return;
+    }
+    if (strcmp(sub, "last") == 0) {
+        uint32_t count = lardkit_bugreplay_count();
+        lardkit_bugreplay_frame_t f;
+        if (count == 0 || lardkit_bugreplay_at(count - 1u, &f) != 0) {
+            out_append("bugreplay: no frames.\n");
+            return;
+        }
+        out_append("last seq=");
+        out_append_u32(f.seq);
+        out_append(" scan=");
+        out_append_u32(f.scan);
+        out_append(" bad=");
+        out_append_u32(f.bad_tiles);
+        out_append(" err=");
+        out_append_u32(f.last_error);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "write") == 0 || strcmp(sub, "save") == 0) {
+        out_append(lardkit_bugreplay_write() == 0 ? "bugreplay: wrote bugreplay.lardd\n" : "bugreplay: write failed\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
+        (void)lardkit_bugreplay_write();
+        cmd_larddoc("bugreplay.lardd", "Usage: bugreplay show");
+        return;
+    }
+    if (strcmp(sub, "draw") == 0) {
+        out_append(lardkit_bugreplay_draw() == 0 ? "bugreplay: drew frame log panel.\n" : "bugreplay: draw failed.\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        lardkit_bugreplay_clear();
+        out_append("bugreplay: cleared.\n");
+        return;
+    }
+    out_append("Usage: bugreplay status|last|show|draw|write|clear\n");
+}
+
+static void cmd_rollback_status(void)
+{
+    lardkit_rollback_info_t info;
+    lardkit_rollback_info(&info);
+    out_append("Rollback ");
+    out_append(info.valid ? "ready" : "empty");
+    out_append(" label=");
+    out_append(info.label);
+    out_append(" snaps=");
+    out_append_u32(info.snapshots);
+    out_append(" applied=");
+    out_append_u32(info.applied);
+    out_append("\n");
+    if (info.valid) {
+        out_append("exgui=");
+        out_append_u32(info.exgui_enabled);
+        out_append(" style=");
+        out_append_u32(info.exgui_style);
+        out_append(" layout=");
+        out_append_u32(info.exgui_layout);
+        out_append(" split=");
+        out_append_u32(info.exexgui_enabled);
+        out_append(" buddy=");
+        out_append_u32(info.buddy_enabled);
+        out_append(" http=");
+        out_append(info.http_post ? "POST" : "GET");
+        out_append(" boot=");
+        out_append(info.boot_profile);
+        out_append(" prio=");
+        out_append_i32(info.task_default);
+        out_append("\n");
+    }
+}
+
+static void cmd_rollback(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_rollback_status();
+        return;
+    }
+    if (strcmp(sub, "snap") == 0 || strcmp(sub, "snapshot") == 0 || strcmp(sub, "save") == 0) {
+        char label[32];
+        if (vcs_read_word(&args, label, sizeof(label)) != 0) label[0] = '\0';
+        (void)lardkit_snapshot(label[0] ? label : "manual");
+        out_append("rollback: snapshot saved.\n");
+        cmd_rollback_status();
+        return;
+    }
+    if (strcmp(sub, "apply") == 0 || strcmp(sub, "last") == 0 || strcmp(sub, "restore") == 0) {
+        if (lardkit_rollback_apply() == 0) out_append("rollback: restored last snapshot.\n");
+        else out_append("rollback: no snapshot.\n");
+        cmd_rollback_status();
+        return;
+    }
+    out_append("Usage: rollback status|snap [label]|apply\n");
+}
+
+static uint32_t trust_cap_from_name(const char* name)
+{
+    if (strcmp(name, "fs") == 0 || strcmp(name, "file") == 0) return LARDKIT_TRUST_FS;
+    if (strcmp(name, "screen") == 0 || strcmp(name, "gui") == 0) return LARDKIT_TRUST_SCREEN;
+    if (strcmp(name, "net") == 0 || strcmp(name, "network") == 0) return LARDKIT_TRUST_NET;
+    if (strcmp(name, "oslink") == 0 || strcmp(name, "bus") == 0) return LARDKIT_TRUST_OSLINK;
+    if (strcmp(name, "raw") == 0 || strcmp(name, "sum") == 0) return LARDKIT_TRUST_RAW;
+    return 0;
+}
+
+static void trust_print_caps(uint32_t caps)
+{
+    int any = 0;
+    if (caps & LARDKIT_TRUST_FS) { out_append("fs"); any = 1; }
+    if (caps & LARDKIT_TRUST_SCREEN) { out_append(any ? ",screen" : "screen"); any = 1; }
+    if (caps & LARDKIT_TRUST_NET) { out_append(any ? ",net" : "net"); any = 1; }
+    if (caps & LARDKIT_TRUST_OSLINK) { out_append(any ? ",oslink" : "oslink"); any = 1; }
+    if (caps & LARDKIT_TRUST_RAW) { out_append(any ? ",raw" : "raw"); any = 1; }
+    if (!any) out_append("none");
+}
+
+static const char* trust_cap_name(uint32_t cap)
+{
+    if (cap == LARDKIT_TRUST_FS) return "fs";
+    if (cap == LARDKIT_TRUST_SCREEN) return "screen";
+    if (cap == LARDKIT_TRUST_NET) return "net";
+    if (cap == LARDKIT_TRUST_OSLINK) return "oslink";
+    if (cap == LARDKIT_TRUST_RAW) return "raw";
+    return "unknown";
+}
+
+static void cmd_trust_list(void)
+{
+    uint32_t count = lardkit_trust_count();
+    out_append("Trust policy\n");
+    for (uint32_t i = 0; i < count; i++) {
+        lardkit_trust_entry_t e;
+        if (lardkit_trust_at(i, &e) == 0) {
+            out_append("  ");
+            out_append(e.subject);
+            out_append(": ");
+            trust_print_caps(e.caps);
+            out_append("\n");
+        }
+    }
+}
+
+static void cmd_trust_history(const char* args)
+{
+    char sub[16];
+    uint32_t count;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) == 0 &&
+        (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0)) {
+        lardkit_trust_history_clear();
+        out_append("trust history: cleared.\n");
+        return;
+    }
+    count = lardkit_trust_history_count();
+    out_append("Trust history count=");
+    out_append_u32(count);
+    out_append("\n");
+    if (count == 0) {
+        out_append("trust history: no permission changes yet.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lardkit_trust_history_entry_t e;
+        if (lardkit_trust_history_at(i, &e) != 0) continue;
+        out_append("#");
+        out_append_u32(e.seq);
+        out_append(" ");
+        out_append(e.allowed ? "allow " : "deny ");
+        out_append(e.subject);
+        out_append(" ");
+        out_append(trust_cap_name(e.cap));
+        out_append(" -> ");
+        trust_print_caps(e.caps_after);
+        out_append("\n");
+    }
+}
+
+static void cmd_trust(const char* args)
+{
+    char sub[16];
+    char subject[32];
+    char capname[16];
+    uint32_t cap;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "list") == 0 || strcmp(sub, "status") == 0) {
+        cmd_trust_list();
+        return;
+    }
+    if (strcmp(sub, "caps") == 0) {
+        out_append("trust caps: fs screen net oslink raw\n");
+        return;
+    }
+    if (strcmp(sub, "history") == 0 || strcmp(sub, "hist") == 0 || strcmp(sub, "audit") == 0) {
+        cmd_trust_history(args);
+        return;
+    }
+    if (strcmp(sub, "allow") == 0 || strcmp(sub, "deny") == 0) {
+        if (vcs_read_word(&args, subject, sizeof(subject)) != 0 ||
+            vcs_read_word(&args, capname, sizeof(capname)) != 0) {
+            out_append("Usage: trust allow|deny subject fs|screen|net|oslink|raw\n");
+            return;
+        }
+        cap = trust_cap_from_name(capname);
+        if (!cap || lardkit_trust_set(subject, cap, strcmp(sub, "allow") == 0) != 0) {
+            out_append("trust: unknown subject or cap.\n");
+            return;
+        }
+        cmd_trust_list();
+        return;
+    }
+    out_append("Usage: trust list|caps|history|allow|deny\n");
+}
+
+static void cmd_bootmap(const char* args)
+{
+    (void)args;
+    bootprof_info_t bp;
+    awake_info_t aw;
+    bootprof_info(&bp);
+    awake_info(&aw);
+    out_append("BootMap profile=");
+    out_append(bp.name);
+    out_append(" awake=");
+    out_append(aw.enabled ? aw.current : "off");
+    out_append("\n");
+    for (uint32_t i = 0; i < lardkit_bootmap_count(); i++) {
+        out_append("  ");
+        out_append_u32(i);
+        out_append(" ");
+        out_append(lardkit_bootmap_phase(i));
+        if (aw.enabled && i == 8u + aw.phase) out_append("  <- background");
+        out_append("\n");
+    }
+}
+
+static void cmd_panicroom(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        out_append("PanicRoom ");
+        out_append(lardkit_panicroom_active() ? "entered" : "standby");
+        out_append(" entries=");
+        out_append_u32(lardkit_panicroom_entries());
+        out_append("\nUse crashlog show for recovery notes, rollback apply for settings restore.\n");
+        return;
+    }
+    if (strcmp(sub, "enter") == 0 || strcmp(sub, "on") == 0) {
+        lardkit_panicroom_enter();
+        out_append("panicroom: recovery shell armed.\n");
+        return;
+    }
+    if (strcmp(sub, "exit") == 0 || strcmp(sub, "off") == 0) {
+        lardkit_panicroom_exit();
+        out_append("panicroom: standby.\n");
+        return;
+    }
+    if (strcmp(sub, "capsule") == 0 || strcmp(sub, "report") == 0) {
+        if (lardkit_panic_capsule_write() == 0) {
+            out_append("panicroom: wrote paniccapsule.lardd\n");
+            cmd_larddoc("paniccapsule.lardd", "Usage: panicroom capsule");
+        } else {
+            out_append("panicroom: capsule failed.\n");
+        }
+        return;
+    }
+    out_append("Usage: panicroom status|enter|exit|capsule\n");
+}
+
+static void cmd_paniccapsule(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "make") == 0 || strcmp(sub, "write") == 0 || strcmp(sub, "capture") == 0) {
+        if (lardkit_panic_capsule_write() == 0) out_append("paniccapsule: wrote paniccapsule.lardd\n");
+        else out_append("paniccapsule: write failed.\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
+        (void)lardkit_panic_capsule_write();
+        cmd_larddoc("paniccapsule.lardd", "Usage: paniccapsule show");
+        return;
+    }
+    out_append("Usage: paniccapsule make|show\n");
+}
+
+static void cmd_oldcheck_status(void)
+{
+    lardkit_oldcheck_info_t info;
+    lardkit_oldcheck_info(&info);
+    out_append("OldCheck files=");
+    out_append_u32(info.count);
+    out_append(" storage=");
+    out_append(info.available ? "online" : "offline");
+    out_append(" dirty=");
+    out_append_u32(info.dirty);
+    out_append(" gen=");
+    out_append_u32(info.generation);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_oldcheck(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        (void)lardkit_oldcheck_run(0);
+        cmd_oldcheck_status();
+        return;
+    }
+    if (strcmp(sub, "draw") == 0 || strcmp(sub, "run") == 0 || strcmp(sub, "retro") == 0) {
+        (void)lardkit_oldcheck_run(1);
+        cmd_oldcheck_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(lardkit_oldcheck_run(0) == 0 ? "oldcheck: selftest OK\n" : "oldcheck: selftest failed\n");
+        return;
+    }
+    out_append("Usage: oldcheck status|draw|test\n");
+}
+
+static void cmd_lfsdoctor_status(void)
+{
+    lardkit_lfsdoctor_info_t info;
+    lardkit_lfsdoctor_info(&info);
+    out_append("LFSDoctor files=");
+    out_append_u32(info.files);
+    out_append(" storage=");
+    out_append(info.storage_available ? "online" : "offline");
+    out_append(" dirty=");
+    out_append_u32(info.dirty);
+    out_append(" gen=");
+    out_append_u32(info.generation);
+    out_append(" last=");
+    out_append_i32(info.last_result);
+    out_append(" repairs=");
+    out_append_u32(info.repairs);
+    out_append(" repair-last=");
+    out_append_i32(info.last_repair);
+    out_append("\n");
+}
+
+static void cmd_lfsdoctor(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        (void)lardkit_lfsdoctor_scan(0);
+        cmd_lfsdoctor_status();
+        return;
+    }
+    if (strcmp(sub, "scan") == 0 || strcmp(sub, "check") == 0) {
+        (void)lardkit_lfsdoctor_scan(0);
+        out_append("lfsdoctor: wrote lfsdoctor.lardd\n");
+        cmd_lfsdoctor_status();
+        return;
+    }
+    if (strcmp(sub, "repair") == 0 || strcmp(sub, "fix") == 0) {
+        int r = lardkit_lfsdoctor_scan(1);
+        out_append(r == 0 ? "lfsdoctor: repair path completed.\n" : "lfsdoctor: repair path reported an issue.\n");
+        cmd_lfsdoctor_status();
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
+        (void)lardkit_lfsdoctor_scan(0);
+        cmd_larddoc("lfsdoctor.lardd", "Usage: lfsdoctor show");
+        return;
+    }
+    out_append("Usage: lfsdoctor status|scan|repair|show\n");
+}
+
+static void cmd_trace(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        lardkit_trace_info_t info;
+        lardkit_trace_info(&info);
+        out_append("LardTrace ");
+        out_append(info.enabled ? "on" : "off");
+        out_append(" events=");
+        out_append_u32(info.count);
+        out_append(" next=");
+        out_append_u32(info.next_seq);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "on") == 0) {
+        lardkit_trace_enable(1);
+        out_append("trace: on\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        lardkit_trace_enable(0);
+        out_append("trace: off\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        lardkit_trace_clear();
+        out_append("trace: cleared\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "log") == 0) {
+        (void)lardkit_trace_write();
+        cmd_larddoc("trace.lardd", "Usage: trace show");
+        return;
+    }
+    if (strcmp(sub, "module") == 0 || strcmp(sub, "mod") == 0) {
+        char module[32];
+        uint32_t count = lardkit_trace_count();
+        if (vcs_read_word(&args, module, sizeof(module)) != 0) {
+            out_append("Usage: trace module gui|shell|oslink|taskprio\n");
+            return;
+        }
+        for (uint32_t i = 0; i < count; i++) {
+            lardkit_trace_entry_t e;
+            if (lardkit_trace_at(i, &e) != 0 || strcmp(e.module, module) != 0) continue;
+            out_append("#");
+            out_append_u32(e.seq);
+            out_append(" ");
+            out_append(e.module);
+            out_append(" ");
+            out_append(e.text);
+            out_append(" ");
+            out_append_i32(e.value);
+            out_append("\n");
+        }
+        return;
+    }
+    out_append("Usage: trace on|off|status|show|module name|clear\n");
+}
+
+static void cmd_netwatch(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        lardkit_netwatch_info_t info;
+        lardkit_netwatch_info(&info);
+        out_append("NetWatch ");
+        out_append(info.enabled ? "on" : "off");
+        out_append(" events=");
+        out_append_u32(info.count);
+        out_append(" sent=");
+        out_append_u32(info.sent);
+        out_append(" recv=");
+        out_append_u32(info.received);
+        out_append(" http=");
+        out_append_u32(info.http);
+        out_append(" oslink=");
+        out_append_u32(info.oslink);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "on") == 0) {
+        lardkit_netwatch_enable(1);
+        out_append("netwatch: on\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        lardkit_netwatch_enable(0);
+        out_append("netwatch: off\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        lardkit_netwatch_clear();
+        out_append("netwatch: cleared\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "log") == 0) {
+        (void)lardkit_netwatch_write();
+        cmd_larddoc("netwatch.lardd", "Usage: netwatch show");
+        return;
+    }
+    out_append("Usage: netwatch on|off|status|show|clear\n");
+}
+
+static void cmd_journal(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        cmd_larddoc("journal.lardd", "Usage: journal show|clear|add text");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        out_append(lardkit_journal_clear() == 0 ? "journal: cleared\n" : "journal: clear failed\n");
+        return;
+    }
+    if (strcmp(sub, "add") == 0 || strcmp(sub, "write") == 0) {
+        while (*args == ' ' || *args == '\t') args++;
+        lardkit_journal_event("user", args && args[0] ? args : "manual event");
+        out_append("journal: added\n");
+        return;
+    }
+    out_append("Usage: journal show|clear|add text\n");
+}
+
+static void cmd_bootreplay(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        (void)lardkit_bootreplay_write();
+        cmd_larddoc("bootreplay.lardd", "Usage: bootreplay show");
+        return;
+    }
+    if (strcmp(sub, "write") == 0 || strcmp(sub, "capture") == 0) {
+        out_append(lardkit_bootreplay_write() == 0 ? "bootreplay: wrote bootreplay.lardd\n" : "bootreplay: write failed\n");
+        return;
+    }
+    out_append("Usage: bootreplay show|write\n");
+}
+
+static void cmd_postbaseline(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        cmd_larddoc("postbaseline.lardd", "Usage: postbaseline show");
+        return;
+    }
+    out_append("Usage: postbaseline show\n");
+}
+
+static void devmap_draw(void)
+{
+    gui_syscall_fill_rect(32, 72, 430, 180, 0xFF081018u);
+    gui_syscall_draw_text(44, 84, "DEVICE MAP", 0xFFFFFFFFu, 0xFF081018u);
+    gui_syscall_fill_rect(44, 112, 84, 28, 0xFF4DE1C1u);
+    gui_syscall_draw_text(50, 122, "PCI", 0xFF081018u, 0xFF4DE1C1u);
+    gui_syscall_fill_rect(144, 112, 110, 28, 0xFFFFD84Au);
+    gui_syscall_draw_text(150, 122, "STORAGE", 0xFF081018u, 0xFFFFD84Au);
+    gui_syscall_fill_rect(270, 112, 150, 28, 0xFF72D6FFu);
+    gui_syscall_draw_text(276, 122, "NETWORK", 0xFF081018u, 0xFF72D6FFu);
+    gui_syscall_draw_text(44, 158, "rtl8139 / piix3 / LPST / OSLink", 0xFFFFFFFFu, 0xFF081018u);
+}
+
+static void cmd_devmap(const char* args)
+{
+    pci_addr_t a;
+    uint32_t available = 0, dirty = 0, lba = 0, sectors = 0;
+    int last = 0;
+    const char* driver = NULL;
+    oslink_info_t oi;
+    if (args_word_is(args, "draw")) devmap_draw();
+    fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
+    oslink_info(&oi);
+    out_append("Device Map\n");
+    out_append("pci rtl8139=");
+    out_append(pci_find_device(0x10ECu, 0x8139u, &a) == 0 ? "present" : "missing");
+    out_append(" piix3ide=");
+    out_append(pci_find_device(0x8086u, 0x7010u, &a) == 0 ? "present" : "missing");
+    out_append("\nstorage=");
+    out_append(available ? "online" : "offline");
+    out_append(" driver=");
+    out_append(driver ? driver : "none");
+    out_append(" dirty=");
+    out_append(dirty ? "yes" : "no");
+    out_append(" last=");
+    out_append_i32(last);
+    out_append("\noslink=");
+    out_append(oi.ready ? "ready" : "offline");
+    out_append(" peers=");
+    out_append_u32(oi.peer_count);
+    out_append(" inbox=");
+    out_append_u32(oi.inbox_count);
+    out_append("\n");
+}
+
+static void cmd_cfgprof(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "list") == 0 || strcmp(sub, "status") == 0) {
+        uint32_t count = lardkit_cfgprof_count();
+        out_append("CFG profiles=");
+        out_append_u32(count);
+        out_append("\n");
+        for (uint32_t i = 0; i < count; i++) {
+            lardkit_cfg_profile_t p;
+            if (lardkit_cfgprof_at(i, &p) != 0) continue;
+            out_append("  ");
+            out_append(p.name);
+            out_append(" boot=");
+            out_append(p.boot_profile);
+            out_append(" prio=");
+            out_append_i32(p.task_default);
+            out_append("\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "save") == 0) {
+        char name[32];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0 || lardkit_cfgprof_save(name) != 0) {
+            out_append("Usage: cfgprof save name\n");
+            return;
+        }
+        out_append("cfgprof: saved\n");
+        return;
+    }
+    if (strcmp(sub, "load") == 0) {
+        char name[32];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0 || lardkit_cfgprof_load(name) != 0) {
+            out_append("Usage: cfgprof load name\n");
+            return;
+        }
+        out_append("cfgprof: loaded\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0) {
+        (void)lardkit_cfgprof_write();
+        cmd_larddoc("cfgprof.lardd", "Usage: cfgprof show");
+        return;
+    }
+    out_append("Usage: cfgprof list|save name|load name|show\n");
+}
+
+static void cmd_userlaw(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        cmd_larddoc("userlaw.lardd", "Usage: userlaw show|reset|check");
+        return;
+    }
+    if (strcmp(sub, "reset") == 0) {
+        out_append(lardkit_userlaw_reset() == 0 ? "userlaw: reset\n" : "userlaw: reset failed\n");
+        return;
+    }
+    if (strcmp(sub, "check") == 0) {
+        out_append(lardkit_userlaw_check() == 0 ? "userlaw: valid\n" : "userlaw: invalid\n");
+        return;
+    }
+    out_append("Usage: userlaw show|reset|check\n");
+}
+
+static int lunit_prefix(const char* s, const char* end, const char* pfx, const char** rest)
+{
+    while (s < end && *pfx && *s == *pfx) {
+        s++;
+        pfx++;
+    }
+    if (*pfx) return 0;
+    if (rest) *rest = s;
+    return 1;
+}
+
+static void cmd_lunit(const char* args)
+{
+    char sub[16];
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    uint32_t pass = 0, fail = 0;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 || strcmp(sub, "run") != 0 ||
+        vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: lunit run tests.lunit\n");
+        return;
+    }
+    const char* p = (const char*)data;
+    const char* end = p + size;
+    if (size < 8u || data[0] != 'L' || data[1] != 'U' || data[2] != 'N' || data[3] != 'I' || data[4] != 'T') {
+        out_append("lunit: bad header\n");
+        return;
+    }
+    while (p < end) {
+        const char* ls = p;
+        const char* le;
+        const char* rest;
+        while (p < end && *p != '\n' && *p != '\r') p++;
+        le = p;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+        if (lunit_prefix(ls, le, "CHECK file ", &rest)) {
+            char name[64];
+            uint32_t i = 0;
+            while (rest < le && i + 1u < sizeof(name)) name[i++] = *rest++;
+            name[i] = '\0';
+            if (fs_open(name)) pass++; else fail++;
+        } else if (lunit_prefix(ls, le, "CHECK writable ", &rest)) {
+            char name[64];
+            uint32_t i = 0;
+            while (rest < le && i + 1u < sizeof(name)) name[i++] = *rest++;
+            name[i] = '\0';
+            if (fs_open_writable(name)) pass++; else fail++;
+        } else if (lunit_prefix(ls, le, "CHECK command ", &rest)) {
+            char name[64];
+            uint32_t i = 0;
+            while (rest < le && i + 1u < sizeof(name)) name[i++] = *rest++;
+            name[i] = '\0';
+            if (magic_find_exact(name)) pass++; else fail++;
+        }
+    }
+    out_append("lunit: ");
+    out_append_u32(pass);
+    out_append(" passed, ");
+    out_append_u32(fail);
+    out_append(" failed\n");
+}
+
+static void cmd_larsapp(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "open") == 0 || strcmp(sub, "show") == 0) {
+        cmd_larddoc(args && args[0] ? args : "lardos.lars", "Usage: larsapp open file.lars");
+        return;
+    }
+    if (strcmp(sub, "form") == 0 || strcmp(sub, "controls") == 0) {
+        cmd_larsform(args);
+        return;
+    }
+    if (strcmp(sub, "run") == 0 || strcmp(sub, "act") == 0) {
+        cmd_larsact(args);
+        return;
+    }
+    out_append("Usage: larsapp open file.lars | larsapp form file.lars | larsapp run file.lars index\n");
+}
+
+static void cmd_ltheme_status(void)
+{
+    lardkit_theme_info_t info;
+    lardkit_theme_info(&info);
+    out_append("LTheme active=");
+    out_append(info.name);
+    out_append(" fg=");
+    out_append_hex32(info.fg);
+    out_append(" bg=");
+    out_append_hex32(info.bg);
+    out_append(" accent=");
+    out_append_hex32(info.accent);
+    out_append(" style-hint=");
+    out_append_u32(info.style_hint);
+    out_append("\n");
+}
+
+static void cmd_ltheme(const char* args)
+{
+    char sub[16];
+    char name[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_ltheme_status();
+        return;
+    }
+    if (strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0) {
+        for (uint32_t i = 0; i < lardkit_theme_count(); i++) {
+            lardkit_theme_info_t info;
+            if (lardkit_theme_at(i, &info) == 0) {
+                out_append("  ");
+                out_append(info.name);
+                out_append(" accent=");
+                out_append_hex32(info.accent);
+                out_append("\n");
+            }
+        }
+        return;
+    }
+    if (strcmp(sub, "show") == 0) {
+        const FsFile* f;
+        lardkit_theme_info_t info;
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: ltheme show file.ltheme\n");
+            return;
+        }
+        f = fs_open(name);
+        if (!f || lardkit_theme_parse(f->data, f->size, &info) != 0) {
+            out_append("ltheme: not a LTHEME file.\n");
+            return;
+        }
+        out_append("LTHEME ");
+        out_append(info.name);
+        out_append(" fg=");
+        out_append_hex32(info.fg);
+        out_append(" bg=");
+        out_append_hex32(info.bg);
+        out_append(" accent=");
+        out_append_hex32(info.accent);
+        out_append(" style-hint=");
+        out_append_u32(info.style_hint);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "preview") == 0) {
+        const FsFile* f;
+        lardkit_theme_info_t info;
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: ltheme preview file.ltheme\n");
+            return;
+        }
+        f = fs_open(name);
+        if (!f || lardkit_theme_parse(f->data, f->size, &info) != 0) {
+            out_append("ltheme: not a LTHEME file.\n");
+            return;
+        }
+        out_append(lardkit_theme_preview_draw(&info) == 0 ? "ltheme: preview drawn.\n" : "ltheme: preview failed.\n");
+        return;
+    }
+    if (strcmp(sub, "use") == 0 || strcmp(sub, "set") == 0) {
+        const FsFile* f;
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: ltheme use classic|contrast|night|amber|file.ltheme\n");
+            return;
+        }
+        if (lardkit_theme_use(name) != 0) {
+            f = fs_open(name);
+            if (!f || lardkit_theme_use_data(f->data, f->size) != 0) {
+                out_append("Usage: ltheme use classic|contrast|night|amber|file.ltheme\n");
+                return;
+            }
+        }
+        cmd_ltheme_status();
+        return;
+    }
+    out_append("Usage: ltheme status|list|show file|preview file|use name\n");
+}
+
+static void cmd_awakemon(const char* args)
+{
+    (void)args;
+    lardkit_awakemon_info_t info;
+    lardkit_awakemon_info(&info);
+    out_append("AwakeMonitor phase=");
+    out_append_u32(info.current_phase);
+    out_append("/");
+    out_append_u32(info.phase_count);
+    out_append(" percent=");
+    out_append_u32(info.percent);
+    out_append("% done=");
+    out_append_u32(info.done);
+    out_append(" current=");
+    out_append(info.current);
+    out_append("\n");
+}
+
+static void cmd_oschat(const char* args)
+{
+    char sub[16];
+    char channel[OSLINK_CHANNEL_MAX + 1u];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        oslink_info_t info;
+        oslink_info(&info);
+        out_append("OSChat inbox=");
+        out_append_u32(info.inbox_count);
+        out_append(" local=");
+        out_append_u32(info.local_count);
+        out_append(" emitted=");
+        out_append_u32(info.local_sent);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "send") == 0 || strcmp(sub, "say") == 0) {
+        if (strcmp(sub, "send") == 0) {
+            if (vcs_read_word(&args, channel, sizeof(channel)) != 0) {
+                out_append("Usage: oschat send channel text\n");
+                return;
+            }
+        } else {
+            channel[0] = 'c'; channel[1] = 'h'; channel[2] = 'a'; channel[3] = 't'; channel[4] = '\0';
+        }
+        while (*args == ' ' || *args == '\t') args++;
+        if (oslink_emit_local(channel, args) == 0) out_append("oschat: sent.\n");
+        else out_append("oschat: empty message or inbox full.\n");
+        return;
+    }
+    if (strcmp(sub, "read") == 0 || strcmp(sub, "recv") == 0) {
+        oslink_msg_t m;
+        if (oslink_recv(&m) == 0) {
+            out_append("oschat: no messages.\n");
+            return;
+        }
+        out_append(oslink_type_name(m.type));
+        out_append(" channel=");
+        out_append(m.channel[0] ? m.channel : "main");
+        out_append(" ");
+        out_append(m.text);
+        out_append("\n");
+        return;
+    }
+    out_append("Usage: oschat status|say text|send channel text|read\n");
+}
+
+static void cmd_larsview_status(void)
+{
+    lardkit_larsview_info_t info;
+    lardkit_larsview_info(&info);
+    out_append("LARSView path=");
+    out_append(info.path);
+    out_append(" opened=");
+    out_append_u32(info.opened);
+    out_append(" size=");
+    out_append_u32(info.size);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_larsview(const char* args)
+{
+    char sub[16];
+    char path[64];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_larsview_status();
+        return;
+    }
+    if (strcmp(sub, "home") == 0) {
+        (void)lardkit_larsview_open("lardos.lars");
+        cmd_larddoc("lardos.lars", "Usage: larsview open file.lars|file.lardd");
+        return;
+    }
+    if (strcmp(sub, "open") == 0 || strcmp(sub, "view") == 0) {
+        if (vcs_read_word(&args, path, sizeof(path)) != 0) {
+            out_append("Usage: larsview open file.lars|file.lardd\n");
+            return;
+        }
+        if (lardkit_larsview_open(path) != 0) {
+            out_append("larsview: file not found or not native doc.\n");
+            return;
+        }
+        cmd_larddoc(path, "Usage: larsview open file.lars|file.lardd");
+        return;
+    }
+    out_append("Usage: larsview status|home|open file\n");
+}
+
+static void cmd_larddnotes(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "view") == 0) {
+        cmd_larddoc("notes.lardd", "Usage: notes show|add text|clear");
+        return;
+    }
+    if (strcmp(sub, "add") == 0 || strcmp(sub, "append") == 0) {
+        while (*args == ' ' || *args == '\t') args++;
+        if (lardkit_notes_append(args) == 0) out_append("notes: added to notes.lardd\n");
+        else out_append("notes: add failed.\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0) {
+        if (lardkit_notes_reset() == 0) out_append("notes: reset notes.lardd\n");
+        else out_append("notes: reset failed.\n");
+        return;
+    }
+    out_append("Usage: notes show|add text|clear\n");
+}
+
+static void cmd_task_list(void)
+{
+    taskprio_info_t info;
+    taskprio_info(&info);
+    out_append("Tasks queued=");
+    out_append_u32(info.queued);
+    out_append(" runnable=");
+    out_append_u32(info.runnable);
+    out_append(" paused=");
+    out_append_u32(info.paused);
+    out_append(" default-prio=");
+    out_append_i32(info.default_priority);
+    out_append(" completed=");
+    out_append_u32(info.completed);
+    out_append(" lev10=");
+    out_append_u32(info.os_urgent);
+    out_append("\n");
+    if (info.queued == 0) {
+        out_append("task: no queued tasks.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < info.queued; i++) {
+        taskprio_task_t t;
+        if (taskprio_at(i, &t) == 0) {
+            out_append("#");
+            out_append_u32(t.id);
+            out_append(" prio=");
+            out_append_i32(t.priority);
+            out_append(" wait=");
+            out_append_u32(t.wait_ticks);
+            out_append(t.paused ? " pause " : " run   ");
+            out_append(" ");
+            out_append(t.name);
+            out_append(" :: ");
+            out_append(t.command);
+            out_append("\n");
+        }
+    }
+}
+
+static void cmd_task_history(const char* args)
+{
+    char sub[16];
+    uint32_t count;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) == 0 &&
+        (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0)) {
+        taskprio_history_clear();
+        out_append("priority history: cleared.\n");
+        return;
+    }
+    count = taskprio_history_count();
+    out_append("Priority lev.10 history count=");
+    out_append_u32(count);
+    out_append("\n");
+    if (count == 0) {
+        out_append("priority history: no lev.10 grants yet.\n");
+        return;
+    }
+    out_append("SEQ ACTOR ACTION TASK OLD->NEW\n");
+    for (uint32_t i = 0; i < count; i++) {
+        taskprio_history_entry_t e;
+        if (taskprio_history_at(i, &e) != 0) continue;
+        out_append_u32(e.seq);
+        out_append(" ");
+        out_append(e.actor);
+        out_append(" ");
+        out_append(e.action);
+        out_append(" #");
+        out_append_u32(e.id);
+        out_append(" ");
+        out_append(e.name);
+        out_append(" ");
+        out_append_i32(e.old_priority);
+        out_append("->");
+        out_append_i32(e.new_priority);
+        out_append("\n");
+    }
+}
+
+static void tasktop_bar(int32_t priority)
+{
+    if (priority == TASKPRIO_OS_LEVEL) {
+        out_append("[LEV10!!!]");
+        return;
+    }
+    out_append("[");
+    for (int32_t i = 0; i <= TASKPRIO_MAX; i++) {
+        out_append_char(i <= priority ? '#' : '.');
+    }
+    out_append("]");
+}
+
+static void cmd_tasktop(const char* args)
+{
+    (void)args;
+    taskprio_info_t info;
+    taskprio_info(&info);
+    out_append("TASKTOP  queued=");
+    out_append_u32(info.queued);
+    out_append(" runnable=");
+    out_append_u32(info.runnable);
+    out_append(" paused=");
+    out_append_u32(info.paused);
+    out_append(" done=");
+    out_append_u32(info.completed);
+    out_append(" lev10=");
+    out_append_u32(info.os_urgent);
+    out_append(" default=");
+    out_append_i32(info.default_priority);
+    out_append("\n");
+    out_append("ID  ST  PRIO BAR        WAIT CMD\n");
+    for (uint32_t i = 0; i < info.queued; i++) {
+        taskprio_task_t t;
+        if (taskprio_at(i, &t) == 0) {
+            out_append_u32(t.id);
+            out_append("  ");
+            out_append(t.paused ? "PAU " : "RUN ");
+            out_append_i32(t.priority);
+            out_append("    ");
+            tasktop_bar(t.priority);
+            out_append(" ");
+            out_append_u32(t.wait_ticks);
+            out_append("    ");
+            out_append(t.command);
+            out_append("\n");
+        }
+    }
+    if (info.queued == 0) out_append("No queued tasks. Use: task run 7 echo hello\n");
+}
+
+static int task_parse_priority(const char** args, int32_t* out)
+{
+    uint32_t v;
+    if (vcs_parse_u32(args, &v) != 0 || v > (uint32_t)TASKPRIO_MAX) return -1;
+    *out = (int32_t)v;
+    return 0;
+}
+
+static void cmd_task_run_like(const char* args)
+{
+    int32_t prio;
+    uint32_t id;
+    if (task_parse_priority(&args, &prio) != 0) {
+        out_append("Usage: task run priority command (0..10; lev.10 urgent)\n");
+        return;
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    if (!*args) {
+        out_append("Usage: task run priority command (0..10; lev.10 urgent)\n");
+        return;
+    }
+    if (taskprio_enqueue(NULL, args, prio, &id) == 0) {
+        out_append("task: queued #");
+        out_append_u32(id);
+        out_append(" prio=");
+        out_append_i32(prio);
+        out_append("\n");
+    } else {
+        out_append("task: queue full or empty command.\n");
+    }
+}
+
+static void cmd_task(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        cmd_task_list();
+        return;
+    }
+    if (strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0 || strcmp(sub, "status") == 0) {
+        cmd_task_list();
+        return;
+    }
+    if (strcmp(sub, "history") == 0 || strcmp(sub, "hist") == 0 || strcmp(sub, "audit") == 0) {
+        cmd_task_history(args);
+        return;
+    }
+    if (strcmp(sub, "default") == 0) {
+        int32_t prio;
+        if (task_parse_priority(&args, &prio) != 0) {
+            out_append("task: default-prio=");
+            out_append_i32(taskprio_default_priority());
+            out_append("\nUsage: task default priority (0..10; lev.10 urgent)\n");
+            return;
+        }
+        taskprio_set_default(prio);
+        out_append("task: default priority ");
+        out_append_i32(prio);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "set") == 0 || strcmp(sub, "prio") == 0) {
+        uint32_t id;
+        int32_t prio;
+        if (vcs_parse_u32(&args, &id) != 0 || task_parse_priority(&args, &prio) != 0) {
+            out_append("Usage: task set id priority (0..10; lev.10 urgent)\n");
+            return;
+        }
+        if (taskprio_set_priority(id, prio) == 0) {
+            out_append("task: #");
+            out_append_u32(id);
+            out_append(" priority ");
+            out_append_i32(prio);
+            out_append("\n");
+        } else {
+            out_append("task: id not found.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "boost") == 0 || strcmp(sub, "urgent") == 0 || strcmp(sub, "lev10") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task boost|urgent|lev10 id\n");
+            return;
+        }
+        if (taskprio_grant_urgent_priority(id) == 0) out_append("task: lev.10 granted.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "up") == 0 || strcmp(sub, "+") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task up id\n");
+            return;
+        }
+        if (taskprio_adjust_priority(id, 1) == 0) out_append("task: priority up.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "down") == 0 || strcmp(sub, "-") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task down id\n");
+            return;
+        }
+        if (taskprio_adjust_priority(id, -1) == 0) out_append("task: priority down.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "pause") == 0 || strcmp(sub, "hold") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task pause id\n");
+            return;
+        }
+        if (taskprio_pause(id, 1) == 0) out_append("task: paused.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "resume") == 0 || strcmp(sub, "cont") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task resume id\n");
+            return;
+        }
+        if (taskprio_pause(id, 0) == 0) out_append("task: resumed.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "drop") == 0 || strcmp(sub, "kill") == 0 || strcmp(sub, "rm") == 0) {
+        uint32_t id;
+        if (vcs_parse_u32(&args, &id) != 0) {
+            out_append("Usage: task drop id\n");
+            return;
+        }
+        if (taskprio_remove(id) == 0) out_append("task: dropped.\n");
+        else out_append("task: id not found.\n");
+        return;
+    }
+    if (strcmp(sub, "run") == 0 || strcmp(sub, "queue") == 0) {
+        cmd_task_run_like(args);
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(taskprio_selftest() == 0 ? "task: selftest OK\n" : "task: selftest failed\n");
+        return;
+    }
+    out_append("Usage: task list|set|default|run|history|up|down|pause|resume|boost|urgent|drop|test\n");
+    out_append("Note: lev.10 is urgent and user-grantable; wait-time aging still cannot create it.\n");
+}
+
+static void cmd_nice(const char* args)
+{
+    cmd_task_run_like(args);
+}
+
+static void cmd_prio(const char* args)
+{
+    const char* p = args ? args : "";
+    char word[16];
+    uint32_t id;
+    int32_t prio;
+    if (vcs_read_word(&p, word, sizeof(word)) == 0 &&
+        (strcmp(word, "history") == 0 || strcmp(word, "hist") == 0 || strcmp(word, "audit") == 0)) {
+        cmd_task_history(p);
+        return;
+    }
+    if (vcs_parse_u32(&args, &id) != 0 || task_parse_priority(&args, &prio) != 0) {
+        out_append("Usage: prio id priority | prio history (0..10; lev.10 urgent)\n");
+        return;
+    }
+    if (taskprio_set_priority(id, prio) == 0) out_append("prio: updated.\n");
+    else out_append("prio: id not found.\n");
+}
+
+static void cmd_awake_status(void)
+{
+    bootprof_info_t bp;
+    awake_info_t info;
+    bootprof_info(&bp);
+    awake_info(&info);
+    out_append("Awakening mode: ");
+    out_append(bp.awakening_mode ? "profile-on" : "profile-off");
+    out_append(", loader=");
+    out_append(info.enabled ? (info.done ? "complete" : "background") : "off");
+    out_append("\nphase=");
+    out_append_u32(info.phase);
+    out_append("/");
+    out_append_u32(info.total);
+    out_append(" current=");
+    out_append(info.current);
+    out_append(" runs=");
+    out_append_u32(info.background_runs);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_awake(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_awake_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0 || strcmp(sub, "enable") == 0 || strcmp(sub, "start") == 0) {
+        int r = bootprof_set("awakening");
+        if (r == 0) {
+            out_append("awake: on for next boot. Run sync to persist. Current boot keeps its startup path.\n");
+        } else {
+            out_append("awake: failed to store awakening profile.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "disable") == 0 || strcmp(sub, "stop") == 0) {
+        int r = bootprof_set("normal");
+        awake_enable(0, 0);
+        if (r == 0) {
+            out_append("awake: off. Run sync to persist. Next boot is normal; current background loader stopped.\n");
+        } else {
+            out_append("awake: failed to store normal profile.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(awake_selftest() == 0 ? "awake: selftest OK\n" : "awake: selftest failed\n");
+        return;
+    }
+    out_append("Usage: awake on|off|status|test\n");
+}
+
+static void cmd_buddy_status(void)
+{
+    lassist_info_t info;
+    lassist_info(&info);
+    out_append("Lard Buddy: ");
+    out_append(info.enabled ? "on" : "off");
+    out_append(", mood=");
+    out_append(lassist_mood_name(info.mood));
+    out_append(", jokes=");
+    out_append_u32(info.jokes);
+    out_append(", tick=");
+    out_append_u32(info.tick);
+    out_append("\n\"");
+    out_append(info.message);
+    out_append("\"\n");
+}
+
+static void cmd_buddy(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_buddy_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0 || strcmp(sub, "enable") == 0 || strcmp(sub, "start") == 0) {
+        lassist_enable(1);
+        out_append("buddy: on. I will hover politely and pretend this was my idea.\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "disable") == 0 || strcmp(sub, "stop") == 0) {
+        lassist_enable(0);
+        out_append("buddy: off. I will be emotionally available off-screen.\n");
+        return;
+    }
+    if (strcmp(sub, "joke") == 0 || strcmp(sub, "fun") == 0) {
+        lassist_joke();
+        cmd_buddy_status();
+        return;
+    }
+    if (strcmp(sub, "next") == 0 || strcmp(sub, "tip") == 0) {
+        lassist_next(0);
+        cmd_buddy_status();
+        return;
+    }
+    if (strcmp(sub, "mood") == 0 || strcmp(sub, "personality") == 0) {
+        char mood[16];
+        if (vcs_read_word(&args, mood, sizeof(mood)) != 0 || lassist_set_mood(mood) != 0) {
+            out_append("Usage: buddy mood calm|funny|strict|silent\n");
+            return;
+        }
+        lassist_enable(strcmp(mood, "silent") == 0 ? lassist_enabled() : 1);
+        cmd_buddy_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lassist_selftest() == 0 ? "buddy: selftest OK\n" : "buddy: selftest failed\n");
+        return;
+    }
+    out_append("Usage: buddy on|off|status|joke|next|mood|test\n");
+}
+
+static void cmd_bootprof_status(void)
+{
+    bootprof_info_t info;
+    bootprof_info(&info);
+    out_append("Boot profile: ");
+    out_append(info.name);
+    out_append("\n");
+    out_append("network=");
+    out_append(info.network ? "on" : "off");
+    out_append(" force_post=");
+    out_append(info.force_post ? "on" : "off");
+    out_append(" safe=");
+    out_append(info.safe_mode ? "on" : "off");
+    out_append(" dev=");
+    out_append(info.dev_mode ? "on" : "off");
+    out_append(" awake=");
+    out_append(info.awakening_mode ? "on" : "off");
+    out_append("\nProfiles: normal safe netoff dev awakening\n");
+    out_append("Stored in bootprof.txt. Use sync to persist it.\n");
+}
+
+static void cmd_bootprof(const char* args)
+{
+    char sub[16];
+    char name[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0 ||
+        strcmp(sub, "list") == 0) {
+        cmd_bootprof_status();
+        return;
+    }
+    if (strcmp(sub, "set") == 0 || strcmp(sub, "use") == 0) {
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: bootprof set normal|safe|netoff|dev|awakening\n");
+            return;
+        }
+        int r = bootprof_set(name);
+        if (r == 0) {
+            out_append("bootprof: set ");
+            out_append(name);
+            out_append(". Run sync to persist.\n");
+        } else {
+            out_append("bootprof: unknown profile.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        out_append(bootprof_selftest() == 0 ? "bootprof: selftest OK\n" : "bootprof: selftest failed\n");
+        return;
+    }
+    out_append("Usage: bootprof status|set|test\n");
+}
+
+static void cmd_crashlog(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "status") == 0) {
+        const char* text = crashlog_text();
+        out_append(text && text[0] ? text : "crashlog: empty\n");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        if (crashlog_clear() == 0) out_append("crashlog: cleared.\n");
+        else out_append("crashlog: unavailable.\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0) {
+        crashlog_record("test", "manual diagnostic event");
+        out_append("crashlog: test event recorded.\n");
+        return;
+    }
+    if (strcmp(sub, "selftest") == 0) {
+        out_append(crashlog_selftest() == 0 ? "crashlog: selftest OK\n" : "crashlog: selftest failed\n");
+        return;
+    }
+    out_append("Usage: crashlog show|clear|test|selftest\n");
+}
+
+static int lsh_require_sum(const char* cmd)
+{
+    if (s_in_sum_mode) return 1;
+    out_append(cmd);
+    out_append(": SUM mode required. Type 'sum' first.\n");
+    return 0;
+}
+
+static void cmd_peek(const char* args)
+{
+    uint64_t addr;
+    uint64_t len = 64;
+    volatile const uint8_t* p;
+    if (!lsh_require_sum("peek")) return;
+    if (lsh_parse_u64(&args, &addr) != 0) {
+        out_append("Usage: peek addr [len]\n");
+        return;
+    }
+    if (*args && lsh_parse_u64(&args, &len) != 0) {
+        out_append("Usage: peek addr [len]\n");
+        return;
+    }
+    if (len == 0) len = 1;
+    if (len > 256) {
+        out_append("peek: capped to 256 bytes for console output.\n");
+        len = 256;
+    }
+    p = (volatile const uint8_t*)(uintptr_t)addr;
+    for (uint64_t i = 0; i < len; i++) {
+        if ((i & 15u) == 0) {
+            if (i) out_append("\n");
+            out_append_hex64(addr + i);
+            out_append(": ");
+        }
+        out_append_hex8(p[i]);
+        out_append_char(' ');
+    }
+    out_append("\n");
+}
+
+static void cmd_poke(const char* args)
+{
+    uint64_t addr;
+    uint64_t val;
+    uint64_t width = 8;
+    if (!lsh_require_sum("poke")) return;
+    if (lsh_parse_u64(&args, &addr) != 0 || lsh_parse_u64(&args, &val) != 0) {
+        out_append("Usage: poke addr value [8|16|32]\n");
+        return;
+    }
+    if (*args && lsh_parse_u64(&args, &width) != 0) {
+        out_append("Usage: poke addr value [8|16|32]\n");
+        return;
+    }
+    if (width == 8) {
+        *(volatile uint8_t*)(uintptr_t)addr = (uint8_t)val;
+    } else if (width == 16) {
+        *(volatile uint16_t*)(uintptr_t)addr = (uint16_t)val;
+    } else if (width == 32) {
+        *(volatile uint32_t*)(uintptr_t)addr = (uint32_t)val;
+    } else {
+        out_append("poke: width must be 8, 16, or 32.\n");
+        return;
+    }
+    out_append("poke: wrote ");
+    out_append_u32((uint32_t)width);
+    out_append("-bit ");
+    out_append_hex64(val);
+    out_append(" -> ");
+    out_append_hex64(addr);
+    out_append("\n");
+}
+
+static int lsh_read_data_arg(const char* arg, const uint8_t** data, uint32_t* size,
+                             char* name, uint32_t name_cap)
+{
+    char drv;
+    const FsFile* f;
+    FsWritableFile* w;
+    resolve_path(arg, &drv, name, name_cap);
+    if (!name[0]) return -1;
+    f = lsh_open_read(drv, name);
+    if (f) {
+        *data = f->data;
+        *size = f->size;
+        return 0;
+    }
+    w = fs_open_writable(name);
+    if (w) {
+        *data = w->data;
+        *size = w->size;
+        return 0;
+    }
+    return -2;
+}
+
+static void cmd_copy(const char* args)
+{
+    char src_arg[64];
+    char dst_arg[64];
+    char src_name[64];
+    char dst_name[64];
+    char dst_drive;
+    const uint8_t* data;
+    uint32_t size;
+    FsWritableFile* dst;
+    if (vcs_read_word(&args, src_arg, sizeof(src_arg)) != 0 ||
+        vcs_read_word(&args, dst_arg, sizeof(dst_arg)) != 0) {
+        out_append("Usage: copy src dst\n");
+        return;
+    }
+    if (lsh_read_data_arg(src_arg, &data, &size, src_name, sizeof(src_name)) != 0) {
+        out_append("copy: source not found.\n");
+        return;
+    }
+    resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    (void)dst_drive;
+    dst = fs_open_writable(dst_name);
+    if (!dst) {
+        out_append("copy: destination must be a writable RAM file.\n");
+        return;
+    }
+    if (size > dst->cap) {
+        out_append("copy: destination too small.\n");
+        return;
+    }
+    fs_write(dst, 0, data, size);
+    out_append("Copied ");
+    out_append(src_name);
+    out_append(" -> ");
+    out_append(dst_name);
+    out_append(" (");
+    out_append_u32(size);
+    out_append(" bytes)\n");
+}
+
+static void cmd_write_like(const char* args, int append)
+{
+    char file_arg[64];
+    char name[64];
+    char drv;
+    FsWritableFile* w;
+    uint32_t len = 0;
+    uint32_t wrote;
+    const uint8_t newline = '\n';
+
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+        out_append(append ? "Usage: append file text\n" : "Usage: write file text\n");
+        return;
+    }
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    (void)drv;
+    w = fs_open_writable(name);
+    if (!w) {
+        out_append(append ? "append: target must be a writable RAM file.\n" :
+                            "write: target must be a writable RAM file.\n");
+        return;
+    }
+    while (args[len]) len++;
+    if (append) {
+        uint32_t need = len + (len ? 1u : 0u);
+        if (w->size + need > w->cap) {
+            out_append("append: not enough space.\n");
+            return;
+        }
+        wrote = fs_append(w, (const uint8_t*)args, len);
+        if (len) wrote += fs_append(w, &newline, 1);
+        out_append("Appended ");
+    } else {
+        uint32_t need = len + (len ? 1u : 0u);
+        if (need > w->cap) {
+            out_append("write: text too large.\n");
+            return;
+        }
+        wrote = fs_write(w, 0, (const uint8_t*)args, len);
+        if (len) wrote += fs_write(w, len, &newline, 1);
+        out_append("Wrote ");
+    }
+    out_append_u32(wrote);
+    out_append(" bytes to ");
+    out_append(name);
+    out_append("\n");
+}
+
+static void cmd_write(const char* args)
+{
+    cmd_write_like(args, 0);
+}
+
+static void cmd_append(const char* args)
+{
+    cmd_write_like(args, 1);
 }
 
 static void cmd_set(const char* args)
@@ -1154,6 +4579,40 @@ static void cmd_bosl(const char* args)
     if (r != 0) out_append("BOSL execution failed.\n");
 }
 
+static void cmd_lil(const char* args)
+{
+    char drv;
+    char name[64];
+    static char src[8192];
+    resolve_path(args, &drv, name, sizeof(name));
+    if (!name[0]) {
+        out_append("Usage: lil [drive:]file.lil\n");
+        return;
+    }
+    const FsFile* f = lsh_open_read(drv, name);
+    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    const uint8_t* data = f ? f->data : (w ? w->data : NULL);
+    uint32_t size = f ? f->size : (w ? w->size : 0);
+    if (!data || size == 0) {
+        out_append("LIL file not found.\n");
+        return;
+    }
+    if (size >= sizeof(src)) {
+        out_append("LIL source too large.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < size; i++) {
+        src[i] = (char)data[i];
+    }
+    src[size] = 0;
+    int r = lil_run(src, lsh_putc, NULL);
+    if (r != 0) {
+        out_append("LIL execution failed: ");
+        out_append_i32(r);
+        out_append("\n");
+    }
+}
+
 #define DVM_MAGIC 0x004D5644u  /* "DVM\0" LE */
 
 static void cmd_lafvm(const char* args)
@@ -1421,6 +4880,435 @@ static void cmd_larsh(const char* args)
     out_append("Playing LARSH. Switch to Gallery tab to view.\n");
 }
 
+static int cfgsh_is_status_word(const char* value)
+{
+    return strcmp(value, "status") == 0 || strcmp(value, "info") == 0 || strcmp(value, "?") == 0;
+}
+
+static int cfgsh_bool_value(const char* value, int* out)
+{
+    if (strcmp(value, "on") == 0 || strcmp(value, "enable") == 0 ||
+        strcmp(value, "enabled") == 0 || strcmp(value, "yes") == 0 ||
+        strcmp(value, "true") == 0 || strcmp(value, "1") == 0) {
+        *out = 1;
+        return 0;
+    }
+    if (strcmp(value, "off") == 0 || strcmp(value, "disable") == 0 ||
+        strcmp(value, "disabled") == 0 || strcmp(value, "no") == 0 ||
+        strcmp(value, "false") == 0 || strcmp(value, "0") == 0) {
+        *out = 0;
+        return 0;
+    }
+    return -1;
+}
+
+static const char* cfgsh_style_value(const char* value)
+{
+    if (strcmp(value, "1") == 0) return "win";
+    if (strcmp(value, "2") == 0) return "linux";
+    if (strcmp(value, "3") == 0) return "mac";
+    if (strcmp(value, "win") == 0 || strcmp(value, "windows") == 0) return "win";
+    if (strcmp(value, "linux") == 0 || strcmp(value, "gnome") == 0 || strcmp(value, "kde") == 0) return "linux";
+    if (strcmp(value, "mac") == 0 || strcmp(value, "macos") == 0) return "mac";
+    return NULL;
+}
+
+static const char* cfgsh_layout_value(const char* value)
+{
+    if (strcmp(value, "1") == 0) return "float";
+    if (strcmp(value, "2") == 0) return "tile";
+    if (strcmp(value, "3") == 0) return "stack";
+    if (strcmp(value, "float") == 0 || strcmp(value, "floating") == 0) return "float";
+    if (strcmp(value, "tile") == 0 || strcmp(value, "tiling") == 0) return "tile";
+    if (strcmp(value, "stack") == 0 || strcmp(value, "stacked") == 0) return "stack";
+    return NULL;
+}
+
+static const char* cfgsh_focus_value(const char* value)
+{
+    if (strcmp(value, "1") == 0) return "gui";
+    if (strcmp(value, "2") == 0) return "term";
+    if (strcmp(value, "3") == 0) return "info";
+    if (strcmp(value, "gui") == 0 || strcmp(value, "de") == 0 || strcmp(value, "wm") == 0) return "gui";
+    if (strcmp(value, "term") == 0 || strcmp(value, "terminal") == 0 || strcmp(value, "shell") == 0) return "term";
+    if (strcmp(value, "info") == 0 || strcmp(value, "status") == 0) return "info";
+    return NULL;
+}
+
+static const char* cfgsh_boot_value(const char* value)
+{
+    if (strcmp(value, "1") == 0) return "normal";
+    if (strcmp(value, "2") == 0) return "safe";
+    if (strcmp(value, "3") == 0) return "netoff";
+    if (strcmp(value, "4") == 0) return "dev";
+    if (strcmp(value, "5") == 0) return "awakening";
+    if (strcmp(value, "awake") == 0) return "awakening";
+    if (strcmp(value, "normal") == 0 || strcmp(value, "safe") == 0 ||
+        strcmp(value, "netoff") == 0 || strcmp(value, "dev") == 0 ||
+        strcmp(value, "awakening") == 0) return value;
+    return NULL;
+}
+
+static void cfgsh_help(void)
+{
+    out_append("CFGSH settings shell\n");
+    out_append("  cfgsh              enter settings shell (CFG# prompt)\n");
+    out_append("  exitcfg            leave settings shell\n");
+    out_append("  setting value      e.g. awake on, style 2, layout 3, boot 4\n");
+    out_append("Settings:\n");
+    out_append("  awake on|off       next boot fast-surface mode\n");
+    out_append("  exgui on|off       extended desktop layer\n");
+    out_append("  style 1|2|3        win|linux|mac\n");
+    out_append("  layout 1|2|3       float|tile|stack\n");
+    out_append("  split on|off       EXEXGUI sketch split\n");
+    out_append("  buddy on|off|mood  roaming easygoing assistant\n");
+    out_append("  bugeye on|off      visual bug monitor\n");
+    out_append("  ltheme name        classic|contrast|night|amber\n");
+    out_append("  rollback snap|apply settings snapshot restore\n");
+    out_append("  pane 1|2|3         gui|term|info focus\n");
+    out_append("  sram on|off        screen scratch RAM\n");
+    out_append("  http 1|2           GET|POST mode\n");
+    out_append("  boot 1..5          normal|safe|netoff|dev|awakening\n");
+    out_append("  priority 0..10     default background task priority\n");
+    out_append("  sandbox on|off     default LARDX sandbox run mode\n");
+    out_append("  sum on|off         ring-0 full-control mode\n");
+    out_append("  sync               persist writable settings/files\n");
+}
+
+static void cfgsh_status(void)
+{
+    bootprof_info_t bp;
+    awake_info_t aw;
+    exgui_info_t eg;
+    exexgui_info_t xx;
+    gui_screenram_info_t sr;
+    taskprio_info_t tp;
+    lassist_info_t buddy;
+    lardkit_bugeye_info_t be;
+    lardkit_theme_info_t th;
+    lardkit_rollback_info_t rb;
+    bootprof_info(&bp);
+    awake_info(&aw);
+    exgui_info(&eg);
+    exexgui_info(&xx);
+    gui_screenram_info(&sr);
+    taskprio_info(&tp);
+    lassist_info(&buddy);
+    lardkit_bugeye_info(&be);
+    lardkit_theme_info(&th);
+    lardkit_rollback_info(&rb);
+    out_append("CFGSH status\n");
+    out_append("  boot=");
+    out_append(bp.name);
+    out_append(" awake=");
+    out_append(bp.awakening_mode ? "on" : "off");
+    out_append(" loader=");
+    out_append(aw.enabled ? (aw.done ? "done" : "background") : "off");
+    out_append("\n  exgui=");
+    out_append(eg.enabled ? "on" : "off");
+    out_append(" style=");
+    out_append(exgui_style_name(eg.style));
+    out_append(" layout=");
+    out_append(exgui_layout_name(eg.layout));
+    out_append(" split=");
+    out_append(xx.enabled ? "on" : "off");
+    out_append(" pane=");
+    out_append(exexgui_focus_name(xx.focus));
+    out_append(" buddy=");
+    out_append(buddy.enabled ? "on" : "off");
+    out_append(" bugeye=");
+    out_append(be.enabled ? "on" : "off");
+    out_append(" theme=");
+    out_append(th.name);
+    out_append("\n  sram=");
+    out_append(sr.enabled ? "on" : "off");
+    out_append(" http=");
+    out_append(gui_http_post_mode() ? "POST" : "GET");
+    out_append(" priority=");
+    out_append_i32(tp.default_priority);
+    out_append("\n  sandbox=");
+    out_append(s_sandbox_mode ? "on" : "off");
+    out_append(" sum=");
+    out_append(s_in_sum_mode ? "on" : "off");
+    out_append(" cfgsh=");
+    out_append(s_cfgsh_mode ? "on" : "off");
+    out_append(" rollback=");
+    out_append(rb.valid ? rb.label : "empty");
+    out_append("\n");
+}
+
+static void cfgsh_set_boot(const char* profile)
+{
+    if (bootprof_set(profile) == 0) {
+        out_append("cfgsh: boot=");
+        out_append(profile);
+        out_append(" (run sync to persist)\n");
+    } else {
+        out_append("cfgsh: boot profile failed.\n");
+    }
+}
+
+static int cfgsh_apply(const char* setting, const char* args)
+{
+    char value[32];
+    const char* rest = args ? args : "";
+    int have_value = vcs_read_word(&rest, value, sizeof(value)) == 0;
+    int on = 0;
+    const char* mapped;
+
+    if (!setting || !setting[0]) return 0;
+    if (have_value && !cfgsh_is_status_word(value) &&
+        strcmp(setting, "rollback") != 0 && strcmp(setting, "undo") != 0) {
+        (void)lardkit_snapshot(setting);
+    }
+
+    if (strcmp(setting, "awake") == 0 || strcmp(setting, "awakening") == 0 || strcmp(setting, "fastboot") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_awake_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) cmd_awake(on ? "on" : "off");
+        else out_append("Usage: awake on|off\n");
+        return 1;
+    }
+    if (strcmp(setting, "exgui") == 0 || strcmp(setting, "desktop") == 0 || strcmp(setting, "de") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            exgui_enable(on);
+            out_append(on ? "cfgsh: exgui on\n" : "cfgsh: exgui off\n");
+            return 1;
+        }
+        mapped = cfgsh_style_value(value);
+        if (mapped && exgui_set_style(mapped) == 0) { cmd_exgui_status(); return 1; }
+        mapped = cfgsh_layout_value(value);
+        if (mapped && exgui_set_layout(mapped) == 0) { cmd_exgui_status(); return 1; }
+        out_append("Usage: exgui on|off or style/layout value\n");
+        return 1;
+    }
+    if (strcmp(setting, "style") == 0 || strcmp(setting, "theme") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
+        mapped = cfgsh_style_value(value);
+        if (mapped && exgui_set_style(mapped) == 0) cmd_exgui_status();
+        else out_append("Usage: style 1|2|3 (win|linux|mac)\n");
+        return 1;
+    }
+    if (strcmp(setting, "layout") == 0 || strcmp(setting, "wm") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
+        mapped = cfgsh_layout_value(value);
+        if (mapped && exgui_set_layout(mapped) == 0) cmd_exgui_status();
+        else out_append("Usage: layout 1|2|3 (float|tile|stack)\n");
+        return 1;
+    }
+    if (strcmp(setting, "split") == 0 || strcmp(setting, "exexgui") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exexgui_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            exexgui_enable(on);
+            out_append(on ? "cfgsh: split on\n" : "cfgsh: split off\n");
+        } else {
+            out_append("Usage: split on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "buddy") == 0 || strcmp(setting, "assistant") == 0 ||
+        strcmp(setting, "helper") == 0 || strcmp(setting, "lardbuddy") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_buddy_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            lassist_enable(on);
+            out_append(on ? "cfgsh: buddy on\n" : "cfgsh: buddy off\n");
+        } else if (strcmp(value, "joke") == 0) {
+            lassist_joke();
+            cmd_buddy_status();
+        } else if (strcmp(value, "next") == 0 || strcmp(value, "tip") == 0) {
+            lassist_next(0);
+            cmd_buddy_status();
+        } else if (lassist_set_mood(value) == 0) {
+            lassist_enable(1);
+            cmd_buddy_status();
+        } else {
+            out_append("Usage: buddy on|off|joke|next|calm|funny|strict|silent\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "bugeye") == 0 || strcmp(setting, "bug") == 0 || strcmp(setting, "visualbug") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_bugeye_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            lardkit_bugeye_enable(on);
+            if (on) (void)lardkit_bugeye_scan();
+            cmd_bugeye_status();
+        } else if (strcmp(value, "scan") == 0) {
+            (void)lardkit_bugeye_scan();
+            cmd_bugeye_status();
+        } else {
+            out_append("Usage: bugeye on|off|scan\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "ltheme") == 0 || strcmp(setting, "theme2") == 0 || strcmp(setting, "colors") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_ltheme_status(); return 1; }
+        if (lardkit_theme_use(value) == 0) cmd_ltheme_status();
+        else out_append("Usage: ltheme classic|contrast|night|amber\n");
+        return 1;
+    }
+    if (strcmp(setting, "rollback") == 0 || strcmp(setting, "undo") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_rollback_status(); return 1; }
+        if (strcmp(value, "snap") == 0 || strcmp(value, "save") == 0) {
+            (void)lardkit_snapshot("cfgsh");
+            out_append("cfgsh: rollback snapshot saved\n");
+        } else if (strcmp(value, "apply") == 0 || strcmp(value, "last") == 0 || strcmp(value, "restore") == 0) {
+            out_append(lardkit_rollback_apply() == 0 ? "cfgsh: rollback applied\n" : "cfgsh: no rollback snapshot\n");
+        } else {
+            out_append("Usage: rollback snap|apply\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "pane") == 0 || strcmp(setting, "focus") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_exexgui_status(); return 1; }
+        mapped = cfgsh_focus_value(value);
+        if (mapped && exexgui_set_focus(mapped) == 0) cmd_exexgui_status();
+        else out_append("Usage: pane 1|2|3 (gui|term|info)\n");
+        return 1;
+    }
+    if (strcmp(setting, "sram") == 0 || strcmp(setting, "screenram") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_sram_status(); return 1; }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            if (on) (void)gui_screenram_enable(1);
+            else gui_screenram_enable(0);
+            cmd_sram_status();
+        } else if (strcmp(value, "clear") == 0) {
+            gui_screenram_clear();
+            out_append("cfgsh: sram cleared\n");
+        } else {
+            out_append("Usage: sram on|off|clear\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "http") == 0 || strcmp(setting, "method") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: http=");
+            out_append(gui_http_post_mode() ? "POST\n" : "GET\n");
+            return 1;
+        }
+        if (strcmp(value, "get") == 0 || strcmp(value, "1") == 0 || strcmp(value, "off") == 0) {
+            gui_http_set_post_mode(0);
+            out_append("cfgsh: http=GET\n");
+        } else if (strcmp(value, "post") == 0 || strcmp(value, "2") == 0 || strcmp(value, "on") == 0) {
+            gui_http_set_post_mode(1);
+            out_append("cfgsh: http=POST\n");
+        } else {
+            out_append("Usage: http get|post or 1|2\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "boot") == 0 || strcmp(setting, "bootprof") == 0 || strcmp(setting, "profile") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_bootprof_status(); return 1; }
+        mapped = cfgsh_boot_value(value);
+        if (mapped) cfgsh_set_boot(mapped);
+        else out_append("Usage: boot 1..5 (normal|safe|netoff|dev|awakening)\n");
+        return 1;
+    }
+    if (strcmp(setting, "priority") == 0 || strcmp(setting, "prio") == 0 ||
+        strcmp(setting, "taskprio") == 0 || strcmp(setting, "defaultprio") == 0) {
+        uint32_t pr;
+        const char* p = args ? args : "";
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: priority=");
+            out_append_i32(taskprio_default_priority());
+            out_append("\n");
+            return 1;
+        }
+        if (vcs_parse_u32(&p, &pr) == 0 && pr <= (uint32_t)TASKPRIO_MAX) {
+            taskprio_set_default((int32_t)pr);
+            out_append("cfgsh: priority=");
+            out_append_u32(pr);
+            out_append("\n");
+        } else {
+            out_append("Usage: priority 0..10\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "sandbox") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: sandbox=");
+            out_append(s_sandbox_mode ? "on\n" : "off\n");
+            return 1;
+        }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            s_sandbox_mode = on ? 1 : 0;
+            out_append(on ? "cfgsh: sandbox on\n" : "cfgsh: sandbox off\n");
+        } else {
+            out_append("Usage: sandbox on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "sum") == 0 || strcmp(setting, "ring0") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: sum=");
+            out_append(s_in_sum_mode ? "on\n" : "off\n");
+            return 1;
+        }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            if (on) cmd_sum("");
+            else cmd_exitsum("");
+        } else {
+            out_append("Usage: sum on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "sync") == 0 || strcmp(setting, "save") == 0 || strcmp(setting, "persist") == 0) {
+        cmd_fssave("");
+        return 1;
+    }
+    return 0;
+}
+
+static void cmd_cfgsh(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "on") == 0 || strcmp(sub, "enter") == 0 || strcmp(sub, "shell") == 0) {
+        s_cfgsh_mode = 1;
+        out_append("CFGSH ON. Use setting value; exitcfg to leave.\n");
+        cfgsh_help();
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "exit") == 0 || strcmp(sub, "quit") == 0) {
+        s_cfgsh_mode = 0;
+        out_append("CFGSH OFF.\n");
+        return;
+    }
+    if (strcmp(sub, "help") == 0 || strcmp(sub, "list") == 0 || strcmp(sub, "?") == 0) {
+        cfgsh_help();
+        return;
+    }
+    if (strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cfgsh_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lsh_cfgsh_selftest() == 0 ? "cfgsh: selftest OK\n" : "cfgsh: selftest failed\n");
+        return;
+    }
+    if (!cfgsh_apply(sub, args)) {
+        out_append("cfgsh: unknown setting. Try cfgsh help.\n");
+    }
+}
+
+int lsh_cfgsh_selftest(void)
+{
+    int on = -1;
+    const char* s;
+    if (cfgsh_bool_value("on", &on) != 0 || on != 1) return -1;
+    if (cfgsh_bool_value("0", &on) != 0 || on != 0) return -2;
+    s = cfgsh_style_value("2");
+    if (!s || strcmp(s, "linux") != 0) return -3;
+    s = cfgsh_layout_value("3");
+    if (!s || strcmp(s, "stack") != 0) return -4;
+    s = cfgsh_focus_value("1");
+    if (!s || strcmp(s, "gui") != 0) return -5;
+    s = cfgsh_boot_value("5");
+    if (!s || strcmp(s, "awakening") != 0) return -6;
+    if (cfgsh_style_value("bad") != NULL) return -7;
+    return 0;
+}
+
 static int run_lsh_cmd(const char* name, const char* argv)
 {
     (void)argv;
@@ -1464,7 +5352,106 @@ static int run_lsh_cmd(const char* name, const char* argv)
 static void parse_and_run(const char* cmd, const char* args)
 {
     if (!cmd || !cmd[0]) return;
+    lardkit_trace_event("shell", cmd, 0);
+    if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
+    if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
+        strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
+    if (strcmp(cmd, "exgui") == 0 || strcmp(cmd, "exexgui") == 0 || strcmp(cmd, "ltheme") == 0) lardkit_trace_event("gui", cmd, 0);
 
+    if (s_cfgsh_mode) {
+        if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "quit") == 0 || strcmp(cmd, "exitcfg") == 0) {
+            s_cfgsh_mode = 0;
+            out_append("CFGSH OFF.\n");
+            return;
+        }
+        if (strcmp(cmd, "help") == 0 || strcmp(cmd, "?") == 0 || strcmp(cmd, "list") == 0) {
+            cfgsh_help();
+            return;
+        }
+        if (strcmp(cmd, "status") == 0 || strcmp(cmd, "info") == 0) {
+            cfgsh_status();
+            return;
+        }
+        if (strcmp(cmd, "sync") == 0) {
+            cmd_fssave(args);
+            return;
+        }
+        if (strcmp(cmd, "cfgsh") == 0 || strcmp(cmd, "cfg") == 0 || strcmp(cmd, "settings") == 0) {
+            cmd_cfgsh(args);
+            return;
+        }
+        if (cfgsh_apply(cmd, args)) return;
+        out_append("cfgsh: unknown setting. Try help or exitcfg.\n");
+        return;
+    }
+
+    if (strcmp(cmd, "magic") == 0) {
+        if (s_magic_depth > 0) {
+            out_append("magic: nested magic ignored.\n");
+            return;
+        }
+        cmd_magic(args);
+        return;
+    }
+    if (strcmp(cmd, "help") == 0 || (cmd[0] == '?' && cmd[1] == '\0')) { cmd_help(args); return; }
+    if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
+    if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
+    if (strcmp(cmd, "cfgsh") == 0 || strcmp(cmd, "cfg") == 0 || strcmp(cmd, "settings") == 0) { cmd_cfgsh(args); return; }
+    if (strcmp(cmd, "exitcfg") == 0) { s_cfgsh_mode = 0; out_append("CFGSH OFF.\n"); return; }
+    if (strcmp(cmd, "buddy") == 0 || strcmp(cmd, "assistant") == 0 || strcmp(cmd, "lardbuddy") == 0) { cmd_buddy(args); return; }
+    if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
+    if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
+    if (strcmp(cmd, "netwatch") == 0) { cmd_netwatch(args); return; }
+    if (strcmp(cmd, "journal") == 0) { cmd_journal(args); return; }
+    if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
+    if (strcmp(cmd, "oschat") == 0) { cmd_oschat(args); return; }
+    if (strcmp(cmd, "exgui") == 0) { cmd_exgui(args); return; }
+    if (strcmp(cmd, "exexgui") == 0) { cmd_exexgui(args); return; }
+    if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
+    if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
+    if (strcmp(cmd, "awake") == 0 || strcmp(cmd, "awakening") == 0) { cmd_awake(args); return; }
+    if (strcmp(cmd, "awakemon") == 0) { cmd_awakemon(args); return; }
+    if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }
+    if (strcmp(cmd, "tasktop") == 0) { cmd_tasktop(args); return; }
+    if (strcmp(cmd, "bootprof") == 0) { cmd_bootprof(args); return; }
+    if (strcmp(cmd, "bootmap") == 0) { cmd_bootmap(args); return; }
+    if (strcmp(cmd, "bootreplay") == 0) { cmd_bootreplay(args); return; }
+    if (strcmp(cmd, "postbaseline") == 0 || strcmp(cmd, "postbase") == 0) { cmd_postbaseline(args); return; }
+    if (strcmp(cmd, "devmap") == 0) { cmd_devmap(args); return; }
+    if (strcmp(cmd, "crashlog") == 0) { cmd_crashlog(args); return; }
+    if (strcmp(cmd, "panicroom") == 0 || strcmp(cmd, "panic") == 0) { cmd_panicroom(args); return; }
+    if (strcmp(cmd, "paniccapsule") == 0) { cmd_paniccapsule(args); return; }
+    if (strcmp(cmd, "rollback") == 0) { cmd_rollback(args); return; }
+    if (strcmp(cmd, "trust") == 0) { cmd_trust(args); return; }
+    if (strcmp(cmd, "bugeye") == 0) { cmd_bugeye(args); return; }
+    if (strcmp(cmd, "bugreplay") == 0) { cmd_bugreplay(args); return; }
+    if (strcmp(cmd, "oldcheck") == 0) { cmd_oldcheck(args); return; }
+    if (strcmp(cmd, "lfsdoctor") == 0) { cmd_lfsdoctor(args); return; }
+    if (strcmp(cmd, "cfgprof") == 0) { cmd_cfgprof(args); return; }
+    if (strcmp(cmd, "userlaw") == 0) { cmd_userlaw(args); return; }
+    if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
+    if (strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) { cmd_prio(args); return; }
+    if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
+    if (strcmp(cmd, "peek") == 0) { cmd_peek(args); return; }
+    if (strcmp(cmd, "poke") == 0) { cmd_poke(args); return; }
+    if (strcmp(cmd, "lars") == 0) { cmd_larddoc(args, "Usage: lars [drive:]file.lars"); return; }
+    if (strcmp(cmd, "lardd") == 0) { cmd_larddoc(args, "Usage: lardd [drive:]file.lardd"); return; }
+    if (strcmp(cmd, "doc") == 0) { cmd_larddoc(args, "Usage: doc [drive:]file.lars|file.lardd"); return; }
+    if (strcmp(cmd, "larsview") == 0) { cmd_larsview(args); return; }
+    if (strcmp(cmd, "larsapp") == 0) { cmd_larsapp(args); return; }
+    if (strcmp(cmd, "larddnotes") == 0 || strcmp(cmd, "notes") == 0) { cmd_larddnotes(args); return; }
+    if (strcmp(cmd, "larsform") == 0) { cmd_larsform(args); return; }
+    if (strcmp(cmd, "larsact") == 0) { cmd_larsact(args); return; }
+    if (strcmp(cmd, "lunit") == 0) { cmd_lunit(args); return; }
+    if (strcmp(cmd, "lpack") == 0) { cmd_lpack(args); return; }
+    if (strcmp(cmd, "lpackls") == 0) { cmd_lpack_op("list", args); return; }
+    if (strcmp(cmd, "lpackinstall") == 0) { cmd_lpack_op("install", args); return; }
+    if (strcmp(cmd, "lpackverify") == 0) { cmd_lpack_op("verify", args); return; }
+    if (strcmp(cmd, "lpackchecksum") == 0) { cmd_lpack_op("checksum", args); return; }
+    if (strcmp(cmd, "lpackundo") == 0) { cmd_lpack("undo"); return; }
+    if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
+    if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }
+    if (strcmp(cmd, "append") == 0) { cmd_append(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'e' && cmd[2] == 't' && cmd[3] == '\0') { cmd_set(args); return; }
     if (cmd[0] == 'm' && cmd[1] == 'o' && cmd[2] == 'r' && cmd[3] == 'e' && cmd[4] == '\0') { cmd_more(args); return; }
     if (cmd[0] == 'd' && cmd[1] == 'i' && cmd[2] == 'r' && cmd[3] == '\0') { cmd_dir(args); return; }
@@ -1477,6 +5464,20 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == 'a' && cmd[4] == 'v' && cmd[5] == 'e' && cmd[6] == '\0') { cmd_fssave(args); return; }
     if (cmd[0] == 'f' && cmd[1] == 's' && cmd[2] == 'l' && cmd[3] == 'o' && cmd[4] == 'a' && cmd[5] == 'd' && cmd[6] == '\0') { cmd_fsload(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'y' && cmd[2] == 'n' && cmd[3] == 'c' && cmd[4] == '\0') { cmd_fssave(args); return; }
+    if (cmd[0] == 'p' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 't' && cmd[4] == '\0') {
+        const char* rest = args;
+        char sub[16];
+        if (vcs_read_word(&rest, sub, sizeof(sub)) == 0 &&
+            (strcmp(sub, "baseline") == 0 || strcmp(sub, "base") == 0)) {
+            cmd_postbaseline(rest);
+            return;
+        }
+        cmd_selftest(args);
+        return;
+    }
+    if (cmd[0] == 's' && cmd[1] == 'r' && cmd[2] == 'a' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_sram(args); return; }
+    if (cmd[0] == 's' && cmd[1] == 'c' && cmd[2] == 'r' && cmd[3] == 'e' && cmd[4] == 'e' && cmd[5] == 'n' && cmd[6] == 'r' && cmd[7] == 'a' && cmd[8] == 'm' && cmd[9] == '\0') { cmd_sram(args); return; }
+    if (strcmp(cmd, "screencheck") == 0 || strcmp(cmd, "scrcheck") == 0) { cmd_screencheck(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'e' && cmd[2] == 'l' && cmd[3] == 'f' && cmd[4] == 't' && cmd[5] == 'e' && cmd[6] == 's' && cmd[7] == 't' && cmd[8] == '\0') { cmd_selftest(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'c' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == '\0') { cmd_lcnt(args); return; }
     if (cmd[0] == 'c' && cmd[1] == 'o' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == 'a' && cmd[5] == 'i' && cmd[6] == 'n' && cmd[7] == 'e' && cmd[8] == 'r' && cmd[9] == '\0') { cmd_lcnt(args); return; }
@@ -1497,6 +5498,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'a' && cmd[1] == 's' && cmd[2] == 'm' && cmd[3] == '_' && cmd[4] == '\0') { cmd_asm_(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 's' && cmd[4] == 'h' && cmd[5] == '\0') { cmd_larsh(args); return; }
     if (cmd[0] == 'b' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 'l' && cmd[4] == '\0') { cmd_bosl(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == '\0') { cmd_lil(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'f' && cmd[3] == 'v' && cmd[4] == 'm' && cmd[5] == '\0') { cmd_lafvm(args); return; }
     if (cmd[0] == 'o' && cmd[1] == 's' && cmd[2] == 'v' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_osvm(args); return; }
     if (cmd[0] == 'r' && cmd[1] == 'u' && cmd[2] == 'n' && cmd[3] == '\0') { cmd_run(args); return; }
@@ -1528,8 +5530,12 @@ void lsh_init(void)
     s_nenv = 0;
     s_in_sum_mode = 0;
     s_sandbox_mode = 0;
+    s_cfgsh_mode = 0;
+    taskprio_init();
     lcontainer_init();
     lvcs_init();
+    lardkit_init();
+    out_append("Lard Shell ready. Type help for commands.\n");
 }
 
 static void parse_and_run(const char* cmd, const char* args);
@@ -1571,37 +5577,12 @@ void lsh_exec(const char* line)
 
     expand_env(buf);
 
-    if (background && s_bg_count < LSH_MAX_BG) {
-        uint32_t j = 0;
-        while (buf[j] && j < LSH_MAX_LINE - 1) {
-            s_bg_queue[s_bg_count][j] = buf[j];
-            j++;
-        }
-        s_bg_queue[s_bg_count][j] = '\0';
-        s_bg_count++;
-        if (s_in_sum_mode) {
-            out_append("SUM# ");
-        } else if (s_sandbox_mode) {
-            out_append("[sandbox] ");
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        } else if (lcontainer_has_active()) {
-            out_append("[lcnt:");
-            out_append(lcontainer_active_name());
-            out_append("] ");
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        } else {
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        }
-        out_append(line);
-        out_append("\n");
-        out_append("(background)\n");
-        return;
-    }
     if (background) {
-        if (s_in_sum_mode) {
+        uint32_t task_id = 0;
+        int enqueue_ok = taskprio_enqueue(NULL, buf, taskprio_default_priority(), &task_id) == 0;
+        if (s_cfgsh_mode) {
+            out_append("CFG# ");
+        } else if (s_in_sum_mode) {
             out_append("SUM# ");
         } else if (s_sandbox_mode) {
             out_append("[sandbox] ");
@@ -1619,11 +5600,21 @@ void lsh_exec(const char* line)
         }
         out_append(line);
         out_append("\n");
-        out_append("Background queue full.\n");
+        if (enqueue_ok) {
+            out_append("(background task #");
+            out_append_u32(task_id);
+            out_append(" prio=");
+            out_append_i32(taskprio_default_priority());
+            out_append(")\n");
+        } else {
+            out_append("Background task queue full.\n");
+        }
         return;
     }
 
-    if (s_in_sum_mode) {
+    if (s_cfgsh_mode) {
+        out_append("CFG# ");
+    } else if (s_in_sum_mode) {
         out_append("SUM# ");
     } else if (s_sandbox_mode) {
         out_append("[sandbox] ");
@@ -1687,21 +5678,9 @@ static void lsh_exec_impl(const char* buf, int show_prompt)
 
 int lsh_poll_background(void)
 {
-    if (s_bg_count == 0) return 0;
-    char line[LSH_MAX_LINE];
-    uint32_t i = 0;
-    while (s_bg_queue[0][i] && i < LSH_MAX_LINE - 1) { line[i] = s_bg_queue[0][i]; i++; }
-    line[i] = '\0';
-    s_bg_count--;
-    for (uint32_t q = 0; q < s_bg_count; q++) {
-        i = 0;
-        while (s_bg_queue[q + 1][i]) {
-            s_bg_queue[q][i] = s_bg_queue[q + 1][i];
-            i++;
-        }
-        s_bg_queue[q][i] = '\0';
-    }
-    lsh_exec_impl(line, 0);
+    taskprio_task_t task;
+    if (taskprio_dequeue_next(&task) != 1) return 0;
+    lsh_exec_impl(task.command, 0);
     return 1;
 }
 

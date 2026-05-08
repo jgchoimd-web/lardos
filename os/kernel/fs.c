@@ -3,6 +3,7 @@
 #include "storage.h"
 #include "fs_ldll.inc"
 #include "lafillo_demo_data.inc"
+#include "releases_lardd.inc"
 #include <stddef.h>
 
 /* Hybrid: built-in table + LFS volume + writable RAM files. */
@@ -43,6 +44,11 @@ static const uint8_t notes_init[] = "Image: \xEE\x80\x80\n";
 static uint8_t ram_notes_buf[RAM_FILE_CAP];
 static FsWritableFile ram_notes = { "notes.txt", ram_notes_buf, 0, RAM_FILE_CAP };
 
+#define LARDD_NOTES_CAP 2048u
+static const uint8_t lardd_notes_init[] = "LARDD 1\nTITLE LardOS Notes\n";
+static uint8_t ram_lardd_notes_buf[LARDD_NOTES_CAP];
+static FsWritableFile ram_lardd_notes = { "notes.lardd", ram_lardd_notes_buf, 0, LARDD_NOTES_CAP };
+
 #define LAFILLO_SAVE_CAP 4096u
 static uint8_t ram_lafillo_save_buf[LAFILLO_SAVE_CAP];
 static FsWritableFile ram_lafillo_save = { "lafillo_saved.txt", ram_lafillo_save_buf, 0, LAFILLO_SAVE_CAP };
@@ -54,6 +60,109 @@ static FsWritableFile ram_lar_extract = { "lar_extract.txt", ram_lar_extract_buf
 #define VCS_RESTORE_CAP 4096u
 static uint8_t ram_vcs_restore_buf[VCS_RESTORE_CAP];
 static FsWritableFile ram_vcs_restore = { "vcs_restore.txt", ram_vcs_restore_buf, 0, VCS_RESTORE_CAP };
+
+#define BOOTPROF_CAP 64u
+static const uint8_t bootprof_init[] = "normal\n";
+static uint8_t ram_bootprof_buf[BOOTPROF_CAP];
+static FsWritableFile ram_bootprof = { "bootprof.txt", ram_bootprof_buf, 0, BOOTPROF_CAP };
+
+#define CRASHLOG_CAP 2048u
+static const uint8_t crashlog_init[] = "LardOS crashlog\n";
+static uint8_t ram_crashlog_buf[CRASHLOG_CAP];
+static FsWritableFile ram_crashlog = { "crashlog.txt", ram_crashlog_buf, 0, CRASHLOG_CAP };
+
+#define BUGREPORT_CAP 4096u
+static const uint8_t bugreport_init[] =
+    "LARDD 1\n"
+    "TITLE BugEye Report\n"
+    "TEXT No BugEye scan has run yet.\n";
+static uint8_t ram_bugreport_buf[BUGREPORT_CAP];
+static FsWritableFile ram_bugreport = { "bugreport.lardd", ram_bugreport_buf, 0, BUGREPORT_CAP };
+
+#define BUGREPLAY_CAP 2048u
+static const uint8_t bugreplay_init[] =
+    "LARDD 1\n"
+    "TITLE Bug Replay\n"
+    "TEXT No BugEye replay frames yet.\n";
+static uint8_t ram_bugreplay_buf[BUGREPLAY_CAP];
+static FsWritableFile ram_bugreplay = { "bugreplay.lardd", ram_bugreplay_buf, 0, BUGREPLAY_CAP };
+
+#define PANIC_CAPSULE_CAP 2048u
+static const uint8_t panic_capsule_init[] =
+    "LARDD 1\n"
+    "TITLE Panic Capsule\n"
+    "TEXT No capsule has been generated yet.\n";
+static uint8_t ram_panic_capsule_buf[PANIC_CAPSULE_CAP];
+static FsWritableFile ram_panic_capsule = { "paniccapsule.lardd", ram_panic_capsule_buf, 0, PANIC_CAPSULE_CAP };
+
+#define LFSDOCTOR_CAP 1024u
+static const uint8_t lfsdoctor_init[] =
+    "LARDD 1\n"
+    "TITLE LFS Doctor\n"
+    "TEXT No filesystem doctor scan has run yet.\n";
+static uint8_t ram_lfsdoctor_buf[LFSDOCTOR_CAP];
+static FsWritableFile ram_lfsdoctor = { "lfsdoctor.lardd", ram_lfsdoctor_buf, 0, LFSDOCTOR_CAP };
+
+#define TRACE_CAP 4096u
+static const uint8_t trace_init[] =
+    "LARDD 1\n"
+    "TITLE LardTrace\n"
+    "TEXT Trace is off. Use trace on.\n";
+static uint8_t ram_trace_buf[TRACE_CAP];
+static FsWritableFile ram_trace = { "trace.lardd", ram_trace_buf, 0, TRACE_CAP };
+
+#define NETWATCH_CAP 2048u
+static const uint8_t netwatch_init[] =
+    "LARDD 1\n"
+    "TITLE NetWatch\n"
+    "TEXT NetWatch is off. Use netwatch on.\n";
+static uint8_t ram_netwatch_buf[NETWATCH_CAP];
+static FsWritableFile ram_netwatch = { "netwatch.lardd", ram_netwatch_buf, 0, NETWATCH_CAP };
+
+#define JOURNAL_CAP 4096u
+static const uint8_t journal_init[] =
+    "LARDD 1\n"
+    "TITLE LardOS Journal\n"
+    "SECTION Events\n";
+static uint8_t ram_journal_buf[JOURNAL_CAP];
+static FsWritableFile ram_journal = { "journal.lardd", ram_journal_buf, 0, JOURNAL_CAP };
+
+#define POSTBASELINE_CAP 4096u
+static const uint8_t postbaseline_init[] =
+    "LARDD 1\n"
+    "TITLE POST Baseline\n"
+    "TEXT No POST baseline has been stored yet.\n";
+static uint8_t ram_postbaseline_buf[POSTBASELINE_CAP];
+static FsWritableFile ram_postbaseline = { "postbaseline.lardd", ram_postbaseline_buf, 0, POSTBASELINE_CAP };
+
+#define BOOTREPLAY_CAP 2048u
+static const uint8_t bootreplay_init[] =
+    "LARDD 1\n"
+    "TITLE Boot Replay\n"
+    "TEXT No boot replay has been captured yet.\n";
+static uint8_t ram_bootreplay_buf[BOOTREPLAY_CAP];
+static FsWritableFile ram_bootreplay = { "bootreplay.lardd", ram_bootreplay_buf, 0, BOOTREPLAY_CAP };
+
+#define CFGPROF_CAP 2048u
+static const uint8_t cfgprof_init[] =
+    "LARDD 1\n"
+    "TITLE CFG Profiles\n"
+    "TEXT No settings profile has been saved yet.\n";
+static uint8_t ram_cfgprof_buf[CFGPROF_CAP];
+static FsWritableFile ram_cfgprof = { "cfgprof.lardd", ram_cfgprof_buf, 0, CFGPROF_CAP };
+
+#define USERLAW_CAP 2048u
+static const uint8_t userlaw_init[] =
+    "LARDD 1\n"
+    "TITLE User Law\n"
+    "TEXT LardOS user-right principles live here.\n"
+    "SECTION Principles\n"
+    "ITEM user may grant priority lev.10\n"
+    "ITEM SUM/raw control is visible to the user\n"
+    "ITEM magic must explain automatic execution\n"
+    "END\n";
+static uint8_t ram_userlaw_buf[USERLAW_CAP];
+static FsWritableFile ram_userlaw = { "userlaw.lardd", ram_userlaw_buf, 0, USERLAW_CAP };
 
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
 #define LPST_VERSION     2u
@@ -78,6 +187,219 @@ static const uint8_t file_hello_txt[] =
 
 static const uint8_t file_readme_txt[] =
     "This is a tiny RAM-based filesystem used for experimentation.\n";
+
+static const uint8_t file_lardos_lars[] =
+    "LARS 1\n"
+    "title LardOS Control Room\n"
+    "p A TempleOS-inspired, user-owned system built from C, in-tree tools, native filesystems, and LardOS languages.\n"
+    "p LardOS local documents use LARS instead of HTML so the system owns its own document surface.\n"
+    "p A GUI overlay chrome layer now draws clearer titles, safer tabs, button feedback, and output frames above the classic GUI.\n"
+    "p LGUILIB files are native GUI library records that theme the overlay without external libraries.\n"
+    "p The Doc tab can switch HTTP requests between GET and POST; POST reads the address as URL|body.\n"
+    "section Full-control starts\n"
+    "li Run control in LSH for the system control map.\n"
+    "li Run status to inspect version, storage, drivers, and containers.\n"
+    "li Use magic before a command when LSH should predict and execute a mistyped safe command.\n"
+    "li Use magic dryrun statsu to see the prediction without executing it.\n"
+    "li Run mode probe to enter a controlled real16 window and return to long64.\n"
+    "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
+    "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
+    "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
+    "li Use oslink emit channel text for LardOS-internal module messages.\n"
+    "li Use exgui on and exgui style win linux mac for an extended desktop/window manager layer.\n"
+    "li Use exexgui on for the sketch split layout: GUI left, terminal top-right, info bottom-right.\n"
+    "li Use cfgsh for the settings shell: awake on, style 2, layout 3, http 2, boot 4.\n"
+    "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
+    "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
+    "li Use task list and task set id prio to inspect and change queued task priority.\n"
+    "li Priority lev.10 is urgent work the user can grant with task urgent id, task set id 10, or nice 10 cmd.\n"
+    "li Use tasktop to see runnable and paused task queues with priority bars.\n"
+    "li Use bootprof set safe or bootprof set netoff to change the next boot profile.\n"
+    "li Awakening mode is off by default; use awake on or awake off to choose the next boot path.\n"
+    "li Use crashlog show to inspect panic and diagnostic history.\n"
+    "li Use lpack verify sample.lpack before install, and lpack undo last to roll back the last install.\n"
+    "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
+    "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
+    "li Use bugreplay show to review the last BugEye screen-health frames.\n"
+    "li Use bugreplay draw to draw the replay frames as a GUI panel.\n"
+    "li Use trace on and trace show to inspect LardTrace module and shell events.\n"
+    "li Use netwatch on and netwatch show to inspect readable UDP, OSLink, and HTTP GET/POST events.\n"
+    "li Use journal show to read the automatic LARDD system journal.\n"
+    "li Use rollback snap and rollback last to save and restore user-visible settings.\n"
+    "li Use priority history to audit who granted priority lev.10.\n"
+    "li Use trust list and trust history to inspect the user-owned permission policy map.\n"
+    "li Use lfsdoctor scan or lfsdoctor repair to inspect and repair LPST-backed writable files.\n"
+    "li Use panic capsule to bundle crashlog, BugEye, boot, trust, priority, and filesystem state.\n"
+    "li Use bootmap, bootreplay show, postbaseline show, devmap draw, oldcheck draw, and awakemon to see boot, POST, device, storage, and Awakening progress.\n"
+    "li Use ltheme preview default.ltheme and ltheme use night for native shell theme presets.\n"
+    "li Use cfgprof save safe-ui and cfgprof load safe-ui for settings profiles.\n"
+    "li Use userlaw show to inspect the OS policy principles that protect user control.\n"
+    "li Use lunit run tests.lunit for small native feature tests.\n"
+    "li Use oschat say text for local OSLink chat-style module messages.\n"
+    "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
+    "button System status | status\n"
+    "button Task dashboard | tasktop\n"
+    "button Crash history | crashlog show\n"
+    "input profile normal\n"
+    "li Press P during boot for POST, or M for the CPU Mode Bridge Test.\n"
+    "li Use write notes.txt text and append notes.txt text for the RAM FS.\n"
+    "li Use vcs status/log/show to inspect the in-OS history layer.\n"
+    "li Use lcnt info to inspect syscall-cap containers.\n"
+    "li Run lil features.lil to try the native LIL scripting language.\n"
+    "li Use sum, peek, poke, and asm_ when you want raw ring-0 control.\n"
+    "cmd release\n"
+    "cmd magic statsu\n"
+    "cmd magic dryrun statsu\n"
+    "cmd mode probe\n"
+    "cmd mode guard\n"
+    "cmd sram on\n"
+    "cmd oslink status\n"
+    "cmd oslink emit shell hello-from-lardos\n"
+    "cmd exgui style linux\n"
+    "cmd exgui layout tile\n"
+    "cmd exexgui on\n"
+    "cmd cfgsh status\n"
+    "cmd cfg style 2\n"
+    "cmd cfg http 2\n"
+    "cmd buddy joke\n"
+    "cmd lguilib show default.lguilib\n"
+    "cmd oslink exec 10.0.2.15 status\n"
+    "cmd task list\n"
+    "cmd tasktop\n"
+    "cmd bootprof status\n"
+    "cmd awake status\n"
+    "cmd awake on\n"
+    "cmd awake off\n"
+    "cmd crashlog show\n"
+    "cmd lpack verify sample.lpack\n"
+    "cmd lpack list sample.lpack\n"
+    "cmd screencheck retro\n"
+    "cmd bugeye scan\n"
+    "cmd bugreplay show\n"
+    "cmd bugreplay draw\n"
+    "cmd trace on\n"
+    "cmd trace show\n"
+    "cmd netwatch on\n"
+    "cmd netwatch show\n"
+    "cmd journal show\n"
+    "cmd type bugreport.lardd\n"
+    "cmd rollback snap demo\n"
+    "cmd priority history\n"
+    "cmd trust list\n"
+    "cmd trust history\n"
+    "cmd bootmap\n"
+    "cmd oldcheck draw\n"
+    "cmd bootreplay show\n"
+    "cmd postbaseline show\n"
+    "cmd devmap draw\n"
+    "cmd lfsdoctor scan\n"
+    "cmd panic capsule\n"
+    "cmd awakemon\n"
+    "cmd ltheme list\n"
+    "cmd ltheme preview default.ltheme\n"
+    "cmd ltheme show default.ltheme\n"
+    "cmd cfgprof save safe-ui\n"
+    "cmd userlaw show\n"
+    "cmd lunit run tests.lunit\n"
+    "cmd larsapp form lardos.lars\n"
+    "cmd oschat say hello-from-lardkit\n"
+    "cmd notes add hello-from-lardos\n"
+    "cmd larsview open notes.lardd\n"
+    "cmd post\n"
+    "cmd lil features.lil\n"
+    "cmd lardd lardd_guide.lardd\n"
+    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch.\n"
+    "end\n";
+
+static const uint8_t file_default_lguilib[] =
+    "LGUILIB 1\n"
+    "NAME lardos-overlay\n"
+    "COLOR title_bg 0x304060\n"
+    "COLOR title_fg 0xffffff\n"
+    "COLOR title_accent 0xe7f0ff\n"
+    "COLOR panel_bg 0x202840\n"
+    "COLOR border 0x05070c\n"
+    "COLOR tab_active 0x3e5f82\n"
+    "COLOR tab_idle 0x282838\n"
+    "COLOR tab_hover 0x343a50\n"
+    "COLOR tab_accent 0x72d6ff\n"
+    "COLOR button_border 0x203060\n"
+    "COLOR button_hover 0xd5e5ff\n"
+    "COLOR button_inner 0x6680a0ff\n"
+    "COLOR output_frame 0x5a6b86\n"
+    "COLOR hint_fg 0xafc2d8\n"
+    "COLOR shadow 0x33000000\n"
+    "WIDGET title chrome\n"
+    "WIDGET tab compact\n"
+    "WIDGET button feedback\n"
+    "WIDGET output frame\n"
+    "WIDGET status badge\n"
+    "END\n";
+
+static const uint8_t file_default_ltheme[] =
+    "LTHEME 1\n"
+    "NAME lardos-night\n"
+    "FG 0xddebff\n"
+    "BG 0x080c18\n"
+    "ACCENT 0x4de1c1\n"
+    "STYLE linux\n"
+    "END\n";
+
+static const uint8_t file_lardd_guide[] =
+    "LARDD 1\n"
+    "TITLE LARDD Format\n"
+    "TEXT LARDD replaces Markdown for LardOS-authored local documents.\n"
+    "TEXT It is record based, easy to parse in freestanding C, and readable without a renderer.\n"
+    "SECTION Records\n"
+    "ITEM TITLE text -> document title.\n"
+    "ITEM SECTION text -> section heading.\n"
+    "ITEM TEXT text -> paragraph line.\n"
+    "ITEM ITEM text -> list item.\n"
+    "ITEM QUOTE text -> quoted note.\n"
+    "ITEM CODE / ENDCODE -> verbatim code block.\n"
+    "SECTION Example\n"
+    "CODE\n"
+    "LARDD 1\n"
+    "TITLE Notes\n"
+    "TEXT A local LardOS document.\n"
+    "ITEM One record per line.\n"
+    "ENDCODE\n"
+    "END\n";
+
+static const uint8_t file_features_lil[] =
+    "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
+    "(begin\n"
+    "  (assert (eq (pow 2 8) 256))\n"
+    "  (assert (eq (gcd 84 30) 6))\n"
+    "  (print (clamp 99 0 10))\n"
+    "  (print (between 5 1 5))\n"
+    "  (print (within 5 1 5))\n"
+    "  (when (eq 1 1) (print 111))\n"
+    "  (unless 0 (print 222))\n"
+    "  (repeat 4 (printn it) (emit 32))\n"
+    "  (emit 10)\n"
+    "  (for i 5 -1 -2 (begin (printn i) (emit 32)))\n"
+    "  (emit 10)\n"
+    "  (print (lcm 6 14 21)))\n";
+
+static const uint8_t file_sample_lpack[] =
+    "LPACK 1\n"
+    "NAME starter\n"
+    "FILE notes.txt\n"
+    "Installed by LardPack.\n"
+    "Use type notes.txt after install.\n"
+    "ENDFILE\n"
+    "END\n";
+
+static const uint8_t file_tests_lunit[] =
+    "LUNIT 1\n"
+    "CHECK file lardos.lars\n"
+    "CHECK file default.ltheme\n"
+    "CHECK writable journal.lardd\n"
+    "CHECK writable userlaw.lardd\n"
+    "CHECK command trace\n"
+    "CHECK command netwatch\n"
+    "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
 static const uint8_t file_bundle_lar[166] = {
@@ -111,7 +433,7 @@ static const uint8_t file_sample_bmp[246] = {
     255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0,
 };
 
-/* demo.larsh - LARSH animation: rect + circle + text + LMD with keyframe */
+/* demo.larsh - LARSH animation: rect + circle + text + LARDD with keyframe */
 static const uint8_t file_demo_larsh[] =
     "LARSH 1\n"
     "w 256\n"
@@ -123,7 +445,12 @@ static const uint8_t file_demo_larsh[] =
     "obj 0 rect 20 80 60 40 0xe94560\n"
     "obj 1 circle 200 96 25 0x0f3460\n"
     "obj 2 text 80 4 \"Hello LardOS\" 0xeaeaea\n"
-    "obj 3 lmd 8 24 240 160 0xeaeaea \"# LMD Demo\\n- **bold** text\\n- `code` style\\n- List items\"\n"
+    "obj 3 lardd 8 24 240 160 0xeaeaea \"LARDD 1\n"
+    "TITLE LARSH LARDD Demo\n"
+    "TEXT Animated scenes can carry native LardOS documents.\n"
+    "ITEM No Markdown surface is needed.\n"
+    "ITEM LARDD is parsed by kernel/lard_doc.c.\n"
+    "END\"\n"
     "\n"
     "key 0 0 x 20\n"
     "key 60 0 x 180\n"
@@ -148,6 +475,14 @@ static const FsFile FS_FILES[] = {
     { "hello.shrine",  file_hello_shrine,  sizeof(file_hello_shrine) },
     { "hello.txt",     file_hello_txt,     sizeof(file_hello_txt) - 1 },
     { "readme.txt",    file_readme_txt,    sizeof(file_readme_txt) - 1 },
+    { "lardos.lars",   file_lardos_lars,   sizeof(file_lardos_lars) - 1 },
+    { "default.lguilib", file_default_lguilib, sizeof(file_default_lguilib) - 1 },
+    { "default.ltheme", file_default_ltheme, sizeof(file_default_ltheme) - 1 },
+    { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
+    { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
+    { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
+    { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
+    { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
     { "rtl8139.drfl",  file_rtl8139_drfl,  sizeof(file_rtl8139_drfl) },
@@ -226,15 +561,29 @@ static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
 
 static uint32_t writable_count(void)
 {
-    return 4u;
+    return 18u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
 {
     if (idx == 0) return &ram_notes;
-    if (idx == 1) return &ram_lafillo_save;
-    if (idx == 2) return &ram_lar_extract;
-    if (idx == 3) return &ram_vcs_restore;
+    if (idx == 1) return &ram_lardd_notes;
+    if (idx == 2) return &ram_lafillo_save;
+    if (idx == 3) return &ram_lar_extract;
+    if (idx == 4) return &ram_vcs_restore;
+    if (idx == 5) return &ram_bootprof;
+    if (idx == 6) return &ram_crashlog;
+    if (idx == 7) return &ram_bugreport;
+    if (idx == 8) return &ram_bugreplay;
+    if (idx == 9) return &ram_panic_capsule;
+    if (idx == 10) return &ram_lfsdoctor;
+    if (idx == 11) return &ram_trace;
+    if (idx == 12) return &ram_netwatch;
+    if (idx == 13) return &ram_journal;
+    if (idx == 14) return &ram_postbaseline;
+    if (idx == 15) return &ram_bootreplay;
+    if (idx == 16) return &ram_cfgprof;
+    if (idx == 17) return &ram_userlaw;
     return NULL;
 }
 
@@ -244,6 +593,62 @@ void fs_init(void)
         ram_notes_buf[i] = notes_init[i];
     }
     ram_notes.size = sizeof(notes_init) - 1;
+    for (uint32_t i = 0; i < sizeof(lardd_notes_init) - 1 && i < LARDD_NOTES_CAP; i++) {
+        ram_lardd_notes_buf[i] = lardd_notes_init[i];
+    }
+    ram_lardd_notes.size = sizeof(lardd_notes_init) - 1;
+    for (uint32_t i = 0; i < sizeof(bootprof_init) - 1 && i < BOOTPROF_CAP; i++) {
+        ram_bootprof_buf[i] = bootprof_init[i];
+    }
+    ram_bootprof.size = sizeof(bootprof_init) - 1;
+    for (uint32_t i = 0; i < sizeof(crashlog_init) - 1 && i < CRASHLOG_CAP; i++) {
+        ram_crashlog_buf[i] = crashlog_init[i];
+    }
+    ram_crashlog.size = sizeof(crashlog_init) - 1;
+    for (uint32_t i = 0; i < sizeof(bugreport_init) - 1 && i < BUGREPORT_CAP; i++) {
+        ram_bugreport_buf[i] = bugreport_init[i];
+    }
+    ram_bugreport.size = sizeof(bugreport_init) - 1;
+    for (uint32_t i = 0; i < sizeof(bugreplay_init) - 1 && i < BUGREPLAY_CAP; i++) {
+        ram_bugreplay_buf[i] = bugreplay_init[i];
+    }
+    ram_bugreplay.size = sizeof(bugreplay_init) - 1;
+    for (uint32_t i = 0; i < sizeof(panic_capsule_init) - 1 && i < PANIC_CAPSULE_CAP; i++) {
+        ram_panic_capsule_buf[i] = panic_capsule_init[i];
+    }
+    ram_panic_capsule.size = sizeof(panic_capsule_init) - 1;
+    for (uint32_t i = 0; i < sizeof(lfsdoctor_init) - 1 && i < LFSDOCTOR_CAP; i++) {
+        ram_lfsdoctor_buf[i] = lfsdoctor_init[i];
+    }
+    ram_lfsdoctor.size = sizeof(lfsdoctor_init) - 1;
+    for (uint32_t i = 0; i < sizeof(trace_init) - 1 && i < TRACE_CAP; i++) {
+        ram_trace_buf[i] = trace_init[i];
+    }
+    ram_trace.size = sizeof(trace_init) - 1;
+    for (uint32_t i = 0; i < sizeof(netwatch_init) - 1 && i < NETWATCH_CAP; i++) {
+        ram_netwatch_buf[i] = netwatch_init[i];
+    }
+    ram_netwatch.size = sizeof(netwatch_init) - 1;
+    for (uint32_t i = 0; i < sizeof(journal_init) - 1 && i < JOURNAL_CAP; i++) {
+        ram_journal_buf[i] = journal_init[i];
+    }
+    ram_journal.size = sizeof(journal_init) - 1;
+    for (uint32_t i = 0; i < sizeof(postbaseline_init) - 1 && i < POSTBASELINE_CAP; i++) {
+        ram_postbaseline_buf[i] = postbaseline_init[i];
+    }
+    ram_postbaseline.size = sizeof(postbaseline_init) - 1;
+    for (uint32_t i = 0; i < sizeof(bootreplay_init) - 1 && i < BOOTREPLAY_CAP; i++) {
+        ram_bootreplay_buf[i] = bootreplay_init[i];
+    }
+    ram_bootreplay.size = sizeof(bootreplay_init) - 1;
+    for (uint32_t i = 0; i < sizeof(cfgprof_init) - 1 && i < CFGPROF_CAP; i++) {
+        ram_cfgprof_buf[i] = cfgprof_init[i];
+    }
+    ram_cfgprof.size = sizeof(cfgprof_init) - 1;
+    for (uint32_t i = 0; i < sizeof(userlaw_init) - 1 && i < USERLAW_CAP; i++) {
+        ram_userlaw_buf[i] = userlaw_init[i];
+    }
+    ram_userlaw.size = sizeof(userlaw_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
 }
@@ -274,41 +679,15 @@ const FsFile* fs_open(const char* name)
             return &g_lfs_result;
         }
     }
-    {
-        uint32_t j = 0;
-        const char* n1 = "notes.txt";
-        while (n1[j] && name[j] && n1[j] == name[j]) j++;
-        if (n1[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_notes.name;
-            g_ram_result.data = ram_notes.data;
-            g_ram_result.size = ram_notes.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n2 = "lafillo_saved.txt";
-        while (n2[j] && name[j] && n2[j] == name[j]) j++;
-        if (n2[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_lafillo_save.name;
-            g_ram_result.data = ram_lafillo_save.data;
-            g_ram_result.size = ram_lafillo_save.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n3 = "lar_extract.txt";
-        while (n3[j] && name[j] && n3[j] == name[j]) j++;
-        if (n3[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_lar_extract.name;
-            g_ram_result.data = ram_lar_extract.data;
-            g_ram_result.size = ram_lar_extract.size;
-            return &g_ram_result;
-        }
-        j = 0;
-        const char* n4 = "vcs_restore.txt";
-        while (n4[j] && name[j] && n4[j] == name[j]) j++;
-        if (n4[j] == '\0' && name[j] == '\0') {
-            g_ram_result.name = ram_vcs_restore.name;
-            g_ram_result.data = ram_vcs_restore.data;
-            g_ram_result.size = ram_vcs_restore.size;
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        const char* a = w ? w->name : "";
+        const char* b = name;
+        while (*a && *b && *a == *b) { a++; b++; }
+        if (*a == '\0' && *b == '\0') {
+            g_ram_result.name = w->name;
+            g_ram_result.data = w->data;
+            g_ram_result.size = w->size;
             return &g_ram_result;
         }
     }
@@ -340,10 +719,10 @@ void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user
         cb(FS_FILES[i].name, FS_FILES[i].size, user);
     }
     lfs_list(cb, user);
-    cb(ram_notes.name, ram_notes.size, user);
-    cb(ram_lafillo_save.name, ram_lafillo_save.size, user);
-    cb(ram_lar_extract.name, ram_lar_extract.size, user);
-    cb(ram_vcs_restore.name, ram_vcs_restore.size, user);
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        if (w) cb(w->name, w->size, user);
+    }
 }
 
 static int lpst_name_equals(const uint8_t* fixed_name, const char* name)
@@ -526,22 +905,13 @@ void fs_persist_detail(uint32_t* active_bank, uint32_t* generation, uint32_t* ba
 
 FsWritableFile* fs_open_writable(const char* name)
 {
-    const char* n1 = "notes.txt";
-    uint32_t i = 0;
-    while (n1[i] && name[i] && n1[i] == name[i]) i++;
-    if (n1[i] == '\0' && name[i] == '\0') return &ram_notes;
-    const char* n2 = "lafillo_saved.txt";
-    i = 0;
-    while (n2[i] && name[i] && n2[i] == name[i]) i++;
-    if (n2[i] == '\0' && name[i] == '\0') return &ram_lafillo_save;
-    const char* n3 = "lar_extract.txt";
-    i = 0;
-    while (n3[i] && name[i] && n3[i] == name[i]) i++;
-    if (n3[i] == '\0' && name[i] == '\0') return &ram_lar_extract;
-    const char* n4 = "vcs_restore.txt";
-    i = 0;
-    while (n4[i] && name[i] && n4[i] == name[i]) i++;
-    if (n4[i] == '\0' && name[i] == '\0') return &ram_vcs_restore;
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        const char* a = w ? w->name : "";
+        const char* b = name ? name : "";
+        while (*a && *b && *a == *b) { a++; b++; }
+        if (*a == '\0' && *b == '\0') return w;
+    }
     return NULL;
 }
 

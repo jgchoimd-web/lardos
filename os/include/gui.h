@@ -13,9 +13,56 @@ int gui_screensaver_active(void);  /* 1 if screensaver is showing */
 void gui_demo(void);
 
 // GUI -> kernel integration for "fetch" demo
-int gui_take_submit(char* out_url, unsigned out_cap); // returns 1 if got submit
+#define GUI_HTTP_URL_MAX 256u
+#define GUI_HTTP_METHOD_MAX 8u
+#define GUI_HTTP_BODY_MAX 1024u
+
+typedef struct {
+    char url[GUI_HTTP_URL_MAX];
+    char method[GUI_HTTP_METHOD_MAX];
+    char body[GUI_HTTP_BODY_MAX];
+    uint32_t body_len;
+} gui_http_request_t;
+
+int gui_take_submit(gui_http_request_t* out); // returns 1 if got submit
 void gui_set_response(const char* text);
 void gui_set_loading(int on);
+void gui_http_set_post_mode(int on);
+int gui_http_post_mode(void);
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t changed_samples;
+    int window_inside;
+    int response_view_ok;
+    int chrome_ok;
+} gui_post_info_t;
+
+/* POST-visible screen sanity checks. Returns 0 when a framebuffer is present. */
+int gui_post_check(gui_post_info_t* out);
+
+typedef struct {
+    uint32_t enabled;
+    uint32_t x;
+    uint32_t y;
+    uint32_t w;
+    uint32_t h;
+    uint32_t capacity;
+    uint32_t used;
+    uint32_t max_capacity;
+    uint32_t last_error;
+} gui_screenram_info_t;
+
+/* Screen RAM stores bytes in a reserved framebuffer/backbuffer rectangle. */
+int gui_screenram_enable(int on);
+int gui_screenram_set_corner(const char* corner, uint32_t w, uint32_t h);
+int gui_screenram_set_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+int gui_screenram_write(uint32_t offset, const uint8_t* data, uint32_t len);
+int gui_screenram_read(uint32_t offset, uint8_t* data, uint32_t len);
+void gui_screenram_clear(void);
+void gui_screenram_info(gui_screenram_info_t* out);
+int gui_screenram_selftest(void);
 
 // Lafillo tab: set extracted + raw content (for View Source)
 void gui_lafillo_set_content(const char* extracted, const char* raw);

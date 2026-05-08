@@ -10,15 +10,15 @@
 #define LARSH_MAX_OBJ  32
 #define LARSH_MAX_KEY  128
 #define LARSH_MAX_TEXT 64
-#define LARSH_MAX_LMD  256
+#define LARSH_MAX_LARDD  256
 
 typedef struct {
-    uint8_t type;     /* 0=rect 1=circle 2=line 3=text 4=lmd */
+    uint8_t type;     /* 0=rect 1=circle 2=line 3=text 4=lardd */
     int16_t x, y;
     int16_t w, h;     /* rect/line: width,height; circle: r in w */
     uint32_t color;
     char text[LARSH_MAX_TEXT];
-    char lmd[LARSH_MAX_LMD];  /* LMD content when type==4 */
+    char lardd[LARSH_MAX_LARDD];  /* LARDD content when type==4 */
 } larsh_obj_t;
 
 typedef struct {

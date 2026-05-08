@@ -44,6 +44,29 @@ static int lil_streq(const char* a, const char* b)
     return *a == 0 && *b == 0;
 }
 
+static void lil_copy_sym(char* dst, uint32_t cap, const char* src)
+{
+    uint32_t i = 0;
+    if (!dst || cap == 0) {
+        return;
+    }
+    while (src && src[i] && i + 1 < cap) {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = 0;
+}
+
+static uint64_t lil_mag(int64_t v)
+{
+    return (v < 0) ? (uint64_t)(-(v + 1)) + 1u : (uint64_t)v;
+}
+
+static int64_t lil_from_mag(uint64_t v)
+{
+    return (v > 9223372036854775807ULL) ? 9223372036854775807LL : (int64_t)v;
+}
+
 static void lil_put_dec(lil_putc_fn putc, void* user, int64_t v)
 {
     char buf[24];
@@ -294,6 +317,18 @@ static int bound_p(const char* name, lil_env_t* env)
     return 0;
 }
 
+static int64_t lil_eval_body(lil_node_t* n, uint32_t first, lil_env_t* env, lil_putc_fn putc, void* user, int* err, uint32_t* steps)
+{
+    int64_t r = 0;
+    for (uint32_t i = first; i < n->nkids; i++) {
+        r = lil_eval(n->kids[i], env, putc, user, err, steps);
+        if (*err) {
+            return 0;
+        }
+    }
+    return r;
+}
+
 static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* user, int* err, uint32_t* steps)
 {
     if (*err) {
@@ -385,6 +420,24 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
         return rtc_unix_seconds();
     }
 
+    if (lil_streq(op, "assert")) {
+        if (n->nkids < 2) {
+            *err = -16;
+            return 0;
+        }
+        for (uint32_t i = 1; i < n->nkids; i++) {
+            int64_t v = lil_eval(n->kids[i], env, putc, user, err, steps);
+            if (*err) {
+                return 0;
+            }
+            if (v == 0) {
+                *err = -22;
+                return 0;
+            }
+        }
+        return 1;
+    }
+
     if (lil_streq(op, "let")) {
         if (n->nkids < 4) {
             *err = -12;
@@ -401,15 +454,9 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
         }
         lil_env_t frame;
         frame.parent = env;
-        frame.name[0] = 0;
-        uint32_t i = 0;
-        while (name->sym[i] && i + 1 < sizeof(frame.name)) {
-            frame.name[i] = name->sym[i];
-            i++;
-        }
-        frame.name[i] = 0;
+        lil_copy_sym(frame.name, (uint32_t)sizeof(frame.name), name->sym);
         frame.value = val;
-        return lil_eval(n->kids[3], &frame, putc, user, err, steps);
+        return lil_eval_body(n, 3, &frame, putc, user, err, steps);
     }
 
     if (lil_streq(op, "defun")) {
@@ -429,12 +476,7 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
             return 0;
         }
         lil_func_t* f = &g_funcs[g_nfuncs++];
-        uint32_t i = 0;
-        while (name_n->sym[i] && i + 1 < sizeof(f->name)) {
-            f->name[i] = name_n->sym[i];
-            i++;
-        }
-        f->name[i] = 0;
+        lil_copy_sym(f->name, (uint32_t)sizeof(f->name), name_n->sym);
         f->nparams = nparams;
         for (uint32_t j = 0; j < nparams; j++) {
             lil_node_t* pn = params_n->kids[j];
@@ -442,12 +484,7 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
                 *err = -13;
                 return 0;
             }
-            uint32_t k = 0;
-            while (pn->sym[k] && k + 1 < sizeof(f->params[j])) {
-                f->params[j][k] = pn->sym[k];
-                k++;
-            }
-            f->params[j][k] = 0;
+            lil_copy_sym(f->params[j], (uint32_t)sizeof(f->params[j]), pn->sym);
         }
         f->body = n->kids[3];
         return 0;
@@ -471,19 +508,28 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
         return 0;
     }
 
+    if (lil_streq(op, "when") || lil_streq(op, "unless")) {
+        if (n->nkids < 3) {
+            *err = -14;
+            return 0;
+        }
+        int64_t c = lil_eval(n->kids[1], env, putc, user, err, steps);
+        if (*err) {
+            return 0;
+        }
+        int take = lil_streq(op, "when") ? (c != 0) : (c == 0);
+        if (take) {
+            return lil_eval_body(n, 2, env, putc, user, err, steps);
+        }
+        return 0;
+    }
+
     if (lil_streq(op, "begin")) {
         if (n->nkids < 2) {
             *err = -15;
             return 0;
         }
-        int64_t r = 0;
-        for (uint32_t i = 1; i < n->nkids; i++) {
-            r = lil_eval(n->kids[i], env, putc, user, err, steps);
-            if (*err) {
-                return 0;
-            }
-        }
-        return r;
+        return lil_eval_body(n, 1, env, putc, user, err, steps);
     }
 
     if (lil_streq(op, "while")) {
@@ -508,6 +554,27 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
         return last;
     }
 
+    if (lil_streq(op, "repeat")) {
+        if (n->nkids < 3) {
+            *err = -16;
+            return 0;
+        }
+        int64_t count = lil_eval(n->kids[1], env, putc, user, err, steps);
+        if (*err) {
+            return 0;
+        }
+        int64_t last = 0;
+        for (int64_t i = 0; i < count; i++) {
+            lil_env_t frame;
+            frame.parent = env;
+            lil_copy_sym(frame.name, (uint32_t)sizeof(frame.name), "it");
+            frame.value = i;
+            last = lil_eval_body(n, 2, &frame, putc, user, err, steps);
+            if (*err) return 0;
+        }
+        return last;
+    }
+
     if (lil_streq(op, "for")) {
         if (n->nkids < 5) {
             *err = -16;
@@ -522,19 +589,24 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
         if (*err) return 0;
         int64_t end = lil_eval(n->kids[3], env, putc, user, err, steps);
         if (*err) return 0;
-        lil_node_t* body = n->kids[4];
+        int64_t step = 1;
+        uint32_t body_idx = 4;
+        if (n->nkids >= 6) {
+            step = lil_eval(n->kids[4], env, putc, user, err, steps);
+            if (*err) return 0;
+            if (step == 0) {
+                *err = -23;
+                return 0;
+            }
+            body_idx = 5;
+        }
         int64_t last = 0;
-        for (int64_t i = start; i < end; i++) {
+        for (int64_t i = start; (step > 0) ? (i < end) : (i > end); i += step) {
             lil_env_t frame;
             frame.parent = env;
-            uint32_t k = 0;
-            while (var_n->sym[k] && k + 1 < sizeof(frame.name)) {
-                frame.name[k] = var_n->sym[k];
-                k++;
-            }
-            frame.name[k] = 0;
+            lil_copy_sym(frame.name, (uint32_t)sizeof(frame.name), var_n->sym);
             frame.value = i;
-            last = lil_eval(body, &frame, putc, user, err, steps);
+            last = lil_eval_body(n, body_idx, &frame, putc, user, err, steps);
             if (*err) return 0;
         }
         return last;
@@ -553,14 +625,14 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
             }
             lil_node_t* head = clause->kids[0];
             if (head && head->kind == LIL_SYM && lil_streq(head->sym, "else")) {
-                return lil_eval(clause->kids[1], env, putc, user, err, steps);
+                return lil_eval_body(clause, 1, env, putc, user, err, steps);
             }
             int64_t pred = lil_eval(clause->kids[0], env, putc, user, err, steps);
             if (*err) {
                 return 0;
             }
             if (pred != 0) {
-                return lil_eval(clause->kids[1], env, putc, user, err, steps);
+                return lil_eval_body(clause, 1, env, putc, user, err, steps);
             }
         }
         return 0;
@@ -589,6 +661,85 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
             }
         }
         return acc;
+    }
+
+    if (lil_streq(op, "clamp") || lil_streq(op, "between") || lil_streq(op, "within")) {
+        if (n->nkids != 4) {
+            *err = -16;
+            return 0;
+        }
+        int64_t x = lil_eval(n->kids[1], env, putc, user, err, steps);
+        if (*err) return 0;
+        int64_t lo = lil_eval(n->kids[2], env, putc, user, err, steps);
+        if (*err) return 0;
+        int64_t hi = lil_eval(n->kids[3], env, putc, user, err, steps);
+        if (*err) return 0;
+        if (lo > hi) {
+            int64_t t = lo;
+            lo = hi;
+            hi = t;
+        }
+        if (lil_streq(op, "clamp")) {
+            if (x < lo) return lo;
+            if (x > hi) return hi;
+            return x;
+        }
+        if (lil_streq(op, "within")) {
+            return (x >= lo && x < hi) ? 1 : 0;
+        }
+        return (x >= lo && x <= hi) ? 1 : 0;
+    }
+
+    if (lil_streq(op, "pow")) {
+        if (n->nkids != 3) {
+            *err = -16;
+            return 0;
+        }
+        int64_t base = lil_eval(n->kids[1], env, putc, user, err, steps);
+        if (*err) return 0;
+        int64_t exp = lil_eval(n->kids[2], env, putc, user, err, steps);
+        if (*err) return 0;
+        if (exp < 0) {
+            *err = -24;
+            return 0;
+        }
+        int64_t acc = 1;
+        while (exp > 0) {
+            if (exp & 1) {
+                acc *= base;
+            }
+            exp >>= 1;
+            if (exp) {
+                base *= base;
+            }
+        }
+        return acc;
+    }
+
+    if (lil_streq(op, "gcd") || lil_streq(op, "lcm")) {
+        if (n->nkids < 2) {
+            *err = -16;
+            return 0;
+        }
+        uint64_t acc = lil_mag(lil_eval(n->kids[1], env, putc, user, err, steps));
+        if (*err) return 0;
+        for (uint32_t i = 2; i < n->nkids; i++) {
+            uint64_t b = lil_mag(lil_eval(n->kids[i], env, putc, user, err, steps));
+            if (*err) return 0;
+            uint64_t a = acc;
+            uint64_t bb = b;
+            while (bb != 0) {
+                uint64_t t = a % bb;
+                a = bb;
+                bb = t;
+            }
+            if (lil_streq(op, "gcd")) {
+                acc = a;
+            } else {
+                acc = (acc == 0 || b == 0) ? 0 : (acc / a) * b;
+            }
+        }
+        return lil_from_mag(acc);
     }
 
     if (lil_streq(op, "neg")) {
@@ -765,29 +916,27 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
             *err = -21;
             return 0;
         }
-        lil_env_t* frame_chain = (lil_env_t*)kmalloc((uint32_t)(f->nparams * sizeof(lil_env_t)));
-        if (!frame_chain) {
+        lil_env_t* frame_chain = 0;
+        if (f->nparams > 0) {
+            frame_chain = (lil_env_t*)kmalloc((uint32_t)(f->nparams * sizeof(lil_env_t)));
+        }
+        if (f->nparams > 0 && !frame_chain) {
             *err = -5;
             return 0;
         }
         for (uint32_t pi = 0; pi < f->nparams; pi++) {
             int64_t arg = lil_eval(n->kids[pi + 1], env, putc, user, err, steps);
             if (*err) {
-                kfree(frame_chain);
+                if (frame_chain) kfree(frame_chain);
                 return 0;
             }
             frame_chain[pi].parent = (pi == 0) ? env : &frame_chain[pi - 1];
-            uint32_t k = 0;
-            while (f->params[pi][k] && k + 1 < sizeof(frame_chain[pi].name)) {
-                frame_chain[pi].name[k] = f->params[pi][k];
-                k++;
-            }
-            frame_chain[pi].name[k] = 0;
+            lil_copy_sym(frame_chain[pi].name, (uint32_t)sizeof(frame_chain[pi].name), f->params[pi]);
             frame_chain[pi].value = arg;
         }
-        lil_env_t* call_env = &frame_chain[f->nparams - 1];
+        lil_env_t* call_env = f->nparams ? &frame_chain[f->nparams - 1] : env;
         int64_t r = lil_eval(f->body, call_env, putc, user, err, steps);
-        kfree(frame_chain);
+        if (frame_chain) kfree(frame_chain);
         return r;
     }
 

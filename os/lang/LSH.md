@@ -5,6 +5,45 @@
 ## Commands
 
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
+- `release policy` - show when to use `a`, `b`, or `p` release suffixes.
+- `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
+- `post baseline` / `postbaseline show` - show the saved POST baseline report.
+- `magic command [args]` - predict and run a mistyped safe built-in command.
+- `magic dryrun command [args]` - show the Magic prediction without executing it.
+- `magic explain` - show why the last Magic prediction executed or stopped.
+- `mode [status|probe|real|guard]` - inspect or run the controlled real16/long64 bridge.
+- `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
+- `screencheck status|retro|test` - probe or draw the retro visual screen checker.
+- `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
+- `exexgui on|off|focus|next|workspace|save|load` - sketch split GUI with GUI, terminal, status panes, and workspaces 1/2/3.
+- `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
+- `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
+- `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.
+- `bugreplay status|last|show|draw|clear` - replay BugEye scan frames from `bugreplay.lardd`.
+- `lardtrace on|off|show|module name` / `trace ...` - LardTrace event timeline for shell/modules.
+- `netwatch on|off|show|clear` - readable network, OSLink, and HTTP GET/POST watcher.
+- `journal show|add|clear` - automatic `.lardd` OS journal.
+- `rollback snap|last|apply` - settings snapshot and restore.
+- `trust list|allow|deny|history` - user-owned permission policy map and audit log.
+- `lfsdoctor scan|repair|show` - filesystem and LPST persistence health report.
+- `panic capsule` / `paniccapsule show` - write and view a recovery bundle report.
+- `bootmap` / `bootreplay show` / `post baseline` / `postbaseline show` / `devmap draw` / `oldcheck draw` / `awakemon` - boot, POST, device, storage, and Awakening views.
+- `ltheme list|show|preview|use name` - native shell theme presets and `.ltheme` files.
+- `cfgprof save|load name` / `cfg profile` in the feature map / `userlaw show` - settings profiles and user-right policy.
+- `oschat say|send|read` - local OSLink chat-style messages.
+- `larsview open file` / `larsapp open|form|run` / `notes show|add|clear` - native document/app browser state and writable `notes.lardd`.
+- `lunit run tests.lunit` - run small native feature tests.
+- `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
+- `awake on|off|status|test` - control the default-off Awakening fast-boot mode.
+- `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.
+- `task list|set|default|run|history|boost|urgent|drop` - inspect and change task priority.
+- `priority history` / `prio history` - audit who granted priority `lev.10`.
+- `tasktop` - show queued tasks with status and priority bars.
+- `nice priority command` - queue a command at a chosen priority.
+- `bootprof status|set` - inspect or select normal, safe, netoff, dev, or awakening boot profiles.
+- `crashlog show|clear|test` - inspect or write diagnostic crash history.
+- `larsform file` / `larsact file index` - list or run LARS form buttons.
+- `lpack info|list|verify|install|undo file.lpack` - inspect, validate, install, or roll back a native LardPack package.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 
@@ -24,5 +63,26 @@
 ## Background
 
 - `cmd &` — queue command, return immediately
-- Commands run one per `gui_tick`
-- Queue limit: 4 commands
+- Commands run one per `gui_tick`, highest effective priority first
+- Queue limit: 8 tasks
+- `task set id priority` changes queued work; priority range is 0..10
+- Priority `lev.10` is user-grantable urgent work via `task urgent id`, `task set id 10`, or `nice 10 command`; wait-time aging cannot create it
+- `task history` shows lev.10 grants with sequence, actor, action, and task name
+- `task pause id` keeps a task visible but skips it until `task resume id`
+
+## Recovery And Audit
+
+- `bugreplay` keeps a small ring of BugEye frames with scan number, changed samples, bad tiles, and last render error
+- `trust history` records who changed file, screen, network, OSLink, package, raw, and SUM permissions
+- `lpack verify file.lpack` checks package structure before install and prints hash, warnings, errors, installable files, and bytes
+- `lpack undo` restores the last writable-file snapshot captured before a package install
+- `paniccapsule show` builds a compact LARDD recovery bundle from panic room, crashlog, BugEye, replay, trust, priority, LFSDoctor, and BootMap state
+- `lfsdoctor repair` runs the native LPST repair path and rewrites `lfsdoctor.lardd`
+
+## Settings Shell
+
+- `cfgsh` enters the settings-focused `CFG#` prompt; `exitcfg` leaves it
+- Inside `CFG#`, use `setting value`: `awake on`, `style 2`, `layout 3`, `pane 1`, `http 2`, `boot 4`, `priority 10`
+- `buddy on` / `buddy off`, `bugeye on`, `ltheme night`, and `rollback snap|apply` can also be changed from `CFG#`
+- Outside `CFG#`, use `cfg setting value` for one-shot changes
+- Number maps: style 1=win 2=linux 3=mac; layout 1=float 2=tile 3=stack; pane 1=gui 2=term 3=info; http 1=GET 2=POST; boot 1=normal 2=safe 3=netoff 4=dev 5=awakening

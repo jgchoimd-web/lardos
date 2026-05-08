@@ -3,6 +3,7 @@
 #include "rtl8139.h"
 #include "drfl.h"
 #include "lard_tls.h"
+#include "lardkit.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -250,6 +251,90 @@ int net_get_cfg(net_stack_t* n, net_cfg_t* out)
     if (!s->cfg_valid) return -1;
     *out = s->cfg;
     return 0;
+}
+
+static int ip_is_broadcast(ip4_t ip)
+{
+    return ip.b[0] == 255 && ip.b[1] == 255 && ip.b[2] == 255 && ip.b[3] == 255;
+}
+
+static uint32_t ip4_pack(ip4_t ip)
+{
+    return ((uint32_t)ip.b[0] << 24) | ((uint32_t)ip.b[1] << 16) | ((uint32_t)ip.b[2] << 8) | (uint32_t)ip.b[3];
+}
+
+static int ip_same_subnet(ip4_t a, ip4_t b, ip4_t mask)
+{
+    uint32_t m = ip4_pack(mask);
+    return (ip4_pack(a) & m) == (ip4_pack(b) & m);
+}
+
+int net_udp_send(net_stack_t* n,
+                 ip4_t dst,
+                 uint16_t src_port,
+                 uint16_t dst_port,
+                 const void* payload,
+                 uint32_t payload_len)
+{
+    net_stack_impl_t* s = impl(n);
+    net_cfg_t cfg;
+    uint8_t mac[6];
+    if (!n || (!payload && payload_len) || payload_len > 1400u) return -1;
+    if (net_get_cfg(n, &cfg) != 0) return -2;
+    if (ip_is_broadcast(dst)) {
+        mac_broadcast(mac);
+    } else if (ip_same_subnet(cfg.ip, dst, cfg.mask)) {
+        if (arp_resolve(n, cfg.ip, dst, mac) != 0) return -3;
+    } else {
+        if (!s->gw_mac_valid) {
+            if (arp_resolve(n, cfg.ip, cfg.gw, s->gw_mac) != 0) return -3;
+            s->gw_mac_valid = 1;
+        }
+        for (int i = 0; i < 6; i++) mac[i] = s->gw_mac[i];
+    }
+    int r = ip_send_udp(n, mac, cfg.ip, dst, src_port, dst_port, payload, (uint16_t)payload_len);
+    if (r == 0) lardkit_netwatch_record("udp-send", "packet", (int32_t)payload_len);
+    return r;
+}
+
+int net_udp_recv(net_stack_t* n,
+                 uint16_t dst_port,
+                 void* out_payload,
+                 uint32_t out_cap,
+                 ip4_t* out_src,
+                 uint16_t* out_src_port)
+{
+    if (!n || !out_payload || out_cap == 0) return -1;
+    uint8_t* rx = NULL;
+    uint32_t rx_len = 0;
+    if (nic_rx(n, &rx, &rx_len) != 0) return 0;
+    if (rx_len < sizeof(eth_hdr_t) + sizeof(ip4_hdr_t) + sizeof(udp_hdr_t)) return 0;
+    const eth_hdr_t* eth = (const eth_hdr_t*)rx;
+    if (ntohs(eth->ethertype) != 0x0800) return 0;
+    const ip4_hdr_t* ip = (const ip4_hdr_t*)(rx + sizeof(eth_hdr_t));
+    if (ip->proto != 17) return 0;
+    uint8_t ihl = (uint8_t)((ip->ver_ihl & 0x0Fu) * 4u);
+    if (ihl < sizeof(ip4_hdr_t)) return 0;
+    if (rx_len < sizeof(eth_hdr_t) + ihl + sizeof(udp_hdr_t)) return 0;
+    const udp_hdr_t* udp = (const udp_hdr_t*)((const uint8_t*)ip + ihl);
+    if (ntohs(udp->dst_port) != dst_port) return 0;
+    uint16_t udp_len = ntohs(udp->len);
+    if (udp_len < sizeof(udp_hdr_t)) return 0;
+    if (rx_len < sizeof(eth_hdr_t) + ihl + udp_len) return 0;
+    uint32_t pay_len = (uint32_t)udp_len - sizeof(udp_hdr_t);
+    if (pay_len > out_cap) return -1;
+    const uint8_t* pay = (const uint8_t*)udp + sizeof(udp_hdr_t);
+    for (uint32_t i = 0; i < pay_len; i++) ((uint8_t*)out_payload)[i] = pay[i];
+    if (out_src) {
+        uint32_t src = ntohl(ip->src);
+        out_src->b[0] = (uint8_t)(src >> 24);
+        out_src->b[1] = (uint8_t)(src >> 16);
+        out_src->b[2] = (uint8_t)(src >> 8);
+        out_src->b[3] = (uint8_t)src;
+    }
+    if (out_src_port) *out_src_port = ntohs(udp->src_port);
+    lardkit_netwatch_record("udp-recv", "packet", (int32_t)pay_len);
+    return (int)pay_len;
 }
 
 // ---- DHCP (very small: DISCOVER/REQUEST) ----
@@ -887,6 +972,93 @@ static uint32_t str_len(const char* s)
     return n;
 }
 
+static int http_method_is_post(const char* method)
+{
+    return method && method[0] == 'P' && method[1] == 'O' && method[2] == 'S' &&
+           method[3] == 'T' && method[4] == '\0';
+}
+
+static int req_puts(char* out, uint32_t cap, uint32_t* pos, const char* s)
+{
+    if (!out || !pos || !s) return -1;
+    while (*s) {
+        if (*pos + 1u >= cap) return -2;
+        out[(*pos)++] = *s++;
+    }
+    return 0;
+}
+
+static int req_putn(char* out, uint32_t cap, uint32_t* pos, const char* s, uint32_t n)
+{
+    if (!out || !pos || (!s && n)) return -1;
+    for (uint32_t i = 0; i < n; i++) {
+        if (*pos + 1u >= cap) return -2;
+        out[(*pos)++] = s[i];
+    }
+    return 0;
+}
+
+static int req_put_u32(char* out, uint32_t cap, uint32_t* pos, uint32_t v)
+{
+    char tmp[12];
+    uint32_t n = 0;
+    if (v == 0) {
+        return req_puts(out, cap, pos, "0");
+    }
+    while (v && n < sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (v % 10u));
+        v /= 10u;
+    }
+    while (n) {
+        if (*pos + 1u >= cap) return -2;
+        out[(*pos)++] = tmp[--n];
+    }
+    return 0;
+}
+
+static int build_http_request(char* req,
+                              uint32_t cap,
+                              const char* method,
+                              const char* host,
+                              const char* path,
+                              const char* body,
+                              uint32_t body_len,
+                              uint32_t* out_len)
+{
+    if (!req || cap < 64 || !host || !path || !out_len) return -1;
+    uint32_t p = 0;
+    int is_post = http_method_is_post(method);
+    const char* verb = is_post ? "POST" : "GET";
+    if (!is_post) {
+        body = NULL;
+        body_len = 0;
+    } else if (body && body_len == 0) {
+        body_len = str_len(body);
+    }
+
+    if (req_puts(req, cap, &p, verb) != 0) return -2;
+    if (req_puts(req, cap, &p, " ") != 0) return -2;
+    if (path[0]) {
+        if (req_puts(req, cap, &p, path) != 0) return -2;
+    } else {
+        if (req_puts(req, cap, &p, "/") != 0) return -2;
+    }
+    if (req_puts(req, cap, &p, " HTTP/1.0\r\nHost: ") != 0) return -2;
+    if (req_puts(req, cap, &p, host) != 0) return -2;
+    if (req_puts(req, cap, &p, "\r\nConnection: close\r\n") != 0) return -2;
+    if (is_post) {
+        if (req_puts(req, cap, &p, "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: ") != 0) return -2;
+        if (req_put_u32(req, cap, &p, body_len) != 0) return -2;
+        if (req_puts(req, cap, &p, "\r\n\r\n") != 0) return -2;
+        if (body_len && req_putn(req, cap, &p, body, body_len) != 0) return -2;
+    } else {
+        if (req_puts(req, cap, &p, "\r\n") != 0) return -2;
+    }
+    req[p] = '\0';
+    *out_len = p;
+    return 0;
+}
+
 /* Split "host:port" in place for DNS; default_port if no ':'. */
 static int dns_host_strip_port(char* host, uint16_t* port, uint16_t default_port)
 {
@@ -1080,7 +1252,19 @@ static int parse_location(const char* v, uint32_t vlen, char* out_host, uint32_t
     return 0;
 }
 
-static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap, int* out_status, char* out_loc, uint32_t loc_cap)
+static int net_https_request_once(net_stack_t* n,
+                                  ip4_t dst,
+                                  uint16_t port,
+                                  const char* host,
+                                  const char* path,
+                                  const char* method,
+                                  const char* body,
+                                  uint32_t body_len,
+                                  char* out,
+                                  uint32_t out_cap,
+                                  int* out_status,
+                                  char* out_loc,
+                                  uint32_t loc_cap)
 {
     net_sock_t sock;
     if (net_sock_connect(n, dst, port, &sock) != 0) return -2;
@@ -1097,16 +1281,12 @@ static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const ch
         return tr;
     }
 
-    char req[1024];
+    char req[2048];
     uint32_t rlen = 0;
-    const char* pfx = "GET ";
-    for (int i = 0; pfx[i]; i++) req[rlen++] = pfx[i];
-    for (int i = 0; path[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = path[i];
-    const char* mid = " HTTP/1.0\r\nHost: ";
-    for (int i = 0; mid[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = mid[i];
-    for (int i = 0; host[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = host[i];
-    const char* end = "\r\nConnection: close\r\n\r\n";
-    for (int i = 0; end[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = end[i];
+    if (build_http_request(req, sizeof(req), method, host, path, body, body_len, &rlen) != 0) {
+        net_sock_close(n, &sock);
+        return -6;
+    }
 
     uint32_t sent = 0;
     while (sent < rlen) {
@@ -1202,24 +1382,35 @@ static int net_https_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const ch
     return 0;
 }
 
-static int net_http_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap, int* out_status, char* out_loc, uint32_t loc_cap)
+static int net_http_request_once(net_stack_t* n,
+                                 ip4_t dst,
+                                 uint16_t port,
+                                 const char* host,
+                                 const char* path,
+                                 const char* method,
+                                 const char* body,
+                                 uint32_t body_len,
+                                 char* out,
+                                 uint32_t out_cap,
+                                 int* out_status,
+                                 char* out_loc,
+                                 uint32_t loc_cap)
 {
     net_sock_t sock;
     if (net_sock_connect(n, dst, port, &sock) != 0) return -2;
 
     // HTTP request
-    char req[1024];
+    char req[2048];
     uint32_t rlen = 0;
-    const char* pfx = "GET ";
-    for (int i = 0; pfx[i]; i++) req[rlen++] = pfx[i];
-    for (int i = 0; path[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = path[i];
-    const char* mid = " HTTP/1.0\r\nHost: ";
-    for (int i = 0; mid[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = mid[i];
-    for (int i = 0; host[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = host[i];
-    const char* end = "\r\nConnection: close\r\n\r\n";
-    for (int i = 0; end[i] && rlen + 1 < sizeof(req); i++) req[rlen++] = end[i];
+    if (build_http_request(req, sizeof(req), method, host, path, body, body_len, &rlen) != 0) {
+        net_sock_close(n, &sock);
+        return -6;
+    }
 
-    if (net_sock_send(n, &sock, req, rlen) != 0) return -5;
+    if (net_sock_send(n, &sock, req, rlen) != 0) {
+        net_sock_close(n, &sock);
+        return -5;
+    }
 
     // Parse/accumulate
     uint32_t out_len = 0;
@@ -1373,20 +1564,33 @@ static int net_http_get_once(net_stack_t* n, ip4_t dst, uint16_t port, const cha
     return 0;
 }
 
-int net_http_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
+int net_http_request(net_stack_t* n,
+                     ip4_t dst,
+                     uint16_t port,
+                     const char* host,
+                     const char* path,
+                     const char* method,
+                     const char* body,
+                     uint32_t body_len,
+                     char* out,
+                     uint32_t out_cap)
 {
     // Follow up to 1 redirect.
     net_cfg_t cfg;
+    int is_post = http_method_is_post(method);
+    lardkit_netwatch_record("http", is_post ? "POST" : "GET", (int32_t)body_len);
+    lardkit_trace_event("net", is_post ? "http POST" : "http GET", (int32_t)port);
     if (net_get_cfg(n, &cfg) != 0) {
         cfg.dns = (ip4_t){{10, 0, 2, 3}};
     }
 
     char loc[192];
     int st = -1;
-    int r = net_http_get_once(n, dst, port, host, path, out, out_cap, &st, loc, sizeof(loc));
+    int r = net_http_request_once(n, dst, port, host, path, method, body, body_len, out, out_cap, &st, loc, sizeof(loc));
     if (r != 0) return r;
 
     if ((st == 301 || st == 302 || st == 307 || st == 308) && loc[0] != '\0') {
+        if (is_post && st != 307 && st != 308) return 0;
         char nhost[128];
         char npath[128];
         if (parse_location(loc, str_len(loc), nhost, sizeof(nhost), npath, sizeof(npath)) == 0) {
@@ -1414,24 +1618,42 @@ int net_http_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, con
                 }
                 host_hdr_val = nhost;
             }
-            return net_http_get_once(n, use_dst, use_port, host_hdr_val, use_path, out, out_cap, &st, NULL, 0);
+            return net_http_request_once(n, use_dst, use_port, host_hdr_val, use_path, method, body, body_len, out, out_cap, &st, NULL, 0);
         }
     }
     return 0;
 }
 
-int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
+int net_http_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
+{
+    return net_http_request(n, dst, port, host, path, "GET", NULL, 0, out, out_cap);
+}
+
+int net_https_request(net_stack_t* n,
+                      ip4_t dst,
+                      uint16_t port,
+                      const char* host,
+                      const char* path,
+                      const char* method,
+                      const char* body,
+                      uint32_t body_len,
+                      char* out,
+                      uint32_t out_cap)
 {
     net_cfg_t cfg;
+    int is_post = http_method_is_post(method);
+    lardkit_netwatch_record("https", is_post ? "POST" : "GET", (int32_t)body_len);
+    lardkit_trace_event("net", is_post ? "https POST" : "https GET", (int32_t)port);
     if (net_get_cfg(n, &cfg) != 0) cfg.dns = (ip4_t){{10, 0, 2, 3}};
     if (out && out_cap) out[0] = '\0';
 
     char loc[192];
     int st = -1;
-    int r = net_https_get_once(n, dst, port, host, path, out, out_cap, &st, loc, sizeof(loc));
+    int r = net_https_request_once(n, dst, port, host, path, method, body, body_len, out, out_cap, &st, loc, sizeof(loc));
     if (r != 0) return r;
 
     if ((st == 301 || st == 302 || st == 307 || st == 308) && loc[0] != '\0') {
+        if (is_post && st != 307 && st != 308) return 0;
         char nhost[128];
         char npath[128];
         if (parse_location(loc, str_len(loc), nhost, sizeof(nhost), npath, sizeof(npath)) == 0) {
@@ -1449,15 +1671,20 @@ int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, co
                     if (dns_host_strip_port(hbuf, &use_port, scheme_port) == 0 && net_dns_a(n, cfg.dns, hbuf, &use_dst) == 0) {
                         host_hdr_val = nhost;
                         if (streq_prefix(loc, "http://"))
-                            return net_http_get_once(n, use_dst, use_port, host_hdr_val, npath, out, out_cap, &st, NULL, 0);
-                        return net_https_get_once(n, use_dst, use_port, host_hdr_val, npath, out, out_cap, &st, NULL, 0);
+                            return net_http_request_once(n, use_dst, use_port, host_hdr_val, npath, method, body, body_len, out, out_cap, &st, NULL, 0);
+                        return net_https_request_once(n, use_dst, use_port, host_hdr_val, npath, method, body, body_len, out, out_cap, &st, NULL, 0);
                     }
                 }
             }
             if (streq_prefix(loc, "http://"))
-                return net_http_get_once(n, use_dst, use_port, host, npath, out, out_cap, &st, NULL, 0);
-            return net_https_get_once(n, use_dst, use_port, host, npath, out, out_cap, &st, NULL, 0);
+                return net_http_request_once(n, use_dst, use_port, host, npath, method, body, body_len, out, out_cap, &st, NULL, 0);
+            return net_https_request_once(n, use_dst, use_port, host, npath, method, body, body_len, out, out_cap, &st, NULL, 0);
         }
     }
     return 0;
+}
+
+int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
+{
+    return net_https_request(n, dst, port, host, path, "GET", NULL, 0, out, out_cap);
 }

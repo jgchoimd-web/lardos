@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.26.0a
+ITEM Added TaskPrio priority lev.10 as an OS-only urgent scheduling level.
+ITEM User commands and wait-time aging still stop at priorities 0..9; lev.10 can only be granted by the OS.
+ITEM The scheduler now picks an unpaused lev.10 task before all normal task scoring, matching the stop-and-handle-first rule.
+ITEM tasktop, status, docs, and POST selftest now cover the reserved lev.10 path.
+
 SECTION v1.25.0a
 ITEM Added LGUILIB, a native LardOS GUI library file format stored as .lguilib records.
 ITEM Added default.lguilib to the embedded filesystem with NAME, COLOR, WIDGET, and END records.

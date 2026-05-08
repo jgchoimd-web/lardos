@@ -14,11 +14,16 @@ typedef struct {
 
 static taskprio_state_t s_taskprio;
 
-static int32_t clamp_priority(int32_t p)
+static int32_t clamp_user_priority(int32_t p)
 {
     if (p < TASKPRIO_MIN) return TASKPRIO_MIN;
     if (p > TASKPRIO_MAX) return TASKPRIO_MAX;
     return p;
+}
+
+static int is_os_priority(const taskprio_task_t* t)
+{
+    return t && t->priority == TASKPRIO_OS_LEVEL;
 }
 
 static uint32_t slen(const char* s, uint32_t cap)
@@ -82,7 +87,7 @@ void taskprio_init(void)
     s_taskprio.default_priority = TASKPRIO_DEFAULT;
 }
 
-int taskprio_enqueue(const char* name, const char* command, int32_t priority, uint32_t* out_id)
+static int enqueue_with_priority(const char* name, const char* command, int32_t priority, uint32_t* out_id)
 {
     if (!command || slen(command, TASKPRIO_CMD_MAX) == 0) return -1;
     if (s_taskprio.count >= TASKPRIO_MAX_TASKS) return -2;
@@ -92,7 +97,7 @@ int taskprio_enqueue(const char* name, const char* command, int32_t priority, ui
     if (name && name[0]) scopy(t->name, sizeof(t->name), name);
     else copy_name_from_command(t->name, sizeof(t->name), command);
     scopy(t->command, sizeof(t->command), command);
-    t->priority = clamp_priority(priority);
+    t->priority = priority;
     t->wait_ticks = 0;
     t->runs = 0;
     t->paused = 0;
@@ -101,22 +106,44 @@ int taskprio_enqueue(const char* name, const char* command, int32_t priority, ui
     return 0;
 }
 
+int taskprio_enqueue(const char* name, const char* command, int32_t priority, uint32_t* out_id)
+{
+    return enqueue_with_priority(name, command, clamp_user_priority(priority), out_id);
+}
+
+int taskprio_enqueue_os(const char* name, const char* command, uint32_t* out_id)
+{
+    return enqueue_with_priority(name && name[0] ? name : "os", command, TASKPRIO_OS_LEVEL, out_id);
+}
+
 int taskprio_dequeue_next(taskprio_task_t* out)
 {
     if (s_taskprio.count == 0) return 0;
     uint32_t best = 0xFFFFFFFFu;
     int32_t best_score = -1;
     for (uint32_t i = 0; i < s_taskprio.count; i++) {
-        if (s_taskprio.tasks[i].paused) continue;
-        int32_t score = s_taskprio.tasks[i].priority * 16 + (int32_t)s_taskprio.tasks[i].wait_ticks;
-        if (score > best_score) {
-            best_score = score;
+        if (!s_taskprio.tasks[i].paused && is_os_priority(&s_taskprio.tasks[i])) {
             best = i;
+            break;
         }
     }
     if (best == 0xFFFFFFFFu) {
         for (uint32_t i = 0; i < s_taskprio.count; i++) {
-            if (s_taskprio.tasks[i].wait_ticks < 255u) s_taskprio.tasks[i].wait_ticks++;
+            uint32_t age = s_taskprio.tasks[i].wait_ticks;
+            if (s_taskprio.tasks[i].paused || is_os_priority(&s_taskprio.tasks[i])) continue;
+            if (age > 15u) age = 15u;
+            int32_t score = s_taskprio.tasks[i].priority * 16 + (int32_t)age;
+            if (score > best_score) {
+                best_score = score;
+                best = i;
+            }
+        }
+    }
+    if (best == 0xFFFFFFFFu) {
+        for (uint32_t i = 0; i < s_taskprio.count; i++) {
+            if (!is_os_priority(&s_taskprio.tasks[i]) && s_taskprio.tasks[i].wait_ticks < 255u) {
+                s_taskprio.tasks[i].wait_ticks++;
+            }
         }
         return 0;
     }
@@ -127,7 +154,9 @@ int taskprio_dequeue_next(taskprio_task_t* out)
     s_taskprio.completed++;
     remove_at(best);
     for (uint32_t i = 0; i < s_taskprio.count; i++) {
-        if (s_taskprio.tasks[i].wait_ticks < 255u) s_taskprio.tasks[i].wait_ticks++;
+        if (!is_os_priority(&s_taskprio.tasks[i]) && s_taskprio.tasks[i].wait_ticks < 255u) {
+            s_taskprio.tasks[i].wait_ticks++;
+        }
     }
     return 1;
 }
@@ -148,7 +177,8 @@ int taskprio_set_priority(uint32_t id, int32_t priority)
 {
     int idx = find_index(id);
     if (idx < 0) return -1;
-    s_taskprio.tasks[(uint32_t)idx].priority = clamp_priority(priority);
+    if (is_os_priority(&s_taskprio.tasks[(uint32_t)idx])) return -2;
+    s_taskprio.tasks[(uint32_t)idx].priority = clamp_user_priority(priority);
     s_taskprio.tasks[(uint32_t)idx].wait_ticks = 0;
     return 0;
 }
@@ -158,8 +188,19 @@ int taskprio_adjust_priority(uint32_t id, int32_t delta)
     int idx = find_index(id);
     if (idx < 0) return -1;
     taskprio_task_t* t = &s_taskprio.tasks[(uint32_t)idx];
-    t->priority = clamp_priority(t->priority + delta);
+    if (is_os_priority(t)) return -2;
+    t->priority = clamp_user_priority(t->priority + delta);
     t->wait_ticks = 0;
+    return 0;
+}
+
+int taskprio_grant_os_priority(uint32_t id)
+{
+    int idx = find_index(id);
+    if (idx < 0) return -1;
+    s_taskprio.tasks[(uint32_t)idx].priority = TASKPRIO_OS_LEVEL;
+    s_taskprio.tasks[(uint32_t)idx].wait_ticks = 0;
+    s_taskprio.tasks[(uint32_t)idx].paused = 0;
     return 0;
 }
 
@@ -167,6 +208,7 @@ int taskprio_pause(uint32_t id, int pause)
 {
     int idx = find_index(id);
     if (idx < 0) return -1;
+    if (is_os_priority(&s_taskprio.tasks[(uint32_t)idx])) return -2;
     s_taskprio.tasks[(uint32_t)idx].paused = pause ? 1u : 0u;
     return 0;
 }
@@ -175,13 +217,14 @@ int taskprio_remove(uint32_t id)
 {
     int idx = find_index(id);
     if (idx < 0) return -1;
+    if (is_os_priority(&s_taskprio.tasks[(uint32_t)idx])) return -2;
     remove_at((uint32_t)idx);
     return 0;
 }
 
 void taskprio_set_default(int32_t priority)
 {
-    s_taskprio.default_priority = clamp_priority(priority);
+    s_taskprio.default_priority = clamp_user_priority(priority);
 }
 
 int32_t taskprio_default_priority(void)
@@ -198,7 +241,9 @@ void taskprio_info(taskprio_info_t* out)
     out->last_id = s_taskprio.last_id;
     out->paused = 0;
     out->runnable = 0;
+    out->os_urgent = 0;
     for (uint32_t i = 0; i < s_taskprio.count; i++) {
+        if (is_os_priority(&s_taskprio.tasks[i])) out->os_urgent++;
         if (s_taskprio.tasks[i].paused) out->paused++;
         else out->runnable++;
     }
@@ -211,6 +256,9 @@ int taskprio_selftest(void)
     taskprio_task_t t;
     uint32_t low_id = 0;
     uint32_t high_id = 0;
+    uint32_t user_id = 0;
+    uint32_t os_id = 0;
+    taskprio_info_t info;
     taskprio_init();
     if (taskprio_enqueue("low", "echo low", 1, &low_id) != 0) {
         s_taskprio = saved;
@@ -244,6 +292,36 @@ int taskprio_selftest(void)
     if (taskprio_default_priority() != 7) {
         s_taskprio = saved;
         return -8;
+    }
+    if (taskprio_enqueue("user", "echo user", 10, &user_id) != 0) {
+        s_taskprio = saved;
+        return -9;
+    }
+    if (taskprio_at(0, &t) != 0 || t.priority != TASKPRIO_MAX) {
+        s_taskprio = saved;
+        return -10;
+    }
+    s_taskprio.tasks[0].wait_ticks = 255u;
+    if (taskprio_enqueue_os("panic", "crashlog show", &os_id) != 0) {
+        s_taskprio = saved;
+        return -11;
+    }
+    taskprio_info(&info);
+    if (info.os_urgent != 1u) {
+        s_taskprio = saved;
+        return -12;
+    }
+    if (taskprio_dequeue_next(&t) != 1 || t.id != os_id || t.priority != TASKPRIO_OS_LEVEL) {
+        s_taskprio = saved;
+        return -13;
+    }
+    if (taskprio_grant_os_priority(user_id) != 0) {
+        s_taskprio = saved;
+        return -14;
+    }
+    if (taskprio_dequeue_next(&t) != 1 || t.id != user_id || t.priority != TASKPRIO_OS_LEVEL) {
+        s_taskprio = saved;
+        return -15;
     }
     s_taskprio = saved;
     return 0;

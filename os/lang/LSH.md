@@ -43,4 +43,5 @@
 - Commands run one per `gui_tick`, highest effective priority first
 - Queue limit: 8 tasks
 - `task set id priority` changes queued work; priority range is 0..9
+- Priority `lev.10` is OS-only urgent work; users and wait-time aging cannot create it
 - `task pause id` keeps a task visible but skips it until `task resume id`

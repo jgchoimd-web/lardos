@@ -7,6 +7,7 @@
 #define TASKPRIO_NAME_MAX 31u
 #define TASKPRIO_MIN 0
 #define TASKPRIO_MAX 9
+#define TASKPRIO_OS_LEVEL 10
 #define TASKPRIO_DEFAULT 5
 
 typedef struct {
@@ -26,16 +27,19 @@ typedef struct {
     uint32_t last_id;
     uint32_t paused;
     uint32_t runnable;
+    uint32_t os_urgent;
     int32_t default_priority;
 } taskprio_info_t;
 
 void taskprio_init(void);
 int taskprio_enqueue(const char* name, const char* command, int32_t priority, uint32_t* out_id);
+int taskprio_enqueue_os(const char* name, const char* command, uint32_t* out_id);
 int taskprio_dequeue_next(taskprio_task_t* out);
 uint32_t taskprio_count(void);
 int taskprio_at(uint32_t idx, taskprio_task_t* out);
 int taskprio_set_priority(uint32_t id, int32_t priority);
 int taskprio_adjust_priority(uint32_t id, int32_t delta);
+int taskprio_grant_os_priority(uint32_t id);
 int taskprio_pause(uint32_t id, int pause);
 int taskprio_remove(uint32_t id);
 void taskprio_set_default(int32_t priority);

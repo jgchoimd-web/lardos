@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.22.0a
+ITEM Added EXEXGUI, a sketch-driven split desktop shell.
+ITEM EXEXGUI keeps the existing GUI in the left DE/WM pane, mirrors LSH in the top-right terminal pane, and draws an info/status pane below it.
+ITEM Added exexgui on, off, status, focus, next, and test commands in LSH.
+ITEM POST now checks EXEXGUI layout math so the split GUI regions are covered by boot diagnostics.
+
 SECTION v1.21.0a
 ITEM Added EXGUI, an optional extended desktop environment and window-manager layer.
 ITEM EXGUI can draw Windows-like, Linux-like, and Mac-like shell chrome without replacing the classic GUI.

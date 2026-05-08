@@ -16,6 +16,7 @@
 #include "ps2.h"
 #include "kr_basic.h"
 #include "exgui.h"
+#include "exexgui.h"
 #include "syscall.h"
 #include "lib3d_demo.h"
 
@@ -454,6 +455,7 @@ int gui_init(void)
     if (!g_have_fb) return -1;
     g_bg = 0xFF101020;
     exgui_init();
+    exexgui_init();
     if (g_fb.w <= 1024 && g_fb.h <= 768) {
         g_bb.fb = g_backbuf;
         g_bb.w = g_fb.w;
@@ -713,6 +715,34 @@ static int in_rect(int x, int y, int rx, int ry, int rw, int rh)
     return x >= rx && y >= ry && x < (rx + rw) && y < (ry + rh);
 }
 
+static void gui_apply_exexgui_layout(void)
+{
+    exexgui_layout_t l;
+    int pad = 6;
+    int label_h = 30;
+    int ww;
+    int wh;
+    if (!g_have_fb || !exexgui_is_enabled()) return;
+    if (exexgui_layout_for(g_fb.w, g_fb.h, &l) != 0) return;
+
+    ww = (int)l.gui.w - pad * 2;
+    wh = (int)l.gui.h - label_h - pad;
+    if (ww < 220) ww = (int)l.gui.w > 8 ? (int)l.gui.w - 8 : (int)l.gui.w;
+    if (wh < 170) wh = (int)l.gui.h > 8 ? (int)l.gui.h - 8 : (int)l.gui.h;
+
+    g.win_x = (int)l.gui.x + pad;
+    g.win_y = (int)l.gui.y + label_h;
+    g.win_w = ww;
+    g.win_h = wh;
+    if (g.win_x < (int)l.gui.x) g.win_x = (int)l.gui.x;
+    if (g.win_y < (int)l.gui.y) g.win_y = (int)l.gui.y;
+    if (g.win_x + g.win_w > (int)(l.gui.x + l.gui.w)) g.win_w = (int)(l.gui.x + l.gui.w) - g.win_x;
+    if (g.win_y + g.win_h > (int)(l.gui.y + l.gui.h)) g.win_h = (int)(l.gui.y + l.gui.h) - g.win_y;
+    if (g.win_w < 1) g.win_w = 1;
+    if (g.win_h < 1) g.win_h = 1;
+    g.dragging = 0;
+}
+
 static void gui_resp_clear(void)
 {
     g.resp[0] = '\0';
@@ -892,6 +922,24 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int l_pressed = l_down && !l_prev;
     int l_released = !l_down && l_prev;
 
+    gui_apply_exexgui_layout();
+    if (l_pressed && exexgui_is_enabled()) {
+        exexgui_layout_t xl;
+        if (exexgui_layout_for(g_fb.w, g_fb.h, &xl) == 0) {
+            if (in_rect(g.mx, g.my, (int)xl.term.x, (int)xl.term.y, (int)xl.term.w, (int)xl.term.h)) {
+                exexgui_set_focus("term");
+                g.app_id = 7;
+                g.tb_focused = 1;
+                g.lafaelo_focus = 0;
+                gui_lsh_sync_output();
+            } else if (in_rect(g.mx, g.my, (int)xl.info.x, (int)xl.info.y, (int)xl.info.w, (int)xl.info.h)) {
+                exexgui_set_focus("info");
+            } else if (in_rect(g.mx, g.my, (int)xl.gui.x, (int)xl.gui.y, (int)xl.gui.w, (int)xl.gui.h)) {
+                exexgui_set_focus("gui");
+            }
+        }
+    }
+
     // Settings button (top-right of title bar)
     int set_btn_x = g.win_x + g.win_w - 52;
     int set_btn_w = 48;
@@ -937,7 +985,8 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     if (l_released) g.slider_drag = 0;
 
     // Title bar drag (top 20px of window, exclude settings button)
-    if (l_pressed && in_rect(g.mx, g.my, g.win_x, g.win_y, g.win_w - set_btn_w - 4, title_h)) {
+    if (!exexgui_is_enabled() &&
+        l_pressed && in_rect(g.mx, g.my, g.win_x, g.win_y, g.win_w - set_btn_w - 4, title_h)) {
         g.dragging = 1;
         g.drag_off_x = g.mx - g.win_x;
         g.drag_off_y = g.my - g.win_y;
@@ -1543,6 +1592,7 @@ int gui_take_submit(gui_http_request_t* out)
 int gui_post_check(gui_post_info_t* out)
 {
     if (!g_have_fb || !g_fb.fb) return -1;
+    gui_apply_exexgui_layout();
     if (out) {
         out->width = g_fb.w;
         out->height = g_fb.h;
@@ -1678,6 +1728,8 @@ void gui_render(void)
     // Full redraw for simplicity & correctness.
     fb_clear(tgt, g_bg);
     exgui_draw_desktop();
+    exexgui_draw_desktop();
+    gui_apply_exexgui_layout();
 
     // Window frame
     uint32_t win_bg = 0xFF202840;
@@ -1966,6 +2018,7 @@ void gui_render(void)
     }
 
     exgui_draw_overlay();
+    exexgui_draw_overlay();
 
     // Cursor last
     gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);

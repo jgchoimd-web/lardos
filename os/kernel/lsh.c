@@ -21,6 +21,7 @@
 #include "cpumode.h"
 #include "screencheck.h"
 #include "exgui.h"
+#include "exexgui.h"
 #include "oslink.h"
 #include "taskprio.h"
 #include "bootprof.h"
@@ -247,7 +248,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "exgui", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "oslink", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "crashlog", 1 }, { "nice", 1 }, { "prio", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -1101,10 +1102,11 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode oslink exgui task bootprof crashlog cls\n");
+    out_append("  help control status release ver post selftest magic mode oslink exgui exexgui task bootprof crashlog cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|install file.lpack\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
+    out_append("  exexgui on|off|focus gui|term|info|next|test\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
@@ -1137,6 +1139,7 @@ static void cmd_control(const char* args)
     out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
     out_append("  oslink bus          inspect LardOS-internal OSLink messages\n");
     out_append("  exgui style mac     enable familiar desktop/window chrome\n");
+    out_append("  exexgui on          use sketch split: GUI, terminal, status\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
     out_append("  bootprof set netoff save a boot profile in bootprof.txt\n");
     out_append("  crashlog show       inspect panic and diagnostic history\n");
@@ -1250,6 +1253,22 @@ static void cmd_status(const char* args)
     out_append(exgui_style_name(xg.style));
     out_append(", layout=");
     out_append(exgui_layout_name(xg.layout));
+    out_append("\n");
+
+    exexgui_info_t xxg;
+    exexgui_info(&xxg);
+    out_append("EXEXGUI: ");
+    out_append(xxg.enabled ? "on" : "off");
+    out_append(", focus=");
+    out_append(exexgui_focus_name(xxg.focus));
+    out_append(", gui=");
+    out_append_u32(xxg.layout.gui.w);
+    out_append("x");
+    out_append_u32(xxg.layout.gui.h);
+    out_append(", term=");
+    out_append_u32(xxg.layout.term.w);
+    out_append("x");
+    out_append_u32(xxg.layout.term.h);
     out_append("\n");
 
     oslink_info_t link;
@@ -1625,6 +1644,72 @@ static void cmd_exgui(const char* args)
         return;
     }
     out_append("Usage: exgui on|off|status|style|layout|next|test\n");
+}
+
+static void cmd_exexgui_status(void)
+{
+    exexgui_info_t info;
+    exexgui_info(&info);
+    out_append("EXEXGUI ");
+    out_append(info.enabled ? "on" : "off");
+    out_append(" focus=");
+    out_append(exexgui_focus_name(info.focus));
+    out_append(" gui=");
+    out_append_u32(info.layout.gui.w);
+    out_append("x");
+    out_append_u32(info.layout.gui.h);
+    out_append(" term=");
+    out_append_u32(info.layout.term.w);
+    out_append("x");
+    out_append_u32(info.layout.term.h);
+    out_append(" info=");
+    out_append_u32(info.layout.info.w);
+    out_append("x");
+    out_append_u32(info.layout.info.h);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_exexgui(const char* args)
+{
+    char sub[16];
+    char value[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0 || strcmp(sub, "apply") == 0 || strcmp(sub, "sketch") == 0) {
+        exexgui_enable(1);
+        out_append("exexgui: enabled sketch split layout.\n");
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "off") == 0) {
+        exexgui_enable(0);
+        out_append("exexgui: disabled; classic GUI and EXGUI stay available.\n");
+        return;
+    }
+    if (strcmp(sub, "focus") == 0 || strcmp(sub, "pane") == 0) {
+        if (vcs_read_word(&args, value, sizeof(value)) != 0 || exexgui_set_focus(value) != 0) {
+            out_append("Usage: exexgui focus gui|term|info\n");
+            return;
+        }
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "next") == 0) {
+        exexgui_focus_next();
+        cmd_exexgui_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(exexgui_selftest() == 0 ? "exexgui: selftest OK\n" : "exexgui: selftest failed\n");
+        return;
+    }
+    out_append("Usage: exexgui on|off|status|focus|next|test\n");
 }
 
 static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
@@ -3192,6 +3277,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "exgui") == 0) { cmd_exgui(args); return; }
+    if (strcmp(cmd, "exexgui") == 0) { cmd_exexgui(args); return; }
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }
     if (strcmp(cmd, "tasktop") == 0) { cmd_tasktop(args); return; }
     if (strcmp(cmd, "bootprof") == 0) { cmd_bootprof(args); return; }

@@ -68,6 +68,7 @@ flowchart TB
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
     EXGUI["exgui DE + WM layer"]
+    EXEXGUI["exexgui split DE shell"]
     VM["BOSL GASM LIL LML OSVM"]
 
     Kmain --> GDT
@@ -87,6 +88,7 @@ flowchart TB
     Net --> TLS
     Kmain --> GUI
     GUI --> EXGUI
+    GUI --> EXEXGUI
     GUI --> ScreenCheck
     GUI --> TaskPrio
     GUI --> VM
@@ -185,6 +187,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
 | Extended GUI shell | `os/kernel/exgui.c`, `os/include/exgui.h` |
+| Sketch split GUI shell | `os/kernel/exexgui.c`, `os/include/exexgui.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
 | Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |
@@ -217,6 +220,13 @@ adds familiar shell chrome for users arriving from Windows, Linux, or macOS:
 taskbars, top panels, docks, launchers, focus indicators, and float/tile/stack
 window layouts. LSH controls it with `exgui on`, `exgui style`, `exgui layout`,
 and `exgui next`.
+
+`exexgui.c` is a second opt-in shell based on the user's sketch. It turns the
+screen into three persistent regions: the left region keeps the existing GUI as
+the DE/WM center, the top-right region mirrors the LSH terminal, and the
+bottom-right region shows status information. The split renderer is separate
+from EXGUI, so users can keep the old GUI behavior or enable `exexgui on` when
+they want the sketched layout.
 
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a

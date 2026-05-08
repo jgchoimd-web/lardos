@@ -85,6 +85,10 @@ commands:
   environment and window-manager layer. The classic GUI stays intact, while
   EXGUI adds familiar Windows-like, Linux-like, or Mac-like panels, docks,
   launchers, task lists, and floating/tile/stack window chrome.
+- `exexgui on|off|focus|next` enables the sketch-driven extended extended GUI:
+  the left pane hosts the existing GUI as the DE/WM center, the top-right pane
+  mirrors the terminal, and the bottom-right pane shows information/status. It
+  is opt-in, so the previous classic GUI and EXGUI layer remain available.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
   command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered
@@ -130,7 +134,8 @@ scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec fi
 scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
 ScreenCheck visual diagnostics, and LIL feature forms. The screen checks are there to catch visible boot/UI
-regressions as well as code errors.
+regressions as well as code errors. POST also checks EXEXGUI's split layout
+math so the drawn GUI/terminal/status regions do not collapse.
 
 Each feature addition gets a release: bump the kernel version, add an entry to
 `os/RELEASES.lardd`, keep the embedded `releases.lardd` in sync so LSH can show

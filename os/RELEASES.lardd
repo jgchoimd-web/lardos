@@ -3,6 +3,12 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.32.0a
+ITEM Added LardKit, a native C feature suite for BugEye, Rollback, Trust, BootMap, PanicRoom, OldCheck, LTheme, AwakeMonitor, OSChat, LARSView, and LARDD notes.
+ITEM Added magic explain so the shell records why Magic executed, refused, or failed a prediction.
+ITEM Added assistant mood controls with calm, funny, strict, and silent modes.
+ITEM Added writable notes.lardd and POST coverage for the new user-control feature suite.
+
 SECTION v1.31.0a
 ITEM Added Lard Buddy, an optional roaming assistant overlay with casual tips and jokes.
 ITEM Added buddy on, buddy off, buddy status, buddy joke, and buddy next commands plus assistant/lardbuddy aliases.

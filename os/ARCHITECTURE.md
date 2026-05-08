@@ -64,6 +64,7 @@ flowchart TB
     BootProf["bootprof profiles"]
     Awake["awake fast boot tracker"]
     CrashLog["crashlog panic history"]
+    LardKit["lardkit user-control suite"]
     LPack["lpack packages"]
     ScreenCheck["screencheck diagnostics"]
     TLS["lard_tls native TLS"]
@@ -83,6 +84,7 @@ flowchart TB
     Kmain --> Storage
     Storage --> BootProf
     Storage --> CrashLog
+    Storage --> LardKit
     Storage --> LPack
     Kmain --> POST
     Kmain --> Net
@@ -189,6 +191,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Boot profiles | `os/kernel/bootprof.c`, `os/include/bootprof.h` |
 | Awakening boot mode | `os/kernel/awake.c`, `os/include/awake.h` |
 | Crash log | `os/kernel/crashlog.c`, `os/include/crashlog.h` |
+| User-control suite | `os/kernel/lardkit.c`, `os/include/lardkit.h` |
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
 | Extended GUI shell | `os/kernel/exgui.c`, `os/include/exgui.h` |
@@ -279,7 +282,18 @@ aliases stay covered.
 default, can be toggled with `buddy on` / `buddy off` or through CFGSH, and is
 drawn as a small native overlay after the desktop layers so it follows the user
 across tabs, split views, and screensaver rendering. `buddy joke` and `buddy
-next` rotate its casual messages.
+next` rotate its casual messages, while `buddy mood calm|funny|strict|silent`
+changes its personality.
+
+`lardkit.c` groups user-control tools that sit on top of existing kernel
+modules without external libraries. BugEye scans visible framebuffer/layout
+health, Rollback snapshots and restores user-visible settings, Trust stores a
+user-owned permission policy map, BootMap lists boot phases, PanicRoom exposes a
+recovery stance, OldCheck draws a retro storage-check screen, LTheme selects
+native shell theme presets, AwakeMonitor reports background boot progress,
+OSChat uses the OSLink local bus for chat-style module messages, LARSView tracks
+native document browsing state, and LARDD notes writes `notes.lardd`. LTheme can
+also parse `.ltheme` records such as `default.ltheme`.
 
 `crashlog.c` owns `crashlog.txt`, a writable panic and diagnostic history. Panic
 paths append an entry and attempt an LPST save before halting; LSH exposes the
@@ -303,7 +317,7 @@ real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
 ScreenRAM scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
-LardPack package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS
+LardKit user-control tools, LardPack package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS
 hashing, containers, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a

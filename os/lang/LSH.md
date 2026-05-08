@@ -7,13 +7,21 @@
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `magic command [args]` - predict and run a mistyped safe built-in command.
+- `magic explain` - show why the last Magic prediction executed or stopped.
 - `mode [status|probe|real]` - inspect or run the controlled real16/long64 bridge.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
 - `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
 - `exexgui on|off|focus|next` - sketch split GUI with GUI, terminal, and status panes.
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
-- `buddy on|off|status|joke|next` - optional roaming assistant overlay.
+- `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
+- `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks.
+- `rollback snap|apply` - settings snapshot and restore.
+- `trust list|allow|deny` - user-owned permission policy map.
+- `bootmap` / `oldcheck draw` / `awakemon` - boot phase map, retro storage check, and Awakening monitor.
+- `ltheme list|show|use name` - native shell theme presets and `.ltheme` files.
+- `oschat say|send|read` - local OSLink chat-style messages.
+- `larsview open file` / `notes show|add|clear` - native document browser state and writable `notes.lardd`.
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
 - `awake on|off|status|test` - control the default-off Awakening fast-boot mode.
 - `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.
@@ -53,6 +61,6 @@
 
 - `cfgsh` enters the settings-focused `CFG#` prompt; `exitcfg` leaves it
 - Inside `CFG#`, use `setting value`: `awake on`, `style 2`, `layout 3`, `pane 1`, `http 2`, `boot 4`, `priority 10`
-- `buddy on` / `buddy off` can also be changed from `CFG#`
+- `buddy on` / `buddy off`, `bugeye on`, `ltheme night`, and `rollback snap|apply` can also be changed from `CFG#`
 - Outside `CFG#`, use `cfg setting value` for one-shot changes
 - Number maps: style 1=win 2=linux 3=mac; layout 1=float 2=tile 3=stack; pane 1=gui 2=term 3=info; http 1=GET 2=POST; boot 1=normal 2=safe 3=netoff 4=dev 5=awakening

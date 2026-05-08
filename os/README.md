@@ -56,6 +56,7 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
 - `LARDD` (`.lardd`) replaces Markdown for project notes and guides.
 - `LGUILIB` (`.lguilib`) stores native GUI library/theme records for the
   overlay chrome.
+- `LTHEME` (`.ltheme`) stores compact native shell theme presets.
 
 Both are record-based, readable without a renderer, and parsed by freestanding C
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
@@ -110,6 +111,20 @@ commands:
 - `buddy on|off|status|joke|next` controls Lard Buddy, an optional roaming
   assistant overlay. It follows the GUI surface, offers casual tips, and tells
   small jokes without replacing the user's control.
+- `buddy mood calm|funny|strict|silent` changes the assistant personality.
+- `bugeye on|off|scan` runs a user-visible framebuffer/layout bug monitor on
+  top of the existing screen checks.
+- `rollback snap|apply` snapshots and restores user-visible settings such as
+  GUI layers, HTTP method, boot profile, assistant, theme, and task priority.
+- `trust list|allow|deny` exposes a user-owned permission policy map for core
+  subjects such as shell, GUI, OSLink, packages, and SUM.
+- `bootmap`, `oldcheck draw`, and `awakemon` show the boot phase map, a retro
+  storage-check screen, and Awakening background loader progress.
+- `ltheme list|show|use name` selects native shell theme presets or parses
+  `.ltheme` files such as `default.ltheme`, while `oschat` sends local OSLink
+  chat-style messages between OS modules.
+- `larsview open file` tracks native document browsing state, and `notes
+  show|add|clear` edits the writable `notes.lardd` document.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use
   `oslink status`, `oslink ping ip`, `oslink send ip text`, `oslink exec ip
   command`, `oslink recv`, and `oslink peers`. Remote exec packets are filtered
@@ -161,7 +176,7 @@ Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
 descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
 scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec filtering, TaskPrio
-scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
+scheduling, BootProf profile flags, CrashLog writes, LardKit user-control suite, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
 ScreenCheck visual diagnostics, and LIL feature forms. The screen checks are there to catch visible boot/UI
 regressions as well as code errors. POST also checks the LGUILIB parser, GUI

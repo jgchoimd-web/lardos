@@ -20,5 +20,7 @@ void lassist_draw(uint32_t app_id, uint32_t mouse_x, uint32_t mouse_y,
                   uint32_t win_x, uint32_t win_y, uint32_t win_w, uint32_t win_h);
 void lassist_next(uint32_t app_id);
 void lassist_joke(void);
+int lassist_set_mood(const char* name);
+const char* lassist_mood_name(uint32_t mood);
 void lassist_info(lassist_info_t* out);
 int lassist_selftest(void);

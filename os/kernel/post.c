@@ -11,6 +11,7 @@
 #include "gui.h"
 #include "lar.h"
 #include "lard_doc.h"
+#include "lardkit.h"
 #include "lcontainer.h"
 #include "lil.h"
 #include "lguilib.h"
@@ -105,6 +106,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: releases", fs_open("releases.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: features.lil", fs_open("features.lil") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.lguilib", fs_open("default.lguilib") != NULL, emit, user, &pass, &fail);
+    post_check("fs: default.ltheme", fs_open("default.ltheme") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
@@ -125,6 +127,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("gui: overlay chrome layout", gui_ok && gui_info.chrome_ok, emit, user, &pass, &fail);
     post_check("gui: screenram scratch", gui_screenram_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: retro screencheck", screencheck_selftest() == 0, emit, user, &pass, &fail);
+    post_check("kit: user feature suite", lardkit_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: exgui desktop layer", exgui_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: exexgui split layout", exexgui_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: lard buddy assistant", lassist_selftest() == 0, emit, user, &pass, &fail);

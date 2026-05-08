@@ -44,6 +44,11 @@ static const uint8_t notes_init[] = "Image: \xEE\x80\x80\n";
 static uint8_t ram_notes_buf[RAM_FILE_CAP];
 static FsWritableFile ram_notes = { "notes.txt", ram_notes_buf, 0, RAM_FILE_CAP };
 
+#define LARDD_NOTES_CAP 2048u
+static const uint8_t lardd_notes_init[] = "LARDD 1\nTITLE LardOS Notes\n";
+static uint8_t ram_lardd_notes_buf[LARDD_NOTES_CAP];
+static FsWritableFile ram_lardd_notes = { "notes.lardd", ram_lardd_notes_buf, 0, LARDD_NOTES_CAP };
+
 #define LAFILLO_SAVE_CAP 4096u
 static uint8_t ram_lafillo_save_buf[LAFILLO_SAVE_CAP];
 static FsWritableFile ram_lafillo_save = { "lafillo_saved.txt", ram_lafillo_save_buf, 0, LAFILLO_SAVE_CAP };
@@ -119,6 +124,13 @@ static const uint8_t file_lardos_lars[] =
     "li Use crashlog show to inspect panic and diagnostic history.\n"
     "li Use lpack list sample.lpack and lpack install sample.lpack for native package installs.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
+    "li Use bugeye scan to catch visible framebuffer/layout bugs from inside the OS.\n"
+    "li Use rollback snap and rollback apply to save and restore user-visible settings.\n"
+    "li Use trust list to inspect the user-owned permission policy map.\n"
+    "li Use bootmap, oldcheck draw, and awakemon to see boot structure, storage checks, and Awakening progress.\n"
+    "li Use ltheme list and ltheme use night for native shell theme presets.\n"
+    "li Use oschat say text for local OSLink chat-style module messages.\n"
+    "li Use larsview open lardos.lars and notes add text for native document browsing and notes.lardd.\n"
     "button System status | status\n"
     "button Task dashboard | tasktop\n"
     "button Crash history | crashlog show\n"
@@ -153,6 +165,17 @@ static const uint8_t file_lardos_lars[] =
     "cmd crashlog show\n"
     "cmd lpack list sample.lpack\n"
     "cmd screencheck retro\n"
+    "cmd bugeye scan\n"
+    "cmd rollback snap demo\n"
+    "cmd trust list\n"
+    "cmd bootmap\n"
+    "cmd oldcheck draw\n"
+    "cmd awakemon\n"
+    "cmd ltheme list\n"
+    "cmd ltheme show default.ltheme\n"
+    "cmd oschat say hello-from-lardkit\n"
+    "cmd notes add hello-from-lardos\n"
+    "cmd larsview open notes.lardd\n"
     "cmd post\n"
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
@@ -182,6 +205,15 @@ static const uint8_t file_default_lguilib[] =
     "WIDGET button feedback\n"
     "WIDGET output frame\n"
     "WIDGET status badge\n"
+    "END\n";
+
+static const uint8_t file_default_ltheme[] =
+    "LTHEME 1\n"
+    "NAME lardos-night\n"
+    "FG 0xddebff\n"
+    "BG 0x080c18\n"
+    "ACCENT 0x4de1c1\n"
+    "STYLE linux\n"
     "END\n";
 
 static const uint8_t file_lardd_guide[] =
@@ -306,6 +338,7 @@ static const FsFile FS_FILES[] = {
     { "readme.txt",    file_readme_txt,    sizeof(file_readme_txt) - 1 },
     { "lardos.lars",   file_lardos_lars,   sizeof(file_lardos_lars) - 1 },
     { "default.lguilib", file_default_lguilib, sizeof(file_default_lguilib) - 1 },
+    { "default.ltheme", file_default_ltheme, sizeof(file_default_ltheme) - 1 },
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
@@ -388,17 +421,18 @@ static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
 
 static uint32_t writable_count(void)
 {
-    return 6u;
+    return 7u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
 {
     if (idx == 0) return &ram_notes;
-    if (idx == 1) return &ram_lafillo_save;
-    if (idx == 2) return &ram_lar_extract;
-    if (idx == 3) return &ram_vcs_restore;
-    if (idx == 4) return &ram_bootprof;
-    if (idx == 5) return &ram_crashlog;
+    if (idx == 1) return &ram_lardd_notes;
+    if (idx == 2) return &ram_lafillo_save;
+    if (idx == 3) return &ram_lar_extract;
+    if (idx == 4) return &ram_vcs_restore;
+    if (idx == 5) return &ram_bootprof;
+    if (idx == 6) return &ram_crashlog;
     return NULL;
 }
 
@@ -408,6 +442,10 @@ void fs_init(void)
         ram_notes_buf[i] = notes_init[i];
     }
     ram_notes.size = sizeof(notes_init) - 1;
+    for (uint32_t i = 0; i < sizeof(lardd_notes_init) - 1 && i < LARDD_NOTES_CAP; i++) {
+        ram_lardd_notes_buf[i] = lardd_notes_init[i];
+    }
+    ram_lardd_notes.size = sizeof(lardd_notes_init) - 1;
     for (uint32_t i = 0; i < sizeof(bootprof_init) - 1 && i < BOOTPROF_CAP; i++) {
         ram_bootprof_buf[i] = bootprof_init[i];
     }
@@ -454,6 +492,15 @@ const FsFile* fs_open(const char* name)
             g_ram_result.name = ram_notes.name;
             g_ram_result.data = ram_notes.data;
             g_ram_result.size = ram_notes.size;
+            return &g_ram_result;
+        }
+        j = 0;
+        const char* n1b = "notes.lardd";
+        while (n1b[j] && name[j] && n1b[j] == name[j]) j++;
+        if (n1b[j] == '\0' && name[j] == '\0') {
+            g_ram_result.name = ram_lardd_notes.name;
+            g_ram_result.data = ram_lardd_notes.data;
+            g_ram_result.size = ram_lardd_notes.size;
             return &g_ram_result;
         }
         j = 0;
@@ -531,6 +578,7 @@ void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user
     }
     lfs_list(cb, user);
     cb(ram_notes.name, ram_notes.size, user);
+    cb(ram_lardd_notes.name, ram_lardd_notes.size, user);
     cb(ram_lafillo_save.name, ram_lafillo_save.size, user);
     cb(ram_lar_extract.name, ram_lar_extract.size, user);
     cb(ram_vcs_restore.name, ram_vcs_restore.size, user);
@@ -722,6 +770,10 @@ FsWritableFile* fs_open_writable(const char* name)
     uint32_t i = 0;
     while (n1[i] && name[i] && n1[i] == name[i]) i++;
     if (n1[i] == '\0' && name[i] == '\0') return &ram_notes;
+    const char* n1b = "notes.lardd";
+    i = 0;
+    while (n1b[i] && name[i] && n1b[i] == name[i]) i++;
+    if (n1b[i] == '\0' && name[i] == '\0') return &ram_lardd_notes;
     const char* n2 = "lafillo_saved.txt";
     i = 0;
     while (n2[i] && name[i] && n2[i] == name[i]) i++;

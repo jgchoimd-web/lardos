@@ -34,6 +34,14 @@ static const char* const s_jokes[] = {
     "I asked the scheduler for priority. It said, buddy, take a number.",
 };
 
+const char* lassist_mood_name(uint32_t mood)
+{
+    if (mood == 1u) return "funny";
+    if (mood == 2u) return "strict";
+    if (mood == 3u) return "silent";
+    return "calm";
+}
+
 static uint32_t scopy(char* dst, uint32_t cap, const char* src)
 {
     uint32_t i = 0;
@@ -57,6 +65,14 @@ static uint32_t slen(const char* s)
 static void set_message(const char* msg)
 {
     (void)scopy(s_lassist.message, sizeof(s_lassist.message), msg);
+}
+
+static int streq(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && a[i] == b[i]) i++;
+    return a[i] == '\0' && b[i] == '\0';
 }
 
 static uint32_t app_mix(uint32_t app_id)
@@ -88,8 +104,8 @@ void lassist_tick(uint32_t app_id)
     if (!s_lassist.enabled) return;
     s_lassist.tick++;
     if ((s_lassist.tick % 480u) == 0u) {
-        s_lassist.mood = (s_lassist.mood + 1u) % 4u;
-        set_message(s_tips[app_mix(app_id)]);
+        if (s_lassist.mood == 2u) set_message("Strict note: run bugeye scan after GUI changes.");
+        else if (s_lassist.mood != 3u) set_message(s_tips[app_mix(app_id)]);
     }
 }
 
@@ -97,15 +113,42 @@ void lassist_next(uint32_t app_id)
 {
     s_lassist.mood = (s_lassist.mood + 1u) % 4u;
     s_lassist.tick += 73u;
-    set_message(s_tips[app_mix(app_id)]);
+    if (s_lassist.mood == 3u) set_message("Silent mood. I will keep the commentary parked.");
+    else set_message(s_tips[app_mix(app_id)]);
 }
 
 void lassist_joke(void)
 {
     uint32_t n = sizeof(s_jokes) / sizeof(s_jokes[0]);
+    s_lassist.mood = 1u;
     set_message(s_jokes[s_lassist.jokes % n]);
     s_lassist.jokes++;
     s_lassist.enabled = 1u;
+}
+
+int lassist_set_mood(const char* name)
+{
+    if (streq(name, "calm") || streq(name, "0")) {
+        s_lassist.mood = 0u;
+        set_message("Calm mood. I will keep it useful and light.");
+        return 0;
+    }
+    if (streq(name, "funny") || streq(name, "1")) {
+        s_lassist.mood = 1u;
+        set_message("Funny mood. No promises about my dignity.");
+        return 0;
+    }
+    if (streq(name, "strict") || streq(name, "2")) {
+        s_lassist.mood = 2u;
+        set_message("Strict mood. I will point at problems first.");
+        return 0;
+    }
+    if (streq(name, "silent") || streq(name, "3")) {
+        s_lassist.mood = 3u;
+        set_message("Silent mood. Icon only, fewer side comments.");
+        return 0;
+    }
+    return -1;
 }
 
 void lassist_info(lassist_info_t* out)
@@ -216,7 +259,7 @@ void lassist_draw(uint32_t app_id, uint32_t mouse_x, uint32_t mouse_y,
         by = by > 64u ? by - 54u : by + 54u;
     }
     draw_buddy(bx, by + 30u);
-    draw_bubble(bx + 38u, by, s_lassist.message);
+    if (s_lassist.mood != 3u) draw_bubble(bx + 38u, by, s_lassist.message);
 }
 
 int lassist_selftest(void)
@@ -239,10 +282,14 @@ int lassist_selftest(void)
         s_lassist = saved;
         return -3;
     }
+    if (lassist_set_mood("strict") != 0 || s_lassist.mood != 2u) {
+        s_lassist = saved;
+        return -4;
+    }
     lassist_enable(0);
     if (lassist_enabled()) {
         s_lassist = saved;
-        return -4;
+        return -5;
     }
     s_lassist = saved;
     return 0;

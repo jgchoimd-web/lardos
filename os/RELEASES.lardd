@@ -2,6 +2,13 @@ LARDD 1
 TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
+TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
+
+SECTION v1.35.0b
+ITEM Beta release channel split: LardOS no longer treats every feature release as an official a build by default.
+ITEM Added release policy so the shell explains a, b, and p channel use inside the OS.
+ITEM Documented that large experimental kernel, GUI, filesystem, or shell bundles should ship as b until promoted.
+ITEM Kept p reserved for narrow emergency hotpatches and a reserved for verified official builds.
 
 SECTION v1.34.0a
 ITEM Added LardTrace with trace on, trace show, and trace module filters for shell, GUI, OSLink, TaskPrio, network, and package events.

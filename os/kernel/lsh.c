@@ -666,7 +666,24 @@ static void cmd_larddoc(const char* args, const char* usage)
 
 static void cmd_release(const char* args)
 {
-    (void)args;
+    while (args && (*args == ' ' || *args == '\t')) args++;
+    if (args && (strcmp(args, "policy") == 0 || strcmp(args, "channel") == 0 || strcmp(args, "channels") == 0)) {
+        out_append("Release channel policy\n");
+        out_append("  current: ");
+        out_append(LARDOS_VERSION);
+        out_append(" (");
+        out_append(lardos_version_channel());
+        out_append(")\n");
+        out_append("  a = official: promoted stable builds after boot, POST, GUI, and media checks.\n");
+        out_append("  b = beta-experimental: new or risky feature bundles before promotion.\n");
+        out_append("  p = hotpatch: narrow emergency fixes for an existing release line.\n");
+        out_append("  Do not use a just because a feature was added; choose the channel by risk.\n");
+        return;
+    }
+    if (args && args[0]) {
+        out_append("Usage: release [policy]\n");
+        return;
+    }
     cmd_larddoc("releases.lardd", "Usage: release");
 }
 
@@ -1182,7 +1199,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust trace netwatch journal oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control status release [policy] ver post selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust trace netwatch journal oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
@@ -1228,6 +1245,7 @@ static void cmd_control(const char* args)
     out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
     out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
     out_append("  Release suffix: a=official, b=beta-experimental, p=hotpatch.\n");
+    out_append("  Do not default to a: risky or broad feature bundles ship as b first.\n");
     out_append("  Each feature addition gets a version bump and releases.lardd entry.\n");
     out_append("\n");
     out_append("Start points:\n");

@@ -196,7 +196,10 @@ commands:
   and `asm_` expose raw memory and I/O controls.
 
 Release suffixes are part of the project contract: `a` means official, `b`
-means beta/experimental, and `p` means hotpatch.
+means beta/experimental, and `p` means hotpatch. LardOS should not default every
+feature build to `a`: broad kernel, GUI, filesystem, package, or shell changes
+ship as `b` until they are promoted, while `p` is reserved for narrow emergency
+fixes.
 
 During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
 Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
@@ -210,10 +213,11 @@ regressions as well as code errors. POST also checks the LGUILIB parser, GUI
 overlay chrome, Awakening background loader tracker, and EXEXGUI's split layout
 math so the drawn regions do not collapse.
 
-Each feature addition gets a release: bump the kernel version, add an entry to
-`os/RELEASES.lardd`, keep the embedded `releases.lardd` in sync so LSH can show
-it with `release`, and run `make release` so the matching ISO/IMG artifacts are
-available.
+Each feature addition gets a release: choose `a`, `b`, or `p` by risk, bump the
+kernel version, add an entry to `os/RELEASES.lardd`, keep the embedded
+`releases.lardd` in sync so LSH can show it with `release`, and run
+`make release` so the matching ISO/IMG artifacts are available. Inside LSH,
+`release policy` prints the channel rules.
 
 ### Networking And TLS
 

@@ -5,6 +5,7 @@
 ## Commands
 
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
+- `release policy` - show when to use `a`, `b`, or `p` release suffixes.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `magic command [args]` - predict and run a mistyped safe built-in command.
 - `magic dryrun command [args]` - show the Magic prediction without executing it.

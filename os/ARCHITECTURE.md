@@ -360,12 +360,15 @@ include assertions, `when`/`unless`, `repeat` with the `it` index, stepped
 `gcd`, and `lcm`.
 
 Release suffix policy is deliberately small and visible: `a` is official, `b`
-is beta/experimental, and `p` is hotpatch.
+is beta/experimental, and `p` is hotpatch. New feature bundles do not
+automatically get `a`; broad or risky work ships as `b` first, then can be
+promoted once boot media, POST, and user-visible checks are verified.
 
-Feature work is released as it lands. A feature release updates the kernel
-version, records the change in `os/RELEASES.lardd`, embeds the matching
-`releases.lardd` file so the `release` command shows the same history inside
-LardOS, and produces versioned boot media with `make release`.
+Feature work is released as it lands. A feature release chooses the channel by
+risk, updates the kernel version, records the change in `os/RELEASES.lardd`,
+embeds the matching `releases.lardd` file so the `release` command shows the
+same history inside LardOS, and produces versioned boot media with
+`make release`. `release policy` exposes the same rule from the shell.
 
 Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal

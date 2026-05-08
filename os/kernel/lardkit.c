@@ -23,11 +23,19 @@ typedef struct {
 
 typedef struct {
     lardkit_bugeye_info_t bugeye;
+    lardkit_bugreplay_frame_t bugreplay[LARDKIT_BUGREPLAY_MAX];
+    uint32_t bugreplay_count;
+    uint32_t bugreplay_next;
     lardkit_rollback_info_t rollback;
     lardkit_trust_entry_t trust[5];
+    lardkit_trust_history_entry_t trust_history[LARDKIT_TRUST_HISTORY_MAX];
+    uint32_t trust_history_count;
+    uint32_t trust_history_next;
     uint32_t panicroom_active;
     uint32_t panicroom_entries;
+    uint32_t panic_capsules;
     lardkit_oldcheck_info_t oldcheck;
+    lardkit_lfsdoctor_info_t lfsdoctor;
     uint32_t active_theme;
     uint32_t custom_theme_active;
     lardkit_theme_info_t custom_theme;
@@ -97,6 +105,16 @@ static void report_append_u32(FsWritableFile* f, uint32_t v)
     }
 }
 
+static void report_append_i32(FsWritableFile* f, int32_t v)
+{
+    if (v < 0) {
+        report_append(f, "-");
+        report_append_u32(f, (uint32_t)(-v));
+    } else {
+        report_append_u32(f, (uint32_t)v);
+    }
+}
+
 static void report_append_bool(FsWritableFile* f, int on)
 {
     report_append(f, on ? "yes" : "no");
@@ -128,6 +146,8 @@ static void trust_default(uint32_t idx, const char* subject, uint32_t caps)
 void lardkit_init(void)
 {
     for (uint32_t i = 0; i < sizeof(s_lardkit); i++) ((uint8_t*)&s_lardkit)[i] = 0;
+    s_lardkit.bugreplay_next = 1u;
+    s_lardkit.trust_history_next = 1u;
     trust_default(0, "shell", LARDKIT_TRUST_FS | LARDKIT_TRUST_SCREEN | LARDKIT_TRUST_OSLINK);
     trust_default(1, "gui", LARDKIT_TRUST_SCREEN | LARDKIT_TRUST_NET);
     trust_default(2, "oslink", LARDKIT_TRUST_NET | LARDKIT_TRUST_OSLINK);
@@ -182,6 +202,84 @@ int lardkit_bugeye_write_report(void)
     return 0;
 }
 
+static void bugreplay_record(void)
+{
+    uint32_t idx = (s_lardkit.bugreplay_next - 1u) % LARDKIT_BUGREPLAY_MAX;
+    lardkit_bugreplay_frame_t* f = &s_lardkit.bugreplay[idx];
+    f->seq = s_lardkit.bugreplay_next++;
+    if (s_lardkit.bugreplay_next == 0) s_lardkit.bugreplay_next = 1u;
+    f->scan = s_lardkit.bugeye.scans;
+    f->width = s_lardkit.bugeye.screen.width;
+    f->height = s_lardkit.bugeye.screen.height;
+    f->changed_samples = s_lardkit.bugeye.screen.changed_samples;
+    f->bad_tiles = s_lardkit.bugeye.bug_count;
+    f->last_error = s_lardkit.bugeye.last_error;
+    if (s_lardkit.bugreplay_count < LARDKIT_BUGREPLAY_MAX) s_lardkit.bugreplay_count++;
+}
+
+uint32_t lardkit_bugreplay_count(void)
+{
+    return s_lardkit.bugreplay_count;
+}
+
+int lardkit_bugreplay_at(uint32_t idx, lardkit_bugreplay_frame_t* out)
+{
+    uint32_t start;
+    uint32_t slot;
+    if (!out || idx >= s_lardkit.bugreplay_count) return -1;
+    start = s_lardkit.bugreplay_count < LARDKIT_BUGREPLAY_MAX ? 0u :
+        ((s_lardkit.bugreplay_next - 1u) % LARDKIT_BUGREPLAY_MAX);
+    slot = (start + idx) % LARDKIT_BUGREPLAY_MAX;
+    *out = s_lardkit.bugreplay[slot];
+    return 0;
+}
+
+int lardkit_bugreplay_write(void)
+{
+    FsWritableFile* w = fs_open_writable("bugreplay.lardd");
+    static const char header[] = "LARDD 1\nTITLE Bug Replay\n";
+    if (!w) return -1;
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
+    report_append(w, "TEXT Last BugEye screen health frames.\n");
+    report_append(w, "SECTION Frames\n");
+    if (s_lardkit.bugreplay_count == 0u) {
+        report_append(w, "ITEM none\nEND\n");
+        return 0;
+    }
+    for (uint32_t i = 0; i < s_lardkit.bugreplay_count; i++) {
+        lardkit_bugreplay_frame_t f;
+        if (lardkit_bugreplay_at(i, &f) != 0) continue;
+        report_append(w, "ITEM seq ");
+        report_append_u32(w, f.seq);
+        report_append(w, " scan ");
+        report_append_u32(w, f.scan);
+        report_append(w, " size ");
+        report_append_u32(w, f.width);
+        report_append(w, "x");
+        report_append_u32(w, f.height);
+        report_append(w, " changed ");
+        report_append_u32(w, f.changed_samples);
+        report_append(w, " bad ");
+        report_append_u32(w, f.bad_tiles);
+        report_append(w, " err ");
+        report_append_u32(w, f.last_error);
+        report_append(w, "\n");
+    }
+    report_append(w, "END\n");
+    return 0;
+}
+
+void lardkit_bugreplay_clear(void)
+{
+    for (uint32_t i = 0; i < LARDKIT_BUGREPLAY_MAX; i++) {
+        for (uint32_t j = 0; j < sizeof(s_lardkit.bugreplay[i]); j++) ((uint8_t*)&s_lardkit.bugreplay[i])[j] = 0;
+    }
+    s_lardkit.bugreplay_count = 0;
+    s_lardkit.bugreplay_next = 1u;
+    (void)lardkit_bugreplay_write();
+}
+
 int lardkit_bugeye_scan(void)
 {
     screencheck_info_t info;
@@ -191,11 +289,15 @@ int lardkit_bugeye_scan(void)
     s_lardkit.bugeye.last_error = (r == 0) ? 0u : (uint32_t)(-r);
     if (r != 0) {
         s_lardkit.bugeye.bug_count++;
+        bugreplay_record();
         (void)lardkit_bugeye_write_report();
+        (void)lardkit_bugreplay_write();
         return r;
     }
     s_lardkit.bugeye.bug_count = info.bad_tiles;
+    bugreplay_record();
     (void)lardkit_bugeye_write_report();
+    (void)lardkit_bugreplay_write();
     return info.bad_tiles == 0 ? 0 : 1;
 }
 
@@ -306,16 +408,56 @@ uint32_t lardkit_trust_caps(const char* subject)
     return 0;
 }
 
+static void trust_history_log(const char* subject, uint32_t cap, int allow, uint32_t caps_after)
+{
+    uint32_t idx = (s_lardkit.trust_history_next - 1u) % LARDKIT_TRUST_HISTORY_MAX;
+    lardkit_trust_history_entry_t* e = &s_lardkit.trust_history[idx];
+    e->seq = s_lardkit.trust_history_next++;
+    if (s_lardkit.trust_history_next == 0) s_lardkit.trust_history_next = 1u;
+    scopy(e->subject, sizeof(e->subject), subject);
+    e->cap = cap;
+    e->allowed = allow ? 1u : 0u;
+    e->caps_after = caps_after;
+    if (s_lardkit.trust_history_count < LARDKIT_TRUST_HISTORY_MAX) s_lardkit.trust_history_count++;
+}
+
 int lardkit_trust_set(const char* subject, uint32_t cap, int allow)
 {
     for (uint32_t i = 0; i < lardkit_trust_count(); i++) {
         if (streq(subject, s_lardkit.trust[i].subject)) {
             if (allow) s_lardkit.trust[i].caps |= cap;
             else s_lardkit.trust[i].caps &= ~cap;
+            trust_history_log(subject, cap, allow, s_lardkit.trust[i].caps);
             return 0;
         }
     }
     return -1;
+}
+
+uint32_t lardkit_trust_history_count(void)
+{
+    return s_lardkit.trust_history_count;
+}
+
+int lardkit_trust_history_at(uint32_t idx, lardkit_trust_history_entry_t* out)
+{
+    uint32_t start;
+    uint32_t slot;
+    if (!out || idx >= s_lardkit.trust_history_count) return -1;
+    start = s_lardkit.trust_history_count < LARDKIT_TRUST_HISTORY_MAX ? 0u :
+        ((s_lardkit.trust_history_next - 1u) % LARDKIT_TRUST_HISTORY_MAX);
+    slot = (start + idx) % LARDKIT_TRUST_HISTORY_MAX;
+    *out = s_lardkit.trust_history[slot];
+    return 0;
+}
+
+void lardkit_trust_history_clear(void)
+{
+    for (uint32_t i = 0; i < LARDKIT_TRUST_HISTORY_MAX; i++) {
+        for (uint32_t j = 0; j < sizeof(s_lardkit.trust_history[i]); j++) ((uint8_t*)&s_lardkit.trust_history[i])[j] = 0;
+    }
+    s_lardkit.trust_history_count = 0;
+    s_lardkit.trust_history_next = 1u;
 }
 
 uint32_t lardkit_bootmap_count(void)
@@ -416,6 +558,133 @@ void lardkit_oldcheck_info(lardkit_oldcheck_info_t* out)
 {
     if (!out) return;
     *out = s_lardkit.oldcheck;
+}
+
+static int lfsdoctor_write_report(void)
+{
+    FsWritableFile* w = fs_open_writable("lfsdoctor.lardd");
+    lardkit_lfsdoctor_info_t* d = &s_lardkit.lfsdoctor;
+    static const char header[] = "LARDD 1\nTITLE LFS Doctor\n";
+    if (!w) return -1;
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
+    report_append(w, "SECTION Last Scan\nITEM files ");
+    report_append_u32(w, d->files);
+    report_append(w, "\nITEM storage ");
+    report_append(w, d->storage_available ? "online" : "offline");
+    report_append(w, "\nITEM dirty ");
+    report_append_bool(w, d->dirty != 0u);
+    report_append(w, "\nITEM generation ");
+    report_append_u32(w, d->generation);
+    report_append(w, "\nITEM last-result ");
+    report_append_i32(w, d->last_result);
+    report_append(w, "\nITEM repairs ");
+    report_append_u32(w, d->repairs);
+    report_append(w, "\nITEM last-repair ");
+    report_append_i32(w, d->last_repair);
+    report_append(w, "\nSECTION Advice\n");
+    if (!d->storage_available) report_append(w, "ITEM storage offline; repair needs a block device\n");
+    else if (d->dirty) report_append(w, "ITEM dirty RAM files detected; lfsdoctor repair will persist them\n");
+    else report_append(w, "ITEM no dirty writable files; lfsdoctor repair refreshes from LPST\n");
+    report_append(w, "END\n");
+    return 0;
+}
+
+int lardkit_lfsdoctor_scan(int repair)
+{
+    uint32_t count = 0;
+    uint32_t available = 0;
+    uint32_t dirty = 0;
+    uint32_t generation = 0;
+    int last = 0;
+    int rr = 0;
+    const char* driver;
+    (void)driver;
+    fs_list(oldcheck_count_cb, &count);
+    fs_persist_info(&available, &dirty, &last, &driver, NULL, NULL);
+    fs_persist_detail(NULL, &generation, NULL);
+    s_lardkit.lfsdoctor.files = count;
+    s_lardkit.lfsdoctor.storage_available = available;
+    s_lardkit.lfsdoctor.dirty = dirty;
+    s_lardkit.lfsdoctor.generation = generation;
+    s_lardkit.lfsdoctor.last_result = last;
+    if (repair) {
+        if (!available) rr = -1;
+        else if (dirty) rr = fs_persist_save();
+        else rr = fs_persist_load();
+        s_lardkit.lfsdoctor.repairs++;
+        s_lardkit.lfsdoctor.last_repair = rr;
+        fs_persist_info(&available, &dirty, &last, &driver, NULL, NULL);
+        fs_persist_detail(NULL, &generation, NULL);
+        s_lardkit.lfsdoctor.storage_available = available;
+        s_lardkit.lfsdoctor.dirty = dirty;
+        s_lardkit.lfsdoctor.generation = generation;
+        s_lardkit.lfsdoctor.last_result = last;
+    }
+    (void)lfsdoctor_write_report();
+    return repair ? rr : 0;
+}
+
+void lardkit_lfsdoctor_info(lardkit_lfsdoctor_info_t* out)
+{
+    if (!out) return;
+    *out = s_lardkit.lfsdoctor;
+}
+
+int lardkit_panic_capsule_write(void)
+{
+    FsWritableFile* w = fs_open_writable("paniccapsule.lardd");
+    lardkit_bugeye_info_t bi;
+    lardkit_lfsdoctor_info_t lf;
+    const FsFile* crash = fs_open("crashlog.txt");
+    static const char header[] = "LARDD 1\nTITLE Panic Capsule\n";
+    if (!w) return -1;
+    (void)lardkit_bugeye_write_report();
+    (void)lardkit_bugreplay_write();
+    (void)lardkit_oldcheck_run(0);
+    (void)lardkit_lfsdoctor_scan(0);
+    lardkit_bugeye_info(&bi);
+    lardkit_lfsdoctor_info(&lf);
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
+    s_lardkit.panic_capsules++;
+    report_append(w, "SECTION Summary\nITEM capsule ");
+    report_append_u32(w, s_lardkit.panic_capsules);
+    report_append(w, "\nITEM panicroom ");
+    report_append(w, s_lardkit.panicroom_active ? "entered" : "standby");
+    report_append(w, "\nITEM panicroom-entries ");
+    report_append_u32(w, s_lardkit.panicroom_entries);
+    report_append(w, "\nITEM crashlog-bytes ");
+    report_append_u32(w, crash ? crash->size : 0u);
+    report_append(w, "\nITEM bugeye-bugs ");
+    report_append_u32(w, bi.bug_count);
+    report_append(w, "\nITEM replay-frames ");
+    report_append_u32(w, s_lardkit.bugreplay_count);
+    report_append(w, "\nITEM trust-events ");
+    report_append_u32(w, s_lardkit.trust_history_count);
+    report_append(w, "\nITEM priority-lev10-events ");
+    report_append_u32(w, taskprio_history_count());
+    report_append(w, "\nITEM files ");
+    report_append_u32(w, lf.files);
+    report_append(w, "\nITEM storage ");
+    report_append(w, lf.storage_available ? "online" : "offline");
+    report_append(w, "\nITEM dirty ");
+    report_append_bool(w, lf.dirty != 0u);
+    report_append(w, "\nSECTION Linked Reports\n");
+    report_append(w, "ITEM crashlog.txt\n");
+    report_append(w, "ITEM bugreport.lardd\n");
+    report_append(w, "ITEM bugreplay.lardd\n");
+    report_append(w, "ITEM lfsdoctor.lardd\n");
+    report_append(w, "SECTION BootMap\n");
+    for (uint32_t i = 0; i < lardkit_bootmap_count(); i++) {
+        report_append(w, "ITEM ");
+        report_append_u32(w, i);
+        report_append(w, " ");
+        report_append(w, lardkit_bootmap_phase(i));
+        report_append(w, "\n");
+    }
+    report_append(w, "END\n");
+    return 0;
 }
 
 uint32_t lardkit_theme_count(void)
@@ -650,6 +919,10 @@ int lardkit_selftest(void)
         s_lardkit = saved;
         return -10;
     }
+    if (lardkit_bugreplay_count() == 0u || !fs_open("bugreplay.lardd")) {
+        s_lardkit = saved;
+        return -11;
+    }
     if (lardkit_snapshot("selftest") != 0 || !s_lardkit.rollback.valid) {
         s_lardkit = saved;
         return -2;
@@ -657,6 +930,11 @@ int lardkit_selftest(void)
     if ((lardkit_trust_caps("shell") & LARDKIT_TRUST_FS) == 0u) {
         s_lardkit = saved;
         return -3;
+    }
+    if (lardkit_trust_set("shell", LARDKIT_TRUST_RAW, 1) != 0 ||
+        lardkit_trust_history_count() == 0u) {
+        s_lardkit = saved;
+        return -12;
     }
     if (lardkit_bootmap_count() < 6u || !lardkit_bootmap_phase(0)[0]) {
         s_lardkit = saved;
@@ -687,6 +965,14 @@ int lardkit_selftest(void)
     if (lardkit_oldcheck_run(0) != 0 || s_lardkit.oldcheck.count == 0u) {
         s_lardkit = saved;
         return -8;
+    }
+    if (lardkit_lfsdoctor_scan(0) != 0 || s_lardkit.lfsdoctor.files == 0u || !fs_open("lfsdoctor.lardd")) {
+        s_lardkit = saved;
+        return -13;
+    }
+    if (lardkit_panic_capsule_write() != 0 || !fs_open("paniccapsule.lardd")) {
+        s_lardkit = saved;
+        return -14;
     }
     s_lardkit = saved;
     return 0;

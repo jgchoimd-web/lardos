@@ -65,6 +65,7 @@ flowchart TB
     Awake["awake fast boot tracker"]
     CrashLog["crashlog panic history"]
     LardKit["lardkit user-control suite"]
+    BugReplay["bugreplay + panic capsule + lfsdoctor"]
     LPack["lpack packages"]
     ScreenCheck["screencheck diagnostics"]
     TLS["lard_tls native TLS"]
@@ -85,6 +86,7 @@ flowchart TB
     Storage --> BootProf
     Storage --> CrashLog
     Storage --> LardKit
+    LardKit --> BugReplay
     Storage --> LPack
     Kmain --> POST
     Kmain --> Net
@@ -211,6 +213,14 @@ tab and `lardd_guide.lardd` as the native document-format guide. LardOS uses
 `LARS` instead of HTML for local structured pages and `LARDD` instead of
 Markdown for project documents. `kernel/lard_doc.c` renders both formats with a
 small freestanding C parser.
+
+LardKit also owns the new local recovery/audit reports:
+`bugreplay.lardd` stores recent BugEye frame summaries, `paniccapsule.lardd`
+bundles panic-room, crashlog, screen, trust, priority, filesystem, and BootMap
+state for recovery, and `lfsdoctor.lardd` records filesystem plus LPST health.
+Trust history is kept in memory as a small user-readable permission audit log.
+LPack verification runs before install, reports package hash and structural
+warnings, and captures a bounded undo snapshot for the last package install.
 
 `gui.c` also owns ScreenRAM, an optional scratch-memory layer backed by a
 reserved framebuffer/backbuffer rectangle. The default is a quiet bottom-right

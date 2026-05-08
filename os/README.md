@@ -114,10 +114,19 @@ commands:
 - `buddy mood calm|funny|strict|silent` changes the assistant personality.
 - `bugeye on|off|scan` runs a user-visible framebuffer/layout bug monitor on
   top of the existing screen checks and writes `bugreport.lardd`.
+- `bugreplay status|last|show|clear` records BugEye scan frames so screen
+  overlap, clipped text, color, and render-break reports can be replayed from
+  `bugreplay.lardd`.
 - `rollback snap|last|apply` snapshots and restores user-visible settings such as
   GUI layers, HTTP method, boot profile, assistant, theme, and task priority.
-- `trust list|allow|deny` exposes a user-owned permission policy map for core
-  subjects such as shell, GUI, OSLink, packages, and SUM.
+- `trust list|allow|deny|history` exposes a user-owned permission policy map for
+  core subjects such as shell, GUI, OSLink, packages, and SUM, and audits each
+  permission change.
+- `lfsdoctor scan|repair|show` writes `lfsdoctor.lardd` with filesystem and
+  LPST persistence health, then lets the user trigger the in-kernel repair path.
+- `panic capsule` or `paniccapsule show` writes `paniccapsule.lardd`, a small
+  recovery bundle that joins panic-room, crashlog, BugEye, Trust, LFSDoctor,
+  priority, and BootMap state.
 - `bootmap`, `oldcheck draw`, and `awakemon` show the boot phase map, a retro
   storage-check screen, and Awakening background loader progress.
 - `ltheme list|show|use name` selects native shell theme presets or parses
@@ -156,8 +165,10 @@ commands:
 - `LARS` documents can include `button label | command` and `input name value`
   records. `larsform file.lars` lists those controls and `larsact file.lars n`
   executes a button action through LSH.
-- `lpack info|list|install file.lpack` inspects and installs native LardPack
-  packages. The built-in `sample.lpack` writes a starter note into `notes.txt`.
+- `lpack info|list|verify|install|undo file.lpack` inspects, validates, installs,
+  and rolls back native LardPack packages. Verification reports package hash,
+  warning/error counts, installable targets, and payload size before install.
+  The built-in `sample.lpack` writes a starter note into `notes.txt`.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has

@@ -79,6 +79,30 @@ static const uint8_t bugreport_init[] =
 static uint8_t ram_bugreport_buf[BUGREPORT_CAP];
 static FsWritableFile ram_bugreport = { "bugreport.lardd", ram_bugreport_buf, 0, BUGREPORT_CAP };
 
+#define BUGREPLAY_CAP 2048u
+static const uint8_t bugreplay_init[] =
+    "LARDD 1\n"
+    "TITLE Bug Replay\n"
+    "TEXT No BugEye replay frames yet.\n";
+static uint8_t ram_bugreplay_buf[BUGREPLAY_CAP];
+static FsWritableFile ram_bugreplay = { "bugreplay.lardd", ram_bugreplay_buf, 0, BUGREPLAY_CAP };
+
+#define PANIC_CAPSULE_CAP 2048u
+static const uint8_t panic_capsule_init[] =
+    "LARDD 1\n"
+    "TITLE Panic Capsule\n"
+    "TEXT No capsule has been generated yet.\n";
+static uint8_t ram_panic_capsule_buf[PANIC_CAPSULE_CAP];
+static FsWritableFile ram_panic_capsule = { "paniccapsule.lardd", ram_panic_capsule_buf, 0, PANIC_CAPSULE_CAP };
+
+#define LFSDOCTOR_CAP 1024u
+static const uint8_t lfsdoctor_init[] =
+    "LARDD 1\n"
+    "TITLE LFS Doctor\n"
+    "TEXT No filesystem doctor scan has run yet.\n";
+static uint8_t ram_lfsdoctor_buf[LFSDOCTOR_CAP];
+static FsWritableFile ram_lfsdoctor = { "lfsdoctor.lardd", ram_lfsdoctor_buf, 0, LFSDOCTOR_CAP };
+
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
 #define LPST_VERSION     2u
 #define LPST_START_LBA   2752u
@@ -130,12 +154,15 @@ static const uint8_t file_lardos_lars[] =
     "li Use bootprof set safe or bootprof set netoff to change the next boot profile.\n"
     "li Awakening mode is off by default; use awake on or awake off to choose the next boot path.\n"
     "li Use crashlog show to inspect panic and diagnostic history.\n"
-    "li Use lpack list sample.lpack and lpack install sample.lpack for native package installs.\n"
+    "li Use lpack verify sample.lpack before install, and lpack undo last to roll back the last install.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
     "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
+    "li Use bugreplay show to review the last BugEye screen-health frames.\n"
     "li Use rollback snap and rollback last to save and restore user-visible settings.\n"
     "li Use priority history to audit who granted priority lev.10.\n"
-    "li Use trust list to inspect the user-owned permission policy map.\n"
+    "li Use trust list and trust history to inspect the user-owned permission policy map.\n"
+    "li Use lfsdoctor scan or lfsdoctor repair to inspect and repair LPST-backed writable files.\n"
+    "li Use panic capsule to bundle crashlog, BugEye, boot, trust, priority, and filesystem state.\n"
     "li Use bootmap, oldcheck draw, and awakemon to see boot structure, storage checks, and Awakening progress.\n"
     "li Use ltheme list and ltheme use night for native shell theme presets.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
@@ -172,15 +199,20 @@ static const uint8_t file_lardos_lars[] =
     "cmd awake on\n"
     "cmd awake off\n"
     "cmd crashlog show\n"
+    "cmd lpack verify sample.lpack\n"
     "cmd lpack list sample.lpack\n"
     "cmd screencheck retro\n"
     "cmd bugeye scan\n"
+    "cmd bugreplay show\n"
     "cmd type bugreport.lardd\n"
     "cmd rollback snap demo\n"
     "cmd priority history\n"
     "cmd trust list\n"
+    "cmd trust history\n"
     "cmd bootmap\n"
     "cmd oldcheck draw\n"
+    "cmd lfsdoctor scan\n"
+    "cmd panic capsule\n"
     "cmd awakemon\n"
     "cmd ltheme list\n"
     "cmd ltheme show default.ltheme\n"
@@ -432,7 +464,7 @@ static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
 
 static uint32_t writable_count(void)
 {
-    return 8u;
+    return 11u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -445,6 +477,9 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 5) return &ram_bootprof;
     if (idx == 6) return &ram_crashlog;
     if (idx == 7) return &ram_bugreport;
+    if (idx == 8) return &ram_bugreplay;
+    if (idx == 9) return &ram_panic_capsule;
+    if (idx == 10) return &ram_lfsdoctor;
     return NULL;
 }
 
@@ -470,6 +505,18 @@ void fs_init(void)
         ram_bugreport_buf[i] = bugreport_init[i];
     }
     ram_bugreport.size = sizeof(bugreport_init) - 1;
+    for (uint32_t i = 0; i < sizeof(bugreplay_init) - 1 && i < BUGREPLAY_CAP; i++) {
+        ram_bugreplay_buf[i] = bugreplay_init[i];
+    }
+    ram_bugreplay.size = sizeof(bugreplay_init) - 1;
+    for (uint32_t i = 0; i < sizeof(panic_capsule_init) - 1 && i < PANIC_CAPSULE_CAP; i++) {
+        ram_panic_capsule_buf[i] = panic_capsule_init[i];
+    }
+    ram_panic_capsule.size = sizeof(panic_capsule_init) - 1;
+    for (uint32_t i = 0; i < sizeof(lfsdoctor_init) - 1 && i < LFSDOCTOR_CAP; i++) {
+        ram_lfsdoctor_buf[i] = lfsdoctor_init[i];
+    }
+    ram_lfsdoctor.size = sizeof(lfsdoctor_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
 }
@@ -573,6 +620,33 @@ const FsFile* fs_open(const char* name)
             g_ram_result.size = ram_bugreport.size;
             return &g_ram_result;
         }
+        j = 0;
+        const char* n8 = "bugreplay.lardd";
+        while (n8[j] && name[j] && n8[j] == name[j]) j++;
+        if (n8[j] == '\0' && name[j] == '\0') {
+            g_ram_result.name = ram_bugreplay.name;
+            g_ram_result.data = ram_bugreplay.data;
+            g_ram_result.size = ram_bugreplay.size;
+            return &g_ram_result;
+        }
+        j = 0;
+        const char* n9 = "paniccapsule.lardd";
+        while (n9[j] && name[j] && n9[j] == name[j]) j++;
+        if (n9[j] == '\0' && name[j] == '\0') {
+            g_ram_result.name = ram_panic_capsule.name;
+            g_ram_result.data = ram_panic_capsule.data;
+            g_ram_result.size = ram_panic_capsule.size;
+            return &g_ram_result;
+        }
+        j = 0;
+        const char* n10 = "lfsdoctor.lardd";
+        while (n10[j] && name[j] && n10[j] == name[j]) j++;
+        if (n10[j] == '\0' && name[j] == '\0') {
+            g_ram_result.name = ram_lfsdoctor.name;
+            g_ram_result.data = ram_lfsdoctor.data;
+            g_ram_result.size = ram_lfsdoctor.size;
+            return &g_ram_result;
+        }
     }
     return 0;
 }
@@ -610,6 +684,9 @@ void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user
     cb(ram_bootprof.name, ram_bootprof.size, user);
     cb(ram_crashlog.name, ram_crashlog.size, user);
     cb(ram_bugreport.name, ram_bugreport.size, user);
+    cb(ram_bugreplay.name, ram_bugreplay.size, user);
+    cb(ram_panic_capsule.name, ram_panic_capsule.size, user);
+    cb(ram_lfsdoctor.name, ram_lfsdoctor.size, user);
 }
 
 static int lpst_name_equals(const uint8_t* fixed_name, const char* name)
@@ -824,6 +901,18 @@ FsWritableFile* fs_open_writable(const char* name)
     i = 0;
     while (n7[i] && name[i] && n7[i] == name[i]) i++;
     if (n7[i] == '\0' && name[i] == '\0') return &ram_bugreport;
+    const char* n8 = "bugreplay.lardd";
+    i = 0;
+    while (n8[i] && name[i] && n8[i] == name[i]) i++;
+    if (n8[i] == '\0' && name[i] == '\0') return &ram_bugreplay;
+    const char* n9 = "paniccapsule.lardd";
+    i = 0;
+    while (n9[i] && name[i] && n9[i] == name[i]) i++;
+    if (n9[i] == '\0' && name[i] == '\0') return &ram_panic_capsule;
+    const char* n10 = "lfsdoctor.lardd";
+    i = 0;
+    while (n10[i] && name[i] && n10[i] == name[i]) i++;
+    if (n10[i] == '\0' && name[i] == '\0') return &ram_lfsdoctor;
     return NULL;
 }
 

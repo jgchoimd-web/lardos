@@ -16,8 +16,11 @@
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
 - `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
 - `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.
+- `bugreplay status|last|show|clear` - replay BugEye scan frames from `bugreplay.lardd`.
 - `rollback snap|last|apply` - settings snapshot and restore.
-- `trust list|allow|deny` - user-owned permission policy map.
+- `trust list|allow|deny|history` - user-owned permission policy map and audit log.
+- `lfsdoctor scan|repair|show` - filesystem and LPST persistence health report.
+- `panic capsule` / `paniccapsule show` - write and view a recovery bundle report.
 - `bootmap` / `oldcheck draw` / `awakemon` - boot phase map, retro storage check, and Awakening monitor.
 - `ltheme list|show|use name` - native shell theme presets and `.ltheme` files.
 - `oschat say|send|read` - local OSLink chat-style messages.
@@ -32,7 +35,7 @@
 - `bootprof status|set` - inspect or select normal, safe, netoff, dev, or awakening boot profiles.
 - `crashlog show|clear|test` - inspect or write diagnostic crash history.
 - `larsform file` / `larsact file index` - list or run LARS form buttons.
-- `lpack info|list|install file.lpack` - inspect or install a native LardPack package.
+- `lpack info|list|verify|install|undo file.lpack` - inspect, validate, install, or roll back a native LardPack package.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 
@@ -58,6 +61,15 @@
 - Priority `lev.10` is user-grantable urgent work via `task urgent id`, `task set id 10`, or `nice 10 command`; wait-time aging cannot create it
 - `task history` shows lev.10 grants with sequence, actor, action, and task name
 - `task pause id` keeps a task visible but skips it until `task resume id`
+
+## Recovery And Audit
+
+- `bugreplay` keeps a small ring of BugEye frames with scan number, changed samples, bad tiles, and last render error
+- `trust history` records who changed file, screen, network, OSLink, package, raw, and SUM permissions
+- `lpack verify file.lpack` checks package structure before install and prints hash, warnings, errors, installable files, and bytes
+- `lpack undo` restores the last writable-file snapshot captured before a package install
+- `paniccapsule show` builds a compact LARDD recovery bundle from panic room, crashlog, BugEye, replay, trust, priority, LFSDoctor, and BootMap state
+- `lfsdoctor repair` runs the native LPST repair path and rewrites `lfsdoctor.lardd`
 
 ## Settings Shell
 

@@ -255,9 +255,9 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "oldcheck", 1 }, { "larsview", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "larsview", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
-    { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 },
+    { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
     { "bosl", 1 }, { "lil", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
@@ -1137,17 +1137,18 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release ver post selftest magic mode cfgsh buddy bugeye rollback trust oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap crashlog panicroom cls\n");
+    out_append("  help control status release ver post selftest magic mode cfgsh buddy bugeye bugreplay rollback trust oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
-    out_append("  lpack info|list|install file.lpack\n");
+    out_append("  lpack info|list|verify|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
     out_append("  exexgui on|off|focus gui|term|info|next|test\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
+    out_append("  bugreplay status|last|show      replay last BugEye screen-health frames\n");
     out_append("  rollback snap|last|apply        save/restore user-visible settings\n");
-    out_append("  trust list|allow|deny           user-owned permission policy map\n");
-    out_append("  bootmap oldcheck awakemon       boot map, retro storage check, awake loader monitor\n");
+    out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
+    out_append("  bootmap oldcheck lfsdoctor awakemon boot map, storage doctor, awake monitor\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open file              native LARS/LARDD browser state\n");
@@ -1164,6 +1165,7 @@ static void cmd_help(const char* args)
     out_append("  tasktop  task list|set|urgent|history|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
+    out_append("  panic capsule / paniccapsule    collect crashlog, BugEye, boot, trust, priority state\n");
     out_append("  crashlog show|clear|test\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
@@ -1187,8 +1189,10 @@ static void cmd_control(const char* args)
     out_append("  magic explain       show why magic executed or refused its last prediction\n");
     out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
     out_append("  bugeye scan         scan for visible bugs and write bugreport.lardd\n");
+    out_append("  bugreplay show      render the last BugEye replay frames from bugreplay.lardd\n");
     out_append("  rollback snap       snapshot settings before experiments\n");
     out_append("  trust list          inspect user-controlled permission policy\n");
+    out_append("  trust history       audit permission allow/deny changes\n");
     out_append("  oslink bus          inspect LardOS-internal OSLink messages\n");
     out_append("  oschat say hello    send a local OSLink chat-style message\n");
     out_append("  exgui style mac     enable familiar desktop/window chrome\n");
@@ -1202,10 +1206,13 @@ static void cmd_control(const char* args)
     out_append("  awake off           return next boot to normal and stop loader\n");
     out_append("  bootmap             show the boot structure as numbered phases\n");
     out_append("  oldcheck draw       draw the retro storage check map\n");
+    out_append("  lfsdoctor scan      diagnose writable files and LPST persistence state\n");
+    out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme list         list native theme presets\n");
     out_append("  notes add text      append to notes.lardd\n");
     out_append("  crashlog show       inspect panic and diagnostic history\n");
-    out_append("  lpack list sample.lpack inspect a native package\n");
+    out_append("  lpack verify sample.lpack inspect package integrity before install\n");
+    out_append("  lpack undo last     restore files changed by the last install\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  screencheck retro   draw a retro boot/storage-style screen check\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
@@ -2107,7 +2114,7 @@ static void cmd_lpack_op(const char* op, const char* args)
     uint32_t size;
     if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
         lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
-        out_append("Usage: lpack info|list|install [drive:]file.lpack\n");
+        out_append("Usage: lpack info|list|verify|install [drive:]file.lpack\n");
         return;
     }
     if (strcmp(op, "info") == 0) {
@@ -2116,6 +2123,27 @@ static void cmd_lpack_op(const char* op, const char* args)
     }
     if (strcmp(op, "list") == 0 || strcmp(op, "ls") == 0) {
         cmd_lpack_show(file_arg, data, size, 1);
+        return;
+    }
+    if (strcmp(op, "verify") == 0 || strcmp(op, "check") == 0) {
+        lpack_verify_info_t info;
+        int r = lpack_verify(data, size, &info);
+        out_append("lpack verify ");
+        out_append(file_arg);
+        out_append(r == 0 ? ": OK\n" : ": CHECK\n");
+        out_append("files=");
+        out_append_u32(info.files);
+        out_append(" installable=");
+        out_append_u32(info.installable);
+        out_append(" bytes=");
+        out_append_u32(info.total_bytes);
+        out_append(" hash=");
+        out_append_hex32(info.hash);
+        out_append(" warnings=");
+        out_append_u32(info.warnings);
+        out_append(" errors=");
+        out_append_u32(info.errors);
+        out_append("\n");
         return;
     }
     if (strcmp(op, "install") == 0 || strcmp(op, "add") == 0) {
@@ -2130,7 +2158,7 @@ static void cmd_lpack_op(const char* op, const char* args)
         if (installed == 0) out_append("lpack: no writable package targets matched this system.\n");
         return;
     }
-    out_append("Usage: lpack info|list|install [drive:]file.lpack\n");
+    out_append("Usage: lpack info|list|verify|install [drive:]file.lpack\n");
 }
 
 static void cmd_lpack(const char* args)
@@ -2138,7 +2166,26 @@ static void cmd_lpack(const char* args)
     char sub[16];
     if (!args) args = "";
     if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
-        out_append("Usage: lpack info|list|install|test [drive:]file.lpack\n");
+        lpack_undo_info_t undo;
+        lpack_undo_info(&undo);
+        out_append("Usage: lpack info|list|verify|install file.lpack | lpack undo last | lpack test\n");
+        out_append("undo=");
+        out_append(undo.ready ? "ready" : "empty");
+        out_append(" files=");
+        out_append_u32(undo.files);
+        out_append(" bytes=");
+        out_append_u32(undo.bytes);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "undo") == 0 || strcmp(sub, "rollback") == 0) {
+        int r = lpack_undo_last();
+        if (r < 0) out_append("lpack: no install snapshot to undo.\n");
+        else {
+            out_append("lpack: restored ");
+            out_append_u32((uint32_t)r);
+            out_append(r == 1 ? " file.\n" : " files.\n");
+        }
         return;
     }
     if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
@@ -2402,6 +2449,81 @@ static void cmd_bugeye(const char* args)
     out_append("Usage: bugeye on|off|status|scan|test\n");
 }
 
+static void cmd_bugreplay_list(void)
+{
+    uint32_t count = lardkit_bugreplay_count();
+    out_append("BugReplay frames=");
+    out_append_u32(count);
+    out_append("\n");
+    if (count == 0) {
+        out_append("bugreplay: no frames. Run bugeye scan first.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lardkit_bugreplay_frame_t f;
+        if (lardkit_bugreplay_at(i, &f) != 0) continue;
+        out_append("#");
+        out_append_u32(f.seq);
+        out_append(" scan=");
+        out_append_u32(f.scan);
+        out_append(" ");
+        out_append_u32(f.width);
+        out_append("x");
+        out_append_u32(f.height);
+        out_append(" changed=");
+        out_append_u32(f.changed_samples);
+        out_append(" bad=");
+        out_append_u32(f.bad_tiles);
+        out_append(" err=");
+        out_append_u32(f.last_error);
+        out_append("\n");
+    }
+}
+
+static void cmd_bugreplay(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0) {
+        cmd_bugreplay_list();
+        return;
+    }
+    if (strcmp(sub, "last") == 0) {
+        uint32_t count = lardkit_bugreplay_count();
+        lardkit_bugreplay_frame_t f;
+        if (count == 0 || lardkit_bugreplay_at(count - 1u, &f) != 0) {
+            out_append("bugreplay: no frames.\n");
+            return;
+        }
+        out_append("last seq=");
+        out_append_u32(f.seq);
+        out_append(" scan=");
+        out_append_u32(f.scan);
+        out_append(" bad=");
+        out_append_u32(f.bad_tiles);
+        out_append(" err=");
+        out_append_u32(f.last_error);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "write") == 0 || strcmp(sub, "save") == 0) {
+        out_append(lardkit_bugreplay_write() == 0 ? "bugreplay: wrote bugreplay.lardd\n" : "bugreplay: write failed\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
+        (void)lardkit_bugreplay_write();
+        cmd_larddoc("bugreplay.lardd", "Usage: bugreplay show");
+        return;
+    }
+    if (strcmp(sub, "clear") == 0) {
+        lardkit_bugreplay_clear();
+        out_append("bugreplay: cleared.\n");
+        return;
+    }
+    out_append("Usage: bugreplay status|last|show|write|clear\n");
+}
+
 static void cmd_rollback_status(void)
 {
     lardkit_rollback_info_t info;
@@ -2483,6 +2605,16 @@ static void trust_print_caps(uint32_t caps)
     if (!any) out_append("none");
 }
 
+static const char* trust_cap_name(uint32_t cap)
+{
+    if (cap == LARDKIT_TRUST_FS) return "fs";
+    if (cap == LARDKIT_TRUST_SCREEN) return "screen";
+    if (cap == LARDKIT_TRUST_NET) return "net";
+    if (cap == LARDKIT_TRUST_OSLINK) return "oslink";
+    if (cap == LARDKIT_TRUST_RAW) return "raw";
+    return "unknown";
+}
+
 static void cmd_trust_list(void)
 {
     uint32_t count = lardkit_trust_count();
@@ -2496,6 +2628,41 @@ static void cmd_trust_list(void)
             trust_print_caps(e.caps);
             out_append("\n");
         }
+    }
+}
+
+static void cmd_trust_history(const char* args)
+{
+    char sub[16];
+    uint32_t count;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) == 0 &&
+        (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0)) {
+        lardkit_trust_history_clear();
+        out_append("trust history: cleared.\n");
+        return;
+    }
+    count = lardkit_trust_history_count();
+    out_append("Trust history count=");
+    out_append_u32(count);
+    out_append("\n");
+    if (count == 0) {
+        out_append("trust history: no permission changes yet.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lardkit_trust_history_entry_t e;
+        if (lardkit_trust_history_at(i, &e) != 0) continue;
+        out_append("#");
+        out_append_u32(e.seq);
+        out_append(" ");
+        out_append(e.allowed ? "allow " : "deny ");
+        out_append(e.subject);
+        out_append(" ");
+        out_append(trust_cap_name(e.cap));
+        out_append(" -> ");
+        trust_print_caps(e.caps_after);
+        out_append("\n");
     }
 }
 
@@ -2515,6 +2682,10 @@ static void cmd_trust(const char* args)
         out_append("trust caps: fs screen net oslink raw\n");
         return;
     }
+    if (strcmp(sub, "history") == 0 || strcmp(sub, "hist") == 0 || strcmp(sub, "audit") == 0) {
+        cmd_trust_history(args);
+        return;
+    }
     if (strcmp(sub, "allow") == 0 || strcmp(sub, "deny") == 0) {
         if (vcs_read_word(&args, subject, sizeof(subject)) != 0 ||
             vcs_read_word(&args, capname, sizeof(capname)) != 0) {
@@ -2529,7 +2700,7 @@ static void cmd_trust(const char* args)
         cmd_trust_list();
         return;
     }
-    out_append("Usage: trust list|caps|allow|deny\n");
+    out_append("Usage: trust list|caps|history|allow|deny\n");
 }
 
 static void cmd_bootmap(const char* args)
@@ -2577,7 +2748,34 @@ static void cmd_panicroom(const char* args)
         out_append("panicroom: standby.\n");
         return;
     }
-    out_append("Usage: panicroom status|enter|exit\n");
+    if (strcmp(sub, "capsule") == 0 || strcmp(sub, "report") == 0) {
+        if (lardkit_panic_capsule_write() == 0) {
+            out_append("panicroom: wrote paniccapsule.lardd\n");
+            cmd_larddoc("paniccapsule.lardd", "Usage: panicroom capsule");
+        } else {
+            out_append("panicroom: capsule failed.\n");
+        }
+        return;
+    }
+    out_append("Usage: panicroom status|enter|exit|capsule\n");
+}
+
+static void cmd_paniccapsule(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "make") == 0 || strcmp(sub, "write") == 0 || strcmp(sub, "capture") == 0) {
+        if (lardkit_panic_capsule_write() == 0) out_append("paniccapsule: wrote paniccapsule.lardd\n");
+        else out_append("paniccapsule: write failed.\n");
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
+        (void)lardkit_panic_capsule_write();
+        cmd_larddoc("paniccapsule.lardd", "Usage: paniccapsule show");
+        return;
+    }
+    out_append("Usage: paniccapsule make|show\n");
 }
 
 static void cmd_oldcheck_status(void)
@@ -2617,6 +2815,57 @@ static void cmd_oldcheck(const char* args)
         return;
     }
     out_append("Usage: oldcheck status|draw|test\n");
+}
+
+static void cmd_lfsdoctor_status(void)
+{
+    lardkit_lfsdoctor_info_t info;
+    lardkit_lfsdoctor_info(&info);
+    out_append("LFSDoctor files=");
+    out_append_u32(info.files);
+    out_append(" storage=");
+    out_append(info.storage_available ? "online" : "offline");
+    out_append(" dirty=");
+    out_append_u32(info.dirty);
+    out_append(" gen=");
+    out_append_u32(info.generation);
+    out_append(" last=");
+    out_append_i32(info.last_result);
+    out_append(" repairs=");
+    out_append_u32(info.repairs);
+    out_append(" repair-last=");
+    out_append_i32(info.last_repair);
+    out_append("\n");
+}
+
+static void cmd_lfsdoctor(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        (void)lardkit_lfsdoctor_scan(0);
+        cmd_lfsdoctor_status();
+        return;
+    }
+    if (strcmp(sub, "scan") == 0 || strcmp(sub, "check") == 0) {
+        (void)lardkit_lfsdoctor_scan(0);
+        out_append("lfsdoctor: wrote lfsdoctor.lardd\n");
+        cmd_lfsdoctor_status();
+        return;
+    }
+    if (strcmp(sub, "repair") == 0 || strcmp(sub, "fix") == 0) {
+        int r = lardkit_lfsdoctor_scan(1);
+        out_append(r == 0 ? "lfsdoctor: repair path completed.\n" : "lfsdoctor: repair path reported an issue.\n");
+        cmd_lfsdoctor_status();
+        return;
+    }
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
+        (void)lardkit_lfsdoctor_scan(0);
+        cmd_larddoc("lfsdoctor.lardd", "Usage: lfsdoctor show");
+        return;
+    }
+    out_append("Usage: lfsdoctor status|scan|repair|show\n");
 }
 
 static void cmd_ltheme_status(void)
@@ -4660,11 +4909,14 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "bootprof") == 0) { cmd_bootprof(args); return; }
     if (strcmp(cmd, "bootmap") == 0) { cmd_bootmap(args); return; }
     if (strcmp(cmd, "crashlog") == 0) { cmd_crashlog(args); return; }
-    if (strcmp(cmd, "panicroom") == 0) { cmd_panicroom(args); return; }
+    if (strcmp(cmd, "panicroom") == 0 || strcmp(cmd, "panic") == 0) { cmd_panicroom(args); return; }
+    if (strcmp(cmd, "paniccapsule") == 0) { cmd_paniccapsule(args); return; }
     if (strcmp(cmd, "rollback") == 0) { cmd_rollback(args); return; }
     if (strcmp(cmd, "trust") == 0) { cmd_trust(args); return; }
     if (strcmp(cmd, "bugeye") == 0) { cmd_bugeye(args); return; }
+    if (strcmp(cmd, "bugreplay") == 0) { cmd_bugreplay(args); return; }
     if (strcmp(cmd, "oldcheck") == 0) { cmd_oldcheck(args); return; }
+    if (strcmp(cmd, "lfsdoctor") == 0) { cmd_lfsdoctor(args); return; }
     if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
     if (strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) { cmd_prio(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
@@ -4680,6 +4932,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lpack") == 0) { cmd_lpack(args); return; }
     if (strcmp(cmd, "lpackls") == 0) { cmd_lpack_op("list", args); return; }
     if (strcmp(cmd, "lpackinstall") == 0) { cmd_lpack_op("install", args); return; }
+    if (strcmp(cmd, "lpackverify") == 0) { cmd_lpack_op("verify", args); return; }
+    if (strcmp(cmd, "lpackundo") == 0) { cmd_lpack("undo"); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }
     if (strcmp(cmd, "append") == 0) { cmd_append(args); return; }

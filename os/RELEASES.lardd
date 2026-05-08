@@ -3,6 +3,14 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.33.0a
+ITEM Added BugReplay, a native screen-bug replay log that records BugEye scan frames and writes bugreplay.lardd.
+ITEM Added Trust history so permission allow/deny changes are auditable without taking control away from the user.
+ITEM Added LPack verify and undo: packages now report structure, hash, installable targets, warnings, and can roll back the last install snapshot.
+ITEM Added Panic Capsule, a recovery bundle report that gathers panic, crashlog, BugEye, BugReplay, Trust, TaskPrio, LFSDoctor, and BootMap state into paniccapsule.lardd.
+ITEM Added LFSDoctor scan/repair reports for the built-in filesystem and LPST persistence state.
+ITEM Added POST/selftest coverage for the new writable report files and recovery-control paths.
+
 SECTION v1.32.1p
 ITEM Hotpatch: BugEye now writes every scan to writable bugreport.lardd as a native LARDD report.
 ITEM Added priority history, task history, and prio history for tracking who granted priority lev.10 and in what sequence.

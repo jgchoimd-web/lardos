@@ -71,6 +71,37 @@ static void scopy(char* dst, uint32_t cap, const char* src)
     dst[i] = '\0';
 }
 
+static void report_append(FsWritableFile* f, const char* s)
+{
+    uint32_t n = 0;
+    if (!f || !s) return;
+    while (s[n]) n++;
+    (void)fs_append(f, (const uint8_t*)s, n);
+}
+
+static void report_append_u32(FsWritableFile* f, uint32_t v)
+{
+    char tmp[10];
+    uint32_t n = 0;
+    if (v == 0) {
+        report_append(f, "0");
+        return;
+    }
+    while (v && n < sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (v % 10u));
+        v /= 10u;
+    }
+    while (n > 0) {
+        char c = tmp[--n];
+        (void)fs_append(f, (const uint8_t*)&c, 1u);
+    }
+}
+
+static void report_append_bool(FsWritableFile* f, int on)
+{
+    report_append(f, on ? "yes" : "no");
+}
+
 static int streq(const char* a, const char* b)
 {
     uint32_t i = 0;
@@ -111,18 +142,60 @@ void lardkit_bugeye_enable(int on)
     s_lardkit.bugeye.enabled = on ? 1u : 0u;
 }
 
+int lardkit_bugeye_write_report(void)
+{
+    FsWritableFile* w = fs_open_writable("bugreport.lardd");
+    const screencheck_info_t* sc = &s_lardkit.bugeye.screen;
+    static const char header[] = "LARDD 1\nTITLE BugEye Report\n";
+    if (!w) return -1;
+    w->size = 0;
+    if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
+    report_append(w, "SECTION Last Scan\n");
+    report_append(w, s_lardkit.bugeye.bug_count == 0 ? "TEXT result OK\n" : "TEXT result CHECK\n");
+    report_append(w, "ITEM enabled ");
+    report_append_bool(w, s_lardkit.bugeye.enabled != 0u);
+    report_append(w, "\nITEM scans ");
+    report_append_u32(w, s_lardkit.bugeye.scans);
+    report_append(w, "\nITEM visible-bugs ");
+    report_append_u32(w, s_lardkit.bugeye.bug_count);
+    report_append(w, "\nITEM last-error ");
+    report_append_u32(w, s_lardkit.bugeye.last_error);
+    report_append(w, "\nSECTION Screen\nITEM width ");
+    report_append_u32(w, sc->width);
+    report_append(w, "\nITEM height ");
+    report_append_u32(w, sc->height);
+    report_append(w, "\nITEM changed-samples ");
+    report_append_u32(w, sc->changed_samples);
+    report_append(w, "\nITEM tiles-checked ");
+    report_append_u32(w, sc->tiles_checked);
+    report_append(w, "\nITEM bad-tiles ");
+    report_append_u32(w, sc->bad_tiles);
+    report_append(w, "\nITEM window-inside ");
+    report_append_bool(w, sc->window_inside);
+    report_append(w, "\nITEM response-view-ok ");
+    report_append_bool(w, sc->response_view_ok);
+    report_append(w, "\nSECTION Watchpoints\n");
+    report_append(w, "ITEM overlap window-bounds and response-view probes\n");
+    report_append(w, "ITEM clipped-text inferred from response-view layout health\n");
+    report_append(w, "ITEM odd-color or broken-render inferred from low framebuffer change samples\n");
+    report_append(w, "END\n");
+    return 0;
+}
+
 int lardkit_bugeye_scan(void)
 {
     screencheck_info_t info;
     int r = screencheck_probe(&info);
     s_lardkit.bugeye.scans++;
+    s_lardkit.bugeye.screen = info;
     s_lardkit.bugeye.last_error = (r == 0) ? 0u : (uint32_t)(-r);
     if (r != 0) {
         s_lardkit.bugeye.bug_count++;
+        (void)lardkit_bugeye_write_report();
         return r;
     }
-    s_lardkit.bugeye.screen = info;
     s_lardkit.bugeye.bug_count = info.bad_tiles;
+    (void)lardkit_bugeye_write_report();
     return info.bad_tiles == 0 ? 0 : 1;
 }
 
@@ -572,6 +645,10 @@ int lardkit_selftest(void)
     if (lardkit_bugeye_scan() < 0) {
         s_lardkit = saved;
         return -1;
+    }
+    if (!fs_open("bugreport.lardd")) {
+        s_lardkit = saved;
+        return -10;
     }
     if (lardkit_snapshot("selftest") != 0 || !s_lardkit.rollback.valid) {
         s_lardkit = saved;

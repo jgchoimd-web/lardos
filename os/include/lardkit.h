@@ -89,6 +89,7 @@ void lardkit_init(void);
 void lardkit_bugeye_enable(int on);
 int lardkit_bugeye_scan(void);
 void lardkit_bugeye_info(lardkit_bugeye_info_t* out);
+int lardkit_bugeye_write_report(void);
 
 int lardkit_snapshot(const char* label);
 int lardkit_rollback_apply(void);

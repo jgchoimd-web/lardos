@@ -113,8 +113,8 @@ commands:
   small jokes without replacing the user's control.
 - `buddy mood calm|funny|strict|silent` changes the assistant personality.
 - `bugeye on|off|scan` runs a user-visible framebuffer/layout bug monitor on
-  top of the existing screen checks.
-- `rollback snap|apply` snapshots and restores user-visible settings such as
+  top of the existing screen checks and writes `bugreport.lardd`.
+- `rollback snap|last|apply` snapshots and restores user-visible settings such as
   GUI layers, HTTP method, boot profile, assistant, theme, and task priority.
 - `trust list|allow|deny` exposes a user-owned permission policy map for core
   subjects such as shell, GUI, OSLink, packages, and SUM.
@@ -139,7 +139,8 @@ commands:
   queued work without hiding it from the user. User priorities span `0..10`;
   priority `lev.10` is user-grantable urgent work via `task urgent id`,
   `task set id 10`, `prio id 10`, or `nice 10 command`; it cannot be reached
-  by wait-time aging and is dequeued before all normal work.
+  by wait-time aging and is dequeued before all normal work. `priority history`
+  audits who granted lev.10 and the sequence in which it happened.
 - `bootprof` controls boot profiles stored in `bootprof.txt`. `normal` boots
   normally, `safe` forces POST and skips networking, `netoff` skips networking,
   `dev` keeps networking on while raising the default task priority, and
@@ -162,8 +163,8 @@ commands:
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
   assertion checks, stepped loops, repeat loops, and integer math helpers.
 - `write file text`, `append file text`, and `copy src dst` edit writable RAM
-  files such as `notes.txt`, `lafillo_saved.txt`, `lar_extract.txt`, and
-  `vcs_restore.txt`.
+  files such as `notes.txt`, `bugreport.lardd`, `lafillo_saved.txt`,
+  `lar_extract.txt`, and `vcs_restore.txt`.
 - `sync` / `fssave` persists writable RAM files to the LPST dual-bank store.
 - `sum` enters ring-0 mode; `peek addr [len]`, `poke addr value [8|16|32]`,
   and `asm_` expose raw memory and I/O controls.

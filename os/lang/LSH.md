@@ -15,8 +15,8 @@
 - `exexgui on|off|focus|next` - sketch split GUI with GUI, terminal, and status panes.
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
 - `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
-- `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks.
-- `rollback snap|apply` - settings snapshot and restore.
+- `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.
+- `rollback snap|last|apply` - settings snapshot and restore.
 - `trust list|allow|deny` - user-owned permission policy map.
 - `bootmap` / `oldcheck draw` / `awakemon` - boot phase map, retro storage check, and Awakening monitor.
 - `ltheme list|show|use name` - native shell theme presets and `.ltheme` files.
@@ -25,7 +25,8 @@
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
 - `awake on|off|status|test` - control the default-off Awakening fast-boot mode.
 - `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.
-- `task list|set|default|run|boost|urgent|drop` - inspect and change task priority.
+- `task list|set|default|run|history|boost|urgent|drop` - inspect and change task priority.
+- `priority history` / `prio history` - audit who granted priority `lev.10`.
 - `tasktop` - show queued tasks with status and priority bars.
 - `nice priority command` - queue a command at a chosen priority.
 - `bootprof status|set` - inspect or select normal, safe, netoff, dev, or awakening boot profiles.
@@ -55,6 +56,7 @@
 - Queue limit: 8 tasks
 - `task set id priority` changes queued work; priority range is 0..10
 - Priority `lev.10` is user-grantable urgent work via `task urgent id`, `task set id 10`, or `nice 10 command`; wait-time aging cannot create it
+- `task history` shows lev.10 grants with sequence, actor, action, and task name
 - `task pause id` keeps a task visible but skips it until `task resume id`
 
 ## Settings Shell

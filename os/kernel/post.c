@@ -108,6 +108,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: default.lguilib", fs_open("default.lguilib") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.ltheme", fs_open("default.ltheme") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
+    post_check("fs: bugreport writable", fs_open_writable("bugreport.lardd") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
     post_check("doc: LARDD renderer", post_doc_parse("lardd_guide.lardd"), emit, user, &pass, &fail);

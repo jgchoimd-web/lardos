@@ -71,6 +71,14 @@ static const uint8_t crashlog_init[] = "LardOS crashlog\n";
 static uint8_t ram_crashlog_buf[CRASHLOG_CAP];
 static FsWritableFile ram_crashlog = { "crashlog.txt", ram_crashlog_buf, 0, CRASHLOG_CAP };
 
+#define BUGREPORT_CAP 4096u
+static const uint8_t bugreport_init[] =
+    "LARDD 1\n"
+    "TITLE BugEye Report\n"
+    "TEXT No BugEye scan has run yet.\n";
+static uint8_t ram_bugreport_buf[BUGREPORT_CAP];
+static FsWritableFile ram_bugreport = { "bugreport.lardd", ram_bugreport_buf, 0, BUGREPORT_CAP };
+
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
 #define LPST_VERSION     2u
 #define LPST_START_LBA   2752u
@@ -124,8 +132,9 @@ static const uint8_t file_lardos_lars[] =
     "li Use crashlog show to inspect panic and diagnostic history.\n"
     "li Use lpack list sample.lpack and lpack install sample.lpack for native package installs.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
-    "li Use bugeye scan to catch visible framebuffer/layout bugs from inside the OS.\n"
-    "li Use rollback snap and rollback apply to save and restore user-visible settings.\n"
+    "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
+    "li Use rollback snap and rollback last to save and restore user-visible settings.\n"
+    "li Use priority history to audit who granted priority lev.10.\n"
     "li Use trust list to inspect the user-owned permission policy map.\n"
     "li Use bootmap, oldcheck draw, and awakemon to see boot structure, storage checks, and Awakening progress.\n"
     "li Use ltheme list and ltheme use night for native shell theme presets.\n"
@@ -166,7 +175,9 @@ static const uint8_t file_lardos_lars[] =
     "cmd lpack list sample.lpack\n"
     "cmd screencheck retro\n"
     "cmd bugeye scan\n"
+    "cmd type bugreport.lardd\n"
     "cmd rollback snap demo\n"
+    "cmd priority history\n"
     "cmd trust list\n"
     "cmd bootmap\n"
     "cmd oldcheck draw\n"
@@ -421,7 +432,7 @@ static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
 
 static uint32_t writable_count(void)
 {
-    return 7u;
+    return 8u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -433,6 +444,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 4) return &ram_vcs_restore;
     if (idx == 5) return &ram_bootprof;
     if (idx == 6) return &ram_crashlog;
+    if (idx == 7) return &ram_bugreport;
     return NULL;
 }
 
@@ -454,6 +466,10 @@ void fs_init(void)
         ram_crashlog_buf[i] = crashlog_init[i];
     }
     ram_crashlog.size = sizeof(crashlog_init) - 1;
+    for (uint32_t i = 0; i < sizeof(bugreport_init) - 1 && i < BUGREPORT_CAP; i++) {
+        ram_bugreport_buf[i] = bugreport_init[i];
+    }
+    ram_bugreport.size = sizeof(bugreport_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
 }
@@ -548,6 +564,15 @@ const FsFile* fs_open(const char* name)
             g_ram_result.size = ram_crashlog.size;
             return &g_ram_result;
         }
+        j = 0;
+        const char* n7 = "bugreport.lardd";
+        while (n7[j] && name[j] && n7[j] == name[j]) j++;
+        if (n7[j] == '\0' && name[j] == '\0') {
+            g_ram_result.name = ram_bugreport.name;
+            g_ram_result.data = ram_bugreport.data;
+            g_ram_result.size = ram_bugreport.size;
+            return &g_ram_result;
+        }
     }
     return 0;
 }
@@ -584,6 +609,7 @@ void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user
     cb(ram_vcs_restore.name, ram_vcs_restore.size, user);
     cb(ram_bootprof.name, ram_bootprof.size, user);
     cb(ram_crashlog.name, ram_crashlog.size, user);
+    cb(ram_bugreport.name, ram_bugreport.size, user);
 }
 
 static int lpst_name_equals(const uint8_t* fixed_name, const char* name)
@@ -794,6 +820,10 @@ FsWritableFile* fs_open_writable(const char* name)
     i = 0;
     while (n6[i] && name[i] && n6[i] == name[i]) i++;
     if (n6[i] == '\0' && name[i] == '\0') return &ram_crashlog;
+    const char* n7 = "bugreport.lardd";
+    i = 0;
+    while (n7[i] && name[i] && n7[i] == name[i]) i++;
+    if (n7[i] == '\0' && name[i] == '\0') return &ram_bugreport;
     return NULL;
 }
 

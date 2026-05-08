@@ -255,7 +255,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "nice", 1 }, { "prio", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "oldcheck", 1 }, { "larsview", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "oldcheck", 1 }, { "larsview", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -1144,8 +1144,8 @@ static void cmd_help(const char* args)
     out_append("  exexgui on|off|focus gui|term|info|next|test\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
-    out_append("  bugeye on|off|scan              visual bug monitor using screen probes\n");
-    out_append("  rollback snap|apply             save/restore user-visible settings\n");
+    out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
+    out_append("  rollback snap|last|apply        save/restore user-visible settings\n");
     out_append("  trust list|allow|deny           user-owned permission policy map\n");
     out_append("  bootmap oldcheck awakemon       boot map, retro storage check, awake loader monitor\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
@@ -1161,7 +1161,7 @@ static void cmd_help(const char* args)
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
     out_append("  drivers fsstat fsload fssave sync sram screencheck sandbox exitsandbox\n");
-    out_append("  tasktop  task list|set|urgent|up|down|pause|resume|drop  nice prio cmd\n");
+    out_append("  tasktop  task list|set|urgent|history|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
     out_append("  crashlog show|clear|test\n");
@@ -1186,7 +1186,7 @@ static void cmd_control(const char* args)
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  magic explain       show why magic executed or refused its last prediction\n");
     out_append("  mode probe          real16 <-> long64 controlled roundtrip\n");
-    out_append("  bugeye scan         scan for visible framebuffer/layout bugs\n");
+    out_append("  bugeye scan         scan for visible bugs and write bugreport.lardd\n");
     out_append("  rollback snap       snapshot settings before experiments\n");
     out_append("  trust list          inspect user-controlled permission policy\n");
     out_append("  oslink bus          inspect LardOS-internal OSLink messages\n");
@@ -1197,6 +1197,7 @@ static void cmd_control(const char* args)
     out_append("  cfg style 2         set desktop style by number\n");
     out_append("  buddy on            enable the roaming casual assistant\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
+    out_append("  priority history    show who granted priority lev.10 and when\n");
     out_append("  awake on            enable fast screen boot for next boot\n");
     out_append("  awake off           return next boot to normal and stop loader\n");
     out_append("  bootmap             show the boot structure as numbered phases\n");
@@ -2390,6 +2391,7 @@ static void cmd_bugeye(const char* args)
     if (strcmp(sub, "scan") == 0 || strcmp(sub, "run") == 0) {
         int r = lardkit_bugeye_scan();
         out_append(r == 0 ? "bugeye: no visible layout bugs found.\n" : "bugeye: check report.\n");
+        out_append("bugeye: wrote bugreport.lardd\n");
         cmd_bugeye_status();
         return;
     }
@@ -2876,6 +2878,46 @@ static void cmd_task_list(void)
     }
 }
 
+static void cmd_task_history(const char* args)
+{
+    char sub[16];
+    uint32_t count;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) == 0 &&
+        (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0)) {
+        taskprio_history_clear();
+        out_append("priority history: cleared.\n");
+        return;
+    }
+    count = taskprio_history_count();
+    out_append("Priority lev.10 history count=");
+    out_append_u32(count);
+    out_append("\n");
+    if (count == 0) {
+        out_append("priority history: no lev.10 grants yet.\n");
+        return;
+    }
+    out_append("SEQ ACTOR ACTION TASK OLD->NEW\n");
+    for (uint32_t i = 0; i < count; i++) {
+        taskprio_history_entry_t e;
+        if (taskprio_history_at(i, &e) != 0) continue;
+        out_append_u32(e.seq);
+        out_append(" ");
+        out_append(e.actor);
+        out_append(" ");
+        out_append(e.action);
+        out_append(" #");
+        out_append_u32(e.id);
+        out_append(" ");
+        out_append(e.name);
+        out_append(" ");
+        out_append_i32(e.old_priority);
+        out_append("->");
+        out_append_i32(e.new_priority);
+        out_append("\n");
+    }
+}
+
 static void tasktop_bar(int32_t priority)
 {
     if (priority == TASKPRIO_OS_LEVEL) {
@@ -2969,6 +3011,10 @@ static void cmd_task(const char* args)
     }
     if (strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0 || strcmp(sub, "status") == 0) {
         cmd_task_list();
+        return;
+    }
+    if (strcmp(sub, "history") == 0 || strcmp(sub, "hist") == 0 || strcmp(sub, "audit") == 0) {
+        cmd_task_history(args);
         return;
     }
     if (strcmp(sub, "default") == 0) {
@@ -3071,7 +3117,7 @@ static void cmd_task(const char* args)
         out_append(taskprio_selftest() == 0 ? "task: selftest OK\n" : "task: selftest failed\n");
         return;
     }
-    out_append("Usage: task list|set|default|run|up|down|pause|resume|boost|urgent|drop|test\n");
+    out_append("Usage: task list|set|default|run|history|up|down|pause|resume|boost|urgent|drop|test\n");
     out_append("Note: lev.10 is urgent and user-grantable; wait-time aging still cannot create it.\n");
 }
 
@@ -3082,10 +3128,17 @@ static void cmd_nice(const char* args)
 
 static void cmd_prio(const char* args)
 {
+    const char* p = args ? args : "";
+    char word[16];
     uint32_t id;
     int32_t prio;
+    if (vcs_read_word(&p, word, sizeof(word)) == 0 &&
+        (strcmp(word, "history") == 0 || strcmp(word, "hist") == 0 || strcmp(word, "audit") == 0)) {
+        cmd_task_history(p);
+        return;
+    }
     if (vcs_parse_u32(&args, &id) != 0 || task_parse_priority(&args, &prio) != 0) {
-        out_append("Usage: prio id priority (0..10; lev.10 urgent)\n");
+        out_append("Usage: prio id priority | prio history (0..10; lev.10 urgent)\n");
         return;
     }
     if (taskprio_set_priority(id, prio) == 0) out_append("prio: updated.\n");
@@ -4613,7 +4666,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "bugeye") == 0) { cmd_bugeye(args); return; }
     if (strcmp(cmd, "oldcheck") == 0) { cmd_oldcheck(args); return; }
     if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
-    if (strcmp(cmd, "prio") == 0) { cmd_prio(args); return; }
+    if (strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) { cmd_prio(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
     if (strcmp(cmd, "peek") == 0) { cmd_peek(args); return; }
     if (strcmp(cmd, "poke") == 0) { cmd_poke(args); return; }

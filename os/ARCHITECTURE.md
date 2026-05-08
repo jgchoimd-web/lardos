@@ -260,7 +260,9 @@ highest effective priority and ages waiting tasks. User-visible priorities are
 `0..10`; `lev.10` is an urgent level the user can grant directly with
 `task urgent id`, `task set id 10`, `prio id 10`, `nice 10 command`,
 `task default 10`, or `task boost`. It is not produced by aging and is selected
-before normal scoring whenever it is queued.
+before normal scoring whenever it is queued. `task history`, `prio history`,
+and `priority history` keep an in-kernel audit trail of lev.10 grants with
+actor, sequence, action, and task name.
 
 `bootprof.c` reads `bootprof.txt` after the writable filesystem is restored and
 turns it into boot behavior. `normal` uses the default path, `safe` forces POST
@@ -287,7 +289,7 @@ changes its personality.
 
 `lardkit.c` groups user-control tools that sit on top of existing kernel
 modules without external libraries. BugEye scans visible framebuffer/layout
-health, Rollback snapshots and restores user-visible settings, Trust stores a
+health and writes `bugreport.lardd`, Rollback snapshots and restores user-visible settings, Trust stores a
 user-owned permission policy map, BootMap lists boot phases, PanicRoom exposes a
 recovery stance, OldCheck draws a retro storage-check screen, LTheme selects
 native shell theme presets, AwakeMonitor reports background boot progress,

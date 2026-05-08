@@ -3,6 +3,11 @@ TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 
+SECTION v1.32.1p
+ITEM Hotpatch: BugEye now writes every scan to writable bugreport.lardd as a native LARDD report.
+ITEM Added priority history, task history, and prio history for tracking who granted priority lev.10 and in what sequence.
+ITEM Added POST coverage for bugreport.lardd and TaskPrio lev.10 history.
+
 SECTION v1.32.0a
 ITEM Added LardKit, a native C feature suite for BugEye, Rollback, Trust, BootMap, PanicRoom, OldCheck, LTheme, AwakeMonitor, OSChat, LARSView, and LARDD notes.
 ITEM Added magic explain so the shell records why Magic executed, refused, or failed a prediction.

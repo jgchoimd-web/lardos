@@ -322,6 +322,11 @@ as an actionable control and can be listed with `larsform` or executed with
 `larsact`; `input name value` gives LARS a native field record without falling
 back to HTML.
 
+The GUI cursor can also be owned through the picture Unicode registry. LSH's
+`cursor set U+E000` stores a PUA codepoint in GUI state; the final cursor pass
+then renders that slot through the same live `img_glyph_render` path used by
+inline picture characters, falling back to the block cursor if the slot is empty.
+
 `lpack.c` owns the native LardPack package format. `LPACK 1` files are simple
 record streams with `FILE name` and `ENDFILE` blocks, parsed by freestanding C.
 LSH exposes `lpack info`, `lpack list`, and `lpack install`; installs target the

@@ -18,6 +18,7 @@
 - `exexgui on|off|focus|next|workspace|save|load` - sketch split GUI with GUI, terminal, status panes, and workspaces 1/2/3.
 - GUI polish was beta-tracked in `v1.36.0b` and promoted in official `v1.40.0a` with the glyph and rough-edge repair track.
 - `glyph demo|list|load|auto|show|clear|live|click|insert|write` - bind BMP pictures to private-use Unicode slots U+E000..U+E0FF, render them inline, click them in the GUI, and toggle realtime hover/click rendering.
+- `cursor status|set U+E000|off` - bind the GUI mouse cursor to a user-owned picture Unicode slot.
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
 - `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
 - `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.

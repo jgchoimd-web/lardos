@@ -258,7 +258,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -1191,6 +1191,7 @@ static void cmd_help(const char* args)
     out_append("  lunit run tests.lunit, cfgprof save name/load name, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  glyph demo|list|load|auto|show|live|click|insert|write  clickable live PUA pictures\n");
+    out_append("  cursor set U+E000|off           use a picture Unicode slot as the GUI cursor\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
     out_append("  notes show|add|clear            syncs notes.lardd and GUI notes.txt\n");
@@ -1259,6 +1260,7 @@ static void cmd_control(const char* args)
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
     out_append("  glyph live U+E000 on            enable realtime hover/click rendering for a picture glyph\n");
+    out_append("  cursor U+E000     assign the mouse cursor to a user-owned Unicode picture slot\n");
     out_append("  cfgprof save safe-ui save/load a bundle of settings\n");
     out_append("  userlaw show        inspect user-right policy principles\n");
     out_append("  lunit run tests.lunit run small OS feature tests\n");
@@ -4585,6 +4587,82 @@ static void cmd_glyph(const char* args)
     glyph_usage();
 }
 
+static void cursor_status(void)
+{
+    gui_cursor_info_t cur;
+    img_glyph_info_t info;
+    gui_cursor_info(&cur);
+    out_append("Cursor ");
+    out_append(cur.enabled ? "unicode " : "default ");
+    if (cur.enabled) {
+        glyph_out_cp(cur.cp);
+        out_append(cur.assigned ? " assigned" : " empty");
+        if (img_glyph_info(cur.cp, &info) == 0) {
+            out_append(" name=");
+            out_append(info.name);
+            out_append(" live=");
+            out_append(info.live ? "on" : "off");
+        }
+    }
+    out_append(" renders=");
+    out_append_u32(cur.render_count);
+    out_append(" fallbacks=");
+    out_append_u32(cur.fallback_count);
+    out_append(" err=");
+    out_append_u32(cur.last_error);
+    out_append("\n");
+}
+
+static void cursor_usage(void)
+{
+    out_append("Usage: cursor [status]|set U+E000|U+E000|off\n");
+}
+
+static void cmd_cursor(const char* args)
+{
+    char sub[16];
+    char cp_arg[16];
+    uint32_t cp;
+    img_glyph_info_t info;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cursor_status();
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "default") == 0 || strcmp(sub, "block") == 0) {
+        gui_cursor_disable();
+        out_append("cursor: default block cursor\n");
+        return;
+    }
+    if (strcmp(sub, "set") == 0 || strcmp(sub, "unicode") == 0 || strcmp(sub, "glyph") == 0) {
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0) {
+            cursor_usage();
+            return;
+        }
+    } else {
+        uint32_t i = 0;
+        while (sub[i] && i + 1u < sizeof(cp_arg)) {
+            cp_arg[i] = sub[i];
+            i++;
+        }
+        cp_arg[i] = '\0';
+    }
+    if (glyph_parse_cp(cp_arg, &cp) != 0 || gui_cursor_set_unicode(cp) != 0) {
+        out_append("cursor: codepoint must be U+E000..U+E0FF.\n");
+        return;
+    }
+    out_append("cursor: unicode cursor set to ");
+    glyph_out_cp(cp);
+    if (img_glyph_info(cp, &info) == 0) {
+        out_append(" (");
+        out_append(info.name);
+        out_append(")\n");
+    } else {
+        out_append(" (empty slot; run glyph demo/load to give it a picture)\n");
+    }
+}
+
 static void cmd_copy(const char* args)
 {
     char src_arg[64];
@@ -5806,6 +5884,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
     if (strcmp(cmd, "glyph") == 0 || strcmp(cmd, "glyphs") == 0 || strcmp(cmd, "uglyph") == 0 || strcmp(cmd, "picglyph") == 0) { cmd_glyph(args); return; }
+    if (strcmp(cmd, "cursor") == 0 || strcmp(cmd, "ucursor") == 0) { cmd_cursor(args); return; }
     if (strcmp(cmd, "awake") == 0 || strcmp(cmd, "awakening") == 0) { cmd_awake(args); return; }
     if (strcmp(cmd, "awakemon") == 0) { cmd_awakemon(args); return; }
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }

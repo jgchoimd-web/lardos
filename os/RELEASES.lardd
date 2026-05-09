@@ -4,6 +4,13 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.42.0b
+ITEM Added Unicode cursor assignment: cursor set U+E000 makes the GUI mouse cursor render from a user-owned picture Unicode slot.
+ITEM The cursor renderer reuses the live image-glyph path, so assigned slots keep their realtime hover/click styling when used as a cursor.
+ITEM Empty cursor slots safely fall back to the default block cursor until the user loads or demos a picture glyph.
+ITEM Added cursor status counters and POST coverage for the Unicode cursor control surface.
+ITEM Release media uses beta b-channel versioning while cursor-glyph ergonomics stabilize.
+
 SECTION v1.41.0b
 ITEM Beta PanicRoom real-mode texture pass: runtime panic now enters a real16 bridge window before long64 recovery.
 ITEM Added a real-mode VGA default texture with an LPR badge, hazard pattern, and REAL16 label drawn from the low-memory trampoline.

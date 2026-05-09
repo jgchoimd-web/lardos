@@ -45,6 +45,20 @@ int gui_img_glyph_interaction_selftest(void);
 
 typedef struct {
     uint32_t enabled;
+    uint32_t cp;
+    uint32_t assigned;
+    uint32_t render_count;
+    uint32_t fallback_count;
+    uint32_t last_error;
+} gui_cursor_info_t;
+
+int gui_cursor_set_unicode(uint32_t cp);
+void gui_cursor_disable(void);
+void gui_cursor_info(gui_cursor_info_t* out);
+int gui_unicode_cursor_selftest(void);
+
+typedef struct {
+    uint32_t enabled;
     uint32_t x;
     uint32_t y;
     uint32_t w;

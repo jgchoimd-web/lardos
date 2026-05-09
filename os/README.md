@@ -123,6 +123,9 @@ commands:
   panic enters the real16 bridge, draws an iconic default VGA texture with an
   LPR badge and REAL16 label, returns to long64, then keeps the recovery keys
   available. `panicroom texture` can draw the default texture on demand.
+- `v1.42.0b` lets the GUI cursor point at a Unicode picture slot:
+  `cursor set U+E000` renders the mouse cursor from that user-owned PUA glyph,
+  while `cursor off` restores the default block cursor.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
@@ -170,6 +173,8 @@ commands:
 - `ltheme list|show|use name` selects native shell theme presets or parses
   `.ltheme` files such as `default.ltheme`; `ltheme preview file.ltheme` draws
   a small preview panel before applying.
+- `cursor status`, `cursor set U+E000`, and `cursor off` bind the mouse cursor
+  to the same user-owned picture Unicode slots managed by `glyph demo/load`.
 - `cfgprof save name` and `cfgprof load name` store/load settings bundles
   (`cfg profile` in the feature map), while `userlaw show` opens the user-right
   policy file.

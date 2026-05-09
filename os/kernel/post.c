@@ -146,6 +146,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("gui: screenram scratch", gui_screenram_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: retro screencheck", screencheck_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: clickable image glyphs", gui_img_glyph_interaction_selftest() == 0, emit, user, &pass, &fail);
+    post_check("gui: unicode cursor slot", gui_unicode_cursor_selftest() == 0, emit, user, &pass, &fail);
     post_check("kit: user feature suite", lardkit_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: exgui desktop layer", exgui_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: exexgui split layout", exexgui_selftest() == 0, emit, user, &pass, &fail);

@@ -117,6 +117,12 @@ typedef struct {
     uint32_t glyph_hit_count;
     gui_glyph_hit_t glyph_hits[GUI_GLYPH_HITS_MAX];
     uint32_t glyph_render_pixels[IMG_GLYPH_SIZE * IMG_GLYPH_SIZE];
+    uint32_t cursor_enabled;
+    uint32_t cursor_cp;
+    uint32_t cursor_render_count;
+    uint32_t cursor_fallback_count;
+    uint32_t cursor_last_error;
+    uint32_t cursor_render_pixels[IMG_GLYPH_SIZE * IMG_GLYPH_SIZE];
 
     /* LARSH */
     larsh_scene_t larsh_scene;
@@ -469,6 +475,26 @@ static void fb_draw_image(const fb_t* f, uint16_t x, uint16_t y, const uint32_t*
     }
 }
 
+static void fb_draw_image_scaled(const fb_t* f, int x, int y, const uint32_t* pixels, uint16_t w, uint16_t h, uint16_t scale)
+{
+    if (!pixels || scale == 0) return;
+    for (uint16_t py = 0; py < h; py++) {
+        for (uint16_t px = 0; px < w; px++) {
+            uint32_t argb = pixels[py * (uint32_t)w + px];
+            if ((argb >> 24) == 0) continue;
+            for (uint16_t sy = 0; sy < scale; sy++) {
+                for (uint16_t sx = 0; sx < scale; sx++) {
+                    int dx = x + (int)px * (int)scale + sx;
+                    int dy = y + (int)py * (int)scale + sy;
+                    if (dx >= 0 && dy >= 0 && dx < (int)f->w && dy < (int)f->h) {
+                        fb_putpixel(f, (uint16_t)dx, (uint16_t)dy, argb);
+                    }
+                }
+            }
+        }
+    }
+}
+
 int gui_init(void)
 {
     g_have_fb = (fb_from_bootinfo(&g_fb) == 0);
@@ -539,6 +565,11 @@ int gui_init(void)
     g.glyph_last_click_tick = 0;
     g.glyph_rendered_last = 0;
     g.glyph_hit_count = 0;
+    g.cursor_enabled = 0;
+    g.cursor_cp = IMG_GLYPH_PUA_START;
+    g.cursor_render_count = 0;
+    g.cursor_fallback_count = 0;
+    g.cursor_last_error = 0;
     g.larsh_loaded = 0;
     g.larsh_playing = 0;
     g.larsh_tick = 0;
@@ -731,13 +762,85 @@ int gui_screenram_selftest(void)
 
 static void gui_draw_cursor_at(int x, int y, uint32_t color)
 {
-    // Simple 8x12 block cursor.
+    const fb_t* tgt = g_have_bb ? &g_bb : &g_fb;
+    uint16_t gw = 0;
+    uint16_t gh = 0;
+    if (g.cursor_enabled &&
+        img_glyph_render(g.cursor_cp, g.glyph_tick, 1, g.cursor_render_pixels, &gw, &gh)) {
+        int cw = (int)gw * 2;
+        int ch = (int)gh * 2;
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+        if (x > (int)g_fb.w - cw) x = (int)g_fb.w - cw;
+        if (y > (int)g_fb.h - ch) y = (int)g_fb.h - ch;
+        fb_draw_image_scaled(tgt, x + 1, y + 1, g.cursor_render_pixels, gw, gh, 2);
+        fb_draw_image_scaled(tgt, x, y, g.cursor_render_pixels, gw, gh, 2);
+        g.cursor_render_count++;
+        g.cursor_last_error = 0;
+        return;
+    }
+    if (g.cursor_enabled) {
+        g.cursor_fallback_count++;
+        g.cursor_last_error = 2;
+    }
+
+    // Simple 8x12 fallback cursor.
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     if (x > (int)g_fb.w - 8) x = (int)g_fb.w - 8;
     if (y > (int)g_fb.h - 12) y = (int)g_fb.h - 12;
-    const fb_t* tgt = g_have_bb ? &g_bb : &g_fb;
     fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 8, 12, color);
+}
+
+int gui_cursor_set_unicode(uint32_t cp)
+{
+    if (cp < IMG_GLYPH_PUA_START || cp > IMG_GLYPH_PUA_END) {
+        g.cursor_last_error = 1;
+        return -1;
+    }
+    g.cursor_cp = cp;
+    g.cursor_enabled = 1;
+    g.cursor_last_error = 0;
+    return 0;
+}
+
+void gui_cursor_disable(void)
+{
+    g.cursor_enabled = 0;
+    g.cursor_last_error = 0;
+}
+
+void gui_cursor_info(gui_cursor_info_t* out)
+{
+    img_glyph_info_t info;
+    if (!out) return;
+    out->enabled = g.cursor_enabled;
+    out->cp = g.cursor_cp;
+    out->assigned = img_glyph_info(g.cursor_cp, &info) == 0 ? 1u : 0u;
+    out->render_count = g.cursor_render_count;
+    out->fallback_count = g.cursor_fallback_count;
+    out->last_error = g.cursor_last_error;
+}
+
+int gui_unicode_cursor_selftest(void)
+{
+    uint32_t old_enabled = g.cursor_enabled;
+    uint32_t old_cp = g.cursor_cp;
+    uint32_t old_render_count = g.cursor_render_count;
+    uint32_t old_fallback_count = g.cursor_fallback_count;
+    uint32_t old_error = g.cursor_last_error;
+    gui_cursor_info_t info;
+    int ok = 1;
+    if (gui_cursor_set_unicode(IMG_GLYPH_PUA_START) != 0) ok = 0;
+    gui_cursor_info(&info);
+    if (ok && (!info.enabled || info.cp != IMG_GLYPH_PUA_START)) ok = 0;
+    if (ok && gui_cursor_set_unicode(0x41u) == 0) ok = 0;
+    g.cursor_enabled = old_enabled;
+    g.cursor_cp = old_cp;
+    g.cursor_render_count = old_render_count;
+    g.cursor_fallback_count = old_fallback_count;
+    g.cursor_last_error = old_error;
+    return ok ? 0 : -1;
 }
 
 static int in_rect(int x, int y, int rx, int ry, int rw, int rh)

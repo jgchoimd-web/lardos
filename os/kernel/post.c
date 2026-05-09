@@ -9,6 +9,7 @@
 #include "exexgui.h"
 #include "fs.h"
 #include "gui.h"
+#include "img_glyph.h"
 #include "lar.h"
 #include "lard_doc.h"
 #include "lardkit.h"
@@ -121,6 +122,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: boot replay writable", fs_open_writable("bootreplay.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: cfg profile writable", fs_open_writable("cfgprof.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user law writable", fs_open_writable("userlaw.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: glyph map writable", fs_open_writable("glyphmap.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
@@ -128,6 +130,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("doc: LARS form actions", lard_doc_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);
+    post_check("imgglyph: user picture Unicode slots", img_glyph_selftest() == 0, emit, user, &pass, &fail);
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);
     post_check("version: suffix policy", post_version_suffix_known(), emit, user, &pass, &fail);

@@ -1921,7 +1921,8 @@ void gui_render(void)
         if (bf && bf->size >= 54) {
             bmp_result_t br = { g.gallery_pixels, 0, 0, 0 };
             if (bmp_decode(bf->data, bf->size, &br) == 0 && br.w > 0 && br.h > 0) {
-                img_glyph_assign(0xE000u, g.gallery_pixels, (uint16_t)br.w, (uint16_t)br.h);
+                img_glyph_assign_named(0xE000u, g.gallery_pixels, (uint16_t)br.w, (uint16_t)br.h, "sample.bmp");
+                img_glyph_write_lardd();
                 int scale = 8;
                 if ((int)br.w * scale > view_w - 12) scale = (view_w - 12) / (int)br.w;
                 if ((int)br.h * scale > view_h) scale = view_h / (int)br.h;
@@ -1935,12 +1936,13 @@ void gui_render(void)
                     }
                 }
                 int cap_y = view_y + (int)br.h * scale + 6;
-                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)cap_y, "U+E000 = ", 0xFFFFFFFF, win_bg);
+                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)cap_y, "glyph U+E000 = ", 0xFFFFFFFF, win_bg);
                 const uint32_t* gpx;
                 uint16_t gw, gh;
                 if (img_glyph_get(0xE000u, &gpx, &gw, &gh)) {
-                    fb_draw_image(tgt, (uint16_t)(view_x + 9 * 8), (uint16_t)cap_y, gpx, gw, gh);
+                    fb_draw_image(tgt, (uint16_t)(view_x + 16 * 8), (uint16_t)cap_y, gpx, gw, gh);
                 }
+                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)(cap_y + 12), "LSH: glyph list | glyph auto sample.bmp avatar", 0xFFCFE3FFu, win_bg);
             }
         }
     }

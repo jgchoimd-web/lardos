@@ -102,6 +102,11 @@ commands:
 - `v1.36.0b` starts the GUI polish track: the classic GUI, EXGUI, EXEXGUI, and
   LGUILIB default theme share a warmer multi-accent visual style while keeping
   the previous controls and commands intact.
+- `v1.37.0b` expands TempleOS-style picture Unicode: `glyph demo`,
+  `glyph load U+E000 sample.bmp avatar`, `glyph auto sample.bmp avatar`,
+  `glyph list`, `glyph show`, `glyph insert`, and `glyph write` let the user
+  bind BMP pictures to U+E000..U+E0FF private-use slots and export
+  `glyphmap.lardd`.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

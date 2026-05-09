@@ -17,6 +17,7 @@
 - `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
 - `exexgui on|off|focus|next|workspace|save|load` - sketch split GUI with GUI, terminal, status panes, and workspaces 1/2/3.
 - GUI polish is beta-tracked: `v1.36.0b` refreshes classic GUI chrome, EXGUI, EXEXGUI, and the default LGUILIB theme without removing old controls.
+- `glyph demo|list|load|auto|show|clear|insert|write` - bind BMP pictures to private-use Unicode slots U+E000..U+E0FF, then render them inline in notes and GUI text.
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
 - `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
 - `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.

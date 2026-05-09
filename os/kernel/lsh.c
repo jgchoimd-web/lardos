@@ -4,6 +4,8 @@
  */
 #include "lsh.h"
 #include "fs.h"
+#include "bmp.h"
+#include "img_glyph.h"
 #include "bosl_vm.h"
 #include "lafillo_vm.h"
 #include "os_vm.h"
@@ -256,7 +258,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -575,6 +577,7 @@ static void cmd_dir(const char* args)
         dir_ram_name("lafillo_saved.txt");
         dir_ram_name("lar_extract.txt");
         dir_ram_name("vcs_restore.txt");
+        dir_ram_name("glyphmap.lardd");
     }
 }
 
@@ -1199,7 +1202,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release [policy] ver post baseline selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control status release [policy] ver post baseline selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
@@ -1214,6 +1217,7 @@ static void cmd_help(const char* args)
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
+    out_append("  glyph demo|list|load|auto|show|clear|insert|write  PUA picture characters\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open file              native LARS/LARDD browser state\n");
     out_append("  notes show|add|clear            writable notes.lardd document\n");
@@ -1280,6 +1284,7 @@ static void cmd_control(const char* args)
     out_append("  lfsdoctor scan      diagnose writable files and LPST persistence state\n");
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
+    out_append("  glyph auto sample.bmp avatar    bind a BMP to the next private-use Unicode slot\n");
     out_append("  cfgprof save safe-ui save/load a bundle of settings\n");
     out_append("  userlaw show        inspect user-right policy principles\n");
     out_append("  lunit run tests.lunit run small OS feature tests\n");
@@ -4191,6 +4196,316 @@ static int lsh_read_data_arg(const char* arg, const uint8_t** data, uint32_t* si
     return -2;
 }
 
+#define LSH_GLYPH_MAX_BMP_PIXELS (128u * 128u)
+static uint32_t s_glyph_load_pixels[LSH_GLYPH_MAX_BMP_PIXELS];
+
+static int glyph_hex_digit(char c, uint32_t* out)
+{
+    if (c >= '0' && c <= '9') { *out = (uint32_t)(c - '0'); return 1; }
+    if (c >= 'A' && c <= 'F') { *out = 10u + (uint32_t)(c - 'A'); return 1; }
+    if (c >= 'a' && c <= 'f') { *out = 10u + (uint32_t)(c - 'a'); return 1; }
+    return 0;
+}
+
+static int glyph_parse_cp(const char* s, uint32_t* out)
+{
+    uint32_t v = 0;
+    int base = 10;
+    int saw = 0;
+    int has_alpha = 0;
+    const char* p = s;
+    if (!s || !out) return -1;
+    if ((p[0] == 'U' || p[0] == 'u') && p[1] == '+') {
+        base = 16;
+        p += 2;
+    } else if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+        base = 16;
+        p += 2;
+    } else {
+        for (uint32_t i = 0; p[i]; i++) {
+            if ((p[i] >= 'A' && p[i] <= 'F') || (p[i] >= 'a' && p[i] <= 'f')) has_alpha = 1;
+        }
+        if (has_alpha) base = 16;
+    }
+    while (*p) {
+        uint32_t d = 0;
+        if (base == 16) {
+            if (!glyph_hex_digit(*p, &d)) return -2;
+        } else {
+            if (*p < '0' || *p > '9') return -2;
+            d = (uint32_t)(*p - '0');
+        }
+        if (d >= (uint32_t)base) return -2;
+        v = v * (uint32_t)base + d;
+        saw = 1;
+        p++;
+    }
+    if (!saw || v < IMG_GLYPH_PUA_START || v > IMG_GLYPH_PUA_END) return -3;
+    *out = v;
+    return 0;
+}
+
+static void glyph_out_cp(uint32_t cp)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    out_append("U+");
+    for (int i = 3; i >= 0; i--) {
+        out_append_char(hex[(cp >> (uint32_t)(i * 4)) & 0xFu]);
+    }
+}
+
+static void glyph_out_info(const img_glyph_info_t* info)
+{
+    if (!info) return;
+    glyph_out_cp(info->cp);
+    out_append(" ");
+    out_append(info->name);
+    out_append(" src=");
+    out_append_u32(info->source_w);
+    out_append("x");
+    out_append_u32(info->source_h);
+    out_append(" avg=");
+    out_append_hex32(info->avg_argb);
+    out_append(" rev=");
+    out_append_u32(info->revision);
+    out_append("\n");
+}
+
+static void glyph_usage(void)
+{
+    out_append("Usage: glyph demo|list|load U+E000 file.bmp [name]|auto file.bmp [name]|show U+E000|clear U+E000|insert U+E000 notes.txt|write\n");
+}
+
+static int glyph_load_bmp_to_slot(uint32_t cp, const char* file_arg, const char* label)
+{
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    char name[64];
+    bmp_result_t probe;
+    bmp_result_t br;
+    int r;
+
+    if (lsh_read_data_arg(file_arg, &data, &size, name, sizeof(name)) != 0) {
+        out_append("glyph: BMP file not found.\n");
+        return -1;
+    }
+    probe.pixels = NULL;
+    probe.w = 0;
+    probe.h = 0;
+    probe.has_alpha = 0;
+    r = bmp_decode(data, size, &probe);
+    if (r != 0) {
+        out_append("glyph: only uncompressed 24/32-bit BMP files are supported.\n");
+        return -2;
+    }
+    if (probe.w == 0 || probe.h == 0 || probe.w * probe.h > LSH_GLYPH_MAX_BMP_PIXELS) {
+        out_append("glyph: BMP is too large for the in-kernel importer (max 128x128).\n");
+        return -3;
+    }
+    br.pixels = s_glyph_load_pixels;
+    br.w = 0;
+    br.h = 0;
+    br.has_alpha = 0;
+    r = bmp_decode(data, size, &br);
+    if (r != 0) {
+        out_append("glyph: BMP decode failed.\n");
+        return -4;
+    }
+    if (img_glyph_assign_named(cp, s_glyph_load_pixels, (uint16_t)br.w, (uint16_t)br.h,
+                               (label && label[0]) ? label : name) != 0) {
+        out_append("glyph: assign failed.\n");
+        return -5;
+    }
+    img_glyph_write_lardd();
+    out_append("glyph: assigned ");
+    glyph_out_cp(cp);
+    out_append(" from ");
+    out_append(name);
+    out_append(" (");
+    out_append_u32(br.w);
+    out_append("x");
+    out_append_u32(br.h);
+    out_append(")\n");
+    return 0;
+}
+
+static void cmd_glyph(const char* args)
+{
+    char sub[16];
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        glyph_usage();
+        return;
+    }
+
+    if (strcmp(sub, "demo") == 0 || strcmp(sub, "seed") == 0) {
+        img_glyph_assign_pattern(0xE000u, "face");
+        img_glyph_assign_pattern(0xE001u, "window");
+        img_glyph_assign_pattern(0xE002u, "spark");
+        img_glyph_assign_pattern(0xE003u, "badge");
+        img_glyph_write_lardd();
+        out_append("glyph: demo picture characters assigned at U+E000..U+E003.\n");
+        return;
+    }
+
+    if (strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0) {
+        uint32_t count = img_glyph_count();
+        out_append("Image glyphs ");
+        out_append_u32(count);
+        out_append("/");
+        out_append_u32(IMG_GLYPH_PUA_END - IMG_GLYPH_PUA_START + 1u);
+        out_append("\n");
+        if (!count) {
+            out_append("  none; try glyph demo or glyph auto sample.bmp sample\n");
+            return;
+        }
+        for (uint32_t i = 0; i < count; i++) {
+            img_glyph_info_t info;
+            if (img_glyph_info_at(i, &info) == 0) {
+                out_append("  ");
+                glyph_out_info(&info);
+            }
+        }
+        return;
+    }
+
+    if (strcmp(sub, "load") == 0 || strcmp(sub, "set") == 0 || strcmp(sub, "assign") == 0) {
+        char cp_arg[16];
+        char file_arg[64];
+        char label[IMG_GLYPH_NAME_MAX];
+        uint32_t cp;
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0 ||
+            vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: glyph load U+E000 file.bmp [name]\n");
+            return;
+        }
+        if (glyph_parse_cp(cp_arg, &cp) != 0) {
+            out_append("glyph: codepoint must be U+E000..U+E0FF.\n");
+            return;
+        }
+        if (vcs_read_word(&args, label, sizeof(label)) != 0) label[0] = '\0';
+        glyph_load_bmp_to_slot(cp, file_arg, label);
+        return;
+    }
+
+    if (strcmp(sub, "auto") == 0 || strcmp(sub, "import") == 0) {
+        char file_arg[64];
+        char label[IMG_GLYPH_NAME_MAX];
+        uint32_t cp;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: glyph auto file.bmp [name]\n");
+            return;
+        }
+        if (img_glyph_next_free(&cp) != 0) {
+            out_append("glyph: no free PUA slots.\n");
+            return;
+        }
+        if (vcs_read_word(&args, label, sizeof(label)) != 0) label[0] = '\0';
+        glyph_load_bmp_to_slot(cp, file_arg, label);
+        return;
+    }
+
+    if (strcmp(sub, "show") == 0 || strcmp(sub, "info") == 0) {
+        char cp_arg[16];
+        uint32_t cp;
+        img_glyph_info_t info;
+        char bytes[5];
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0 || glyph_parse_cp(cp_arg, &cp) != 0) {
+            out_append("Usage: glyph show U+E000\n");
+            return;
+        }
+        if (img_glyph_info(cp, &info) != 0) {
+            out_append("glyph: slot is empty.\n");
+            return;
+        }
+        glyph_out_info(&info);
+        if (img_glyph_utf8(cp, bytes) == 3) {
+            out_append("char=");
+            out_append(bytes);
+            out_append(" bytes=");
+            out_append_hex8((uint8_t)bytes[0]);
+            out_append(" ");
+            out_append_hex8((uint8_t)bytes[1]);
+            out_append(" ");
+            out_append_hex8((uint8_t)bytes[2]);
+            out_append("\n");
+        }
+        return;
+    }
+
+    if (strcmp(sub, "clear") == 0 || strcmp(sub, "rm") == 0) {
+        char cp_arg[16];
+        uint32_t cp;
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0 || glyph_parse_cp(cp_arg, &cp) != 0) {
+            out_append("Usage: glyph clear U+E000\n");
+            return;
+        }
+        img_glyph_clear(cp);
+        img_glyph_write_lardd();
+        out_append("glyph: cleared ");
+        glyph_out_cp(cp);
+        out_append("\n");
+        return;
+    }
+
+    if (strcmp(sub, "insert") == 0 || strcmp(sub, "note") == 0) {
+        char cp_arg[16];
+        char file_arg[64];
+        char name[64];
+        char drv;
+        uint32_t cp;
+        char bytes[5];
+        const uint8_t newline = '\n';
+        FsWritableFile* w;
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0) {
+            out_append("Usage: glyph insert U+E000 [notes.txt]\n");
+            return;
+        }
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+            file_arg[0] = 'n'; file_arg[1] = 'o'; file_arg[2] = 't'; file_arg[3] = 'e';
+            file_arg[4] = 's'; file_arg[5] = '.'; file_arg[6] = 't'; file_arg[7] = 'x';
+            file_arg[8] = 't'; file_arg[9] = '\0';
+        }
+        if (glyph_parse_cp(cp_arg, &cp) != 0 || img_glyph_utf8(cp, bytes) != 3) {
+            out_append("glyph: codepoint must be U+E000..U+E0FF.\n");
+            return;
+        }
+        {
+            img_glyph_info_t info;
+            if (img_glyph_info(cp, &info) != 0) {
+                out_append("glyph: slot is empty; load or demo it before insert.\n");
+                return;
+            }
+        }
+        resolve_path(file_arg, &drv, name, sizeof(name));
+        (void)drv;
+        w = fs_open_writable(name);
+        if (!w) {
+            out_append("glyph: target must be a writable RAM file.\n");
+            return;
+        }
+        if (w->size + 4u > w->cap) {
+            out_append("glyph: target file is full.\n");
+            return;
+        }
+        fs_append(w, (const uint8_t*)bytes, 3);
+        fs_append(w, &newline, 1);
+        out_append("glyph: inserted ");
+        glyph_out_cp(cp);
+        out_append(" into ");
+        out_append(name);
+        out_append("\n");
+        return;
+    }
+
+    if (strcmp(sub, "write") == 0 || strcmp(sub, "map") == 0 || strcmp(sub, "export") == 0) {
+        if (img_glyph_write_lardd() == 0) out_append("glyph: wrote glyphmap.lardd\n");
+        else out_append("glyph: glyphmap.lardd is missing.\n");
+        return;
+    }
+
+    glyph_usage();
+}
+
 static void cmd_copy(const char* args)
 {
     char src_arg[64];
@@ -5356,7 +5671,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
-    if (strcmp(cmd, "exgui") == 0 || strcmp(cmd, "exexgui") == 0 || strcmp(cmd, "ltheme") == 0) lardkit_trace_event("gui", cmd, 0);
+    if (strcmp(cmd, "exgui") == 0 || strcmp(cmd, "exexgui") == 0 || strcmp(cmd, "ltheme") == 0 ||
+        strcmp(cmd, "glyph") == 0 || strcmp(cmd, "glyphs") == 0 || strcmp(cmd, "uglyph") == 0 ||
+        strcmp(cmd, "picglyph") == 0) lardkit_trace_event("gui", cmd, 0);
 
     if (s_cfgsh_mode) {
         if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "quit") == 0 || strcmp(cmd, "exitcfg") == 0) {
@@ -5409,6 +5726,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "exexgui") == 0) { cmd_exexgui(args); return; }
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
+    if (strcmp(cmd, "glyph") == 0 || strcmp(cmd, "glyphs") == 0 || strcmp(cmd, "uglyph") == 0 || strcmp(cmd, "picglyph") == 0) { cmd_glyph(args); return; }
     if (strcmp(cmd, "awake") == 0 || strcmp(cmd, "awakening") == 0) { cmd_awake(args); return; }
     if (strcmp(cmd, "awakemon") == 0) { cmd_awakemon(args); return; }
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0) { cmd_task(args); return; }

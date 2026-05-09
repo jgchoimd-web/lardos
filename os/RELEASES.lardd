@@ -4,6 +4,12 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.37.0b
+ITEM Expanded TempleOS-style picture Unicode into a 256-slot user-owned PUA range, U+E000..U+E0FF.
+ITEM Added glyph commands for demo patterns, BMP loading, automatic slot assignment, metadata display, insertion into writable files, and glyphmap.lardd export.
+ITEM Added glyph_guide.lardd, writable glyphmap.lardd, LUNIT command coverage, and POST coverage for the image glyph registry.
+ITEM The Gallery sample now names U+E000 as sample.bmp, refreshes glyphmap.lardd, and points users to glyph list/auto commands.
+
 SECTION v1.36.0b
 ITEM Beta GUI polish pass: refreshed the classic GUI chrome with a warmer multi-accent palette, clearer focus rings, and cleaner input/output frames.
 ITEM Improved EXGUI desktop wallpaper, panels, managed window cards, and task/dock surfaces without replacing existing GUI behavior.

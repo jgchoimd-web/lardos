@@ -4,6 +4,12 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.44.0a
+ITEM Official promotion of the real16 PanicRoom texture, Unicode cursor assignment, and user-editable picture Unicode slot track.
+ITEM The default official build now includes cursor set U+E000 plus glyph move/copy/rename/pixel without requiring the beta channel.
+ITEM POST, LUNIT, QEMU IMG boot, and QEMU ISO boot were rerun for official-release readiness.
+ITEM Release media uses official a-channel versioning with ISO and IMG artifacts.
+
 SECTION v1.43.0b
 ITEM Added user-editable assigned Unicode slots: glyph move, glyph copy, glyph rename, and glyph pixel.
 ITEM glyph move can reassign a picture character to another U+E000..U+E0FF codepoint while preserving the user's image state.

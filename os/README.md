@@ -131,6 +131,9 @@ commands:
   reassign codepoints, duplicate slots, relabel them, and patch individual 8x8
   pixels in-place. If the cursor was bound to a moved slot, it follows the new
   codepoint.
+- `v1.44.0a` promotes the real16 PanicRoom texture, Unicode cursor assignment,
+  and user-editable picture Unicode slot track to the official channel with
+  ISO/IMG release media.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

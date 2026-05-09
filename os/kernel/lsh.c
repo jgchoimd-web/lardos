@@ -471,20 +471,9 @@ void lsh_enter_sum_shortcut(void)
     }
 }
 
-static int s_dir_skip_ram;
-
 static void dir_cb(const char* nm, uint32_t sz, void* u)
 {
     (void)u;
-    if (s_dir_skip_ram) {
-        if (nm[0] == 'n' && nm[1] == 'o' && nm[2] == 't' && nm[3] == 'e' &&
-            nm[4] == 's' && nm[5] == '.' && nm[6] == 't' && nm[7] == 'x' && nm[8] == 't' && nm[9] == '\0')
-            return;
-        if (nm[0] == 'n' && nm[1] == 'o' && nm[2] == 't' && nm[3] == 'e' &&
-            nm[4] == 's' && nm[5] == '.' && nm[6] == 'l' && nm[7] == 'a' && nm[8] == 'r' &&
-            nm[9] == 'd' && nm[10] == 'd' && nm[11] == '\0')
-            return;
-    }
     char ln[96];
     uint32_t i = 0;
     while (nm[i] && i < 48) { ln[i] = nm[i]; i++; }
@@ -501,17 +490,6 @@ static void dir_cb(const char* nm, uint32_t sz, void* u)
     ln[i++] = '\n';
     ln[i] = '\0';
     out_append(ln);
-}
-
-static void dir_ram_name(const char* name)
-{
-    FsWritableFile* w = fs_open_writable(name);
-    if (!w) return;
-    out_append("  ");
-    out_append(w->name);
-    out_append(" ");
-    out_append_u32(w->size);
-    out_append("\n");
 }
 
 static int drive_to_fs(char d)
@@ -568,16 +546,11 @@ static void cmd_dir(const char* args)
     out_append("\n");
 
     if (drive_to_fs(drv) == 0) {
-        s_dir_skip_ram = 1;
-        fs_list(dir_cb, NULL);
-        s_dir_skip_ram = 0;
+        fs_list_readonly(dir_cb, NULL);
+    } else if (drive_to_fs(drv) == 1) {
+        fs_list_writable(dir_cb, NULL);
     } else {
-        dir_ram_name("notes.txt");
-        dir_ram_name("notes.lardd");
-        dir_ram_name("lafillo_saved.txt");
-        dir_ram_name("lar_extract.txt");
-        dir_ram_name("vcs_restore.txt");
-        dir_ram_name("glyphmap.lardd");
+        out_append("dir: bad drive.\n");
     }
 }
 
@@ -1219,8 +1192,8 @@ static void cmd_help(const char* args)
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  glyph demo|list|load|auto|show|live|click|insert|write  clickable live PUA pictures\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
-    out_append("  larsview open file              native LARS/LARDD browser state\n");
-    out_append("  notes show|add|clear            writable notes.lardd document\n");
+    out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
+    out_append("  notes show|add|clear            syncs notes.lardd and GUI notes.txt\n");
     out_append("  lguilib status|show|use|test [file.lguilib]\n");
     out_append("  awake on|off|status|test\n");
     out_append("  write file text  append file text  copy src dst\n");
@@ -1288,7 +1261,7 @@ static void cmd_control(const char* args)
     out_append("  cfgprof save safe-ui save/load a bundle of settings\n");
     out_append("  userlaw show        inspect user-right policy principles\n");
     out_append("  lunit run tests.lunit run small OS feature tests\n");
-    out_append("  notes add text      append to notes.lardd\n");
+    out_append("  notes add text      append to notes.lardd and GUI notes.txt\n");
     out_append("  crashlog show       inspect panic and diagnostic history\n");
     out_append("  lpack verify sample.lpack inspect package integrity before install\n");
     out_append("  lpack undo last     restore files changed by the last install\n");
@@ -3529,8 +3502,12 @@ static void cmd_larsview_status(void)
     lardkit_larsview_info(&info);
     out_append("LARSView path=");
     out_append(info.path);
+    out_append(" previous=");
+    out_append(info.previous_path[0] ? info.previous_path : "none");
     out_append(" opened=");
     out_append_u32(info.opened);
+    out_append(" back=");
+    out_append_u32(info.back_count);
     out_append(" size=");
     out_append_u32(info.size);
     out_append(" err=");
@@ -3553,6 +3530,36 @@ static void cmd_larsview(const char* args)
         cmd_larddoc("lardos.lars", "Usage: larsview open file.lars|file.lardd");
         return;
     }
+    if (strcmp(sub, "reload") == 0 || strcmp(sub, "last") == 0) {
+        lardkit_larsview_info_t info;
+        lardkit_larsview_info(&info);
+        if (lardkit_larsview_open(info.path[0] ? info.path : "lardos.lars") != 0) {
+            out_append("larsview: reload failed.\n");
+            return;
+        }
+        cmd_larddoc(info.path[0] ? info.path : "lardos.lars", "Usage: larsview reload");
+        return;
+    }
+    if (strcmp(sub, "back") == 0) {
+        lardkit_larsview_info_t info;
+        if (lardkit_larsview_back() != 0) {
+            out_append("larsview: no previous document.\n");
+            return;
+        }
+        lardkit_larsview_info(&info);
+        cmd_larddoc(info.path, "Usage: larsview back");
+        return;
+    }
+    if (strcmp(sub, "actions") == 0 || strcmp(sub, "buttons") == 0) {
+        lardkit_larsview_info_t info;
+        if (vcs_read_word(&args, path, sizeof(path)) != 0) {
+            lardkit_larsview_info(&info);
+            cmd_larsform(info.path[0] ? info.path : "lardos.lars");
+        } else {
+            cmd_larsform(path);
+        }
+        return;
+    }
     if (strcmp(sub, "open") == 0 || strcmp(sub, "view") == 0) {
         if (vcs_read_word(&args, path, sizeof(path)) != 0) {
             out_append("Usage: larsview open file.lars|file.lardd\n");
@@ -3565,7 +3572,7 @@ static void cmd_larsview(const char* args)
         cmd_larddoc(path, "Usage: larsview open file.lars|file.lardd");
         return;
     }
-    out_append("Usage: larsview status|home|open file\n");
+    out_append("Usage: larsview status|home|open file|reload|back|actions [file]\n");
 }
 
 static void cmd_larddnotes(const char* args)
@@ -3579,12 +3586,12 @@ static void cmd_larddnotes(const char* args)
     }
     if (strcmp(sub, "add") == 0 || strcmp(sub, "append") == 0) {
         while (*args == ' ' || *args == '\t') args++;
-        if (lardkit_notes_append(args) == 0) out_append("notes: added to notes.lardd\n");
+        if (lardkit_notes_append(args) == 0) out_append("notes: added to notes.lardd and notes.txt\n");
         else out_append("notes: add failed.\n");
         return;
     }
     if (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0) {
-        if (lardkit_notes_reset() == 0) out_append("notes: reset notes.lardd\n");
+        if (lardkit_notes_reset() == 0) out_append("notes: reset notes.lardd and notes.txt\n");
         else out_append("notes: reset failed.\n");
         return;
     }

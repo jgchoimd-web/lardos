@@ -17,8 +17,12 @@ typedef struct FsWritableFile {
 
 void fs_init(void);
 const FsFile* fs_open(const char* name);
+const FsFile* fs_open_readonly(const char* name);
 uint32_t fs_read(const FsFile* file, uint32_t offset, uint8_t* buf, uint32_t len);
 void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user);
+void fs_list_readonly(void (*cb)(const char* name, uint32_t size, void* user), void* user);
+void fs_list_writable(void (*cb)(const char* name, uint32_t size, void* user), void* user);
+uint32_t fs_writable_count(void);
 
 /* Writable RAM files (notes, temp). Returns NULL if not found. */
 FsWritableFile* fs_open_writable(const char* name);

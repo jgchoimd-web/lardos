@@ -110,6 +110,10 @@ commands:
 - `v1.38.0b` makes those picture Unicode slots interactive: rendered glyphs
   keep GUI hitboxes, accept mouse clicks, record click counts in
   `glyphmap.lardd`, and use realtime hover/click/live rendering.
+- `v1.39.0b` starts a rough-edge repair pass for older almost-there features:
+  `dir X:`/`dir Z:` now show the right filesystem surfaces, `notes add` syncs
+  both the LARDD notes file and GUI notes file, and `larsview` gains reload,
+  back, and actions commands.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

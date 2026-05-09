@@ -123,6 +123,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: cfg profile writable", fs_open_writable("cfgprof.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user law writable", fs_open_writable("userlaw.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: glyph map writable", fs_open_writable("glyphmap.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: writable directory index", fs_writable_count() >= 19u, emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);

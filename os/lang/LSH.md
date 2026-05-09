@@ -4,7 +4,7 @@
 
 ## Commands
 
-- `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc.
+- `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc. `dir X:` lists read-only system files; `dir Z:` lists every writable RAM file.
 - `release policy` - show when to use `a`, `b`, or `p` release suffixes.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `post baseline` / `postbaseline show` - show the saved POST baseline report.
@@ -33,7 +33,7 @@
 - `ltheme list|show|preview|use name` - native shell theme presets and `.ltheme` files.
 - `cfgprof save|load name` / `cfg profile` in the feature map / `userlaw show` - settings profiles and user-right policy.
 - `oschat say|send|read` - local OSLink chat-style messages.
-- `larsview open file` / `larsapp open|form|run` / `notes show|add|clear` - native document/app browser state and writable `notes.lardd`.
+- `larsview open|reload|back|actions file` / `larsapp open|form|run` / `notes show|add|clear` - native document/app browser state and notes synced between `notes.lardd` and GUI `notes.txt`.
 - `lunit run tests.lunit` - run small native feature tests.
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
 - `awake on|off|status|test` - control the default-off Awakening fast-boot mode.

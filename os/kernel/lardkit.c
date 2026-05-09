@@ -1429,7 +1429,7 @@ void lardkit_awakemon_info(lardkit_awakemon_info_t* out)
 int lardkit_larsview_open(const char* path)
 {
     const FsFile* f;
-    char out[256];
+    char out[1024];
     if (!path || !path[0]) path = "lardos.lars";
     f = fs_open(path);
     if (!f || !f->data || f->size == 0) {
@@ -1443,8 +1443,26 @@ int lardkit_larsview_open(const char* path)
     s_lardkit.larsview.opened++;
     s_lardkit.larsview.size = f->size;
     s_lardkit.larsview.last_error = 0u;
+    if (!streq(s_lardkit.larsview.path, path)) {
+        scopy(s_lardkit.larsview.previous_path, sizeof(s_lardkit.larsview.previous_path),
+              s_lardkit.larsview.path[0] ? s_lardkit.larsview.path : "lardos.lars");
+    }
     scopy(s_lardkit.larsview.path, sizeof(s_lardkit.larsview.path), path);
     return 0;
+}
+
+int lardkit_larsview_back(void)
+{
+    char target[LARDKIT_NAME_MAX + 1u];
+    int r;
+    if (!s_lardkit.larsview.previous_path[0]) {
+        s_lardkit.larsview.last_error = 3u;
+        return -1;
+    }
+    scopy(target, sizeof(target), s_lardkit.larsview.previous_path);
+    r = lardkit_larsview_open(target);
+    if (r == 0) s_lardkit.larsview.back_count++;
+    return r;
 }
 
 void lardkit_larsview_info(lardkit_larsview_info_t* out)
@@ -1457,23 +1475,34 @@ int lardkit_notes_reset(void)
 {
     static const char head[] = "LARDD 1\nTITLE LardOS Notes\n";
     FsWritableFile* w = fs_open_writable("notes.lardd");
+    FsWritableFile* plain = fs_open_writable("notes.txt");
     if (!w) return -1;
     w->size = 0;
+    if (plain) {
+        plain->size = 0;
+        fs_mark_dirty();
+    }
     return fs_write(w, 0, (const uint8_t*)head, sizeof(head) - 1u) == sizeof(head) - 1u ? 0 : -2;
 }
 
 int lardkit_notes_append(const char* text)
 {
     FsWritableFile* w = fs_open_writable("notes.lardd");
+    FsWritableFile* plain = fs_open_writable("notes.txt");
     static const char prefix[] = "TEXT ";
     static const char nl[] = "\n";
+    uint32_t len = 0;
     if (!w || !text || !text[0]) return -1;
     if (w->size == 0 && lardkit_notes_reset() != 0) return -2;
     if (fs_append(w, (const uint8_t*)prefix, sizeof(prefix) - 1u) != sizeof(prefix) - 1u) return -3;
-    uint32_t len = 0;
     while (text[len]) len++;
     if (fs_append(w, (const uint8_t*)text, len) != len) return -4;
-    return fs_append(w, (const uint8_t*)nl, sizeof(nl) - 1u) == sizeof(nl) - 1u ? 0 : -5;
+    if (fs_append(w, (const uint8_t*)nl, sizeof(nl) - 1u) != sizeof(nl) - 1u) return -5;
+    if (plain) {
+        if (fs_append(plain, (const uint8_t*)text, len) != len) return -6;
+        if (fs_append(plain, (const uint8_t*)nl, sizeof(nl) - 1u) != sizeof(nl) - 1u) return -7;
+    }
+    return 0;
 }
 
 int lardkit_userlaw_reset(void)
@@ -1590,10 +1619,19 @@ int lardkit_selftest(void)
         s_lardkit = saved;
         return -6;
     }
+    if (lardkit_larsview_open("glyph_guide.lardd") != 0 || lardkit_larsview_back() != 0) {
+        s_lardkit = saved;
+        return -21;
+    }
     lardkit_larsview_info(&li);
-    if (!li.opened || li.last_error) {
+    if (!li.opened || li.last_error || !li.back_count) {
         s_lardkit = saved;
         return -7;
+    }
+    if (lardkit_notes_reset() != 0 || lardkit_notes_append("selftest note") != 0 ||
+        !fs_open("notes.lardd") || !fs_open("notes.txt")) {
+        s_lardkit = saved;
+        return -22;
     }
     if (lardkit_oldcheck_run(0) != 0 || s_lardkit.oldcheck.count == 0u) {
         s_lardkit = saved;

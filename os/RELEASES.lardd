@@ -4,6 +4,13 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.39.0b
+ITEM Rough-edge repair pass for older features that only barely worked before the image glyph polish.
+ITEM Fixed directory browsing so dir X: lists read-only system/LFS files and dir Z: lists every writable RAM file instead of a stale hardcoded subset.
+ITEM Made notes add and notes clear keep notes.lardd and the GUI-visible notes.txt in sync.
+ITEM Improved LARSView with reload, back, and actions commands plus previous-document status.
+ITEM Added POST/LUNIT coverage for the repaired writable directory and command surfaces.
+
 SECTION v1.38.0b
 ITEM Made image glyphs clickable in the GUI by recording per-frame hitboxes for rendered PUA picture characters.
 ITEM Added realtime glyph rendering with live shimmer, hover outline, and click flash using the GUI tick.

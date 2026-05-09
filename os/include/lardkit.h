@@ -159,7 +159,9 @@ typedef struct {
     uint32_t opened;
     uint32_t size;
     uint32_t last_error;
+    uint32_t back_count;
     char path[LARDKIT_NAME_MAX + 1u];
+    char previous_path[LARDKIT_NAME_MAX + 1u];
 } lardkit_larsview_info_t;
 
 typedef struct {
@@ -253,6 +255,7 @@ void lardkit_magic_info(lardkit_magic_info_t* out);
 void lardkit_awakemon_info(lardkit_awakemon_info_t* out);
 
 int lardkit_larsview_open(const char* path);
+int lardkit_larsview_back(void);
 void lardkit_larsview_info(lardkit_larsview_info_t* out);
 
 int lardkit_notes_reset(void);

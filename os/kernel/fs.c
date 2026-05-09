@@ -221,6 +221,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use glyph demo, glyph auto sample.bmp avatar, glyph live U+E000 on, glyph click U+E000, and glyph insert U+E000 notes.txt to own clickable realtime private-use Unicode picture characters.\n"
+    "li Use dir X: for read-only system files and dir Z: for every writable RAM file; the two listings are no longer mixed together.\n"
     "li Use task list and task set id prio to inspect and change queued task priority.\n"
     "li Priority lev.10 is urgent work the user can grant with task urgent id, task set id 10, or nice 10 cmd.\n"
     "li Use tasktop to see runnable and paused task queues with priority bars.\n"
@@ -247,6 +248,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
+    "li LARSView now supports reload, back, and actions; notes add updates both notes.lardd and GUI notes.txt.\n"
     "button System status | status\n"
     "button Task dashboard | tasktop\n"
     "button Crash history | crashlog show\n"
@@ -320,7 +322,10 @@ static const uint8_t file_lardos_lars[] =
     "cmd larsapp form lardos.lars\n"
     "cmd oschat say hello-from-lardkit\n"
     "cmd notes add hello-from-lardos\n"
+    "cmd type notes.txt\n"
     "cmd larsview open notes.lardd\n"
+    "cmd larsview actions lardos.lars\n"
+    "cmd larsview back\n"
     "cmd post\n"
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
@@ -435,6 +440,9 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command trace\n"
     "CHECK command netwatch\n"
     "CHECK command glyph\n"
+    "CHECK command notes\n"
+    "CHECK command larsview\n"
+    "CHECK command dir\n"
     "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
@@ -697,6 +705,25 @@ void fs_init(void)
 
 const FsFile* fs_open(const char* name)
 {
+    const FsFile* f = fs_open_readonly(name);
+    if (f) return f;
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        const char* a = w ? w->name : "";
+        const char* b = name;
+        while (*a && *b && *a == *b) { a++; b++; }
+        if (*a == '\0' && *b == '\0') {
+            g_ram_result.name = w->name;
+            g_ram_result.data = w->data;
+            g_ram_result.size = w->size;
+            return &g_ram_result;
+        }
+    }
+    return 0;
+}
+
+const FsFile* fs_open_readonly(const char* name)
+{
     for (uint32_t i = 0; i < FS_FILE_COUNT; i++) {
         const char* a = FS_FILES[i].name;
         const char* b = name;
@@ -719,18 +746,6 @@ const FsFile* fs_open(const char* name)
             g_lfs_result.data = data;
             g_lfs_result.size = sz;
             return &g_lfs_result;
-        }
-    }
-    for (uint32_t wi = 0; wi < writable_count(); wi++) {
-        FsWritableFile* w = writable_at(wi);
-        const char* a = w ? w->name : "";
-        const char* b = name;
-        while (*a && *b && *a == *b) { a++; b++; }
-        if (*a == '\0' && *b == '\0') {
-            g_ram_result.name = w->name;
-            g_ram_result.data = w->data;
-            g_ram_result.size = w->size;
-            return &g_ram_result;
         }
     }
     return 0;
@@ -757,14 +772,31 @@ uint32_t fs_read(const FsFile* file, uint32_t offset, uint8_t* buf, uint32_t len
 void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user)
 {
     if (!cb) return;
+    fs_list_readonly(cb, user);
+    fs_list_writable(cb, user);
+}
+
+void fs_list_readonly(void (*cb)(const char* name, uint32_t size, void* user), void* user)
+{
+    if (!cb) return;
     for (uint32_t i = 0; i < FS_FILE_COUNT; i++) {
         cb(FS_FILES[i].name, FS_FILES[i].size, user);
     }
     lfs_list(cb, user);
+}
+
+void fs_list_writable(void (*cb)(const char* name, uint32_t size, void* user), void* user)
+{
+    if (!cb) return;
     for (uint32_t wi = 0; wi < writable_count(); wi++) {
         FsWritableFile* w = writable_at(wi);
         if (w) cb(w->name, w->size, user);
     }
+}
+
+uint32_t fs_writable_count(void)
+{
+    return writable_count();
 }
 
 static int lpst_name_equals(const uint8_t* fixed_name, const char* name)

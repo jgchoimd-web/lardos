@@ -326,6 +326,10 @@ The GUI cursor can also be owned through the picture Unicode registry. LSH's
 `cursor set U+E000` stores a PUA codepoint in GUI state; the final cursor pass
 then renders that slot through the same live `img_glyph_render` path used by
 inline picture characters, falling back to the block cursor if the slot is empty.
+Assigned Unicode remains user-editable: `glyph move`, `glyph copy`,
+`glyph rename`, and `glyph pixel` can change the codepoint, duplicate the
+slot, relabel it, or patch individual 8x8 pixels. When a cursor-bound slot is
+moved, LSH retargets the cursor so the user's visible choice follows the edit.
 
 `lpack.c` owns the native LardPack package format. `LPACK 1` files are simple
 record streams with `FILE name` and `ENDFILE` blocks, parsed by freestanding C.

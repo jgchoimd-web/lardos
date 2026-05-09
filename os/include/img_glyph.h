@@ -24,6 +24,10 @@ typedef struct img_glyph_info {
 int img_glyph_assign(uint32_t cp, const uint32_t* pixels, uint16_t w, uint16_t h);
 int img_glyph_assign_named(uint32_t cp, const uint32_t* pixels, uint16_t w, uint16_t h, const char* name);
 int img_glyph_assign_pattern(uint32_t cp, const char* name);
+int img_glyph_copy(uint32_t from_cp, uint32_t to_cp);
+int img_glyph_move(uint32_t from_cp, uint32_t to_cp);
+int img_glyph_rename(uint32_t cp, const char* name);
+int img_glyph_set_pixel(uint32_t cp, uint16_t x, uint16_t y, uint32_t argb);
 
 /* Clear glyph for codepoint. */
 void img_glyph_clear(uint32_t cp);

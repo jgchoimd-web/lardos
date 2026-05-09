@@ -1190,7 +1190,7 @@ static void cmd_help(const char* args)
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
-    out_append("  glyph demo|list|load|auto|show|live|click|insert|write  clickable live PUA pictures\n");
+    out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor set U+E000|off           use a picture Unicode slot as the GUI cursor\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
@@ -1260,6 +1260,7 @@ static void cmd_control(const char* args)
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
     out_append("  glyph live U+E000 on            enable realtime hover/click rendering for a picture glyph\n");
+    out_append("  glyph pixel U+E000 0 0 ff00ff  edit an assigned Unicode picture slot in-place\n");
     out_append("  cursor U+E000     assign the mouse cursor to a user-owned Unicode picture slot\n");
     out_append("  cfgprof save safe-ui save/load a bundle of settings\n");
     out_append("  userlaw show        inspect user-right policy principles\n");
@@ -4275,6 +4276,27 @@ static int glyph_parse_cp(const char* s, uint32_t* out)
     return 0;
 }
 
+static int glyph_parse_color(const char* s, uint32_t* out)
+{
+    uint32_t v = 0;
+    uint32_t n = 0;
+    const char* p = s;
+    if (!s || !out) return -1;
+    if (*p == '#') p++;
+    if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) p += 2;
+    while (*p) {
+        uint32_t d = 0;
+        if (!glyph_hex_digit(*p, &d)) return -2;
+        v = (v << 4) | d;
+        n++;
+        p++;
+    }
+    if (n == 6u) v |= 0xFF000000u;
+    else if (n != 8u) return -3;
+    *out = v;
+    return 0;
+}
+
 static void glyph_out_cp(uint32_t cp)
 {
     static const char hex[] = "0123456789ABCDEF";
@@ -4307,7 +4329,7 @@ static void glyph_out_info(const img_glyph_info_t* info)
 
 static void glyph_usage(void)
 {
-    out_append("Usage: glyph demo|list|load U+E000 file.bmp [name]|auto file.bmp [name]|show U+E000|clear U+E000|live U+E000 on|click U+E000|insert U+E000 notes.txt|write\n");
+    out_append("Usage: glyph demo|list|load U+E000 file.bmp [name]|auto file.bmp [name]|show U+E000|move U+E000 U+E010|copy U+E000 U+E011|rename U+E000 name|pixel U+E000 x y RRGGBB|clear U+E000|live U+E000 on|click U+E000|insert U+E000 notes.txt|write\n");
 }
 
 static int glyph_load_bmp_to_slot(uint32_t cp, const char* file_arg, const char* label)
@@ -4463,6 +4485,119 @@ static void cmd_glyph(const char* args)
             out_append_hex8((uint8_t)bytes[2]);
             out_append("\n");
         }
+        return;
+    }
+
+    if (strcmp(sub, "move") == 0 || strcmp(sub, "mv") == 0 || strcmp(sub, "recode") == 0) {
+        char from_arg[16];
+        char to_arg[16];
+        uint32_t from_cp;
+        uint32_t to_cp;
+        gui_cursor_info_t cur;
+        if (vcs_read_word(&args, from_arg, sizeof(from_arg)) != 0 ||
+            vcs_read_word(&args, to_arg, sizeof(to_arg)) != 0 ||
+            glyph_parse_cp(from_arg, &from_cp) != 0 ||
+            glyph_parse_cp(to_arg, &to_cp) != 0) {
+            out_append("Usage: glyph move U+E000 U+E010\n");
+            return;
+        }
+        if (img_glyph_move(from_cp, to_cp) != 0) {
+            out_append("glyph: source slot is empty or codepoint is invalid.\n");
+            return;
+        }
+        gui_cursor_info(&cur);
+        if (cur.enabled && cur.cp == from_cp) {
+            gui_cursor_set_unicode(to_cp);
+            out_append("glyph: cursor assignment followed the moved Unicode slot.\n");
+        }
+        img_glyph_write_lardd();
+        out_append("glyph: moved ");
+        glyph_out_cp(from_cp);
+        out_append(" -> ");
+        glyph_out_cp(to_cp);
+        out_append("\n");
+        return;
+    }
+
+    if (strcmp(sub, "copy") == 0 || strcmp(sub, "cp") == 0 || strcmp(sub, "clone") == 0) {
+        char from_arg[16];
+        char to_arg[16];
+        uint32_t from_cp;
+        uint32_t to_cp;
+        if (vcs_read_word(&args, from_arg, sizeof(from_arg)) != 0 ||
+            vcs_read_word(&args, to_arg, sizeof(to_arg)) != 0 ||
+            glyph_parse_cp(from_arg, &from_cp) != 0 ||
+            glyph_parse_cp(to_arg, &to_cp) != 0) {
+            out_append("Usage: glyph copy U+E000 U+E011\n");
+            return;
+        }
+        if (img_glyph_copy(from_cp, to_cp) != 0) {
+            out_append("glyph: source slot is empty or codepoint is invalid.\n");
+            return;
+        }
+        img_glyph_write_lardd();
+        out_append("glyph: copied ");
+        glyph_out_cp(from_cp);
+        out_append(" -> ");
+        glyph_out_cp(to_cp);
+        out_append("\n");
+        return;
+    }
+
+    if (strcmp(sub, "rename") == 0 || strcmp(sub, "name") == 0) {
+        char cp_arg[16];
+        char label[IMG_GLYPH_NAME_MAX];
+        uint32_t cp;
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0 ||
+            vcs_read_word(&args, label, sizeof(label)) != 0 ||
+            glyph_parse_cp(cp_arg, &cp) != 0) {
+            out_append("Usage: glyph rename U+E000 name\n");
+            return;
+        }
+        if (img_glyph_rename(cp, label) != 0) {
+            out_append("glyph: slot is empty.\n");
+            return;
+        }
+        img_glyph_write_lardd();
+        out_append("glyph: renamed ");
+        glyph_out_cp(cp);
+        out_append(" to ");
+        out_append(label);
+        out_append("\n");
+        return;
+    }
+
+    if (strcmp(sub, "pixel") == 0 || strcmp(sub, "px") == 0 || strcmp(sub, "edit") == 0) {
+        char cp_arg[16];
+        char color_arg[16];
+        uint32_t cp;
+        uint32_t x;
+        uint32_t y;
+        uint32_t color;
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0 ||
+            glyph_parse_cp(cp_arg, &cp) != 0 ||
+            vcs_parse_u32(&args, &x) != 0 ||
+            vcs_parse_u32(&args, &y) != 0 ||
+            vcs_read_word(&args, color_arg, sizeof(color_arg)) != 0 ||
+            glyph_parse_color(color_arg, &color) != 0 ||
+            x >= IMG_GLYPH_SIZE || y >= IMG_GLYPH_SIZE) {
+            out_append("Usage: glyph pixel U+E000 x y RRGGBB  (x/y 0..7, color RRGGBB or AARRGGBB)\n");
+            return;
+        }
+        if (img_glyph_set_pixel(cp, (uint16_t)x, (uint16_t)y, color) != 0) {
+            out_append("glyph: slot is empty.\n");
+            return;
+        }
+        img_glyph_write_lardd();
+        out_append("glyph: pixel ");
+        glyph_out_cp(cp);
+        out_append(" [");
+        out_append_u32(x);
+        out_append(",");
+        out_append_u32(y);
+        out_append("]=");
+        out_append_hex32(color);
+        out_append("\n");
         return;
     }
 

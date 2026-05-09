@@ -207,6 +207,63 @@ int img_glyph_assign_pattern(uint32_t cp, const char* name)
     return img_glyph_assign_named(cp, pixels, IMG_GLYPH_SIZE, IMG_GLYPH_SIZE, name ? name : "pattern");
 }
 
+int img_glyph_copy(uint32_t from_cp, uint32_t to_cp)
+{
+    int from = slot_index(from_cp);
+    int to = slot_index(to_cp);
+    if (from < 0 || to < 0) return -1;
+    if (!s_assigned[from]) return -2;
+
+    for (uint32_t i = 0; i < PIXELS_PER_SLOT; i++) s_glyph_data[to][i] = s_glyph_data[from][i];
+    s_assigned[to] = 1;
+    s_revision++;
+    s_info[to] = s_info[from];
+    s_info[to].cp = to_cp;
+    s_info[to].revision = s_revision;
+    return 0;
+}
+
+int img_glyph_move(uint32_t from_cp, uint32_t to_cp)
+{
+    int from = slot_index(from_cp);
+    int to = slot_index(to_cp);
+    if (from < 0 || to < 0) return -1;
+    if (!s_assigned[from]) return -2;
+    if (from == to) {
+        s_revision++;
+        s_info[from].revision = s_revision;
+        return 0;
+    }
+
+    if (img_glyph_copy(from_cp, to_cp) != 0) return -3;
+    s_assigned[from] = 0;
+    memset(&s_info[from], 0, sizeof(s_info[from]));
+    return 0;
+}
+
+int img_glyph_rename(uint32_t cp, const char* name)
+{
+    int idx = slot_index(cp);
+    if (idx < 0) return -1;
+    if (!s_assigned[idx]) return -2;
+    glyph_copy_name(s_info[idx].name, name);
+    s_revision++;
+    s_info[idx].revision = s_revision;
+    return 0;
+}
+
+int img_glyph_set_pixel(uint32_t cp, uint16_t x, uint16_t y, uint32_t argb)
+{
+    int idx = slot_index(cp);
+    if (idx < 0 || x >= IMG_GLYPH_SIZE || y >= IMG_GLYPH_SIZE) return -1;
+    if (!s_assigned[idx]) return -2;
+    s_glyph_data[idx][(uint32_t)y * IMG_GLYPH_SIZE + x] = argb;
+    s_revision++;
+    s_info[idx].avg_argb = glyph_avg(s_glyph_data[idx], IMG_GLYPH_SIZE, IMG_GLYPH_SIZE);
+    s_info[idx].revision = s_revision;
+    return 0;
+}
+
 void img_glyph_clear(uint32_t cp)
 {
     int idx = slot_index(cp);
@@ -345,7 +402,7 @@ int img_glyph_write_lardd(void)
     glyph_append(w, "LARDD 1\n");
     glyph_append(w, "TITLE Image Glyph Map\n");
     glyph_append(w, "TEXT Private-use Unicode slots can be owned by user pictures.\n");
-    glyph_append(w, "TEXT Commands: glyph demo, glyph load U+E000 sample.bmp name, glyph auto sample.bmp name, glyph live U+E000 on, glyph click U+E000, glyph insert U+E000 notes.txt.\n");
+    glyph_append(w, "TEXT Commands: glyph demo, glyph load U+E000 sample.bmp name, glyph move/copy/rename/pixel, glyph live/click/insert, glyph write.\n");
     glyph_append(w, "SECTION Assigned\n");
     if (!count) {
         glyph_append(w, "ITEM none\n");
@@ -377,11 +434,11 @@ int img_glyph_write_lardd(void)
 int img_glyph_selftest(void)
 {
     uint32_t cp = IMG_GLYPH_PUA_END;
-    int idx = slot_index(cp);
-    uint32_t backup_pixels[PIXELS_PER_SLOT];
+    uint32_t scratch[3] = { IMG_GLYPH_PUA_END, IMG_GLYPH_PUA_END - 1u, IMG_GLYPH_PUA_END - 2u };
+    uint32_t backup_pixels[3][PIXELS_PER_SLOT];
     uint32_t render_pixels[PIXELS_PER_SLOT];
-    uint8_t backup_assigned;
-    img_glyph_info_t backup_info;
+    uint8_t backup_assigned[3];
+    img_glyph_info_t backup_info[3];
     uint32_t backup_revision;
     const uint32_t* px = NULL;
     uint16_t w = 0;
@@ -389,30 +446,43 @@ int img_glyph_selftest(void)
     img_glyph_info_t info;
     char utf8[5];
 
-    if (idx < 0) return -1;
-    for (uint32_t i = 0; i < PIXELS_PER_SLOT; i++) backup_pixels[i] = s_glyph_data[idx][i];
-    backup_assigned = s_assigned[idx];
-    backup_info = s_info[idx];
+    for (uint32_t s = 0; s < 3u; s++) {
+        int idx = slot_index(scratch[s]);
+        if (idx < 0) return -1;
+        for (uint32_t i = 0; i < PIXELS_PER_SLOT; i++) backup_pixels[s][i] = s_glyph_data[idx][i];
+        backup_assigned[s] = s_assigned[idx];
+        backup_info[s] = s_info[idx];
+    }
     backup_revision = s_revision;
 
     if (img_glyph_assign_pattern(cp, "selftest") != 0 ||
         !img_glyph_get(cp, &px, &w, &h) ||
         w != IMG_GLYPH_SIZE || h != IMG_GLYPH_SIZE ||
         img_glyph_info(cp, &info) != 0 ||
+        img_glyph_rename(cp, "edit-test") != 0 ||
+        img_glyph_set_pixel(cp, 0, 0, 0xFFFF00FFu) != 0 ||
+        img_glyph_copy(cp, (uint32_t)(cp - 1u)) != 0 ||
+        img_glyph_move((uint32_t)(cp - 1u), (uint32_t)(cp - 2u)) != 0 ||
         img_glyph_utf8(cp, utf8) != 3 ||
         img_glyph_click(cp, 7u) != 0 ||
         img_glyph_set_live(cp, 1) != 0 ||
         img_glyph_render(cp, 9u, 1, render_pixels, &w, &h) != 1) {
-        for (uint32_t i = 0; i < PIXELS_PER_SLOT; i++) s_glyph_data[idx][i] = backup_pixels[i];
-        s_assigned[idx] = backup_assigned;
-        s_info[idx] = backup_info;
+        for (uint32_t s = 0; s < 3u; s++) {
+            int idx = slot_index(scratch[s]);
+            for (uint32_t i = 0; i < PIXELS_PER_SLOT; i++) s_glyph_data[idx][i] = backup_pixels[s][i];
+            s_assigned[idx] = backup_assigned[s];
+            s_info[idx] = backup_info[s];
+        }
         s_revision = backup_revision;
         return -2;
     }
 
-    for (uint32_t i = 0; i < PIXELS_PER_SLOT; i++) s_glyph_data[idx][i] = backup_pixels[i];
-    s_assigned[idx] = backup_assigned;
-    s_info[idx] = backup_info;
+    for (uint32_t s = 0; s < 3u; s++) {
+        int idx = slot_index(scratch[s]);
+        for (uint32_t i = 0; i < PIXELS_PER_SLOT; i++) s_glyph_data[idx][i] = backup_pixels[s][i];
+        s_assigned[idx] = backup_assigned[s];
+        s_info[idx] = backup_info[s];
+    }
     s_revision = backup_revision;
     return 0;
 }

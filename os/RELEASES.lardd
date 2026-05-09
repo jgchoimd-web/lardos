@@ -4,6 +4,13 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.43.0b
+ITEM Added user-editable assigned Unicode slots: glyph move, glyph copy, glyph rename, and glyph pixel.
+ITEM glyph move can reassign a picture character to another U+E000..U+E0FF codepoint while preserving the user's image state.
+ITEM Cursor-bound Unicode follows glyph move, so a cursor assigned to U+E000 keeps working after the user moves that slot to another codepoint.
+ITEM glyph pixel edits one stored 8x8 picture-glyph cell directly with RRGGBB or AARRGGBB color input and refreshes glyphmap.lardd.
+ITEM POST now labels the image-glyph check as user-editable Unicode slot coverage.
+
 SECTION v1.42.0b
 ITEM Added Unicode cursor assignment: cursor set U+E000 makes the GUI mouse cursor render from a user-owned picture Unicode slot.
 ITEM The cursor renderer reuses the live image-glyph path, so assigned slots keep their realtime hover/click styling when used as a cursor.

@@ -126,6 +126,11 @@ commands:
 - `v1.42.0b` lets the GUI cursor point at a Unicode picture slot:
   `cursor set U+E000` renders the mouse cursor from that user-owned PUA glyph,
   while `cursor off` restores the default block cursor.
+- `v1.43.0b` makes already-assigned picture Unicode slots user-editable:
+  `glyph move`, `glyph copy`, `glyph rename`, and `glyph pixel` let the user
+  reassign codepoints, duplicate slots, relabel them, and patch individual 8x8
+  pixels in-place. If the cursor was bound to a moved slot, it follows the new
+  codepoint.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
@@ -173,6 +178,9 @@ commands:
 - `ltheme list|show|use name` selects native shell theme presets or parses
   `.ltheme` files such as `default.ltheme`; `ltheme preview file.ltheme` draws
   a small preview panel before applying.
+- `glyph move U+E000 U+E010`, `glyph copy U+E000 U+E011`,
+  `glyph rename U+E000 name`, and `glyph pixel U+E000 0 0 ff00ff` edit
+  assigned picture Unicode slots directly.
 - `cursor status`, `cursor set U+E000`, and `cursor off` bind the mouse cursor
   to the same user-owned picture Unicode slots managed by `glyph demo/load`.
 - `cfgprof save name` and `cfgprof load name` store/load settings bundles

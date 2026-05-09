@@ -99,6 +99,9 @@ commands:
   environment and window-manager layer. The classic GUI stays intact, while
   EXGUI adds familiar Windows-like, Linux-like, or Mac-like panels, docks,
   launchers, task lists, and floating/tile/stack window chrome.
+- `v1.36.0b` starts the GUI polish track: the classic GUI, EXGUI, EXEXGUI, and
+  LGUILIB default theme share a warmer multi-accent visual style while keeping
+  the previous controls and commands intact.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

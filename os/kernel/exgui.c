@@ -79,16 +79,16 @@ static void frame(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c)
 
 static uint32_t accent(void)
 {
-    if (s_exgui.style == EXGUI_STYLE_LINUX) return 0xFFFFA23Au;
-    if (s_exgui.style == EXGUI_STYLE_MAC) return 0xFF8FD3FFu;
-    return 0xFF4DA3FFu;
+    if (s_exgui.style == EXGUI_STYLE_LINUX) return 0xFFFFB84Du;
+    if (s_exgui.style == EXGUI_STYLE_MAC) return 0xFF2BA7A0u;
+    return 0xFF3DB8A5u;
 }
 
 static uint32_t panel_color(void)
 {
-    if (s_exgui.style == EXGUI_STYLE_LINUX) return 0xFF222226u;
-    if (s_exgui.style == EXGUI_STYLE_MAC) return 0xFFE8EDF6u;
-    return 0xFF111827u;
+    if (s_exgui.style == EXGUI_STYLE_LINUX) return 0xFF242126u;
+    if (s_exgui.style == EXGUI_STYLE_MAC) return 0xFFF0F5F5u;
+    return 0xFF182126u;
 }
 
 static uint32_t panel_text(void)
@@ -174,27 +174,35 @@ void exgui_info(exgui_info_t* out)
 
 static void draw_wallpaper(uint32_t w, uint32_t h)
 {
-    uint32_t base = s_exgui.style == EXGUI_STYLE_LINUX ? 0xFF241B2Fu :
-                    s_exgui.style == EXGUI_STYLE_MAC ? 0xFFBCD2E8u : 0xFF0C1830u;
-    uint32_t stripe = s_exgui.style == EXGUI_STYLE_LINUX ? 0xFF2F2450u :
-                      s_exgui.style == EXGUI_STYLE_MAC ? 0xFFD7E5F5u : 0xFF102B55u;
+    uint32_t base = s_exgui.style == EXGUI_STYLE_LINUX ? 0xFF1F1B24u :
+                    s_exgui.style == EXGUI_STYLE_MAC ? 0xFFE7F0EDu : 0xFF11191Du;
+    uint32_t stripe = s_exgui.style == EXGUI_STYLE_LINUX ? 0xFF2F2836u :
+                      s_exgui.style == EXGUI_STYLE_MAC ? 0xFFD7E9E5u : 0xFF1C2A2Eu;
+    uint32_t warm = s_exgui.style == EXGUI_STYLE_MAC ? 0xFFFFDFA6u : 0xFFFFB84Du;
+    uint32_t cool = s_exgui.style == EXGUI_STYLE_LINUX ? 0xFF7BE0D6u : 0xFF2BA7A0u;
     fill(0, 0, w, h, base);
-    for (uint32_t y = 0; y < h; y += 32u) {
-        fill(0, y, w, 4u, stripe);
+    for (uint32_t y = 0; y < h; y += 36u) {
+        fill(0, y, w, 3u, stripe);
     }
-    fill(w > 280u ? w - 280u : 0u, 48u, 180u, h > 200u ? h - 160u : 48u, accent());
-    fill(w > 250u ? w - 250u : 0u, 64u, 130u, h > 240u ? h - 220u : 32u, base);
+    fill(0, 0, w, 4u, warm);
+    fill(0, h > 6u ? h - 6u : 0u, w, 6u, cool);
+    fill(w > 320u ? w - 320u : 0u, 48u, 210u, h > 210u ? h - 170u : 48u, cool);
+    fill(w > 284u ? w - 284u : 0u, 66u, 152u, h > 250u ? h - 230u : 32u, base);
+    fill(32u, h > 220u ? h - 178u : 72u, w > 420u ? 260u : 160u, 5u, warm);
 }
 
 static void draw_window_card(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t idx)
 {
     uint32_t focused = idx == s_exgui.focused;
     uint32_t title = focused ? accent() : 0xFF30343Cu;
-    uint32_t body = focused ? 0xFFEAF2FFu : 0xFFD7DCE6u;
+    uint32_t body = focused ? 0xFFF2F5F2u : 0xFFE0E5E4u;
     uint32_t fg = 0xFF111827u;
-    fill(x + 4u, y + 4u, w, h, 0x66000000u);
+    fill(x + 5u, y + 6u, w, h, 0x33000000u);
+    fill(x + 2u, y + 3u, w, h, 0x22000000u);
     fill(x, y, w, h, body);
     fill(x, y, w, 22u, title);
+    fill(x, y + 22u, w, 3u, focused ? 0xFFFFB84Du : 0xFF88929Au);
+    fill(x, y, 5u, h, focused ? 0xFFFFB84Du : 0xFF6B7280u);
     frame(x, y, w, h, focused ? 0xFFFFFFFFu : 0xFF6B7280u);
     if (s_exgui.style == EXGUI_STYLE_MAC) {
         fill(x + 8u, y + 7u, 6u, 6u, 0xFFFF5F56u);
@@ -209,7 +217,8 @@ static void draw_window_card(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uin
     text(x + 12u, y + 38u, idx == 0 ? "classic gui surface" :
          idx == 1 ? "native files and packages" :
          idx == 2 ? "lsh shell workspace" : "desktop preferences", fg, body);
-    fill(x + 12u, y + h - 24u, w > 32u ? w - 24u : 4u, 8u, focused ? accent() : 0xFF9CA3AFu);
+    fill(x + 12u, y + h - 28u, w > 32u ? w - 24u : 4u, 2u, 0xFFC5CECCu);
+    fill(x + 12u, y + h - 22u, w > 32u ? w - 24u : 4u, 8u, focused ? accent() : 0xFF9CA3AFu);
 }
 
 static void draw_managed_windows(uint32_t sw, uint32_t sh)
@@ -244,6 +253,7 @@ static void draw_win_shell(uint32_t w, uint32_t h)
 {
     uint32_t bar_y = h > 42u ? h - 42u : 0u;
     fill(0, bar_y, w, 42u, panel_color());
+    fill(0, bar_y, w, 2u, 0xFFFFB84Du);
     fill(12u, bar_y + 8u, 72u, 26u, accent());
     text(24u, bar_y + 17u, "Start", 0xFFFFFFFFu, accent());
     for (uint32_t i = 0; i < window_count(); i++) {
@@ -259,6 +269,7 @@ static void draw_linux_shell(uint32_t w, uint32_t h)
 {
     (void)h;
     fill(0, 0, w, 30u, panel_color());
+    fill(0, 30u, w, 2u, accent());
     text(12u, 11u, "Activities", panel_text(), panel_color());
     text(w > 168u ? w - 168u : 120u, 11u, "LardOS Workspace", panel_text(), panel_color());
     fill(0, 30u, 56u, h > 30u ? h - 30u : 1u, 0xCC15151Au);
@@ -272,6 +283,7 @@ static void draw_linux_shell(uint32_t w, uint32_t h)
 static void draw_mac_shell(uint32_t w, uint32_t h)
 {
     fill(0, 0, w, 28u, panel_color());
+    fill(0, 27u, w, 1u, 0xFFB7C9C7u);
     text(12u, 10u, "LardOS", panel_text(), panel_color());
     text(84u, 10u, "File Edit View Window", panel_text(), panel_color());
     text(w > 98u ? w - 98u : 4u, 10u, "exgui", panel_text(), panel_color());

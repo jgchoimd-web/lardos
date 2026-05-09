@@ -4,6 +4,12 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.36.0b
+ITEM Beta GUI polish pass: refreshed the classic GUI chrome with a warmer multi-accent palette, clearer focus rings, and cleaner input/output frames.
+ITEM Improved EXGUI desktop wallpaper, panels, managed window cards, and task/dock surfaces without replacing existing GUI behavior.
+ITEM Improved EXEXGUI split layout styling with softer panels, clearer pane labels, workspace markers, and less harsh separator colors.
+ITEM Updated the default LGUILIB overlay theme so native GUI library themes start from the new visual direction.
+
 SECTION v1.35.1b
 ITEM Beta polish: added exact user-facing command spelling for post baseline as an alias of postbaseline show.
 ITEM Updated help and native docs so lardtrace, post baseline, boot replay, cfg profile, and bugreplay draw are visible by the requested names.

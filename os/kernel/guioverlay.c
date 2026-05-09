@@ -92,8 +92,14 @@ static void draw_shadow(const guioverlay_state_t* s)
     uint32_t y = s->win_y;
     uint32_t w = s->win_w;
     uint32_t h = s->win_h;
-    if (x + w + 5u < sw) fill(x + w, y + 5u, 5u, h, th->shadow);
-    if (y + h + 5u < sh) fill(x + 5u, y + h, w, 5u, th->shadow);
+    if (x + w + 7u < sw) {
+        fill(x + w, y + 7u, 3u, h, th->shadow);
+        fill(x + w + 3u, y + 12u, 4u, h > 8u ? h - 8u : h, 0x22000000u);
+    }
+    if (y + h + 7u < sh) {
+        fill(x + 7u, y + h, w, 3u, th->shadow);
+        fill(x + 12u, y + h + 3u, w > 8u ? w - 8u : w, 4u, 0x22000000u);
+    }
 }
 
 static void draw_title(const guioverlay_state_t* s)
@@ -101,11 +107,20 @@ static void draw_title(const guioverlay_state_t* s)
     const lguilib_theme_t* th = overlay_theme();
     uint32_t title_bg = th->title_bg;
     uint32_t set_x = s->win_x + s->win_w - 52u;
+    fill(s->win_x, s->win_y, s->win_w, 20u, title_bg);
+    fill(s->win_x, s->win_y + 19u, s->win_w, 1u, th->tab_accent);
+    fill(s->win_x + 1u, s->win_y + 1u, s->win_w > 2u ? s->win_w - 2u : 1u, 1u, 0xFF334048u);
+    if (s->win_w > 92u) {
+        fill(s->win_x + s->win_w - 44u, s->win_y + 6u, 8u, 8u, th->title_accent);
+        fill(s->win_x + s->win_w - 30u, s->win_y + 6u, 8u, 8u, 0xFF7BE0D6u);
+        fill(s->win_x + s->win_w - 16u, s->win_y + 6u, 8u, 8u, 0xFFFF6B6Bu);
+    }
     if (s->win_w > 150u) text(s->win_x + 8u, s->win_y + 6u, "LardOS GUI", th->title_fg, title_bg);
     if (s->win_w > 300u && s->win_x + 112u + 96u < set_x) {
         text(s->win_x + 112u, s->win_y + 6u, app_title(s->app_id), th->title_accent, title_bg);
     }
     frame(s->win_x, s->win_y, s->win_w, s->win_h, th->border);
+    if (s->win_w > 4u && s->win_h > 4u) frame(s->win_x + 1u, s->win_y + 1u, s->win_w - 2u, s->win_h - 2u, 0xFF384149u);
 }
 
 static void draw_tabs(const guioverlay_state_t* s)
@@ -123,7 +138,13 @@ static void draw_tabs(const guioverlay_state_t* s)
         const char* label = tw >= 34u ? s_tab_names[t] : s_tab_short[t];
         uint32_t label_x = tx + (tw >= 34u ? 4u : (tw > 8u ? (tw - 8u) / 2u : 0u));
         fill(tx, tab_y, tw, tab_h, tab_bg);
-        if (s->app_id == t) fill(tx, tab_y + tab_h - 3u, tw, 3u, th->tab_accent);
+        if (s->app_id == t) {
+            fill(tx, tab_y, tw, 2u, th->tab_accent);
+            fill(tx, tab_y + tab_h - 3u, tw, 3u, th->tab_accent);
+        } else if (hover) {
+            fill(tx, tab_y + tab_h - 2u, tw, 2u, 0xFF7BE0D6u);
+        }
+        if (tw > 2u) fill(tx + tw - 1u, tab_y + 4u, 1u, tab_h > 8u ? tab_h - 8u : tab_h, 0xFF15191Eu);
         text(label_x, tab_y + 8u, label, th->title_fg, tab_bg);
     }
 }
@@ -134,6 +155,7 @@ static void draw_content_badge(const guioverlay_state_t* s)
     uint32_t bg = th->panel_bg;
     uint32_t y = s->win_y + 44u;
     fill(s->win_x + 8u, y + 2u, s->win_w > 16u ? s->win_w - 16u : s->win_w, 18u, bg);
+    fill(s->win_x + 8u, y + 2u, 4u, 18u, th->tab_accent);
     text(s->win_x + 16u, y + 8u, app_title(s->app_id), th->title_fg, bg);
     if (s->win_w > 420u) text(s->win_x + 176u, y + 8u, app_hint(s->app_id), th->hint_fg, bg);
     if (s->win_w > 520u) text(s->win_x + s->win_w - 112u, y + 8u, LARDOS_VERSION, th->hint_fg, bg);
@@ -145,6 +167,7 @@ static void button_frame(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int hov
     uint32_t c = hover ? th->button_hover : th->button_border;
     if (pressed && hover) c = th->title_fg;
     frame(x, y, w, h, c);
+    if (w > 4u && h > 4u) fill(x + 2u, y + 2u, w - 4u, 2u, hover ? th->tab_accent : 0xFF2B4948u);
     if (hover && w > 4u && h > 4u) frame(x + 2u, y + 2u, w - 4u, h - 4u, th->button_inner);
 }
 
@@ -192,7 +215,10 @@ static void draw_fields(const guioverlay_state_t* s)
     uint32_t view_w = s->win_w > 32u ? s->win_w - 32u : 0u;
     uint32_t view_h = s->win_h > 190u ? s->win_h - 190u : 0u;
     frame(tb_x, tb_y, tb_w, 24u, s->textbox_focused ? th->tab_accent : th->output_frame);
-    if (view_w > 4u && view_h > 4u) frame(view_x - 2u, view_y - 2u, view_w + 4u, view_h + 4u, th->output_frame);
+    if (view_w > 4u && view_h > 4u) {
+        frame(view_x - 2u, view_y - 2u, view_w + 4u, view_h + 4u, th->output_frame);
+        fill(view_x - 2u, view_y - 2u, view_w + 4u, 2u, th->tab_accent);
+    }
     if (s->loading && view_w > 96u) text(view_x + view_w - 88u, view_y - 12u, "FETCHING", th->hint_fg, th->panel_bg);
 }
 

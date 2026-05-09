@@ -70,11 +70,11 @@ static void frame(exexgui_rect_t r, uint32_t c)
 
 static void focus_frame(exexgui_rect_t r)
 {
-    uint32_t c = 0xFF79E6D0u;
+    uint32_t c = 0xFFFFB84Du;
     frame(r, c);
     if (r.w > 4u && r.h > 4u) {
         exexgui_rect_t inner = { r.x + 2u, r.y + 2u, r.w - 4u, r.h - 4u };
-        frame(inner, c);
+        frame(inner, 0xFF7BE0D6u);
     }
 }
 
@@ -304,18 +304,20 @@ static void draw_terminal_tail(exexgui_rect_t r)
 
 static void draw_status(exexgui_rect_t r, const exexgui_layout_t* layout)
 {
-    uint32_t bg = 0xFFF7F7F2u;
-    text(r.x + 14u, r.y + 24u, "INFO STATUS", 0xFF111111u, bg);
-    text(r.x + 14u, r.y + 48u, "exexgui sketch layout", 0xFF111111u, bg);
-    text(r.x + 14u, r.y + 68u, "left: GUI DE/WM", 0xFF111111u, bg);
-    text(r.x + 14u, r.y + 88u, "top: terminal", 0xFF111111u, bg);
-    text(r.x + 14u, r.y + 108u, "bottom: status", 0xFF111111u, bg);
-    text(r.x + 14u, r.y + 132u, "focus:", 0xFF111111u, bg);
-    text(r.x + 72u, r.y + 132u, exexgui_focus_name((uint32_t)s_exexgui.focus), 0xFF111111u, bg);
-    text(r.x + 14u, r.y + 152u, LARDOS_VERSION, 0xFF111111u, bg);
+    uint32_t bg = 0xFFF4F1EAu;
+    text(r.x + 14u, r.y + 24u, "INFO STATUS", 0xFF1B2326u, bg);
+    text(r.x + 14u, r.y + 48u, "workspace", 0xFF1B2326u, bg);
+    text(r.x + 96u, r.y + 48u, s_exexgui.workspace == 1u ? "1" : s_exexgui.workspace == 2u ? "2" : "3", 0xFF1B2326u, bg);
+    text(r.x + 14u, r.y + 68u, "left: GUI DE/WM", 0xFF3C464Au, bg);
+    text(r.x + 14u, r.y + 88u, "top: terminal", 0xFF3C464Au, bg);
+    text(r.x + 14u, r.y + 108u, "bottom: status", 0xFF3C464Au, bg);
+    text(r.x + 14u, r.y + 132u, "focus:", 0xFF1B2326u, bg);
+    text(r.x + 72u, r.y + 132u, exexgui_focus_name((uint32_t)s_exexgui.focus), 0xFF2B7A78u, bg);
+    text(r.x + 14u, r.y + 152u, LARDOS_VERSION, 0xFF7A4D00u, bg);
     if (layout) {
         uint32_t bar_w = r.w > 42u ? r.w - 28u : 8u;
-        fill(r.x + 14u, r.y + r.h - 22u, bar_w, 8u, 0xFFB7D7FFu);
+        fill(r.x + 14u, r.y + r.h - 26u, bar_w, 3u, 0xFFFFB84Du);
+        fill(r.x + 14u, r.y + r.h - 18u, bar_w, 8u, 0xFF7BE0D6u);
     }
 }
 
@@ -326,22 +328,28 @@ void exexgui_draw_desktop(void)
     uint32_t h = gui_syscall_get_height();
     if (!s_exexgui.enabled || exexgui_layout_for(w, h, &l) != 0) return;
 
-    fill(0, 0, w, h, 0xFFEDEDE8u);
-    fill(l.outer.x, l.outer.y, l.outer.w, l.outer.h, 0xFFFFFFFFu);
-    fill(l.gui.x + l.gui.w, l.outer.y, l.border, l.outer.h, 0xFF050505u);
-    fill(l.term.x - l.border, l.info.y - l.border, l.term.w + l.border * 2u, l.border, 0xFF050505u);
-    frame(l.outer, 0xFF050505u);
+    fill(0, 0, w, h, 0xFFE8E2D6u);
+    fill(0, 0, w, 6u, 0xFFFFB84Du);
+    fill(0, h > 8u ? h - 8u : 0u, w, 8u, 0xFF2B7A78u);
+    fill(l.outer.x + 5u, l.outer.y + 6u, l.outer.w, l.outer.h, 0x22000000u);
+    fill(l.outer.x, l.outer.y, l.outer.w, l.outer.h, 0xFFF7F4ECu);
+    fill(l.gui.x + l.gui.w, l.outer.y, l.border, l.outer.h, 0xFF2B3438u);
+    fill(l.term.x - l.border, l.info.y - l.border, l.term.w + l.border * 2u, l.border, 0xFF2B3438u);
+    frame(l.outer, 0xFF2B3438u);
 
-    fill(l.gui.x + 6u, l.gui.y + 6u, l.gui.w > 12u ? l.gui.w - 12u : 1u, 22u, 0xFFF7F7F2u);
-    text(l.gui.x + 14u, l.gui.y + 13u, "GUI DE/WM", 0xFF111111u, 0xFFF7F7F2u);
+    fill(l.gui.x + 6u, l.gui.y + 6u, l.gui.w > 12u ? l.gui.w - 12u : 1u, 24u, 0xFFF4F1EAu);
+    fill(l.gui.x + 6u, l.gui.y + 30u, l.gui.w > 12u ? l.gui.w - 12u : 1u, 3u, 0xFFFFB84Du);
+    text(l.gui.x + 14u, l.gui.y + 14u, "GUI DE/WM", 0xFF1B2326u, 0xFFF4F1EAu);
     arrow(l.gui.x + 90u, l.gui.y + 88u, l.gui.x + 42u, l.gui.y + 20u);
 
-    fill(l.term.x, l.term.y, l.term.w, l.term.h, 0xFF08110Eu);
-    fill(l.term.x, l.term.y, l.term.w, 22u, 0xFF102A22u);
-    text(l.term.x + 12u, l.term.y + 8u, "TERMINAL", 0xFFD7FBE8u, 0xFF102A22u);
+    fill(l.term.x, l.term.y, l.term.w, l.term.h, 0xFF07120Fu);
+    fill(l.term.x, l.term.y, l.term.w, 24u, 0xFF123530u);
+    fill(l.term.x, l.term.y + 24u, l.term.w, 3u, 0xFF7BE0D6u);
+    text(l.term.x + 12u, l.term.y + 8u, "TERMINAL", 0xFFE9FFF8u, 0xFF123530u);
     arrow(l.term.x + 90u, l.term.y + 78u, l.term.x + 42u, l.term.y + 24u);
 
-    fill(l.info.x, l.info.y, l.info.w, l.info.h, 0xFFF7F7F2u);
+    fill(l.info.x, l.info.y, l.info.w, l.info.h, 0xFFF4F1EAu);
+    fill(l.info.x, l.info.y, l.info.w, 4u, 0xFFFFB84Du);
     arrow(l.info.x + 76u, l.info.y + 104u, l.info.x + 10u, l.info.y + l.info.h - 18u);
 }
 
@@ -352,12 +360,12 @@ void exexgui_draw_overlay(void)
     uint32_t h = gui_syscall_get_height();
     if (!s_exexgui.enabled || exexgui_layout_for(w, h, &l) != 0) return;
 
-    fill(l.gui.x + l.gui.w, l.outer.y, l.border, l.outer.h, 0xFF050505u);
-    fill(l.term.x - l.border, l.info.y - l.border, l.term.w + l.border * 2u, l.border, 0xFF050505u);
-    frame(l.outer, 0xFF050505u);
-    frame(l.gui, 0xFF1D1D1Du);
-    frame(l.term, 0xFF1D1D1Du);
-    frame(l.info, 0xFF1D1D1Du);
+    fill(l.gui.x + l.gui.w, l.outer.y, l.border, l.outer.h, 0xFF2B3438u);
+    fill(l.term.x - l.border, l.info.y - l.border, l.term.w + l.border * 2u, l.border, 0xFF2B3438u);
+    frame(l.outer, 0xFF2B3438u);
+    frame(l.gui, 0xFF526065u);
+    frame(l.term, 0xFF526065u);
+    frame(l.info, 0xFF526065u);
     draw_terminal_tail(l.term);
     draw_status(l.info, &l);
 

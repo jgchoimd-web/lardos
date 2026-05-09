@@ -16,6 +16,7 @@
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
 - `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
 - `exexgui on|off|focus|next|workspace|save|load` - sketch split GUI with GUI, terminal, status panes, and workspaces 1/2/3.
+- GUI polish is beta-tracked: `v1.36.0b` refreshes classic GUI chrome, EXGUI, EXEXGUI, and the default LGUILIB theme without removing old controls.
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
 - `buddy on|off|status|joke|next|mood` - optional roaming assistant overlay with calm/funny/strict/silent moods.
 - `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.

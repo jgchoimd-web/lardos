@@ -1755,13 +1755,13 @@ void gui_render(void)
     gui_apply_exexgui_layout();
 
     // Window frame
-    uint32_t win_bg = 0xFF202840;
-    uint32_t title_bg = 0xFF304060;
-    uint32_t border = 0xFF000000;
+    uint32_t win_bg = 0xFF20252B;
+    uint32_t title_bg = 0xFF172126;
+    uint32_t border = 0xFF0B0D10;
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, (uint16_t)g.win_h, win_bg);
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, 20, title_bg);
     int set_btn_x = g.win_x + g.win_w - 52;
-    uint32_t set_btn_bg = (g.settings_open || (g.mx >= set_btn_x && g.mx < set_btn_x + 48 && g.my >= g.win_y && g.my < g.win_y + 20)) ? 0xFF506090 : 0xFF405070;
+    uint32_t set_btn_bg = (g.settings_open || (g.mx >= set_btn_x && g.mx < set_btn_x + 48 && g.my >= g.win_y && g.my < g.win_y + 20)) ? 0xFF235D64 : 0xFF2A2F34;
     fb_fill_rect(tgt, (uint16_t)set_btn_x, (uint16_t)g.win_y, 48, 20, set_btn_bg);
     fb_draw_text(tgt, (uint16_t)(set_btn_x + 8), (uint16_t)(g.win_y + 6), "Set", 0xFFFFFFFF, set_btn_bg);
     // crude border
@@ -1777,14 +1777,14 @@ void gui_render(void)
     int tab_w = g.win_w / 10;
     for (int t = 0; t < 10; t++) {
         int tx = g.win_x + t * tab_w;
-        uint32_t tab_bg = (g.app_id == t) ? 0xFF405070 : 0xFF282838;
+        uint32_t tab_bg = (g.app_id == t) ? 0xFF235D64 : 0xFF2A2F34;
         fb_fill_rect(tgt, (uint16_t)tx, (uint16_t)tab_y, (uint16_t)tab_w, (uint16_t)tab_h, tab_bg);
         fb_draw_text(tgt, (uint16_t)(tx + 4), (uint16_t)(tab_y + 8), tab_names[t], 0xFFFFFFFF, tab_bg);
     }
 
     int content_y = g.win_y + 20 + tab_h;
 
-    fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(content_y + 4), "lardos", 0xFFFFFFFF, win_bg);
+    fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(content_y + 4), "LardOS", 0xFFFFC857, win_bg);
 
     // Button
     int btn_x = g.win_x + 16;
@@ -1797,7 +1797,7 @@ void gui_render(void)
         int dww[] = { 48, 64, 52, 56, 50 };
         for (int d = 0; d < 5; d++) {
             const char* label = (d == 2) ? (g.http_post_mode ? "POST" : "GET") : lafillo_labels[d];
-            uint32_t dbg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
+            uint32_t dbg = g.btn_pressed ? 0xFFFFB84D : 0xFF2B7A78;
             fb_fill_rect(tgt, (uint16_t)(btn_x + dx[d]), (uint16_t)btn_y, (uint16_t)dww[d], (uint16_t)btn_h, dbg);
             fb_draw_text(tgt, (uint16_t)(btn_x + dx[d] + 4), (uint16_t)(btn_y + 10), label, 0xFFFFFFFF, dbg);
         }
@@ -1805,17 +1805,17 @@ void gui_render(void)
         static const char* lafaelo_labels[] = { "Open", "Save", "Run" };
         int lfb = 56;
         for (int d = 0; d < 3; d++) {
-            uint32_t dbg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
+            uint32_t dbg = g.btn_pressed ? 0xFFFFB84D : 0xFF2B7A78;
             fb_fill_rect(tgt, (uint16_t)(btn_x + d * (lfb + 4)), (uint16_t)btn_y, (uint16_t)lfb, (uint16_t)btn_h, dbg);
             fb_draw_text(tgt, (uint16_t)(btn_x + d * (lfb + 4) + 4), (uint16_t)(btn_y + 10), lafaelo_labels[d], 0xFFFFFFFF, dbg);
         }
     } else {
         const char* btn_label = (g.app_id == 1) ? "=" : (g.app_id == 2) ? "Save" : (g.app_id == 3) ? "View" : (g.app_id == 4) ? "Extract" : (g.app_id == 8) ? "Run" : "Run";
-        uint32_t btn_bg = g.btn_pressed ? 0xFF80A0FF : 0xFF5070D0;
+        uint32_t btn_bg = g.btn_pressed ? 0xFFFFB84D : 0xFF2B7A78;
         fb_fill_rect(tgt, (uint16_t)btn_x, (uint16_t)btn_y, (uint16_t)btn_w, (uint16_t)btn_h, btn_bg);
         fb_draw_text(tgt, (uint16_t)(btn_x + 12), (uint16_t)(btn_y + 10), btn_label, 0xFFFFFFFF, btn_bg);
         if (g.app_id == 5) {
-            uint32_t sb_bg = g.user_sandbox ? 0xFF60A060 : 0xFF405040;
+            uint32_t sb_bg = g.user_sandbox ? 0xFF3DB86Du : 0xFF42504Au;
             fb_fill_rect(tgt, (uint16_t)(btn_x + btn_w + 8), (uint16_t)btn_y, 70, (uint16_t)btn_h, sb_bg);
             fb_draw_text(tgt, (uint16_t)(btn_x + btn_w + 12), (uint16_t)(btn_y + 10), "Sandbox", 0xFFFFFFFF, sb_bg);
         }
@@ -1825,8 +1825,8 @@ void gui_render(void)
     int tb_y = content_y + 118;
     int tb_w = 260;
     int tb_h = 24;
-    uint32_t tb_bg = 0xFF101020;
-    uint32_t tb_bd = g.tb_focused ? 0xFFFFFF00 : 0xFF000000;
+    uint32_t tb_bg = 0xFF111619;
+    uint32_t tb_bd = g.tb_focused ? 0xFFFFC857 : 0xFF60717C;
     fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, (uint16_t)tb_w, (uint16_t)tb_h, tb_bg);
     fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, (uint16_t)tb_w, 1, tb_bd);
     fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)(tb_y + tb_h - 1), (uint16_t)tb_w, 1, tb_bd);
@@ -1992,9 +1992,9 @@ void gui_render(void)
     int sb_x = view_x + view_w - sb_w;
     int sb_y = view_y;
     int sb_h = view_h;
-    uint32_t sb_bg = 0xFF101018;
-    uint32_t sb_bd = 0xFF000000;
-    uint32_t sb_th = 0xFF8090A0;
+    uint32_t sb_bg = 0xFF111619;
+    uint32_t sb_bd = 0xFF60717C;
+    uint32_t sb_th = 0xFF7BE0D6;
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, (uint16_t)sb_h, sb_bg);
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
     fb_fill_rect(tgt, (uint16_t)(sb_x + sb_w - 1), (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
@@ -2023,29 +2023,29 @@ void gui_render(void)
         int panel_y = g.win_y + 24;
         int panel_w = 196;
         int panel_h = 108;
-        uint32_t panel_bg = 0xFF282840;
+        uint32_t panel_bg = 0xFF20252B;
         fb_fill_rect(tgt, (uint16_t)panel_x, (uint16_t)panel_y, (uint16_t)panel_w, (uint16_t)panel_h, panel_bg);
-        fb_fill_rect(tgt, (uint16_t)panel_x, (uint16_t)panel_y, (uint16_t)panel_w, 1, 0xFF000000);
-        fb_fill_rect(tgt, (uint16_t)panel_x, (uint16_t)(panel_y + panel_h - 1), (uint16_t)panel_w, 1, 0xFF000000);
+        fb_fill_rect(tgt, (uint16_t)panel_x, (uint16_t)panel_y, (uint16_t)panel_w, 1, 0xFFFFB84D);
+        fb_fill_rect(tgt, (uint16_t)panel_x, (uint16_t)(panel_y + panel_h - 1), (uint16_t)panel_w, 1, 0xFF0B0D10);
         int track_x = panel_x + 100;
         int track_w = 90;
         int row_h = 32;
         fb_draw_text(tgt, (uint16_t)(panel_x + 8), (uint16_t)(panel_y + 8), "Brightness", 0xFFFFFFFF, panel_bg);
-        fb_fill_rect(tgt, (uint16_t)track_x, (uint16_t)(panel_y + 12), (uint16_t)track_w, 8, 0xFF101018);
+        fb_fill_rect(tgt, (uint16_t)track_x, (uint16_t)(panel_y + 12), (uint16_t)track_w, 8, 0xFF111619);
         int br_pos = (g.brightness - 50) * track_w / 100;
         if (br_pos < 0) br_pos = 0;
         if (br_pos > track_w - 6) br_pos = track_w - 6;
-        fb_fill_rect(tgt, (uint16_t)(track_x + br_pos), (uint16_t)(panel_y + 10), 6, 12, 0xFF8090A0);
+        fb_fill_rect(tgt, (uint16_t)(track_x + br_pos), (uint16_t)(panel_y + 10), 6, 12, 0xFF7BE0D6);
         fb_draw_text(tgt, (uint16_t)(panel_x + 8), (uint16_t)(panel_y + 8 + row_h), "Volume", 0xFFFFFFFF, panel_bg);
-        fb_fill_rect(tgt, (uint16_t)track_x, (uint16_t)(panel_y + 12 + row_h), (uint16_t)track_w, 8, 0xFF101018);
+        fb_fill_rect(tgt, (uint16_t)track_x, (uint16_t)(panel_y + 12 + row_h), (uint16_t)track_w, 8, 0xFF111619);
         int vol_pos = g.volume * track_w / 100;
         if (vol_pos > track_w - 6) vol_pos = track_w - 6;
-        fb_fill_rect(tgt, (uint16_t)(track_x + vol_pos), (uint16_t)(panel_y + 10 + row_h), 6, 12, 0xFF8090A0);
+        fb_fill_rect(tgt, (uint16_t)(track_x + vol_pos), (uint16_t)(panel_y + 10 + row_h), 6, 12, 0xFF7BE0D6);
         fb_draw_text(tgt, (uint16_t)(panel_x + 8), (uint16_t)(panel_y + 8 + row_h * 2), "Quality", 0xFFFFFFFF, panel_bg);
-        fb_fill_rect(tgt, (uint16_t)track_x, (uint16_t)(panel_y + 12 + row_h * 2), (uint16_t)track_w, 8, 0xFF101018);
+        fb_fill_rect(tgt, (uint16_t)track_x, (uint16_t)(panel_y + 12 + row_h * 2), (uint16_t)track_w, 8, 0xFF111619);
         int q_pos = g.quality * track_w / 2;
         if (q_pos > track_w - 6) q_pos = track_w - 6;
-        fb_fill_rect(tgt, (uint16_t)(track_x + q_pos), (uint16_t)(panel_y + 10 + row_h * 2), 6, 12, 0xFF8090A0);
+        fb_fill_rect(tgt, (uint16_t)(track_x + q_pos), (uint16_t)(panel_y + 10 + row_h * 2), 6, 12, 0xFF7BE0D6);
     }
 
     exgui_draw_overlay();

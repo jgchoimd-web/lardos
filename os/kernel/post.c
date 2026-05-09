@@ -13,6 +13,7 @@
 #include "lar.h"
 #include "lard_doc.h"
 #include "lardkit.h"
+#include "lardtime.h"
 #include "lcontainer.h"
 #include "lil.h"
 #include "lguilib.h"
@@ -106,6 +107,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: hello.txt", fs_open("hello.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: lardos.lars", fs_open("lardos.lars") != NULL, emit, user, &pass, &fail);
     post_check("fs: lardd guide", fs_open("lardd_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: lardtime guide", fs_open("lardtime_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: releases", fs_open("releases.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: features.lil", fs_open("features.lil") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.lguilib", fs_open("default.lguilib") != NULL, emit, user, &pass, &fail);
@@ -135,6 +137,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);
     post_check("version: suffix policy", post_version_suffix_known(), emit, user, &pass, &fail);
+    post_check("time: lardos time calendar", lardtime_selftest() == 0, emit, user, &pass, &fail);
     post_check("pci: rtl8139 option", pci_find_device(0x10ECu, 0x8139u, &pci_addr) == 0, emit, user, &pass, &fail);
     post_check("pci: piix3 ide option", pci_find_device(0x8086u, 0x7010u, &pci_addr) == 0, emit, user, &pass, &fail);
 

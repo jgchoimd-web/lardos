@@ -158,7 +158,7 @@ protected_start:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x90000
+    mov esp, 0x9F000
 
     ; Parse LARDX/BOSX image at 0x00010000 and load segments to physical addresses.
     mov esi, 0x00010000
@@ -445,6 +445,8 @@ disk_read_chs:
     ret
 
 disk_error:
+    mov ax, 0x0003
+    int 0x10
     mov si, disk_err_msg
 .pe2:
     lodsb
@@ -491,8 +493,9 @@ phdr_size   dw 16               ; 16 for BOSX, 20 for LARDX v2
 ; VBE (real mode) framebuffer setup
 ; -----------------------------
 
-; bootinfo struct lives at physical 0x90000 = 0x9000:0000
-BOOTINFO_SEG equ 0x9000
+; bootinfo struct lives at physical 0x9C000 = 0x9C00:0000.
+; Keep it above the kernel image staging buffer and below the EBDA/VGA area.
+BOOTINFO_SEG equ 0x9C00
 BOOTINFO_OFF equ 0x0000
 VBE_MODEINFO_OFF equ 0x0200
 

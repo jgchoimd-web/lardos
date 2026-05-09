@@ -32,7 +32,7 @@ printn
 
 time
 print
-pushc " (unix sec)\n"
+pushc " (lardos ticks)\n"
 printn
 
 halt

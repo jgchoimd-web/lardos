@@ -195,6 +195,28 @@ static void skip_space(const char** p)
     while (**p == ' ' || **p == '\t') (*p)++;
 }
 
+static int ch_eq_ci(char a, char b)
+{
+    if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+    if (b >= 'A' && b <= 'Z') b = (char)(b - 'A' + 'a');
+    return a == b;
+}
+
+static int starts_with_ci(const char* p, const char* word)
+{
+    while (*word) {
+        if (!ch_eq_ci(*p, *word)) return 0;
+        p++;
+        word++;
+    }
+    return 1;
+}
+
+static void skip_line(const char** p)
+{
+    while (**p && **p != '\n') (*p)++;
+}
+
 int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
 {
     if (!src) return -1;
@@ -210,8 +232,7 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
             while (*q && *q != '\n') q++;
             continue;
         }
-        if ((q[0] == 'p' || q[0] == 'P') && (q[1] == 'u' || q[1] == 'U') &&
-            (q[2] == 's' || q[2] == 'S') && (q[3] == 'h' || q[3] == 'H')) {
+        if (starts_with_ci(q, "push")) {
             q += 4;
             skip_space(&q);
             if (*q == '"') {
@@ -223,23 +244,17 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
                 }
             }
             code_len += 5; /* PUSH_STR + u32 */
-        } else if ((q[0] == 'l' || q[0] == 'L') && (q[1] == 'a' || q[1] == 'A') &&
-                   (q[2] == 'f' || q[2] == 'F') && (q[3] == 'i' || q[3] == 'I') &&
-                   (q[4] == 'l' || q[4] == 'L') && (q[5] == 'l' || q[5] == 'L') &&
-                   (q[6] == 'o' || q[6] == 'O')) {
+        } else if (starts_with_ci(q, "lafillo")) {
             q += 7;
             code_len += 1; /* LAFILLO */
-        } else if ((q[0] == 'p' || q[0] == 'P') && (q[1] == 'r' || q[1] == 'R') &&
-                   (q[2] == 'i' || q[2] == 'I') && (q[3] == 'n' || q[3] == 'N') &&
-                   (q[4] == 't' || q[4] == 'T')) {
+        } else if (starts_with_ci(q, "print")) {
             q += 5;
             code_len += 1; /* PRINT */
-        } else if ((q[0] == 'h' || q[0] == 'H') && (q[1] == 'a' || q[1] == 'A') &&
-                   (q[2] == 'l' || q[2] == 'L') && (q[3] == 't' || q[3] == 'T')) {
+        } else if (starts_with_ci(q, "halt")) {
             q += 4;
             code_len += 1; /* HALT */
         } else {
-            while (*q && *q != '\n') q++;
+            skip_line(&q);
         }
         if (*q == '\n') q++;
     }
@@ -252,7 +267,7 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
         skip_space(&q);
         if (!*q) break;
         if (*q == ';' || *q == '#') { while (*q && *q != '\n') q++; continue; }
-        if ((q[0] == 'p' || q[0] == 'P') && (q[1] == 'u') && (q[2] == 's') && (q[3] == 'h')) {
+        if (starts_with_ci(q, "push")) {
             q += 4;
             skip_space(&q);
             if (*q == '"') {
@@ -265,6 +280,8 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
                     q = end;
                 }
             }
+        } else {
+            skip_line(&q);
         }
         if (*q == '\n') q++;
     }
@@ -294,7 +311,7 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
         skip_space(&q);
         if (!*q) break;
         if (*q == ';' || *q == '#') { while (*q && *q != '\n') q++; continue; }
-        if ((q[0] == 'p' || q[0] == 'P') && (q[1] == 'u') && (q[2] == 's') && (q[3] == 'h')) {
+        if (starts_with_ci(q, "push")) {
             q += 4;
             skip_space(&q);
             if (*q == '"') {
@@ -311,6 +328,8 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
                     q = end;
                 }
             }
+        } else {
+            skip_line(&q);
         }
         if (*q == '\n') q++;
     }
@@ -328,7 +347,7 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
         skip_space(&q);
         if (!*q) break;
         if (*q == ';' || *q == '#') { while (*q && *q != '\n') q++; continue; }
-        if ((q[0] == 'p' || q[0] == 'P') && (q[1] == 'u') && (q[2] == 's') && (q[3] == 'h')) {
+        if (starts_with_ci(q, "push")) {
             q += 4;
             skip_space(&q);
             if (*q == '"') {
@@ -344,15 +363,17 @@ int lafillo_vm_asm_eval(const char* src, lafillo_vm_putc_fn putc, void* user)
                     q = end;
                 }
             }
-        } else if ((q[0] == 'l' || q[0] == 'L') && (q[1] == 'a') && (q[2] == 'f') && (q[3] == 'i') && (q[4] == 'l') && (q[5] == 'l') && (q[6] == 'o')) {
+        } else if (starts_with_ci(q, "lafillo")) {
             q += 7;
             img[code_start + codepos++] = 0x02; /* LAFILLO */
-        } else if ((q[0] == 'p' || q[0] == 'P') && (q[1] == 'r') && (q[2] == 'i') && (q[3] == 'n') && (q[4] == 't')) {
+        } else if (starts_with_ci(q, "print")) {
             q += 5;
             img[code_start + codepos++] = 0x03; /* PRINT */
-        } else if ((q[0] == 'h' || q[0] == 'H') && (q[1] == 'a') && (q[2] == 'l') && (q[3] == 't')) {
+        } else if (starts_with_ci(q, "halt")) {
             q += 4;
             img[code_start + codepos++] = 0x00; /* HALT */
+        } else {
+            skip_line(&q);
         }
         if (*q == '\n') q++;
     }

@@ -4,6 +4,15 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.45.0b
+ITEM Added LardOS Time: ticks count from 00000-01-01 00:00:00 instead of Unix epoch seconds.
+ITEM Added five-digit year output to prevent the visible Y10K bug; years 00000..10000+ print without truncation.
+ITEM Added Dangun year view with CE+2333 and the time, date, lunar, and dangun shell commands.
+ITEM Added a native lunar calendar estimate anchored to the 02026 lunar new year for in-OS lunar display.
+ITEM SYS_GET_TIME, LIL time, and BOSL time now expose LardOS Time ticks while RTC Unix seconds remain internal compatibility input.
+ITEM POST and LUNIT now cover the LardOS Time calendar layer and lardtime_guide.lardd.
+ITEM Moved the stage2 boot stack, bootinfo block, and long-mode entry stack away from the kernel staging buffer so larger in-tree kernels still boot cleanly.
+
 SECTION v1.44.0a
 ITEM Official promotion of the real16 PanicRoom texture, Unicode cursor assignment, and user-editable picture Unicode slot track.
 ITEM The default official build now includes cursor set U+E000 plus glyph move/copy/rename/pixel without requiring the beta channel.

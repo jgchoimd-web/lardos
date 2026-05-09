@@ -37,6 +37,10 @@ flowchart LR
 The boot sector uses the 32-bit phase only as a bridge into long mode. The
 kernel payload is built with `-m64`, linked as `elf_x86_64`, and entered through
 `entry64.s`.
+Stage2 keeps bootinfo at `0x9C000` and its temporary protected-mode stack at
+`0x9F000`, above the kernel staging buffer. The long-mode entry stack starts at
+`0x7F0000`, away from VGA, EBDA, bootinfo, and staging data, so the native boot
+path has room as the in-tree kernel grows.
 
 At runtime the kernel also owns a controlled CPU mode bridge. `cpumode.c` copies
 a low-memory trampoline to `0x6000`, and `mode_switch.s` can briefly walk from
@@ -316,6 +320,13 @@ also parse `.ltheme` records such as `default.ltheme`.
 Runtime-ready panic paths append an entry, enter the real16 PanicRoom texture
 window, write `paniccapsule.lardd`, and halt only after the user chooses the halt key; LSH exposes the same log through
 `crashlog show`, `crashlog clear`, and `crashlog test`.
+
+`lardtime.c` owns the user-visible time model. RTC Unix seconds remain an
+internal compatibility input for hardware-facing code such as TLS validation,
+but `SYS_GET_TIME`, LSH `time`, LIL `time`, and BOSL `time` expose LardOS Time
+ticks since `00000-01-01 00:00:00`. The shell prints years with at least five
+digits, adds Dangun year as CE+2333, and derives a native lunar view for LardOS
+calendar surfaces.
 
 `lard_doc.c` also parses LARS form records. `button label | command` is rendered
 as an actionable control and can be listed with `larsform` or executed with

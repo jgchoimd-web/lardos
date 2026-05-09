@@ -27,6 +27,7 @@
 #include "exexgui.h"
 #include "lguilib.h"
 #include "lassist.h"
+#include "lardtime.h"
 #include "oslink.h"
 #include "taskprio.h"
 #include "awake.h"
@@ -178,6 +179,21 @@ static void out_append_u32(uint32_t v)
     while (n > 0) out_append_char(tmp[--n]);
 }
 
+static void out_append_u64(uint64_t v)
+{
+    char tmp[20];
+    uint32_t n = 0;
+    if (v == 0) {
+        out_append_char('0');
+        return;
+    }
+    while (v && n < sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (v % 10u));
+        v /= 10u;
+    }
+    while (n > 0) out_append_char(tmp[--n]);
+}
+
 static void out_append_i32(int32_t v)
 {
     if (v < 0) {
@@ -185,6 +201,16 @@ static void out_append_i32(int32_t v)
         out_append_u32((uint32_t)(-v));
     } else {
         out_append_u32((uint32_t)v);
+    }
+}
+
+static void out_append_i64(int64_t v)
+{
+    if (v < 0) {
+        out_append_char('-');
+        out_append_u64((uint64_t)(-v));
+    } else {
+        out_append_u64((uint64_t)v);
     }
 }
 
@@ -255,7 +281,7 @@ typedef struct {
 } magic_cmd_entry_t;
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
-    { "help", 1 }, { "control", 1 }, { "status", 1 }, { "release", 1 }, { "releases", 1 },
+    { "help", 1 }, { "control", 1 }, { "status", 1 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
@@ -1171,11 +1197,117 @@ static void cmd_ver(const char* args)
     out_append(")\n");
 }
 
+static void out_append_year5(uint32_t y)
+{
+    if (y < 10000u) {
+        uint32_t div = 10000u;
+        while (div > 1u) {
+            out_append_char((char)('0' + ((y / div) % 10u)));
+            div /= 10u;
+        }
+        out_append_char((char)('0' + (y % 10u)));
+    } else {
+        out_append_u32(y);
+    }
+}
+
+static void out_append_2(uint32_t v)
+{
+    out_append_char((char)('0' + ((v / 10u) % 10u)));
+    out_append_char((char)('0' + (v % 10u)));
+}
+
+static void lardtime_out_solar(const lardtime_civil_t* c)
+{
+    out_append_year5(c->year);
+    out_append_char('-');
+    out_append_2(c->month);
+    out_append_char('-');
+    out_append_2(c->day);
+    out_append_char(' ');
+    out_append_2(c->hour);
+    out_append_char(':');
+    out_append_2(c->minute);
+    out_append_char(':');
+    out_append_2(c->second);
+}
+
+static void lardtime_out_lunar(const lardtime_lunar_t* l)
+{
+    out_append_year5(l->year);
+    out_append("-L");
+    out_append_2(l->month);
+    if (l->leap_month) out_append(" leap");
+    out_append_char('-');
+    out_append_2(l->day);
+}
+
+static void cmd_lardtime_mode(const char* args, const char* default_mode)
+{
+    char sub[16];
+    const char* mode = default_mode;
+    lardtime_snapshot_t now;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) == 0) mode = sub;
+    if (strcmp(mode, "explain") == 0 || strcmp(mode, "policy") == 0) {
+        out_append("LardOS Time uses ticks since 00000-01-01 00:00:00, not Unix epoch seconds.\n");
+        out_append("Years print with at least five digits to keep year 10000 visible.\n");
+        out_append("Calendar views include solar CE, Dangun year (CE+2333), and a native lunar estimate.\n");
+        return;
+    }
+    if (lardtime_now(&now) != 0) {
+        out_append("lardtime: RTC unavailable.\n");
+        return;
+    }
+    if (strcmp(mode, "raw") == 0 || strcmp(mode, "ticks") == 0) {
+        out_append_i64(now.ticks);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(mode, "solar") == 0 || strcmp(mode, "date") == 0) {
+        lardtime_out_solar(&now.civil);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(mode, "dangun") == 0 || strcmp(mode, "dan") == 0) {
+        out_append("Dangun ");
+        out_append_year5(now.dangun_year);
+        out_append("-");
+        out_append_2(now.civil.month);
+        out_append("-");
+        out_append_2(now.civil.day);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(mode, "lunar") == 0 || strcmp(mode, "moon") == 0) {
+        lardtime_out_lunar(&now.lunar);
+        out_append(" (Lard lunar)\n");
+        return;
+    }
+    if (!(strcmp(mode, "now") == 0 || strcmp(mode, "status") == 0 || strcmp(mode, "all") == 0)) {
+        out_append("Usage: time|lardtime [now|raw|solar|dangun|lunar|explain]\n");
+        return;
+    }
+    out_append("LardOS Time ticks=");
+    out_append_i64(now.ticks);
+    out_append("\nSolar ");
+    lardtime_out_solar(&now.civil);
+    out_append("\nDangun ");
+    out_append_year5(now.dangun_year);
+    out_append("-");
+    out_append_2(now.civil.month);
+    out_append("-");
+    out_append_2(now.civil.day);
+    out_append("\nLunar ");
+    lardtime_out_lunar(&now.lunar);
+    out_append(" (Lard lunar)\nYear width: >=5, epoch: 00000-01-01, source: CMOS RTC -> LardOS Time\n");
+}
+
 static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status release [policy] ver post baseline selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control status time date lunar dangun release [policy] ver post baseline selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
@@ -1190,6 +1322,7 @@ static void cmd_help(const char* args)
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
+    out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor set U+E000|off           use a picture Unicode slot as the GUI cursor\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
@@ -1231,6 +1364,7 @@ static void cmd_control(const char* args)
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  magic dryrun statsu show what magic would execute without running it\n");
     out_append("  magic explain       show why magic executed or refused its last prediction\n");
+    out_append("  time                show LardOS Time ticks, 5-digit CE year, Dangun year, and lunar view\n");
     out_append("  mode guard          guarded real16 <-> long64 roundtrip with restore check\n");
     out_append("  trace on            record shell/module/oslink/taskprio events in order\n");
     out_append("  netwatch on         watch readable packet/oslink/HTTP activity\n");
@@ -1291,6 +1425,7 @@ static void cmd_status(const char* args)
     uint32_t drivers;
     int last;
     const char* driver;
+    lardtime_snapshot_t time_now;
     (void)args;
 
     fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
@@ -1302,6 +1437,17 @@ static void cmd_status(const char* args)
     out_append(" (");
     out_append(lardos_version_channel());
     out_append(")\n");
+    if (lardtime_now(&time_now) == 0) {
+        out_append("Time: ");
+        lardtime_out_solar(&time_now.civil);
+        out_append(", LT=");
+        out_append_i64(time_now.ticks);
+        out_append(", Dangun=");
+        out_append_year5(time_now.dangun_year);
+        out_append(", Lunar=");
+        lardtime_out_lunar(&time_now.lunar);
+        out_append("\n");
+    }
     out_append("Drive: ");
     out_append_char(s_drive);
     out_append(":\\\n");
@@ -6005,6 +6151,10 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "help") == 0 || (cmd[0] == '?' && cmd[1] == '\0')) { cmd_help(args); return; }
     if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
+    if (strcmp(cmd, "time") == 0 || strcmp(cmd, "lardtime") == 0 || strcmp(cmd, "ltime") == 0) { cmd_lardtime_mode(args, "now"); return; }
+    if (strcmp(cmd, "date") == 0) { cmd_lardtime_mode(args, "solar"); return; }
+    if (strcmp(cmd, "lunar") == 0) { cmd_lardtime_mode(args, "lunar"); return; }
+    if (strcmp(cmd, "dangun") == 0) { cmd_lardtime_mode(args, "dangun"); return; }
     if (strcmp(cmd, "cfgsh") == 0 || strcmp(cmd, "cfg") == 0 || strcmp(cmd, "settings") == 0) { cmd_cfgsh(args); return; }
     if (strcmp(cmd, "exitcfg") == 0) { s_cfgsh_mode = 0; out_append("CFGSH OFF.\n"); return; }
     if (strcmp(cmd, "buddy") == 0 || strcmp(cmd, "assistant") == 0 || strcmp(cmd, "lardbuddy") == 0) { cmd_buddy(args); return; }

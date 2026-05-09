@@ -10,6 +10,7 @@
 #include "gui.h"
 #include "fs.h"
 #include "rtc.h"
+#include "lardtime.h"
 #include "ps2.h"
 #include "lafillo.h"
 #include "hash.h"
@@ -313,7 +314,7 @@ void syscall_handler(void* frame)
     }
 
     if (nr == SYS_GET_TIME) {
-        int64_t t = rtc_unix_seconds();
+        int64_t t = lardtime_now_ticks();
         f->rax = (uint64_t)(int64_t)t;
         return;
     }

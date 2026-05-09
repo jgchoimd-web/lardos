@@ -6,8 +6,8 @@ GLOBAL _start
 EXTERN kmain
 
 _start:
-    ; Use a simple stack in low memory (identity-mapped).
-    mov rsp, 0x00000000000A0000
+    ; Use a stack below 8MiB, away from VGA, EBDA, bootinfo, and staging data.
+    mov rsp, 0x00000000007F0000
 
     call kmain
 

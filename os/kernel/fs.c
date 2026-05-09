@@ -220,6 +220,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use cfgsh for the settings shell: awake on, style 2, layout 3, http 2, boot 4.\n"
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
+    "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
     "li Use glyph demo, glyph auto sample.bmp avatar, glyph move/copy/rename/pixel, glyph live U+E000 on, glyph click U+E000, and glyph insert U+E000 notes.txt to own and edit clickable realtime private-use Unicode picture characters.\n"
     "li Use cursor set U+E000 to make the GUI cursor render from a user-owned Unicode picture slot; cursor off restores the default block cursor.\n"
     "li Use dir X: for read-only system files and dir Z: for every writable RAM file; the two listings are no longer mixed together.\n"
@@ -278,6 +279,9 @@ static const uint8_t file_lardos_lars[] =
     "cmd cfg http 2\n"
     "cmd buddy joke\n"
     "cmd lguilib show default.lguilib\n"
+    "cmd time\n"
+    "cmd lunar\n"
+    "cmd dangun\n"
     "cmd glyph demo\n"
     "cmd glyph list\n"
     "cmd glyph show U+E000\n"
@@ -417,6 +421,23 @@ static const uint8_t file_glyph_guide[] =
     "ITEM glyphmap.lardd records source size, average color, name, revision, live state, and click count.\n"
     "END\n";
 
+static const uint8_t file_lardtime_guide[] =
+    "LARDD 1\n"
+    "TITLE LardOS Time\n"
+    "TEXT LardOS Time is native time, not Unix epoch seconds.\n"
+    "TEXT It counts ticks from 00000-01-01 00:00:00 and prints years with at least five digits.\n"
+    "SECTION Commands\n"
+    "ITEM time -> show ticks, solar date, Dangun year, and Lard lunar date.\n"
+    "ITEM date -> show the five-digit solar date.\n"
+    "ITEM lunar -> show the native lunar date estimate.\n"
+    "ITEM dangun -> show CE+2333 as a five-digit Dangun year.\n"
+    "ITEM time raw -> show LardOS Time ticks only.\n"
+    "ITEM time explain -> show the policy.\n"
+    "SECTION Notes\n"
+    "ITEM RTC Unix seconds remain only as an internal compatibility input for hardware and TLS checks.\n"
+    "ITEM SYS_GET_TIME, LIL time, and BOSL time now expose LardOS Time ticks.\n"
+    "END\n";
+
 static const uint8_t file_features_lil[] =
     "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
     "(begin\n"
@@ -445,6 +466,7 @@ static const uint8_t file_sample_lpack[] =
 static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"
     "CHECK file lardos.lars\n"
+    "CHECK file lardtime_guide.lardd\n"
     "CHECK file default.ltheme\n"
     "CHECK writable journal.lardd\n"
     "CHECK writable userlaw.lardd\n"
@@ -453,6 +475,9 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command netwatch\n"
     "CHECK command glyph\n"
     "CHECK command cursor\n"
+    "CHECK command time\n"
+    "CHECK command lunar\n"
+    "CHECK command dangun\n"
     "CHECK command notes\n"
     "CHECK command larsview\n"
     "CHECK command dir\n"
@@ -540,6 +565,7 @@ static const FsFile FS_FILES[] = {
     { "default.ltheme", file_default_ltheme, sizeof(file_default_ltheme) - 1 },
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
     { "glyph_guide.lardd", file_glyph_guide, sizeof(file_glyph_guide) - 1 },
+    { "lardtime_guide.lardd", file_lardtime_guide, sizeof(file_lardtime_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },

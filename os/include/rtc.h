@@ -3,7 +3,7 @@
 #include "time.h"
 #include <stdint.h>
 
-/* CMOS RTC -> Unix seconds (UTC). Returns 0 if RTC is invalid/unreadable. */
+/* CMOS RTC -> Unix seconds (UTC), kept as an internal compatibility input. */
 int64_t rtc_unix_seconds(void);
 
 /* Freestanding time hook. */

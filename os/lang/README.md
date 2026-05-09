@@ -109,7 +109,7 @@ Addresses and ports may be i32 or i64 on the stack (truncated to 16 bits for I/O
 - `within`: stack `( x lo hi -- f )`; push `1` if `lo <= x < hi` else `0`
 - `2swap`: `(a b c d -- c d a b)` swap two pairs (Forth-style)
 - `rand`: push pseudo-random i32 (0 to 32767); LCG seeded from RTC
-- `time`: push current Unix seconds (i64)
+- `time`: push current LardOS Time ticks since `00000-01-01` (i64)
 
 Programs that use only inline ints, `pushk`, and the JIT-supported opcodes can use the **JIT**. Anything with `pushc`, i64-only paths not in the JIT whitelist, `call`/`ret`, `pick`, `rol`/`ror`, unsigned ops, `memcpy`/`memset`, MMIO, ports, fences, or `cli`/`sti` runs in the **interpreter** (the JIT falls back automatically).
 

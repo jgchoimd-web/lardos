@@ -18,7 +18,7 @@
 #define SYS_OPEN   12
 #define SYS_READ   13
 #define SYS_CLOSE  14
-#define SYS_GET_TIME  16
+#define SYS_GET_TIME  16  /* LardOS Time ticks since 00000-01-01, not Unix seconds */
 #define SYS_POLL_KEY  17
 #define SYS_GET_KEY   18
 #define SYS_LAFILLO_HTML 19

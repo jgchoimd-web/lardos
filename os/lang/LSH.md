@@ -8,6 +8,7 @@
 - `release policy` - show when to use `a`, `b`, or `p` release suffixes.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `post baseline` / `postbaseline show` - show the saved POST baseline report.
+- `time` / `date` / `lunar` / `dangun` - show LardOS Time ticks, five-digit year dates, native lunar view, and Dangun year.
 - `magic command [args]` - predict and run a mistyped safe built-in command.
 - `magic dryrun command [args]` - show the Magic prediction without executing it.
 - `magic explain` - show why the last Magic prediction executed or stopped.

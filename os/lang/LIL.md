@@ -50,7 +50,7 @@ It is not a bytecode VM or JIT; use BOSL for that layer.
 | `(repeat count body...)` | Run body `count` times with `it` bound to `0..count-1` |
 | `(cond (pred e...) ... (else e...))` | First truthy clause yields its last body value |
 | `(rand)` | Pseudo-random integer `0..32767` |
-| `(time)` | Current Unix seconds |
+| `(time)` | Current LardOS Time ticks since `00000-01-01` |
 
 ### Host Runner
 

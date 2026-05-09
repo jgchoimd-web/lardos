@@ -4,6 +4,7 @@
 #include "lipc.h"
 #include "lafillo.h"
 #include "io.h"
+#include "lardtime.h"
 #include "mem.h"
 #include "rtc.h"
 
@@ -278,7 +279,7 @@ enum {
     OP_WITHIN = 0x79, /* pop hi, lo, x; push 1 if lo <= x < hi else 0 */
     OP_2SWAP = 0x7A, /* (a b c d -- c d a b) swap two pairs */
     OP_RAND  = 0x7B, /* push pseudo-random i32 (0 to 0x7FFF) */
-    OP_TIME  = 0x7C, /* push unix seconds (i64) */
+    OP_TIME  = 0x7C, /* push LardOS Time ticks (i64) */
     OP_LIPC_SEND = 0x7D, /* pop len, buf ptr, port; push i32 result (see lipc.h) */
     OP_LIPC_RECV = 0x7E, /* pop cap, buf ptr, port; push i32 bytes or status */
     OP_LIPC_PENDING = 0x7F, /* pop port; push i32 pending message count */
@@ -1180,7 +1181,7 @@ static int bosl_vm_run_impl(const uint8_t* image, uint32_t size, bosl_putc_fn pu
             /* Simple LCG: s = (s * 1103515245 + 12345) & 0x7FFFFFFF */
             static uint32_t s_rand = 0;
             if (s_rand == 0) {
-                int64_t t = rtc_unix_seconds();
+                int64_t t = lardtime_now_ticks();
                 s_rand = (uint32_t)(t ^ (t >> 32)) | 1u;
             }
             s_rand = (uint32_t)((uint64_t)s_rand * 1103515245u + 12345u) & 0x7FFFFFFFu;
@@ -1194,7 +1195,7 @@ static int bosl_vm_run_impl(const uint8_t* image, uint32_t size, bosl_putc_fn pu
                 kprintf("bosl: time overflow\n");
                 goto fail_runtime;
             }
-            int64_t t = rtc_unix_seconds();
+            int64_t t = lardtime_now_ticks();
             stack[sp].type = BOSL_VAL_INT64;
             stack[sp].as.i64 = t;
             sp++;

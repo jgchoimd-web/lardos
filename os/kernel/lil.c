@@ -1,5 +1,6 @@
 #include "lil.h"
 
+#include "lardtime.h"
 #include "mem.h"
 #include "rtc.h"
 
@@ -409,7 +410,7 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
     if (lil_streq(op, "rand")) {
         static uint32_t s_r = 0;
         if (s_r == 0) {
-            int64_t t = rtc_unix_seconds();
+            int64_t t = lardtime_now_ticks();
             s_r = (uint32_t)(t ^ (t >> 32)) | 1u;
         }
         s_r = (uint32_t)((uint64_t)s_r * 1103515245u + 12345u) & 0x7FFFFFFFu;
@@ -417,7 +418,7 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
     }
 
     if (lil_streq(op, "time")) {
-        return rtc_unix_seconds();
+        return lardtime_now_ticks();
     }
 
     if (lil_streq(op, "assert")) {

@@ -134,6 +134,10 @@ commands:
 - `v1.44.0a` promotes the real16 PanicRoom texture, Unicode cursor assignment,
   and user-editable picture Unicode slot track to the official channel with
   ISO/IMG release media.
+- `v1.45.0b` adds LardOS Time: `time`, `date`, `lunar`, and `dangun`
+  expose ticks since `00000-01-01`, five-digit year display, Dangun years, and
+  a native lunar view. `SYS_GET_TIME`, LIL `time`, and BOSL `time` now return
+  LardOS Time ticks instead of Unix epoch seconds.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
@@ -181,6 +185,8 @@ commands:
 - `ltheme list|show|use name` selects native shell theme presets or parses
   `.ltheme` files such as `default.ltheme`; `ltheme preview file.ltheme` draws
   a small preview panel before applying.
+- `time`, `date`, `lunar`, and `dangun` show LardOS Time ticks, five-digit
+  years, Dangun year, and the native lunar calendar view.
 - `glyph move U+E000 U+E010`, `glyph copy U+E000 U+E011`,
   `glyph rename U+E000 name`, and `glyph pixel U+E000 0 0 ff00ff` edit
   assigned picture Unicode slots directly.

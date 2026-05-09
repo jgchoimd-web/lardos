@@ -20,6 +20,7 @@
 #include "console.h"
 #include "lafillo.h"
 #include "mem.h"
+#include "vmmon.h"
 
 #include <stdint.h>
 
@@ -58,13 +59,22 @@ int lafillo_vm_run(const uint8_t* image, uint32_t size)
 
 int lafillo_vm_run_io(const uint8_t* image, uint32_t size, lafillo_vm_putc_fn putc, void* user)
 {
-    if (!image || size < 16) return -1;
+    if (!image || size < 16) {
+        vmmon_record(VMMON_LAFILLO, 0, -1);
+        return -1;
+    }
 
     uint32_t mag = rd_u32(image);
-    if (mag != DVM_MAGIC) return -2;
+    if (mag != DVM_MAGIC) {
+        vmmon_record(VMMON_LAFILLO, 0, -2);
+        return -2;
+    }
 
     uint16_t ver = (uint16_t)image[4] | ((uint16_t)image[5] << 8);
-    if (ver != DVM_VERSION) return -3;
+    if (ver != DVM_VERSION) {
+        vmmon_record(VMMON_LAFILLO, 0, -3);
+        return -3;
+    }
 
     uint32_t const_count = rd_u32(image + 8);
     uint32_t code_size = rd_u32(image + 12);
@@ -72,18 +82,24 @@ int lafillo_vm_run_io(const uint8_t* image, uint32_t size, lafillo_vm_putc_fn pu
     /* Parse const pool */
     uint32_t off = 16;
     str_val_t* consts = (str_val_t*)kmalloc(const_count * sizeof(str_val_t));
-    if (!consts) return -5;
+    if (!consts) {
+        vmmon_record(VMMON_LAFILLO, 0, -5);
+        return -5;
+    }
+    uint32_t steps = 0;
+    uint32_t budget = vmmon_budget(VMMON_LAFILLO);
+    int rc = 0;
+
+#define DVM_FINISH(code_) do { rc = (code_); goto dvm_done; } while (0)
 
     for (uint32_t i = 0; i < const_count; i++) {
         if (off + 4 > size) {
-            kfree(consts);
-            return -6;
+            DVM_FINISH(-6);
         }
         uint32_t len = rd_u32(image + off);
         off += 4;
         if (off + len > size) {
-            kfree(consts);
-            return -7;
+            DVM_FINISH(-7);
         }
         consts[i].ptr = image + off;
         consts[i].len = len;
@@ -91,8 +107,7 @@ int lafillo_vm_run_io(const uint8_t* image, uint32_t size, lafillo_vm_putc_fn pu
     }
 
     if (off + code_size > size) {
-        kfree(consts);
-        return -4;
+        DVM_FINISH(-4);
     }
 
     const uint8_t* code = image + off;
@@ -106,21 +121,21 @@ int lafillo_vm_run_io(const uint8_t* image, uint32_t size, lafillo_vm_putc_fn pu
 
     uint32_t pc = 0;
     while (pc < code_size) {
+        if (++steps > budget) {
+            DVM_FINISH(-16);
+        }
         uint8_t op = code[pc++];
         switch (op) {
         case 0x00: /* HALT */
-            kfree(consts);
-            return 0;
+            DVM_FINISH(0);
         case 0x01: { /* PUSH_STR */
             if (pc + 4 > code_size) {
-                kfree(consts);
-                return -9;
+                DVM_FINISH(-9);
             }
             uint32_t idx = rd_u32(code + pc);
             pc += 4;
             if (idx >= const_count || sp >= MAX_STACK) {
-                kfree(consts);
-                return -10;
+                DVM_FINISH(-10);
             }
             uint32_t n = consts[idx].len;
             if (n >= MAX_STR_LEN) n = MAX_STR_LEN - 1;
@@ -133,15 +148,13 @@ int lafillo_vm_run_io(const uint8_t* image, uint32_t size, lafillo_vm_putc_fn pu
         }
         case 0x02: { /* LAFILLO */
             if (sp == 0) {
-                kfree(consts);
-                return -11;
+                DVM_FINISH(-11);
             }
             sp--;
             const char* in = stack_buf[sp];
             uint32_t in_len = stack_len[sp];
             if (lafillo_http_to_text(in, in_len, lafillo_out, sizeof(lafillo_out)) != 0) {
-                kfree(consts);
-                return -12;
+                DVM_FINISH(-12);
             }
             uint32_t out_len = 0;
             while (lafillo_out[out_len] && out_len < MAX_STR_LEN - 1) out_len++;
@@ -155,8 +168,7 @@ int lafillo_vm_run_io(const uint8_t* image, uint32_t size, lafillo_vm_putc_fn pu
         }
         case 0x03: { /* PRINT */
             if (sp == 0) {
-                kfree(consts);
-                return -13;
+                DVM_FINISH(-13);
             }
             sp--;
             dvm_out_bytes(putc, user, (const uint8_t*)stack_buf[sp], stack_len[sp]);
@@ -164,13 +176,15 @@ int lafillo_vm_run_io(const uint8_t* image, uint32_t size, lafillo_vm_putc_fn pu
             break;
         }
         default:
-            kfree(consts);
-            return -14;
+            DVM_FINISH(-14);
         }
     }
 
+dvm_done:
     kfree(consts);
-    return 0;
+    vmmon_record(VMMON_LAFILLO, steps, rc);
+#undef DVM_FINISH
+    return rc;
 }
 
 /* Minimal inline assembler */

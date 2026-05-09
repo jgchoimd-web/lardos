@@ -89,6 +89,9 @@ commands:
   real-mode window that returns to 64-bit long mode.
 - `mode guard` performs the real-mode roundtrip with a before/after guard and
   reports restoration state.
+- `vm status|limits|selftest|clear` monitors BOSL, LIL, GASM, Lafillo VM, and
+  OSVM runs under common step budgets; `gasm file.gasm` runs GASM source from
+  the shell.
 - `sram` / `screenram` turns a quiet framebuffer/backbuffer rectangle into
   scratch RAM. Use `sram on` for the default corner, `sram rect x y w h` for a
   user-selected area, then `sram write offset text` and `sram read offset len`.
@@ -138,6 +141,9 @@ commands:
   expose ticks since `00000-01-01`, five-digit year display, Dangun years, and
   a native lunar view. `SYS_GET_TIME`, LIL `time`, and BOSL `time` now return
   LardOS Time ticks instead of Unix epoch seconds.
+- `v1.47.0b` adds VM Monitor: `vm status`, `vm limits`, and `vm selftest` show
+  the health of BOSL, LIL, GASM, Lafillo VM, and OSVM. GASM and Lafillo VM now
+  have step budgets, and branchy BOSL uses the budgeted interpreter path.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
@@ -239,6 +245,8 @@ commands:
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
   assertion checks, stepped loops, repeat loops, and integer math helpers.
+- `gasm file` runs native GASM source, and `vm status` shows shared VM Monitor
+  counters for every in-kernel language runtime.
 - `write file text`, `append file text`, and `copy src dst` edit writable RAM
   files such as `notes.txt`, `bugreport.lardd`, `lafillo_saved.txt`,
   `lar_extract.txt`, and `vcs_restore.txt`.
@@ -259,7 +267,7 @@ descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
 scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec filtering, TaskPrio
 scheduling, BootProf profile flags, CrashLog writes, LardKit user-control suite, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
-ScreenCheck visual diagnostics, and LIL feature forms. The screen checks are there to catch visible boot/UI
+ScreenCheck visual diagnostics, VM Monitor budgets, and LIL feature forms. The screen checks are there to catch visible boot/UI
 regressions as well as code errors. POST also checks the LGUILIB parser, GUI
 overlay chrome, Awakening background loader tracker, and EXEXGUI's split layout
 math so the drawn regions do not collapse.

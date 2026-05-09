@@ -2,6 +2,11 @@
 
 **GASM** is a minimal **accumulator-based, object-oriented** virtual machine: accumulator `A`, self register `S`. Contrast with BOSL (stack-based) and LIL (s-expression interpreter).
 
+Run source from LSH with `gasm file.gasm`. `vm status`, `vm limits`, and
+`vm selftest` show GASM under the shared VM Monitor. The runtime has a step
+budget, so accidental infinite loops report a VM failure instead of hanging the
+OS surface.
+
 ### Syntax
 
 - One instruction per line

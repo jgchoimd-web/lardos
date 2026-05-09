@@ -13,6 +13,9 @@
 - `magic dryrun command [args]` - show the Magic prediction without executing it.
 - `magic explain` - show why the last Magic prediction executed or stopped.
 - `mode [status|probe|real|guard]` - inspect or run the controlled real16/long64 bridge.
+- `vm status|limits|selftest|clear` - inspect VM Monitor counters and budgets
+  for BOSL, LIL, GASM, Lafillo VM, and OSVM.
+- `gasm file.gasm` - run an in-tree GASM source file from LSH.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
 - `exgui on|off|style|layout|next` - extended desktop and window-manager shell.

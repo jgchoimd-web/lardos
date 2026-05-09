@@ -6,11 +6,17 @@
 | **OS VM** | 운영체제용 간단한 스택 VM (push/add/sub/mul/div/print/halt) | `kernel/os_vm.c` | `osvm` LSH |
 | **Lafillo VM** | HTML→text 전용 (push/lafillo/print/halt) | `kernel/lafillo_vm.c` | `lafvm` LSH |
 | **LIL** | S-expression **auxiliary** interpreter (int64, `let`/`if`/…) | `kernel/lil.c` | `tools/lil` (C) |
-| **GASM** | Accumulator-based VM (load/add/sub/mul/div/print) | `kernel/gasm_vm.c` | inline only (GASM_ASM) |
+| **GASM** | Accumulator-based VM (load/add/sub/mul/div/print) | `kernel/gasm_vm.c` | `gasm` LSH / `GASM_ASM` |
 | **LML** | Markup language (config, UI, documents) | `kernel/lml.c` | — |
 | **Seed** | 셀프 호스팅 컴파일러 언어 (C 스타일 → BOSL) | — | `lang/seed/seedc` (C) |
 
 See `LIL.md` for LIL syntax, `GASM.md` for GASM, `LML.md` for LML, `LSH.md` for LSH shell, `lang/seed/SEED.md` for Seed, and `bosla` / this file for BOSL.
+
+`vm status`, `vm limits`, and `vm selftest` expose the shared VM Monitor for
+BOSL, LIL, GASM, Lafillo VM, and OSVM. The monitor tracks runs, failures,
+budget hits, last steps, max steps, and return codes. GASM and Lafillo VM are
+now step-budgeted, and branchy BOSL falls back from JIT to the budgeted
+interpreter path.
 
 ---
 

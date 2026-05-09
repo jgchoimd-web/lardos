@@ -4,6 +4,15 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.47.0b
+ITEM Added VM Monitor for BOSL, LIL, GASM, Lafillo VM, and OSVM.
+ITEM Added vm status, vm limits, vm selftest, and vm clear for per-VM runs, failures, budget hits, last steps, max steps, and return code.
+ITEM GASM and Lafillo VM now use common step budgets so runaway programs stop instead of hanging the OS surface.
+ITEM BOSL JIT now falls back to the budgeted interpreter for branchy programs, keeping loops visible and interruptible.
+ITEM Added gasm file.gasm to LSH and vm_guide.lardd to the in-kernel document set.
+ITEM POST and LUNIT cover VM Monitor budgets, vm_guide.lardd, and the new vm/gasm command surfaces.
+ITEM Release media uses beta b-channel versioning while the VM safety and monitor UI stabilize.
+
 SECTION v1.46.0a
 ITEM Official promotion of the LardOS Time beta track without feature loss.
 ITEM Keeps LardOS Time ticks from 00000-01-01, five-digit year output, Dangun year, and native lunar display.

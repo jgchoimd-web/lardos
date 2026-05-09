@@ -29,6 +29,7 @@
 #include "syscall.h"
 #include "taskprio.h"
 #include "version.h"
+#include "vmmon.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -127,6 +128,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: glyph map writable", fs_open_writable("glyphmap.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: writable directory index", fs_writable_count() >= 19u, emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
+    post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
     post_check("doc: LARDD renderer", post_doc_parse("lardd_guide.lardd"), emit, user, &pass, &fail);
@@ -138,6 +140,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);
     post_check("version: suffix policy", post_version_suffix_known(), emit, user, &pass, &fail);
     post_check("time: lardos time calendar", lardtime_selftest() == 0, emit, user, &pass, &fail);
+    post_check("vm: monitor budgets", vmmon_selftest() == 0, emit, user, &pass, &fail);
     post_check("pci: rtl8139 option", pci_find_device(0x10ECu, 0x8139u, &pci_addr) == 0, emit, user, &pass, &fail);
     post_check("pci: piix3 ide option", pci_find_device(0x8086u, 0x7010u, &pci_addr) == 0, emit, user, &pass, &fail);
 

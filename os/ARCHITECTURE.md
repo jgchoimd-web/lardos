@@ -80,6 +80,7 @@ flowchart TB
     EXEXGUI["exexgui split DE shell"]
     LGUILIB["lguilib GUI library format"]
     VM["BOSL GASM LIL LML OSVM"]
+    VMMon["vmmon budgets + counters"]
 
     Kmain --> GDT
     Kmain --> IDT
@@ -106,7 +107,15 @@ flowchart TB
     GUI --> TaskPrio
     BootProf --> Awake
     GUI --> VM
+    VM --> VMMon
+    POST --> VMMon
 ```
+
+VM Monitor (`kernel/vmmon.c`) is a small shared safety and observability layer
+for the language runtimes. BOSL, LIL, GASM, Lafillo VM, and OSVM report run
+counts, failures, budget hits, last step count, max step count, and last return
+code. GASM and Lafillo VM use the shared step budgets directly, and BOSL's JIT
+falls back to the budgeted interpreter for branchy programs.
 
 ## Build
 
@@ -206,6 +215,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Sketch split GUI shell | `os/kernel/exexgui.c`, `os/include/exexgui.h` |
 | LardOS GUI library format | `os/kernel/lguilib.c`, `os/include/lguilib.h` |
 | GUI overlay chrome | `os/kernel/guioverlay.c`, `os/include/guioverlay.h` |
+| VM monitor | `os/kernel/vmmon.c`, `os/include/vmmon.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
 | Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |

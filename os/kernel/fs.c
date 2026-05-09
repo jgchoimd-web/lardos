@@ -221,6 +221,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
+    "li Use vm status, vm limits, and vm selftest to monitor BOSL, LIL, GASM, Lafillo VM, and OSVM under common step budgets.\n"
     "li Use glyph demo, glyph auto sample.bmp avatar, glyph move/copy/rename/pixel, glyph live U+E000 on, glyph click U+E000, and glyph insert U+E000 notes.txt to own and edit clickable realtime private-use Unicode picture characters.\n"
     "li Use cursor set U+E000 to make the GUI cursor render from a user-owned Unicode picture slot; cursor off restores the default block cursor.\n"
     "li Use dir X: for read-only system files and dir Z: for every writable RAM file; the two listings are no longer mixed together.\n"
@@ -282,6 +283,8 @@ static const uint8_t file_lardos_lars[] =
     "cmd time\n"
     "cmd lunar\n"
     "cmd dangun\n"
+    "cmd vm status\n"
+    "cmd vm selftest\n"
     "cmd glyph demo\n"
     "cmd glyph list\n"
     "cmd glyph show U+E000\n"
@@ -438,6 +441,22 @@ static const uint8_t file_lardtime_guide[] =
     "ITEM SYS_GET_TIME, LIL time, and BOSL time now expose LardOS Time ticks.\n"
     "END\n";
 
+static const uint8_t file_vm_guide[] =
+    "LARDD 1\n"
+    "TITLE VM Monitor\n"
+    "TEXT VM Monitor keeps LardOS language runtimes visible and bounded without external libraries.\n"
+    "TEXT BOSL, LIL, GASM, Lafillo VM, and OSVM report runs, failures, budget hits, last steps, max steps, and return code.\n"
+    "SECTION Commands\n"
+    "ITEM vm status -> show per-VM counters and the active step budget.\n"
+    "ITEM vm limits -> list the current step budgets.\n"
+    "ITEM vm selftest -> smoke-test BOSL, LIL, GASM, Lafillo VM, OSVM, and the monitor itself.\n"
+    "ITEM vm clear -> reset counters without changing user files.\n"
+    "ITEM gasm file.gasm -> run an in-tree GASM source file from LSH.\n"
+    "SECTION Safety\n"
+    "ITEM GASM and Lafillo VM now stop runaway programs through VM Monitor budgets.\n"
+    "ITEM BOSL JIT falls back to the budgeted interpreter for branchy programs so loops stay interruptible.\n"
+    "END\n";
+
 static const uint8_t file_features_lil[] =
     "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
     "(begin\n"
@@ -475,6 +494,9 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command netwatch\n"
     "CHECK command glyph\n"
     "CHECK command cursor\n"
+    "CHECK command vm\n"
+    "CHECK command gasm\n"
+    "CHECK file vm_guide.lardd\n"
     "CHECK command time\n"
     "CHECK command lunar\n"
     "CHECK command dangun\n"
@@ -566,6 +588,7 @@ static const FsFile FS_FILES[] = {
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
     { "glyph_guide.lardd", file_glyph_guide, sizeof(file_glyph_guide) - 1 },
     { "lardtime_guide.lardd", file_lardtime_guide, sizeof(file_lardtime_guide) - 1 },
+    { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },

@@ -2,6 +2,7 @@
 
 #include "console.h"
 #include "mem.h"
+#include "vmmon.h"
 
 #include <stdint.h>
 
@@ -441,7 +442,8 @@ static int uses_only_int_ops(const uint8_t* code, uint32_t code_size)
         case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE:
         case OP_HALT:
             break;
-        case OP_JMP: case OP_JZ: case OP_JNZ: pc += 4; break;
+        case OP_JMP: case OP_JZ: case OP_JNZ:
+            return 0; /* Branchy BOSL uses the interpreter step budget. */
         default:
             return 0;
         }
@@ -740,6 +742,7 @@ int bosl_vm_run_jit_io(const uint8_t* image, uint32_t size, bosl_putc_fn putc, v
     int rc = fn(&ctx);
     kfree(const_ints);
     kfree(const_is_int);
+    vmmon_record(VMMON_BOSL, code_size, rc);
     return rc;
 }
 
@@ -747,4 +750,3 @@ int bosl_vm_run_jit(const uint8_t* image, uint32_t size)
 {
     return bosl_vm_run_jit_io(image, size, 0, 0);
 }
-

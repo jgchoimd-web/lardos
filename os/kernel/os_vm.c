@@ -19,6 +19,7 @@
 #include "os_vm.h"
 #include "console.h"
 #include "mem.h"
+#include "vmmon.h"
 
 #include <stdint.h>
 
@@ -64,67 +65,85 @@ int os_vm_run(const uint8_t* image, uint32_t size)
 
 int os_vm_run_io(const uint8_t* image, uint32_t size, os_vm_putc_fn putc, void* user)
 {
-    if (!image || size < 12) return -1;
-    if (rd_u32(image) != OVM_MAGIC) return -2;
-    if ((uint16_t)(image[4] | (image[5] << 8)) != OVM_VER) return -3;
+    if (!image || size < 12) {
+        vmmon_record(VMMON_OSVM, 0, -1);
+        return -1;
+    }
+    if (rd_u32(image) != OVM_MAGIC) {
+        vmmon_record(VMMON_OSVM, 0, -2);
+        return -2;
+    }
+    if ((uint16_t)(image[4] | (image[5] << 8)) != OVM_VER) {
+        vmmon_record(VMMON_OSVM, 0, -3);
+        return -3;
+    }
 
     uint32_t code_size = rd_u32(image + 8);
-    if (12 + code_size > size) return -4;
+    if (12 + code_size > size) {
+        vmmon_record(VMMON_OSVM, 0, -4);
+        return -4;
+    }
 
     const uint8_t* code = image + 12;
     int32_t stack[STACK_MAX];
     uint32_t sp = 0;
     uint32_t pc = 0;
     uint32_t steps = 0;
+    uint32_t budget = vmmon_budget(VMMON_OSVM);
+    int rc = 0;
 
-    while (pc < code_size && steps < 1000000) {
-        steps++;
+#define OVM_FINISH(code_) do { rc = (code_); goto ovm_done; } while (0)
+
+    while (pc < code_size) {
+        if (++steps > budget) {
+            OVM_FINISH(-16);
+        }
         uint8_t op = code[pc++];
         switch (op) {
         case 0x01: { /* PUSH */
-            if (pc + 4 > code_size || sp >= STACK_MAX) return -5;
+            if (pc + 4 > code_size || sp >= STACK_MAX) OVM_FINISH(-5);
             stack[sp++] = rd_i32(code + pc);
             pc += 4;
             break;
         }
         case 0x02: /* ADD */
-            if (sp < 2) return -6;
+            if (sp < 2) OVM_FINISH(-6);
             stack[sp - 2] += stack[sp - 1];
             sp--;
             break;
         case 0x03: /* SUB */
-            if (sp < 2) return -7;
+            if (sp < 2) OVM_FINISH(-7);
             stack[sp - 2] -= stack[sp - 1];
             sp--;
             break;
         case 0x04: /* MUL */
-            if (sp < 2) return -8;
+            if (sp < 2) OVM_FINISH(-8);
             stack[sp - 2] *= stack[sp - 1];
             sp--;
             break;
         case 0x05: /* DIV */
-            if (sp < 2 || stack[sp - 1] == 0) return -9;
+            if (sp < 2 || stack[sp - 1] == 0) OVM_FINISH(-9);
             stack[sp - 2] /= stack[sp - 1];
             sp--;
             break;
         case 0x06: /* PRINT */
-            if (sp == 0) return -10;
+            if (sp == 0) OVM_FINISH(-10);
             out_i32(putc, user, stack[--sp]);
             out_putc(putc, user, '\n');
             break;
         case 0x07: /* HALT */
-            return 0;
+            OVM_FINISH(0);
         case 0x08: { /* JMP */
-            if (pc + 4 > code_size) return -11;
+            if (pc + 4 > code_size) OVM_FINISH(-11);
             uint32_t target = rd_u32(code + pc);
             pc += 4;
-            if (target >= code_size) return -12;
+            if (target >= code_size) OVM_FINISH(-12);
             pc = target;
             break;
         }
         case 0x09: { /* JZ */
-            if (pc + 4 > code_size) return -13;
-            if (sp == 0) return -14;
+            if (pc + 4 > code_size) OVM_FINISH(-13);
+            if (sp == 0) OVM_FINISH(-14);
             int32_t v = stack[--sp];
             uint32_t target = rd_u32(code + pc);
             pc += 4;
@@ -132,10 +151,15 @@ int os_vm_run_io(const uint8_t* image, uint32_t size, os_vm_putc_fn putc, void* 
             break;
         }
         default:
-            return -15;
+            OVM_FINISH(-15);
         }
     }
-    return (steps >= 1000000) ? -16 : 0;
+    rc = 0;
+
+ovm_done:
+    vmmon_record(VMMON_OSVM, steps, rc);
+#undef OVM_FINISH
+    return rc;
 }
 
 /* Minimal inline assembler */

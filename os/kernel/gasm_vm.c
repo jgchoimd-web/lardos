@@ -7,6 +7,7 @@
 #include "console.h"
 #include "mem.h"
 #include "string.h"
+#include "vmmon.h"
 
 #include <stdint.h>
 
@@ -74,12 +75,20 @@ static void gasm_print_i64(gasm_putc_fn putc, void* user, int64_t v)
 
 int gasm_vm_run_io(const uint8_t* code, uint32_t size, gasm_putc_fn putc, void* user)
 {
-    if (!code || size == 0) return -1;
+    if (!code || size == 0) {
+        vmmon_record(VMMON_GASM, 0, -1);
+        return -1;
+    }
     int64_t A = 0;
     uint32_t pc = 0;
+    uint32_t steps = 0;
+    uint32_t budget = vmmon_budget(VMMON_GASM);
+    int rc = 0;
     uint32_t S = MAX_OBJS;  /* self (invalid until invoke) */
     uint32_t ret_stack[MAX_RET];
     int ret_sp = 0;
+
+#define GASM_FINISH(code_) do { rc = (code_); goto gasm_done; } while (0)
 
     /* Object storage: obj[handle][slot] = int64. obj_used[h]=1 if allocated. */
     static int64_t obj[MAX_OBJS][MAX_SLOTS];
@@ -88,6 +97,9 @@ int gasm_vm_run_io(const uint8_t* code, uint32_t size, gasm_putc_fn putc, void* 
     for (int i = 0; i < MAX_OBJS; i++) obj_used[i] = 0;
 
     while (pc + INSN_SZ <= size) {
+        if (++steps > budget) {
+            GASM_FINISH(-20);
+        }
         uint8_t op = code[pc];
         const uint8_t* p = code + pc + 1;
 
@@ -106,7 +118,7 @@ int gasm_vm_run_io(const uint8_t* code, uint32_t size, gasm_putc_fn putc, void* 
             break;
         case GASM_DIV: {
             int64_t b = rd_i64(p);
-            if (b == 0) return -2;
+            if (b == 0) GASM_FINISH(-2);
             A /= b;
             break;
         }
@@ -118,17 +130,17 @@ int gasm_vm_run_io(const uint8_t* code, uint32_t size, gasm_putc_fn putc, void* 
             gasm_print_i64(putc, user, A);
             break;
         case GASM_HALT:
-            return 0;
+            GASM_FINISH(0);
         case GASM_JMP: {
             uint32_t target = rd_u32(p);
-            if (!pc_valid(target, size)) return GASM_ERR_OOB;
+            if (!pc_valid(target, size)) GASM_FINISH(GASM_ERR_OOB);
             pc = target;
             continue;
         }
         case GASM_JZ:
             if (A == 0) {
                 uint32_t target = rd_u32(p);
-                if (!pc_valid(target, size)) return GASM_ERR_OOB;
+                if (!pc_valid(target, size)) GASM_FINISH(GASM_ERR_OOB);
                 pc = target;
                 continue;
             }
@@ -136,7 +148,7 @@ int gasm_vm_run_io(const uint8_t* code, uint32_t size, gasm_putc_fn putc, void* 
         case GASM_JNZ:
             if (A != 0) {
                 uint32_t target = rd_u32(p);
-                if (!pc_valid(target, size)) return GASM_ERR_OOB;
+                if (!pc_valid(target, size)) GASM_FINISH(GASM_ERR_OOB);
                 pc = target;
                 continue;
             }
@@ -189,21 +201,21 @@ int gasm_vm_run_io(const uint8_t* code, uint32_t size, gasm_putc_fn putc, void* 
         }
         case GASM_CALL: {
             uint32_t target = rd_u32(p);
-            if (!pc_valid(target, size)) return GASM_ERR_OOB;
-            if (ret_sp >= MAX_RET) return -5;
+            if (!pc_valid(target, size)) GASM_FINISH(GASM_ERR_OOB);
+            if (ret_sp >= MAX_RET) GASM_FINISH(-5);
             ret_stack[ret_sp++] = pc + INSN_SZ;
             pc = target;
             continue;
         }
         case GASM_RET:
-            if (ret_sp <= 0) return 0;  /* empty stack = exit */
+            if (ret_sp <= 0) GASM_FINISH(0);  /* empty stack = exit */
             pc = ret_stack[--ret_sp];
             break;
         case GASM_INVOKE: {
             uint32_t h = rd_u32(p);
             uint32_t target = rd_u32(p + 4);
-            if (!pc_valid(target, size)) return GASM_ERR_OOB;
-            if (ret_sp >= MAX_RET) return -5;
+            if (!pc_valid(target, size)) GASM_FINISH(GASM_ERR_OOB);
+            if (ret_sp >= MAX_RET) GASM_FINISH(-5);
             S = h;
             ret_stack[ret_sp++] = pc + INSN_SZ;
             pc = target;
@@ -240,11 +252,16 @@ int gasm_vm_run_io(const uint8_t* code, uint32_t size, gasm_putc_fn putc, void* 
             break;
         }
         default:
-            return -3;
+            GASM_FINISH(-3);
         }
         pc += INSN_SZ;
     }
-    return 0;
+    rc = 0;
+
+gasm_done:
+    vmmon_record(VMMON_GASM, steps, rc);
+#undef GASM_FINISH
+    return rc;
 }
 
 int gasm_vm_run(const uint8_t* code, uint32_t size)

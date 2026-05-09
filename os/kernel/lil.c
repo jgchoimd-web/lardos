@@ -3,6 +3,7 @@
 #include "lardtime.h"
 #include "mem.h"
 #include "rtc.h"
+#include "vmmon.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -335,7 +336,7 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
     if (*err) {
         return 0;
     }
-    if (++(*steps) > 500000u) {
+    if (++(*steps) > vmmon_budget(VMMON_LIL)) {
         *err = -10;
         return 0;
     }
@@ -948,12 +949,14 @@ static int64_t lil_eval(lil_node_t* n, lil_env_t* env, lil_putc_fn putc, void* u
 int lil_run(const char* src, lil_putc_fn putc, void* user)
 {
     if (!src) {
+        vmmon_record(VMMON_LIL, 0, 1);
         return 1;
     }
     g_nfuncs = 0;
     const char* p = src;
     skip_ws(&p);
     if (*p == 0) {
+        vmmon_record(VMMON_LIL, 0, 2);
         return 2;
     }
 
@@ -963,11 +966,14 @@ int lil_run(const char* src, lil_putc_fn putc, void* user)
         if (root) {
             lil_tree_free(root);
         }
-        return err ? -err : 3;
+        int rc = err ? -err : 3;
+        vmmon_record(VMMON_LIL, 0, rc);
+        return rc;
     }
     skip_ws(&p);
     if (*p != 0) {
         lil_tree_free(root);
+        vmmon_record(VMMON_LIL, 0, 4);
         return 4;
     }
 
@@ -975,32 +981,45 @@ int lil_run(const char* src, lil_putc_fn putc, void* user)
     err = 0;
     (void)lil_eval(root, 0, putc, user, &err, &steps);
     lil_tree_free(root);
-    return err ? -err : 0;
+    int rc = err ? -err : 0;
+    vmmon_record(VMMON_LIL, steps, rc);
+    return rc;
 }
 
 static void lil_nop_putc(char c, void* u) { (void)c; (void)u; }
 
 int lil_eval_int(const char* src, int64_t* out)
 {
-    if (!src || !out) return -1;
+    if (!src || !out) {
+        vmmon_record(VMMON_LIL, 0, -1);
+        return -1;
+    }
     g_nfuncs = 0;
     const char* p = src;
     skip_ws(&p);
-    if (*p == 0) return -2;
+    if (*p == 0) {
+        vmmon_record(VMMON_LIL, 0, -2);
+        return -2;
+    }
     int err = 0;
     lil_node_t* root = parse_expr(&p, &err);
     if (err || !root) {
         if (root) lil_tree_free(root);
-        return err ? -err : -3;
+        int rc = err ? -err : -3;
+        vmmon_record(VMMON_LIL, 0, rc);
+        return rc;
     }
     skip_ws(&p);
     if (*p != 0) {
         lil_tree_free(root);
+        vmmon_record(VMMON_LIL, 0, -4);
         return -4;
     }
     uint32_t steps = 0;
     err = 0;
     *out = lil_eval(root, 0, lil_nop_putc, 0, &err, &steps);
     lil_tree_free(root);
-    return err ? -err : 0;
+    int rc = err ? -err : 0;
+    vmmon_record(VMMON_LIL, steps, rc);
+    return rc;
 }

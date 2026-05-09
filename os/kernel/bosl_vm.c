@@ -7,6 +7,7 @@
 #include "lardtime.h"
 #include "mem.h"
 #include "rtc.h"
+#include "vmmon.h"
 
 #include <stdint.h>
 
@@ -411,21 +412,25 @@ static int bosl_vm_run_impl(const uint8_t* image, uint32_t size, bosl_putc_fn pu
 
     uint32_t pc = entry;
     uint32_t steps = 0;
-    const uint32_t STEP_LIMIT = 1000000; /* prevents infinite loops from hanging the OS */
+    const uint32_t step_limit = vmmon_budget(VMMON_BOSL);
+
+#define BOSL_FINISH(code_) do { \
+        int bosl_rc__ = (code_); \
+        vmmon_record(VMMON_BOSL, steps, bosl_rc__); \
+        kfree(stack); \
+        kfree(consts); \
+        return bosl_rc__; \
+    } while (0)
 
     for (;;) {
-        if (steps++ > STEP_LIMIT) {
+        if (++steps > step_limit) {
             kprintf("bosl: step limit exceeded\n");
-            kfree(stack);
-            kfree(consts);
-            return 11;
+            BOSL_FINISH(11);
         }
 
         if (pc >= code_size) {
             kprintf("bosl: pc out of range\n");
-            kfree(stack);
-            kfree(consts);
-            return 12;
+            BOSL_FINISH(12);
         }
 
         uint8_t op = code[pc++];
@@ -1707,9 +1712,7 @@ static int bosl_vm_run_impl(const uint8_t* image, uint32_t size, bosl_putc_fn pu
             break;
         }
         case OP_HALT:
-            kfree(stack);
-            kfree(consts);
-            return 0;
+            BOSL_FINISH(0);
         default:
             kprintf("bosl: unknown opcode 0x%x\n", (uint32_t)op);
             goto fail_runtime;
@@ -1717,9 +1720,8 @@ static int bosl_vm_run_impl(const uint8_t* image, uint32_t size, bosl_putc_fn pu
     }
 
 fail_runtime:
-    kfree(stack);
-    kfree(consts);
-    return 13;
+    BOSL_FINISH(13);
+#undef BOSL_FINISH
 }
 
 int bosl_vm_run_io(const uint8_t* image, uint32_t size, bosl_putc_fn putc, void* user)

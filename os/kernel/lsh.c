@@ -7,6 +7,7 @@
 #include "bmp.h"
 #include "img_glyph.h"
 #include "bosl_vm.h"
+#include "gasm_vm.h"
 #include "lafillo_vm.h"
 #include "os_vm.h"
 #include "lardx_load.h"
@@ -34,6 +35,7 @@
 #include "bootprof.h"
 #include "crashlog.h"
 #include "version.h"
+#include "vmmon.h"
 #include "io.h"
 #include "pci.h"
 #include "string.h"
@@ -289,7 +291,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
-    { "bosl", 1 }, { "lil", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
+    { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
     { "lcnt", 1 }, { "container", 1 },
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
     { "vcslog", 1 }, { "vcsshow", 1 },
@@ -1307,7 +1309,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status time date lunar dangun release [policy] ver post baseline selftest magic mode cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control status time date lunar dangun release [policy] ver post baseline selftest magic mode vm cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
@@ -1333,7 +1335,8 @@ static void cmd_help(const char* args)
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
-    out_append("  bosl file  lil file  lafvm file  osvm file  run file.bosx [args]\n");
+    out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM\n");
+    out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
     out_append("  drivers fsstat fsload fssave sync sram screencheck sandbox exitsandbox\n");
@@ -1366,6 +1369,7 @@ static void cmd_control(const char* args)
     out_append("  magic explain       show why magic executed or refused its last prediction\n");
     out_append("  time                show LardOS Time ticks, 5-digit CE year, Dangun year, and lunar view\n");
     out_append("  mode guard          guarded real16 <-> long64 roundtrip with restore check\n");
+    out_append("  vm selftest         run guarded smoke tests across BOSL, LIL, GASM, Lafillo VM, and OSVM\n");
     out_append("  trace on            record shell/module/oslink/taskprio events in order\n");
     out_append("  netwatch on         watch readable packet/oslink/HTTP activity\n");
     out_append("  journal show        view automatic LARDD system journal\n");
@@ -1641,6 +1645,25 @@ static void cmd_status(const char* args)
     out_append(", err=");
     out_append_u32(ai.last_error);
     out_append("\n");
+
+    uint32_t vm_runs = 0;
+    uint32_t vm_failures = 0;
+    uint32_t vm_budget_hits = 0;
+    for (uint32_t i = 0; i < VMMON_COUNT; i++) {
+        vmmon_entry_t ve;
+        if (vmmon_info(i, &ve) == 0) {
+            vm_runs += ve.runs;
+            vm_failures += ve.failures;
+            vm_budget_hits += ve.budget_hits;
+        }
+    }
+    out_append("VMs: runs=");
+    out_append_u32(vm_runs);
+    out_append(", failures=");
+    out_append_u32(vm_failures);
+    out_append(", budget-hits=");
+    out_append_u32(vm_budget_hits);
+    out_append(" (vm status for details)\n");
 
     out_append("CrashLog: events=");
     out_append_u32(crashlog_count());
@@ -5298,6 +5321,106 @@ static void cmd_more(const char* args)
     if (*p) out_append("-- more --\n");
 }
 
+static void lsh_vm_nop_putc(char c, void* user)
+{
+    (void)c;
+    (void)user;
+}
+
+static void cmd_vm_status(void)
+{
+    out_append("VM Monitor\n");
+    for (uint32_t i = 0; i < VMMON_COUNT; i++) {
+        vmmon_entry_t e;
+        if (vmmon_info(i, &e) != 0) {
+            continue;
+        }
+        out_append("  ");
+        out_append(e.name);
+        out_append(": runs=");
+        out_append_u32(e.runs);
+        out_append(", fail=");
+        out_append_u32(e.failures);
+        out_append(", budget-hit=");
+        out_append_u32(e.budget_hits);
+        out_append(", budget=");
+        out_append_u32(vmmon_budget(i));
+        out_append(", last-steps=");
+        out_append_u32(e.last_steps);
+        out_append(", max=");
+        out_append_u32(e.max_steps);
+        out_append(", rc=");
+        out_append_i32(e.last_rc);
+        out_append("\n");
+    }
+}
+
+static void cmd_vm_limits(void)
+{
+    out_append("VM step budgets\n");
+    for (uint32_t i = 0; i < VMMON_COUNT; i++) {
+        out_append("  ");
+        out_append(vmmon_name(i));
+        out_append(": ");
+        out_append_u32(vmmon_budget(i));
+        out_append(" steps\n");
+    }
+}
+
+static void vm_selftest_line(const char* name, int ok, uint32_t* pass, uint32_t* fail)
+{
+    out_append(ok ? "PASS " : "FAIL ");
+    out_append(name);
+    out_append("\n");
+    if (ok) (*pass)++;
+    else (*fail)++;
+}
+
+static void cmd_vm_selftest(void)
+{
+    uint32_t pass = 0;
+    uint32_t fail = 0;
+    int64_t value = 0;
+
+    vm_selftest_line("vmmon budgets", vmmon_selftest() == 0, &pass, &fail);
+    vm_selftest_line("bosl interpreter", bosl_asm_eval("pushi 40\npushi 2\nadd\nhalt\n", lsh_vm_nop_putc, NULL) == 0, &pass, &fail);
+    vm_selftest_line("lil eval", lil_eval_int("(+ 40 2)", &value) == 0 && value == 42, &pass, &fail);
+    vm_selftest_line("gasm accumulator", gasm_asm_eval("load 40\nadd 2\nhalt\n", lsh_vm_nop_putc, NULL) == 0, &pass, &fail);
+    vm_selftest_line("lafillo vm", lafillo_vm_asm_eval("push \"<b>ok</b>\"\nlafillo\nhalt\n", lsh_vm_nop_putc, NULL) == 0, &pass, &fail);
+    vm_selftest_line("osvm stack", os_vm_asm_eval("push 40\npush 2\nadd\nhalt\n", lsh_vm_nop_putc, NULL) == 0, &pass, &fail);
+
+    out_append("VM selftest: pass=");
+    out_append_u32(pass);
+    out_append(", fail=");
+    out_append_u32(fail);
+    out_append("\n");
+}
+
+static void cmd_vm(const char* args)
+{
+    char sub[16];
+    const char* p = args;
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_vm_status();
+        return;
+    }
+    if (strcmp(sub, "limits") == 0 || strcmp(sub, "budget") == 0 || strcmp(sub, "budgets") == 0) {
+        cmd_vm_limits();
+        return;
+    }
+    if (strcmp(sub, "selftest") == 0 || strcmp(sub, "test") == 0) {
+        cmd_vm_selftest();
+        return;
+    }
+    if (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0) {
+        vmmon_reset();
+        out_append("VM Monitor counters cleared.\n");
+        return;
+    }
+    out_append("Usage: vm status|limits|selftest|clear\n");
+}
+
 #define BOSL_MAGIC 0x4C534F42u  /* "BOSL" LE */
 
 static void cmd_bosl(const char* args)
@@ -5361,6 +5484,40 @@ static void cmd_lil(const char* args)
     int r = lil_run(src, lsh_putc, NULL);
     if (r != 0) {
         out_append("LIL execution failed: ");
+        out_append_i32(r);
+        out_append("\n");
+    }
+}
+
+static void cmd_gasm(const char* args)
+{
+    char drv;
+    char name[64];
+    static char src[4096];
+    resolve_path(args, &drv, name, sizeof(name));
+    if (!name[0]) {
+        out_append("Usage: gasm [drive:]file.gasm\n");
+        return;
+    }
+    const FsFile* f = lsh_open_read(drv, name);
+    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
+    const uint8_t* data = f ? f->data : (w ? w->data : NULL);
+    uint32_t size = f ? f->size : (w ? w->size : 0);
+    if (!data || size == 0) {
+        out_append("GASM file not found.\n");
+        return;
+    }
+    if (size >= sizeof(src)) {
+        out_append("GASM source too large.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < size; i++) {
+        src[i] = (char)data[i];
+    }
+    src[size] = 0;
+    int r = gasm_asm_eval(src, lsh_putc, NULL);
+    if (r != 0) {
+        out_append("GASM execution failed: ");
         out_append_i32(r);
         out_append("\n");
     }
@@ -6159,6 +6316,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "exitcfg") == 0) { s_cfgsh_mode = 0; out_append("CFGSH OFF.\n"); return; }
     if (strcmp(cmd, "buddy") == 0 || strcmp(cmd, "assistant") == 0 || strcmp(cmd, "lardbuddy") == 0) { cmd_buddy(args); return; }
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
+    if (strcmp(cmd, "vm") == 0 || strcmp(cmd, "vms") == 0) { cmd_vm(args); return; }
     if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
     if (strcmp(cmd, "netwatch") == 0) { cmd_netwatch(args); return; }
     if (strcmp(cmd, "journal") == 0) { cmd_journal(args); return; }
@@ -6258,8 +6416,10 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'e' && cmd[1] == 'x' && cmd[2] == 'i' && cmd[3] == 't' && cmd[4] == 's' && cmd[5] == 'a' && cmd[6] == 'n' && cmd[7] == 'd' && cmd[8] == 'b' && cmd[9] == 'o' && cmd[10] == 'x' && cmd[11] == '\0') { cmd_exitsandbox(args); return; }
     if (cmd[0] == 'a' && cmd[1] == 's' && cmd[2] == 'm' && cmd[3] == '_' && cmd[4] == '\0') { cmd_asm_(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 's' && cmd[4] == 'h' && cmd[5] == '\0') { cmd_larsh(args); return; }
+    if (cmd[0] == 'v' && cmd[1] == 'm' && cmd[2] == '\0') { cmd_vm(args); return; }
     if (cmd[0] == 'b' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 'l' && cmd[4] == '\0') { cmd_bosl(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == '\0') { cmd_lil(args); return; }
+    if (cmd[0] == 'g' && cmd[1] == 'a' && cmd[2] == 's' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_gasm(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'f' && cmd[3] == 'v' && cmd[4] == 'm' && cmd[5] == '\0') { cmd_lafvm(args); return; }
     if (cmd[0] == 'o' && cmd[1] == 's' && cmd[2] == 'v' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_osvm(args); return; }
     if (cmd[0] == 'r' && cmd[1] == 'u' && cmd[2] == 'n' && cmd[3] == '\0') { cmd_run(args); return; }

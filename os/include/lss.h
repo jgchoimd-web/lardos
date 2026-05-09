@@ -37,7 +37,7 @@ void lss_init(void);
    Output goes to syscall buffer (same as usermode). */
 int lss_run(const char* name);
 
-/* Inspect and validate a .shrine file without running it. */
+/* Inspect wrapper and BOSL payload magic/version without running it. */
 int lss_probe(const char* name, lss_info_t* out);
 void lss_info(lss_info_t* out);
 const char* lss_type_name(uint8_t type);

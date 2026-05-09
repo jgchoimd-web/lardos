@@ -11,10 +11,19 @@
 
 static lss_info_t s_lss;
 
+#define LSS_BOSL_MAGIC 0x4C534F42u /* "BOSL" LE */
+#define LSS_BOSL_VERSION 1u
+#define LSS_BOSL_HEADER_SIZE 20u
+
 static void lss_putc(char c, void* user)
 {
     (void)user;
     syscall_append(&c, 1);
+}
+
+static uint16_t lss_rd16(const uint8_t* d)
+{
+    return (uint16_t)d[0] | ((uint16_t)d[1] << 8);
 }
 
 static uint32_t lss_rd32(const uint8_t* d)
@@ -43,6 +52,8 @@ static int lss_validate_file(const FsFile* f, const char* name, lss_info_t* out)
 {
     if (!f || !f->data || f->size < 5u) {
         s_lss.last_error = -1;
+        s_lss.last_type = 0xFFu;
+        s_lss.last_size = f ? f->size : 0u;
         lss_copy_name(name);
         if (out) *out = s_lss;
         return -1;
@@ -51,6 +62,7 @@ static int lss_validate_file(const FsFile* f, const char* name, lss_info_t* out)
     uint32_t mag = lss_rd32(d);
     if (mag != LSS_MAGIC) {
         s_lss.last_error = -2;
+        s_lss.last_type = 0xFFu;
         lss_copy_name(name);
         s_lss.last_size = f->size;
         if (out) *out = s_lss;
@@ -77,6 +89,18 @@ static int lss_validate_file(const FsFile* f, const char* name, lss_info_t* out)
         s_lss.last_error = -6;
         if (out) *out = s_lss;
         return -6;
+    }
+    const uint8_t* payload = d + 5;
+    uint32_t payload_size = f->size - 5u;
+    if (payload_size < LSS_BOSL_HEADER_SIZE || lss_rd32(payload) != LSS_BOSL_MAGIC) {
+        s_lss.last_error = -7;
+        if (out) *out = s_lss;
+        return -7;
+    }
+    if (lss_rd16(payload + 4) != LSS_BOSL_VERSION) {
+        s_lss.last_error = -8;
+        if (out) *out = s_lss;
+        return -8;
     }
     s_lss.verified++;
     s_lss.last_error = 0;
@@ -133,11 +157,13 @@ int lss_selftest(void)
     if (!s_lss.initialized) {
         lss_init();
     }
+    lss_info_t saved = s_lss;
+    int result = 0;
     if (lss_probe("hello.shrine", &info) != 0) {
-        return -1;
+        result = -1;
+    } else if (info.last_type != LSS_TYPE_BOSL || info.last_size <= 5u) {
+        result = -2;
     }
-    if (info.last_type != LSS_TYPE_BOSL || info.last_size <= 5u) {
-        return -2;
-    }
-    return 0;
+    s_lss = saved;
+    return result;
 }

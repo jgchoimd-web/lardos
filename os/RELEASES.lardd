@@ -4,6 +4,15 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.49.0a
+ITEM Official promotion of the VM Monitor and Shrine subsystem beta track without feature loss.
+ITEM Fixed shrine verify so BOSL .shrine payloads must include valid BOSL magic and supported version before they are accepted.
+ITEM Fixed the Shrine/LSS selftest so POST no longer mutates user-visible LSS counters or last-file state.
+ITEM Keeps vm status, vm limits, vm selftest, vm clear, and shared step budgets for BOSL, LIL, GASM, Lafillo VM, and OSVM.
+ITEM Keeps shrine, lss, and srine status, list, info, verify, run, and test commands plus shrine_guide.lardd.
+ITEM Build, LSS host regression, git diff --check, QEMU IMG boot, and QEMU ISO boot were rerun for official-release readiness.
+ITEM Release media uses official a-channel versioning with ISO and IMG artifacts.
+
 SECTION v1.48.0b
 ITEM Expanded LSS into a visible Shrine subsystem instead of leaving only the hello.shrine sample.
 ITEM Added shrine/lss/srine status, list, info, verify, run, and test commands for .shrine wrappers.

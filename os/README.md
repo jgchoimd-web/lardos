@@ -149,6 +149,10 @@ commands:
 - `v1.48.0b` expands LSS into a visible Shrine subsystem: `shrine status`,
   `shrine list`, `shrine verify hello.shrine`, and `shrine run hello.shrine`
   make the `.shrine` wrapper inspectable and runnable from LSH.
+- `v1.49.0a` officially promotes the VM Monitor and Shrine subsystem track
+  without feature loss. `shrine verify` now validates the wrapped BOSL magic
+  and version, and the LSS POST selftest no longer changes user-visible LSS
+  counters or last-file state.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

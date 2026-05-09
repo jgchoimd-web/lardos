@@ -20,7 +20,8 @@ interpreter path.
 
 `shrine status`, `shrine verify hello.shrine`, and `shrine run hello.shrine`
 expose LSS, the Lard Subsystem for Shrine. Current `.shrine` files wrap a type
-0 BOSL payload after the `LSS\0` magic and one-byte type.
+0 BOSL payload after the `LSS\0` magic and one-byte type; verification checks
+the wrapped BOSL magic and version before accepting the file.
 
 ---
 

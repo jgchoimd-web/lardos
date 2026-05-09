@@ -120,9 +120,10 @@ code. GASM and Lafillo VM use the shared step budgets directly, and BOSL's JIT
 falls back to the budgeted interpreter for branchy programs.
 
 LSS (`kernel/lss.c`) is the Lard Subsystem for Shrine. It validates `.shrine`
-wrappers, tracks runs, failures, verified files, unsupported types, and the
-last wrapper state, then runs type 0 payloads through BOSL. The shell exposes
-this as `shrine`, `lss`, and the typo-friendly alias `srine`.
+wrappers plus the wrapped BOSL payload magic/version, tracks runs, failures,
+verified files, unsupported types, and the last wrapper state, then runs type 0
+payloads through BOSL. The shell exposes this as `shrine`, `lss`, and the
+typo-friendly alias `srine`.
 
 ## Build
 

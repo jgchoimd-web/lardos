@@ -4,6 +4,13 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.41.0b
+ITEM Beta PanicRoom real-mode texture pass: runtime panic now enters a real16 bridge window before long64 recovery.
+ITEM Added a real-mode VGA default texture with an LPR badge, hazard pattern, and REAL16 label drawn from the low-memory trampoline.
+ITEM PanicRoom keeps a matching long64 fallback texture so recovery controls stay visible even if the bridge is unavailable.
+ITEM Added panicroom texture and CPU mode status counters for real16 PanicRoom texture attempts.
+ITEM Release media uses beta b-channel versioning while the new panic recovery visuals stabilize.
+
 SECTION v1.40.0a
 ITEM Official promotion of the GUI polish, picture Unicode, clickable live glyph, and rough-edge repair beta track.
 ITEM PanicRoom now connects to the real kernel panic path once the runtime is ready: panic and panic_u64 enter the recovery screen before halt.

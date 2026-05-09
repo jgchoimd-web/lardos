@@ -42,7 +42,9 @@ At runtime the kernel also owns a controlled CPU mode bridge. `cpumode.c` copies
 a low-memory trampoline to `0x6000`, and `mode_switch.s` can briefly walk from
 64-bit long mode through a 32-bit protected-mode selector into real mode, then
 restore paging, EFER, CR3, and the 64-bit code segment before returning to C.
-The bridge is explicit: use `mode probe`, the boot-time `M` option, or POST.
+PanicRoom uses the same bridge to draw its default real16 VGA texture before
+returning to long64 recovery controls. The bridge is explicit: use `mode probe`,
+`panicroom texture`, the boot-time `M` option, or POST.
 
 ## Kernel
 
@@ -311,8 +313,8 @@ native document browsing state, and LARDD notes writes `notes.lardd`. LTheme can
 also parse `.ltheme` records such as `default.ltheme`.
 
 `crashlog.c` owns `crashlog.txt`, a writable panic and diagnostic history.
-Runtime-ready panic paths append an entry, enter PanicRoom, write
-`paniccapsule.lardd`, and halt only after the user chooses the halt key; LSH exposes the same log through
+Runtime-ready panic paths append an entry, enter the real16 PanicRoom texture
+window, write `paniccapsule.lardd`, and halt only after the user chooses the halt key; LSH exposes the same log through
 `crashlog show`, `crashlog clear`, and `crashlog test`.
 
 `lard_doc.c` also parses LARS form records. `button label | command` is rendered

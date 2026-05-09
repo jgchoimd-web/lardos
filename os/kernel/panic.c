@@ -1,4 +1,5 @@
 #include "panic.h"
+#include "cpumode.h"
 #include "crashlog.h"
 #include "lardkit.h"
 #include "ps2.h"
@@ -56,6 +57,46 @@ static void vga_clear(uint8_t color)
     }
 }
 
+static void vga_put_cell_at(uint16_t row, uint16_t col, char ch, uint8_t color)
+{
+    if (row >= 25u || col >= 80u) return;
+    VGA[(size_t)row * 80u + col] = (uint16_t)color << 8 | (uint8_t)ch;
+}
+
+static void panicroom_draw_default_texture(int real16_result)
+{
+    for (uint16_t y = 0; y < 25u; y++) {
+        for (uint16_t x = 0; x < 80u; x++) {
+            char ch = '.';
+            uint8_t color = 0x17;
+            uint16_t mix = (uint16_t)(x + y * 3u);
+            if ((mix & 7u) == 0u) {
+                ch = '/';
+                color = 0x18;
+            } else if ((mix & 11u) == 3u) {
+                ch = '\\';
+                color = 0x1E;
+            }
+            if (y == 0u || y == 24u) {
+                ch = '=';
+                color = 0x1E;
+            } else if (x == 0u || x == 79u) {
+                ch = '|';
+                color = 0x1E;
+            }
+            vga_put_cell_at(y, x, ch, color);
+        }
+    }
+
+    vga_puts_at(2, 4, "   /====\\   ", 0x1E);
+    vga_puts_at(3, 4, "  / LPR  \\  ", 0x1E);
+    vga_puts_at(4, 4, "  \\ REAL /  ", 0x1E);
+    vga_puts_at(5, 4, "   \\====/   ", 0x1E);
+    vga_puts_at(2, 25, "LARDOS PANIC ROOM", 0x1F);
+    vga_puts_at(3, 25, "DEFAULT TEXTURE", 0x1B);
+    vga_puts_at(4, 25, real16_result == 0 ? "real16 texture pass" : "real16 texture fallback", 0x1B);
+}
+
 static void vga_puts_wrapped(uint16_t row, const char* s, uint8_t color)
 {
     uint16_t col = 0;
@@ -108,12 +149,13 @@ static void panicroom_wait_key(void)
 }
 
 static void panicroom_draw_status(const char* msg, const char* value, int capsule_result,
+                                  int real16_result,
                                   int rollback_result, int dropped_task)
 {
     taskprio_info_t tasks;
     taskprio_info(&tasks);
 
-    vga_clear(0x1F);
+    panicroom_draw_default_texture(real16_result);
     vga_puts_at(0, 0, "LARDOS PANIC ROOM", 0x1F);
     vga_puts_at(1, 0, "Kernel risk was detected. Recovery tools are active before halt.", 0x1F);
     vga_puts_at(3, 0, "panic: ", 0x1F);
@@ -122,20 +164,22 @@ static void panicroom_draw_status(const char* msg, const char* value, int capsul
         vga_puts_at(4, 0, "value: ", 0x1F);
         vga_puts_at(4, 7, value, 0x1F);
     }
-    vga_puts_at(6, 0, "panicroom entries: ", 0x1F);
-    vga_put_u32_at(6, 19, lardkit_panicroom_entries(), 0x1F);
-    vga_puts_at(7, 0, "paniccapsule.lardd: ", 0x1F);
-    vga_puts_at(7, 20, capsule_result == 0 ? "written" : "failed", 0x1F);
-    vga_puts_at(8, 0, "queued tasks: ", 0x1F);
-    vga_put_u32_at(8, 14, tasks.queued, 0x1F);
-    vga_puts_at(9, 0, "last rollback: ", 0x1F);
-    if (rollback_result == 0) vga_puts_at(9, 15, "applied", 0x1F);
-    else if (rollback_result < 0) vga_puts_at(9, 15, "unavailable", 0x1F);
-    else vga_puts_at(9, 15, "not requested", 0x1F);
-    vga_puts_at(10, 0, "last task drop: ", 0x1F);
-    if (dropped_task > 0) vga_puts_at(10, 16, "dropped first queued task", 0x1F);
-    else if (dropped_task < 0) vga_puts_at(10, 16, "no queued task", 0x1F);
-    else vga_puts_at(10, 16, "not requested", 0x1F);
+    vga_puts_at(6, 0, "real16 default texture: ", 0x1F);
+    vga_puts_at(6, 24, real16_result == 0 ? "drawn before long64 recovery" : "fallback in long64", 0x1F);
+    vga_puts_at(7, 0, "panicroom entries: ", 0x1F);
+    vga_put_u32_at(7, 19, lardkit_panicroom_entries(), 0x1F);
+    vga_puts_at(8, 0, "paniccapsule.lardd: ", 0x1F);
+    vga_puts_at(8, 20, capsule_result == 0 ? "written" : "failed", 0x1F);
+    vga_puts_at(9, 0, "queued tasks: ", 0x1F);
+    vga_put_u32_at(9, 14, tasks.queued, 0x1F);
+    vga_puts_at(10, 0, "last rollback: ", 0x1F);
+    if (rollback_result == 0) vga_puts_at(10, 15, "applied", 0x1F);
+    else if (rollback_result < 0) vga_puts_at(10, 15, "unavailable", 0x1F);
+    else vga_puts_at(10, 15, "not requested", 0x1F);
+    vga_puts_at(11, 0, "last task drop: ", 0x1F);
+    if (dropped_task > 0) vga_puts_at(11, 16, "dropped first queued task", 0x1F);
+    else if (dropped_task < 0) vga_puts_at(11, 16, "no queued task", 0x1F);
+    else vga_puts_at(11, 16, "not requested", 0x1F);
 
     vga_puts_at(13, 0, "Keys:", 0x1F);
     vga_puts_at(14, 2, "L show crashlog.txt", 0x1F);
@@ -165,11 +209,12 @@ static void panicroom_drop_first_task(int* dropped_task)
     }
 }
 
-__attribute__((noreturn)) static void panicroom_loop(const char* msg, const char* value, int capsule_result)
+__attribute__((noreturn)) static void panicroom_loop(const char* msg, const char* value,
+                                                     int capsule_result, int real16_result)
 {
     int rollback_result = 1;
     int dropped_task = 0;
-    panicroom_draw_status(msg, value, capsule_result, rollback_result, dropped_task);
+    panicroom_draw_status(msg, value, capsule_result, real16_result, rollback_result, dropped_task);
     for (;;) {
         ps2_key_t key;
         if (ps2_kbd_poll(&key) != 0) {
@@ -192,7 +237,7 @@ __attribute__((noreturn)) static void panicroom_loop(const char* msg, const char
             vga_puts_at(4, 0, "PanicRoom closed. Halting.", 0x4F);
             panic_halt_forever();
         }
-        panicroom_draw_status(msg, value, capsule_result, rollback_result, dropped_task);
+        panicroom_draw_status(msg, value, capsule_result, real16_result, rollback_result, dropped_task);
     }
 }
 
@@ -204,14 +249,16 @@ void panic_runtime_ready(void)
 __attribute__((noreturn)) void panic(const char* msg)
 {
     int capsule_result;
+    int real16_result;
     crashlog_record_panic(msg);
     if (!s_panicroom_runtime_ready) {
         panic_legacy_screen(msg, NULL);
         panic_halt_forever();
     }
     lardkit_panicroom_enter();
+    real16_result = cpu_mode_panicroom_texture();
     capsule_result = lardkit_panic_capsule_write();
-    panicroom_loop(msg, NULL, capsule_result);
+    panicroom_loop(msg, NULL, capsule_result, real16_result);
     panic_halt_forever();
 }
 
@@ -219,6 +266,7 @@ __attribute__((noreturn)) void panic_u64(const char* msg, uint64_t v)
 {
     char hex[17];
     int capsule_result;
+    int real16_result;
     u64_hex(hex, v);
     crashlog_record_panic_u64(msg, v);
     if (!s_panicroom_runtime_ready) {
@@ -226,7 +274,8 @@ __attribute__((noreturn)) void panic_u64(const char* msg, uint64_t v)
         panic_halt_forever();
     }
     lardkit_panicroom_enter();
+    real16_result = cpu_mode_panicroom_texture();
     capsule_result = lardkit_panic_capsule_write();
-    panicroom_loop(msg, hex, capsule_result);
+    panicroom_loop(msg, hex, capsule_result, real16_result);
     panic_halt_forever();
 }

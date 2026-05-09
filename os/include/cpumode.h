@@ -12,6 +12,8 @@ typedef struct {
     uint32_t trampoline_size;
     uint32_t roundtrip_count;
     uint32_t last_roundtrip_ok;
+    uint32_t panicroom_texture_count;
+    uint32_t last_panicroom_texture_ok;
     uint32_t last_error;
 } cpu_mode_info_t;
 
@@ -19,5 +21,6 @@ void cpu_mode_init(void);
 int cpu_mode_bridge_ready(void);
 int cpu_mode_long_mode_active(void);
 int cpu_mode_roundtrip_probe(void);
+int cpu_mode_panicroom_texture(void);
 void cpu_mode_info(cpu_mode_info_t* out);
 const char* cpu_mode_current_name(void);

@@ -1206,7 +1206,7 @@ static void cmd_help(const char* args)
     out_append("  tasktop  task list|set|urgent|history|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
-    out_append("  panic capsule / paniccapsule    collect crashlog, BugEye, boot, trust, priority state\n");
+    out_append("  panicroom texture / panic capsule  draw real16 default texture or collect recovery state\n");
     out_append("  crashlog show|clear|test\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
@@ -1255,6 +1255,7 @@ static void cmd_control(const char* args)
     out_append("  devmap draw         draw PCI/storage/network device map\n");
     out_append("  oldcheck draw       draw the retro storage check map\n");
     out_append("  lfsdoctor scan      diagnose writable files and LPST persistence state\n");
+    out_append("  panicroom texture   draw the real16 LPR default texture\n");
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
     out_append("  glyph live U+E000 on            enable realtime hover/click rendering for a picture glyph\n");
@@ -1574,6 +1575,10 @@ static void cmd_mode(const char* args)
     out_append_u32(info.roundtrip_count);
     out_append(", last=");
     out_append(info.last_roundtrip_ok ? "ok" : "none");
+    out_append("\nPanicRoom real16 texture: ");
+    out_append_u32(info.panicroom_texture_count);
+    out_append(", last=");
+    out_append(info.last_panicroom_texture_ok ? "ok" : "none");
     out_append(", err=");
     out_append_u32(info.last_error);
     out_append("\n");
@@ -2832,14 +2837,20 @@ static void cmd_bootmap(const char* args)
 static void cmd_panicroom(const char* args)
 {
     char sub[16];
+    cpu_mode_info_t mode_info;
     if (!args) args = "";
     if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
         strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cpu_mode_info(&mode_info);
         out_append("PanicRoom ");
         out_append(lardkit_panicroom_active() ? "entered" : "standby");
         out_append(" entries=");
         out_append_u32(lardkit_panicroom_entries());
-        out_append("\nRuntime panic opens a tiny recovery screen; use crashlog show, rollback apply, or panicroom capsule from LSH.\n");
+        out_append(" real16-textures=");
+        out_append_u32(mode_info.panicroom_texture_count);
+        out_append(" last=");
+        out_append(mode_info.last_panicroom_texture_ok ? "ok" : "none");
+        out_append("\nRuntime panic opens a real16-backed texture screen; use crashlog show, rollback apply, or panicroom capsule from LSH.\n");
         return;
     }
     if (strcmp(sub, "enter") == 0 || strcmp(sub, "on") == 0) {
@@ -2861,7 +2872,17 @@ static void cmd_panicroom(const char* args)
         }
         return;
     }
-    out_append("Usage: panicroom status|enter|exit|capsule\n");
+    if (strcmp(sub, "texture") == 0 || strcmp(sub, "real") == 0 || strcmp(sub, "real16") == 0) {
+        if (cpu_mode_panicroom_texture() == 0) out_append("panicroom: real16 default texture drawn.\n");
+        else {
+            cpu_mode_info(&mode_info);
+            out_append("panicroom: real16 texture failed, err=");
+            out_append_u32(mode_info.last_error);
+            out_append("\n");
+        }
+        return;
+    }
+    out_append("Usage: panicroom status|enter|exit|capsule|texture\n");
 }
 
 static void cmd_paniccapsule(const char* args)

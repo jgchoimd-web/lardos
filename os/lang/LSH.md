@@ -28,7 +28,8 @@
 - `rollback snap|last|apply` - settings snapshot and restore.
 - `trust list|allow|deny|history` - user-owned permission policy map and audit log.
 - `lfsdoctor scan|repair|show` - filesystem and LPST persistence health report.
-- `panic capsule` / `paniccapsule show` - write and view a recovery bundle report; runtime-ready kernel panic paths enter the tiny PanicRoom screen before halt.
+- `panic capsule` / `paniccapsule show` - write and view a recovery bundle report; runtime-ready kernel panic paths enter a real16-backed PanicRoom texture screen before halt.
+- `panicroom texture` - enter the real16 bridge and draw the default LPR PanicRoom texture.
 - `bootmap` / `bootreplay show` / `post baseline` / `postbaseline show` / `devmap draw` / `oldcheck draw` / `awakemon` - boot, POST, device, storage, and Awakening views.
 - `ltheme list|show|preview|use name` - native shell theme presets and `.ltheme` files.
 - `cfgprof save|load name` / `cfg profile` in the feature map / `userlaw show` - settings profiles and user-right policy.
@@ -79,7 +80,7 @@
 - `lpack verify file.lpack` checks package structure before install and prints hash, warnings, errors, installable files, and bytes
 - `lpack undo` restores the last writable-file snapshot captured before a package install
 - `paniccapsule show` builds a compact LARDD recovery bundle from panic room, crashlog, BugEye, replay, trust, priority, LFSDoctor, and BootMap state
-- On runtime-ready `panic` or `panic_u64`, PanicRoom auto-writes the capsule and offers crashlog view, capsule rebuild, rollback apply, queued-task drop, and halt keys
+- On runtime-ready `panic` or `panic_u64`, PanicRoom first draws the real16 default texture, auto-writes the capsule, and offers crashlog view, capsule rebuild, rollback apply, queued-task drop, and halt keys
 - `lfsdoctor repair` runs the native LPST repair path and rewrites `lfsdoctor.lardd`
 
 ## Settings Shell

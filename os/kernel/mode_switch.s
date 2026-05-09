@@ -14,10 +14,18 @@ BITS 64
 section .text
 
 GLOBAL cpu_mode_enter_real_probe_asm
+GLOBAL cpu_mode_enter_panicroom_texture_asm
 GLOBAL cpu_mode_trampoline_start
 GLOBAL cpu_mode_trampoline_end
 
 cpu_mode_enter_real_probe_asm:
+    mov rax, MODE_TRAMPOLINE_PA
+    call rax
+    ret
+
+cpu_mode_enter_panicroom_texture_asm:
+    mov rdx, MODE_TRAMPOLINE_PA + mode_request - cpu_mode_trampoline_start
+    mov dword [rdx], 1
     mov rax, MODE_TRAMPOLINE_PA
     call rax
     ret
@@ -99,11 +107,113 @@ mode_real16:
     mov sp, MODE_TMP_STACK
 
     mov word [MODE_TRAMPOLINE_PA + mode_real_marker - cpu_mode_trampoline_start], 0x16
+    cmp dword [MODE_TRAMPOLINE_PA + mode_request - cpu_mode_trampoline_start], 1
+    jne .skip_panic_texture
+    call mode_real16_panic_texture
+    mov word [MODE_TRAMPOLINE_PA + mode_panic_marker - cpu_mode_trampoline_start], 0x5052
+.skip_panic_texture:
 
     mov eax, cr0
     or eax, 1
     mov cr0, eax
     jmp SEL_PCODE32:(MODE_TRAMPOLINE_PA + mode_pm32_from_real - cpu_mode_trampoline_start)
+
+mode_real16_panic_texture:
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+
+    mov ax, 0xB800
+    mov es, ax
+    xor di, di
+    mov cx, 2000
+.texture_fill:
+    mov bx, cx
+    mov ax, 0x172E
+    test bx, 1
+    jnz .texture_write
+    mov ax, 0x182F
+    test bx, 4
+    jz .texture_write
+    mov ax, 0x1E5C
+.texture_write:
+    stosw
+    loop .texture_fill
+
+    xor di, di
+    mov cx, 80
+    mov ax, 0x1E3D
+.top_border:
+    stosw
+    loop .top_border
+
+    mov di, 3840
+    mov cx, 80
+    mov ax, 0x1E3D
+.bottom_border:
+    stosw
+    loop .bottom_border
+
+    mov cx, 23
+    mov di, 160
+.side_border:
+    mov word [es:di], 0x1E7C
+    mov word [es:di + 158], 0x1E7C
+    add di, 160
+    loop .side_border
+
+    mov di, ((2 * 80 + 4) * 2)
+    mov si, MODE_TRAMPOLINE_PA + texture_badge0 - cpu_mode_trampoline_start
+    mov ah, 0x1E
+    call mode_real16_write_string
+    mov di, ((3 * 80 + 4) * 2)
+    mov si, MODE_TRAMPOLINE_PA + texture_badge1 - cpu_mode_trampoline_start
+    mov ah, 0x1E
+    call mode_real16_write_string
+    mov di, ((4 * 80 + 4) * 2)
+    mov si, MODE_TRAMPOLINE_PA + texture_badge2 - cpu_mode_trampoline_start
+    mov ah, 0x1E
+    call mode_real16_write_string
+    mov di, ((5 * 80 + 4) * 2)
+    mov si, MODE_TRAMPOLINE_PA + texture_badge3 - cpu_mode_trampoline_start
+    mov ah, 0x1E
+    call mode_real16_write_string
+
+    mov di, ((2 * 80 + 25) * 2)
+    mov si, MODE_TRAMPOLINE_PA + texture_title - cpu_mode_trampoline_start
+    mov ah, 0x1F
+    call mode_real16_write_string
+    mov di, ((4 * 80 + 25) * 2)
+    mov si, MODE_TRAMPOLINE_PA + texture_subtitle - cpu_mode_trampoline_start
+    mov ah, 0x1B
+    call mode_real16_write_string
+    mov di, ((22 * 80 + 5) * 2)
+    mov si, MODE_TRAMPOLINE_PA + texture_footer - cpu_mode_trampoline_start
+    mov ah, 0x1E
+    call mode_real16_write_string
+
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+mode_real16_write_string:
+    lodsb
+    test al, al
+    jz .done
+    mov [es:di], ax
+    add di, 2
+    jmp mode_real16_write_string
+.done:
+    ret
 
 BITS 32
 mode_pm32_from_real:
@@ -140,6 +250,7 @@ mode_long64_return:
     mov es, ax
     mov ss, ax
     mov dword [rel mode_result], 1
+    mov dword [rel mode_request], 0
     mov rsp, [rel mode_saved_rsp]
 
     pop r15
@@ -170,6 +281,15 @@ mode_saved_efer_lo:  dd 0
 mode_saved_efer_hi:  dd 0
 mode_result:         dd 0
 mode_real_marker:    dw 0
+mode_panic_marker:   dw 0
+mode_request:        dd 0
+texture_badge0:      db '   /====\   ', 0
+texture_badge1:      db '  / LPR  \  ', 0
+texture_badge2:      db '  \ REAL /  ', 0
+texture_badge3:      db '   \====/   ', 0
+texture_title:       db 'LARDOS PANIC ROOM', 0
+texture_subtitle:    db 'REAL16 DEFAULT TEXTURE', 0
+texture_footer:      db 'real-mode first responder is drawing this texture before long64 recovery', 0
 
 cpu_mode_trampoline_end:
 

@@ -20,11 +20,14 @@ enum {
 extern uint8_t cpu_mode_trampoline_start[];
 extern uint8_t cpu_mode_trampoline_end[];
 extern int cpu_mode_enter_real_probe_asm(void);
+extern int cpu_mode_enter_panicroom_texture_asm(void);
 
 static uint32_t s_bridge_ready;
 static uint32_t s_trampoline_size;
 static uint32_t s_roundtrip_count;
 static uint32_t s_last_roundtrip_ok;
+static uint32_t s_panicroom_texture_count;
+static uint32_t s_last_panicroom_texture_ok;
 static uint32_t s_last_error;
 
 static uint64_t read_efer(void)
@@ -53,6 +56,7 @@ void cpu_mode_init(void)
     s_bridge_ready = 0;
     s_trampoline_size = (uint32_t)len;
     s_last_roundtrip_ok = 0;
+    s_last_panicroom_texture_ok = 0;
 
     if (!mmu_protection_is_ready()) {
         s_last_error = CPU_MODE_ERR_MMU_NOT_READY;
@@ -104,6 +108,35 @@ int cpu_mode_roundtrip_probe(void)
     return 0;
 }
 
+int cpu_mode_panicroom_texture(void)
+{
+    int r;
+    if (!s_bridge_ready) {
+        s_last_error = CPU_MODE_ERR_BRIDGE_NOT_READY;
+        s_last_panicroom_texture_ok = 0;
+        return -1;
+    }
+
+    r = cpu_mode_enter_panicroom_texture_asm();
+    s_roundtrip_count++;
+    s_panicroom_texture_count++;
+    if (r != 1) {
+        s_last_error = CPU_MODE_ERR_ROUNDTRIP_FAILED;
+        s_last_panicroom_texture_ok = 0;
+        return -1;
+    }
+    if (!cpu_mode_long_mode_active()) {
+        s_last_error = CPU_MODE_ERR_NOT_LONG_AFTER_RETURN;
+        s_last_panicroom_texture_ok = 0;
+        return -1;
+    }
+
+    s_last_error = CPU_MODE_ERR_NONE;
+    s_last_roundtrip_ok = 1;
+    s_last_panicroom_texture_ok = 1;
+    return 0;
+}
+
 void cpu_mode_info(cpu_mode_info_t* out)
 {
     if (!out) return;
@@ -113,5 +146,7 @@ void cpu_mode_info(cpu_mode_info_t* out)
     out->trampoline_size = s_trampoline_size;
     out->roundtrip_count = s_roundtrip_count;
     out->last_roundtrip_ok = s_last_roundtrip_ok;
+    out->panicroom_texture_count = s_panicroom_texture_count;
+    out->last_panicroom_texture_ok = s_last_panicroom_texture_ok;
     out->last_error = s_last_error;
 }

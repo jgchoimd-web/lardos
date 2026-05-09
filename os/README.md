@@ -119,6 +119,10 @@ commands:
   ready. On panic, LardOS now enters a tiny recovery screen before halt, writes
   `paniccapsule.lardd`, and exposes keys for crashlog viewing, capsule rebuild,
   rollback apply, and dropping the first queued task.
+- `v1.41.0b` makes PanicRoom's first responder screen real-mode backed: runtime
+  panic enters the real16 bridge, draws an iconic default VGA texture with an
+  LPR badge and REAL16 label, returns to long64, then keeps the recovery keys
+  available. `panicroom texture` can draw the default texture on demand.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
@@ -157,8 +161,8 @@ commands:
 - `panic capsule` or `paniccapsule show` writes `paniccapsule.lardd`, a small
   recovery bundle that joins panic-room, crashlog, BugEye, Trust, LFSDoctor,
   priority, and BootMap state. Runtime-ready `panic` and `panic_u64` paths now
-  enter a tiny PanicRoom screen before halt so recovery state is visible
-  immediately.
+  enter a real16-backed PanicRoom texture screen before halt so recovery state
+  is visible immediately.
 - `post baseline`, `postbaseline show`, `bootreplay show`, `bootmap`,
   `oldcheck draw`, `devmap`, and `awakemon` show POST drift, boot replay, boot
   phase map, retro storage check, hardware map, and Awakening background loader

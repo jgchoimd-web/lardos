@@ -4,6 +4,15 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.46.0a
+ITEM Official promotion of the LardOS Time beta track without feature loss.
+ITEM Keeps LardOS Time ticks from 00000-01-01, five-digit year output, Dangun year, and native lunar display.
+ITEM Keeps time, date, lunar, dangun, and lardtime explain shell commands plus SYS_GET_TIME/LIL/BOSL LardOS Time ticks.
+ITEM Includes the boot stack, bootinfo, and long-mode stack layout fix for larger in-tree kernels.
+ITEM Includes the Lafillo ASM parser forward-progress fix so boot-time language demos do not stall the GUI.
+ITEM POST, LUNIT, host lardtime selftest, QEMU IMG boot, and QEMU ISO boot were rerun for official-release readiness.
+ITEM Release media uses official a-channel versioning with ISO and IMG artifacts.
+
 SECTION v1.45.0b
 ITEM Added LardOS Time: ticks count from 00000-01-01 00:00:00 instead of Unix epoch seconds.
 ITEM Added five-digit year output to prevent the visible Y10K bug; years 00000..10000+ print without truncation.

@@ -134,7 +134,7 @@ commands:
 - `v1.44.0a` promotes the real16 PanicRoom texture, Unicode cursor assignment,
   and user-editable picture Unicode slot track to the official channel with
   ISO/IMG release media.
-- `v1.45.0b` adds LardOS Time: `time`, `date`, `lunar`, and `dangun`
+- `v1.46.0a` officially promotes LardOS Time: `time`, `date`, `lunar`, and `dangun`
   expose ticks since `00000-01-01`, five-digit year display, Dangun years, and
   a native lunar view. `SYS_GET_TIME`, LIL `time`, and BOSL `time` now return
   LardOS Time ticks instead of Unix epoch seconds.

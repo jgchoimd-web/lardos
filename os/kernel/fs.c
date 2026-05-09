@@ -241,6 +241,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use trust list and trust history to inspect the user-owned permission policy map.\n"
     "li Use lfsdoctor scan or lfsdoctor repair to inspect and repair LPST-backed writable files.\n"
     "li Use panic capsule to bundle crashlog, BugEye, boot, trust, priority, and filesystem state.\n"
+    "li Official v1.40.0a connects runtime-ready panic paths to PanicRoom: it writes paniccapsule.lardd, shows crashlog, can apply rollback, drop a queued task, then halt.\n"
     "li Use bootmap, bootreplay show, postbaseline show, devmap draw, oldcheck draw, and awakemon to see boot, POST, device, storage, and Awakening progress.\n"
     "li Use ltheme preview default.ltheme and ltheme use night for native shell theme presets.\n"
     "li Use cfgprof save safe-ui and cfgprof load safe-ui for settings profiles.\n"
@@ -443,6 +444,8 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command notes\n"
     "CHECK command larsview\n"
     "CHECK command dir\n"
+    "CHECK command panicroom\n"
+    "CHECK command paniccapsule\n"
     "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */

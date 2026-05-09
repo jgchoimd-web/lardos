@@ -114,6 +114,11 @@ commands:
   `dir X:`/`dir Z:` now show the right filesystem surfaces, `notes add` syncs
   both the LARDD notes file and GUI notes file, and `larsview` gains reload,
   back, and actions commands.
+- `v1.40.0a` promotes the beta GUI/glyph/repair track to the official channel
+  and connects PanicRoom to the real kernel panic path once the runtime is
+  ready. On panic, LardOS now enters a tiny recovery screen before halt, writes
+  `paniccapsule.lardd`, and exposes keys for crashlog viewing, capsule rebuild,
+  rollback apply, and dropping the first queued task.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
@@ -151,7 +156,9 @@ commands:
   LPST persistence health, then lets the user trigger the in-kernel repair path.
 - `panic capsule` or `paniccapsule show` writes `paniccapsule.lardd`, a small
   recovery bundle that joins panic-room, crashlog, BugEye, Trust, LFSDoctor,
-  priority, and BootMap state.
+  priority, and BootMap state. Runtime-ready `panic` and `panic_u64` paths now
+  enter a tiny PanicRoom screen before halt so recovery state is visible
+  immediately.
 - `post baseline`, `postbaseline show`, `bootreplay show`, `bootmap`,
   `oldcheck draw`, `devmap`, and `awakemon` show POST drift, boot replay, boot
   phase map, retro storage check, hardware map, and Awakening background loader
@@ -193,8 +200,8 @@ commands:
   returns the next boot to normal and stops the current background loader if it
   is still running.
 - `crashlog` shows panic and diagnostic events stored in `crashlog.txt`.
-  `panic` paths append to it before halting, and `crashlog test` adds a manual
-  diagnostic entry.
+  `panic` paths append to it, enter PanicRoom, then halt only when the user
+  chooses the halt key; `crashlog test` adds a manual diagnostic entry.
 - `LARS` documents can include `button label | command` and `input name value`
   records. `larsform file.lars` lists those controls and `larsact file.lars n`
   executes a button action through LSH.

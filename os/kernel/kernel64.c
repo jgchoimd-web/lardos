@@ -522,6 +522,7 @@ void kmain(void)
 
     int ps2_ready = ps2_init();
     if (ps2_ready == 0) {
+        panic_runtime_ready();
         if (s_boot_awakening_mode) {
             vga_puts("Awakening mode: POST prompt deferred\n", 0x2F);
         } else {

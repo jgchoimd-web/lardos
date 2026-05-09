@@ -4,6 +4,13 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.40.0a
+ITEM Official promotion of the GUI polish, picture Unicode, clickable live glyph, and rough-edge repair beta track.
+ITEM PanicRoom now connects to the real kernel panic path once the runtime is ready: panic and panic_u64 enter the recovery screen before halt.
+ITEM The panic recovery screen auto-writes paniccapsule.lardd, shows crashlog.txt, can rebuild the capsule, apply the last rollback snapshot, and drop the first queued task.
+ITEM LardKit selftest now verifies PanicRoom enter, capsule generation, and exit state for official-release readiness.
+ITEM Release media uses official a-channel versioning with ISO and IMG artifacts.
+
 SECTION v1.39.0b
 ITEM Rough-edge repair pass for older features that only barely worked before the image glyph polish.
 ITEM Fixed directory browsing so dir X: lists read-only system/LFS files and dir Z: lists every writable RAM file instead of a stale hardcoded subset.

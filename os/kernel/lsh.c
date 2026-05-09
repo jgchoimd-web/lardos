@@ -2839,7 +2839,7 @@ static void cmd_panicroom(const char* args)
         out_append(lardkit_panicroom_active() ? "entered" : "standby");
         out_append(" entries=");
         out_append_u32(lardkit_panicroom_entries());
-        out_append("\nUse crashlog show for recovery notes, rollback apply for settings restore.\n");
+        out_append("\nRuntime panic opens a tiny recovery screen; use crashlog show, rollback apply, or panicroom capsule from LSH.\n");
         return;
     }
     if (strcmp(sub, "enter") == 0 || strcmp(sub, "on") == 0) {

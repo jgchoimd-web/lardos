@@ -1641,9 +1641,16 @@ int lardkit_selftest(void)
         s_lardkit = saved;
         return -13;
     }
-    if (lardkit_panic_capsule_write() != 0 || !fs_open("paniccapsule.lardd")) {
+    lardkit_panicroom_enter();
+    if (!lardkit_panicroom_active() || lardkit_panicroom_entries() == 0u ||
+        lardkit_panic_capsule_write() != 0 || !fs_open("paniccapsule.lardd")) {
         s_lardkit = saved;
-        return -21;
+        return -23;
+    }
+    lardkit_panicroom_exit();
+    if (lardkit_panicroom_active()) {
+        s_lardkit = saved;
+        return -24;
     }
     s_lardkit = saved;
     return 0;

@@ -304,15 +304,16 @@ changes its personality.
 modules without external libraries. BugEye scans visible framebuffer/layout
 health and writes `bugreport.lardd`, Rollback snapshots and restores user-visible settings, Trust stores a
 user-owned permission policy map, BootMap lists boot phases, PanicRoom exposes a
-recovery stance, OldCheck draws a retro storage-check screen, LTheme selects
+recovery stance and a tiny panic-path recovery screen, OldCheck draws a retro storage-check screen, LTheme selects
 native shell theme presets, AwakeMonitor reports background boot progress,
 OSChat uses the OSLink local bus for chat-style module messages, LARSView tracks
 native document browsing state, and LARDD notes writes `notes.lardd`. LTheme can
 also parse `.ltheme` records such as `default.ltheme`.
 
-`crashlog.c` owns `crashlog.txt`, a writable panic and diagnostic history. Panic
-paths append an entry and attempt an LPST save before halting; LSH exposes the
-same log through `crashlog show`, `crashlog clear`, and `crashlog test`.
+`crashlog.c` owns `crashlog.txt`, a writable panic and diagnostic history.
+Runtime-ready panic paths append an entry, enter PanicRoom, write
+`paniccapsule.lardd`, and halt only after the user chooses the halt key; LSH exposes the same log through
+`crashlog show`, `crashlog clear`, and `crashlog test`.
 
 `lard_doc.c` also parses LARS form records. `button label | command` is rendered
 as an actionable control and can be listed with `larsform` or executed with

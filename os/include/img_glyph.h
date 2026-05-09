@@ -14,6 +14,9 @@ typedef struct img_glyph_info {
     uint16_t source_h;
     uint32_t avg_argb;
     uint32_t revision;
+    uint32_t click_count;
+    uint32_t last_click_tick;
+    uint8_t live;
     char name[IMG_GLYPH_NAME_MAX];
 } img_glyph_info_t;
 
@@ -33,5 +36,8 @@ int img_glyph_next_free(uint32_t* out_cp);
 int img_glyph_info(uint32_t cp, img_glyph_info_t* out);
 int img_glyph_info_at(uint32_t assigned_index, img_glyph_info_t* out);
 int img_glyph_utf8(uint32_t cp, char out[5]);
+int img_glyph_click(uint32_t cp, uint32_t tick);
+int img_glyph_set_live(uint32_t cp, int on);
+int img_glyph_render(uint32_t cp, uint32_t tick, int hovered, uint32_t* out_pixels, uint16_t* out_w, uint16_t* out_h);
 int img_glyph_write_lardd(void);
 int img_glyph_selftest(void);

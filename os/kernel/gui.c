@@ -25,6 +25,15 @@
 
 #define LARSH_VIEW_W 160
 #define LARSH_VIEW_H 120
+#define GUI_GLYPH_HITS_MAX 64u
+
+typedef struct {
+    int x;
+    int y;
+    int w;
+    int h;
+    uint32_t cp;
+} gui_glyph_hit_t;
 
 typedef struct {
     uint32_t* fb;
@@ -100,6 +109,14 @@ typedef struct {
     uint32_t calc_cur;
     int gallery_sel;
     uint32_t gallery_pixels[128 * 128];
+    uint32_t glyph_tick;
+    uint32_t glyph_hover_cp;
+    uint32_t glyph_last_cp;
+    uint32_t glyph_last_click_tick;
+    uint32_t glyph_rendered_last;
+    uint32_t glyph_hit_count;
+    gui_glyph_hit_t glyph_hits[GUI_GLYPH_HITS_MAX];
+    uint32_t glyph_render_pixels[IMG_GLYPH_SIZE * IMG_GLYPH_SIZE];
 
     /* LARSH */
     larsh_scene_t larsh_scene;
@@ -516,6 +533,12 @@ int gui_init(void)
     g.calc_len = 1;
     g.calc_cur = 1;
     g.gallery_sel = -1;
+    g.glyph_tick = 0;
+    g.glyph_hover_cp = 0;
+    g.glyph_last_cp = 0;
+    g.glyph_last_click_tick = 0;
+    g.glyph_rendered_last = 0;
+    g.glyph_hit_count = 0;
     g.larsh_loaded = 0;
     g.larsh_playing = 0;
     g.larsh_tick = 0;
@@ -720,6 +743,66 @@ static void gui_draw_cursor_at(int x, int y, uint32_t color)
 static int in_rect(int x, int y, int rx, int ry, int rw, int rh)
 {
     return x >= rx && y >= ry && x < (rx + rw) && y < (ry + rh);
+}
+
+static void gui_glyph_hits_begin(void)
+{
+    g.glyph_hit_count = 0;
+    g.glyph_hover_cp = 0;
+    g.glyph_rendered_last = 0;
+}
+
+static void gui_glyph_register_hit(int x, int y, int w, int h, uint32_t cp)
+{
+    if (g.glyph_hit_count < GUI_GLYPH_HITS_MAX) {
+        gui_glyph_hit_t* hit = &g.glyph_hits[g.glyph_hit_count++];
+        hit->x = x;
+        hit->y = y;
+        hit->w = w;
+        hit->h = h;
+        hit->cp = cp;
+    }
+    g.glyph_rendered_last++;
+    if (in_rect(g.mx, g.my, x, y, w, h)) g.glyph_hover_cp = cp;
+}
+
+static int gui_glyph_hit_at(int x, int y, uint32_t* out_cp)
+{
+    for (uint32_t i = 0; i < g.glyph_hit_count; i++) {
+        gui_glyph_hit_t* hit = &g.glyph_hits[i];
+        if (in_rect(x, y, hit->x, hit->y, hit->w, hit->h)) {
+            if (out_cp) *out_cp = hit->cp;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void gui_cp_label(uint32_t cp, char* out, uint32_t cap)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    if (!out || cap < 7u) return;
+    out[0] = 'U';
+    out[1] = '+';
+    for (int i = 3; i >= 0; i--) {
+        out[5 - i] = hex[(cp >> (uint32_t)(i * 4)) & 0xFu];
+    }
+    out[6] = '\0';
+}
+
+int gui_img_glyph_interaction_selftest(void)
+{
+    uint32_t cp = 0;
+    uint32_t old_count = g.glyph_hit_count;
+    if (!g_have_fb) return -1;
+    g.glyph_hit_count = 0;
+    gui_glyph_register_hit(10, 10, 8, 8, IMG_GLYPH_PUA_START);
+    if (!gui_glyph_hit_at(12, 12, &cp) || cp != IMG_GLYPH_PUA_START) {
+        g.glyph_hit_count = old_count;
+        return -2;
+    }
+    g.glyph_hit_count = old_count;
+    return 0;
 }
 
 static void gui_apply_exexgui_layout(void)
@@ -943,6 +1026,17 @@ void gui_handle_mouse(int dx, int dy, int buttons)
                 exexgui_set_focus("info");
             } else if (in_rect(g.mx, g.my, (int)xl.gui.x, (int)xl.gui.y, (int)xl.gui.w, (int)xl.gui.h)) {
                 exexgui_set_focus("gui");
+            }
+        }
+    }
+
+    if (l_pressed) {
+        uint32_t cp = 0;
+        if (gui_glyph_hit_at(g.mx, g.my, &cp)) {
+            if (img_glyph_click(cp, g.glyph_tick) == 0) {
+                img_glyph_write_lardd();
+                g.glyph_last_cp = cp;
+                g.glyph_last_click_tick = g.glyph_tick;
             }
         }
     }
@@ -1510,6 +1604,7 @@ void gui_handle_key_nav(int kind)
 void gui_tick(void)
 {
     if (!g_have_fb) return;
+    g.glyph_tick++;
     lassist_tick((uint32_t)g.app_id);
     if (lsh_poll_background() && g.app_id == 7) {
         const char* out = lsh_get_output();
@@ -1753,6 +1848,7 @@ void gui_render(void)
     exgui_draw_desktop();
     exexgui_draw_desktop();
     gui_apply_exexgui_layout();
+    gui_glyph_hits_begin();
 
     // Window frame
     uint32_t win_bg = 0xFF20252B;
@@ -1937,12 +2033,15 @@ void gui_render(void)
                 }
                 int cap_y = view_y + (int)br.h * scale + 6;
                 fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)cap_y, "glyph U+E000 = ", 0xFFFFFFFF, win_bg);
-                const uint32_t* gpx;
                 uint16_t gw, gh;
-                if (img_glyph_get(0xE000u, &gpx, &gw, &gh)) {
-                    fb_draw_image(tgt, (uint16_t)(view_x + 16 * 8), (uint16_t)cap_y, gpx, gw, gh);
+                int gx = view_x + 16 * 8;
+                int gy = cap_y;
+                int hover = in_rect(g.mx, g.my, gx, gy, IMG_GLYPH_SIZE, IMG_GLYPH_SIZE);
+                if (img_glyph_render(0xE000u, g.glyph_tick, hover, g.glyph_render_pixels, &gw, &gh)) {
+                    fb_draw_image(tgt, (uint16_t)gx, (uint16_t)gy, g.glyph_render_pixels, gw, gh);
+                    gui_glyph_register_hit(gx, gy, gw, gh, 0xE000u);
                 }
-                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)(cap_y + 12), "LSH: glyph list | glyph auto sample.bmp avatar", 0xFFCFE3FFu, win_bg);
+                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)(cap_y + 12), "Click glyph. LSH: glyph live U+E000 on | glyph list", 0xFFCFE3FFu, win_bg);
             }
         }
     }
@@ -1965,11 +2064,14 @@ void gui_render(void)
             if (on_screen) row = (uint16_t)visible_row;
 
             if (cp >= IMG_GLYPH_PUA_START && cp <= IMG_GLYPH_PUA_END) {
-                const uint32_t* px;
                 uint16_t gw, gh;
-                if (img_glyph_get(cp, &px, &gw, &gh)) {
+                int gx = rx + col * 8;
+                int gy = ry + row * 10;
+                int hover = on_screen && in_rect(g.mx, g.my, gx, gy, IMG_GLYPH_SIZE, IMG_GLYPH_SIZE);
+                if (img_glyph_render(cp, g.glyph_tick, hover, g.glyph_render_pixels, &gw, &gh)) {
                     if (on_screen) {
-                        fb_draw_image(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), px, gw, gh);
+                        fb_draw_image(tgt, (uint16_t)gx, (uint16_t)gy, g.glyph_render_pixels, gw, gh);
+                        gui_glyph_register_hit(gx, gy, gw, gh, cp);
                     }
                     col++;
                     continue;
@@ -1982,6 +2084,15 @@ void gui_render(void)
             }
             col++;
         }
+    }
+    if (g.glyph_hover_cp || g.glyph_last_cp) {
+        char cp_label[8];
+        uint32_t cp = g.glyph_hover_cp ? g.glyph_hover_cp : g.glyph_last_cp;
+        gui_cp_label(cp, cp_label, sizeof(cp_label));
+        fb_draw_text(tgt, (uint16_t)(g.win_x + 112), (uint16_t)(g.win_y + 168),
+                     g.glyph_hover_cp ? "Glyph hover " : "Glyph click ", 0xFFCFE3FFu, win_bg);
+        fb_draw_text(tgt, (uint16_t)(g.win_x + 208), (uint16_t)(g.win_y + 168),
+                     cp_label, 0xFFFFD166u, win_bg);
     }
     g.resp_total_lines = line + 1;
 

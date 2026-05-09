@@ -91,6 +91,35 @@ static uint32_t glyph_pattern_pixel(uint32_t cp, const char* name, uint16_t x, u
     return cool;
 }
 
+static uint8_t glyph_clamp8(int v)
+{
+    if (v < 0) return 0;
+    if (v > 255) return 255;
+    return (uint8_t)v;
+}
+
+static uint32_t glyph_brighten(uint32_t c, int delta)
+{
+    uint32_t a = c & 0xFF000000u;
+    int r = (int)((c >> 16) & 0xFFu) + delta;
+    int g = (int)((c >> 8) & 0xFFu) + delta;
+    int b = (int)(c & 0xFFu) + delta;
+    return a | ((uint32_t)glyph_clamp8(r) << 16) |
+           ((uint32_t)glyph_clamp8(g) << 8) |
+           (uint32_t)glyph_clamp8(b);
+}
+
+static uint32_t glyph_mix(uint32_t a, uint32_t b, uint32_t amount)
+{
+    uint32_t ar = (a >> 16) & 0xFFu, ag = (a >> 8) & 0xFFu, ab = a & 0xFFu;
+    uint32_t br = (b >> 16) & 0xFFu, bg = (b >> 8) & 0xFFu, bb = b & 0xFFu;
+    if (amount > 255u) amount = 255u;
+    ar = (ar * (255u - amount) + br * amount) / 255u;
+    ag = (ag * (255u - amount) + bg * amount) / 255u;
+    ab = (ab * (255u - amount) + bb * amount) / 255u;
+    return 0xFF000000u | (ar << 16) | (ag << 8) | ab;
+}
+
 static void glyph_append(FsWritableFile* w, const char* s)
 {
     uint32_t len = glyph_strlen(s);
@@ -155,6 +184,9 @@ int img_glyph_assign_named(uint32_t cp, const uint32_t* pixels, uint16_t w, uint
     s_info[idx].source_h = h;
     s_info[idx].avg_argb = glyph_avg(pixels, w, h);
     s_info[idx].revision = s_revision;
+    s_info[idx].click_count = 0;
+    s_info[idx].last_click_tick = 0;
+    s_info[idx].live = 1;
     glyph_copy_name(s_info[idx].name, name);
     return 0;
 }
@@ -248,6 +280,62 @@ int img_glyph_utf8(uint32_t cp, char out[5])
     return 3;
 }
 
+int img_glyph_click(uint32_t cp, uint32_t tick)
+{
+    int idx = slot_index(cp);
+    if (idx < 0 || !s_assigned[idx]) return -1;
+    s_info[idx].click_count++;
+    s_info[idx].last_click_tick = tick;
+    s_revision++;
+    s_info[idx].revision = s_revision;
+    return 0;
+}
+
+int img_glyph_set_live(uint32_t cp, int on)
+{
+    int idx = slot_index(cp);
+    if (idx < 0 || !s_assigned[idx]) return -1;
+    s_info[idx].live = on ? 1u : 0u;
+    s_revision++;
+    s_info[idx].revision = s_revision;
+    return 0;
+}
+
+int img_glyph_render(uint32_t cp, uint32_t tick, int hovered, uint32_t* out_pixels, uint16_t* out_w, uint16_t* out_h)
+{
+    int idx = slot_index(cp);
+    uint32_t click_age;
+    int clicked_recent = 0;
+    int pulse = 0;
+    if (idx < 0 || !s_assigned[idx] || !out_pixels) return 0;
+
+    click_age = tick - s_info[idx].last_click_tick;
+    clicked_recent = s_info[idx].click_count && click_age < 24u;
+    if (s_info[idx].live) {
+        uint32_t phase = (tick + (cp & 31u)) & 31u;
+        pulse = (int)(phase < 16u ? phase : (31u - phase)) - 4;
+    }
+    if (hovered) pulse += 18;
+    if (clicked_recent) pulse += (int)(24u - click_age) * 3;
+
+    for (uint16_t y = 0; y < IMG_GLYPH_SIZE; y++) {
+        for (uint16_t x = 0; x < IMG_GLYPH_SIZE; x++) {
+            uint32_t c = s_glyph_data[idx][y * IMG_GLYPH_SIZE + x];
+            if (s_info[idx].live && (((uint32_t)x + (uint32_t)y + tick) & 7u) == 0u) {
+                c = glyph_mix(c, 0xFFFFFFFFu, 40u);
+            }
+            if (pulse) c = glyph_brighten(c, pulse);
+            if ((hovered || clicked_recent) && (x == 0u || y == 0u || x == IMG_GLYPH_SIZE - 1u || y == IMG_GLYPH_SIZE - 1u)) {
+                c = clicked_recent ? 0xFFFFD166u : 0xFFFFFFFFu;
+            }
+            out_pixels[y * IMG_GLYPH_SIZE + x] = c;
+        }
+    }
+    if (out_w) *out_w = IMG_GLYPH_SIZE;
+    if (out_h) *out_h = IMG_GLYPH_SIZE;
+    return 1;
+}
+
 int img_glyph_write_lardd(void)
 {
     FsWritableFile* w = fs_open_writable("glyphmap.lardd");
@@ -257,7 +345,7 @@ int img_glyph_write_lardd(void)
     glyph_append(w, "LARDD 1\n");
     glyph_append(w, "TITLE Image Glyph Map\n");
     glyph_append(w, "TEXT Private-use Unicode slots can be owned by user pictures.\n");
-    glyph_append(w, "TEXT Commands: glyph demo, glyph load U+E000 sample.bmp name, glyph auto sample.bmp name, glyph insert U+E000 notes.txt.\n");
+    glyph_append(w, "TEXT Commands: glyph demo, glyph load U+E000 sample.bmp name, glyph auto sample.bmp name, glyph live U+E000 on, glyph click U+E000, glyph insert U+E000 notes.txt.\n");
     glyph_append(w, "SECTION Assigned\n");
     if (!count) {
         glyph_append(w, "ITEM none\n");
@@ -275,6 +363,10 @@ int img_glyph_write_lardd(void)
             glyph_append_u32(w, info.source_h);
             glyph_append(w, " rev=");
             glyph_append_u32(w, info.revision);
+            glyph_append(w, " live=");
+            glyph_append(w, info.live ? "on" : "off");
+            glyph_append(w, " clicks=");
+            glyph_append_u32(w, info.click_count);
             glyph_append(w, "\n");
         }
     }
@@ -287,6 +379,7 @@ int img_glyph_selftest(void)
     uint32_t cp = IMG_GLYPH_PUA_END;
     int idx = slot_index(cp);
     uint32_t backup_pixels[PIXELS_PER_SLOT];
+    uint32_t render_pixels[PIXELS_PER_SLOT];
     uint8_t backup_assigned;
     img_glyph_info_t backup_info;
     uint32_t backup_revision;
@@ -306,7 +399,10 @@ int img_glyph_selftest(void)
         !img_glyph_get(cp, &px, &w, &h) ||
         w != IMG_GLYPH_SIZE || h != IMG_GLYPH_SIZE ||
         img_glyph_info(cp, &info) != 0 ||
-        img_glyph_utf8(cp, utf8) != 3) {
+        img_glyph_utf8(cp, utf8) != 3 ||
+        img_glyph_click(cp, 7u) != 0 ||
+        img_glyph_set_live(cp, 1) != 0 ||
+        img_glyph_render(cp, 9u, 1, render_pixels, &w, &h) != 1) {
         for (uint32_t i = 0; i < PIXELS_PER_SLOT; i++) s_glyph_data[idx][i] = backup_pixels[i];
         s_assigned[idx] = backup_assigned;
         s_info[idx] = backup_info;

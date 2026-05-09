@@ -1217,7 +1217,7 @@ static void cmd_help(const char* args)
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
-    out_append("  glyph demo|list|load|auto|show|clear|insert|write  PUA picture characters\n");
+    out_append("  glyph demo|list|load|auto|show|live|click|insert|write  clickable live PUA pictures\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open file              native LARS/LARDD browser state\n");
     out_append("  notes show|add|clear            writable notes.lardd document\n");
@@ -1284,7 +1284,7 @@ static void cmd_control(const char* args)
     out_append("  lfsdoctor scan      diagnose writable files and LPST persistence state\n");
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
-    out_append("  glyph auto sample.bmp avatar    bind a BMP to the next private-use Unicode slot\n");
+    out_append("  glyph live U+E000 on            enable realtime hover/click rendering for a picture glyph\n");
     out_append("  cfgprof save safe-ui save/load a bundle of settings\n");
     out_append("  userlaw show        inspect user-right policy principles\n");
     out_append("  lunit run tests.lunit run small OS feature tests\n");
@@ -4268,12 +4268,16 @@ static void glyph_out_info(const img_glyph_info_t* info)
     out_append_hex32(info->avg_argb);
     out_append(" rev=");
     out_append_u32(info->revision);
+    out_append(" live=");
+    out_append(info->live ? "on" : "off");
+    out_append(" clicks=");
+    out_append_u32(info->click_count);
     out_append("\n");
 }
 
 static void glyph_usage(void)
 {
-    out_append("Usage: glyph demo|list|load U+E000 file.bmp [name]|auto file.bmp [name]|show U+E000|clear U+E000|insert U+E000 notes.txt|write\n");
+    out_append("Usage: glyph demo|list|load U+E000 file.bmp [name]|auto file.bmp [name]|show U+E000|clear U+E000|live U+E000 on|click U+E000|insert U+E000 notes.txt|write\n");
 }
 
 static int glyph_load_bmp_to_slot(uint32_t cp, const char* file_arg, const char* label)
@@ -4429,6 +4433,53 @@ static void cmd_glyph(const char* args)
             out_append_hex8((uint8_t)bytes[2]);
             out_append("\n");
         }
+        return;
+    }
+
+    if (strcmp(sub, "live") == 0 || strcmp(sub, "rt") == 0 || strcmp(sub, "realtime") == 0) {
+        char cp_arg[16];
+        char on_arg[16];
+        uint32_t cp;
+        int on;
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0 ||
+            vcs_read_word(&args, on_arg, sizeof(on_arg)) != 0 ||
+            glyph_parse_cp(cp_arg, &cp) != 0) {
+            out_append("Usage: glyph live U+E000 on|off\n");
+            return;
+        }
+        if (strcmp(on_arg, "on") == 0 || strcmp(on_arg, "1") == 0) on = 1;
+        else if (strcmp(on_arg, "off") == 0 || strcmp(on_arg, "0") == 0) on = 0;
+        else {
+            out_append("Usage: glyph live U+E000 on|off\n");
+            return;
+        }
+        if (img_glyph_set_live(cp, on) != 0) {
+            out_append("glyph: slot is empty.\n");
+            return;
+        }
+        img_glyph_write_lardd();
+        out_append("glyph: live render ");
+        out_append(on ? "on " : "off ");
+        glyph_out_cp(cp);
+        out_append("\n");
+        return;
+    }
+
+    if (strcmp(sub, "click") == 0 || strcmp(sub, "tap") == 0) {
+        char cp_arg[16];
+        uint32_t cp;
+        if (vcs_read_word(&args, cp_arg, sizeof(cp_arg)) != 0 || glyph_parse_cp(cp_arg, &cp) != 0) {
+            out_append("Usage: glyph click U+E000\n");
+            return;
+        }
+        if (img_glyph_click(cp, 0u) != 0) {
+            out_append("glyph: slot is empty.\n");
+            return;
+        }
+        img_glyph_write_lardd();
+        out_append("glyph: clicked ");
+        glyph_out_cp(cp);
+        out_append("\n");
         return;
     }
 

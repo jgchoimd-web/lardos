@@ -107,6 +107,9 @@ commands:
   `glyph list`, `glyph show`, `glyph insert`, and `glyph write` let the user
   bind BMP pictures to U+E000..U+E0FF private-use slots and export
   `glyphmap.lardd`.
+- `v1.38.0b` makes those picture Unicode slots interactive: rendered glyphs
+  keep GUI hitboxes, accept mouse clicks, record click counts in
+  `glyphmap.lardd`, and use realtime hover/click/live rendering.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

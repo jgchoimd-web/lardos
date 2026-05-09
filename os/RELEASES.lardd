@@ -4,6 +4,12 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.38.0b
+ITEM Made image glyphs clickable in the GUI by recording per-frame hitboxes for rendered PUA picture characters.
+ITEM Added realtime glyph rendering with live shimmer, hover outline, and click flash using the GUI tick.
+ITEM Added glyph live U+E000 on/off and glyph click U+E000 commands, with live state and click counts exported to glyphmap.lardd.
+ITEM Added POST coverage for clickable image glyph hitboxes while keeping the classic text renderer path intact.
+
 SECTION v1.37.0b
 ITEM Expanded TempleOS-style picture Unicode into a 256-slot user-owned PUA range, U+E000..U+E0FF.
 ITEM Added glyph commands for demo patterns, BMP loading, automatic slot assignment, metadata display, insertion into writable files, and glyphmap.lardd export.

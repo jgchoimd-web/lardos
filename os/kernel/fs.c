@@ -168,7 +168,7 @@ static FsWritableFile ram_userlaw = { "userlaw.lardd", ram_userlaw_buf, 0, USERL
 static const uint8_t glyphmap_init[] =
     "LARDD 1\n"
     "TITLE Image Glyph Map\n"
-    "TEXT No picture Unicode slots have been assigned yet. Use glyph demo or glyph auto sample.bmp sample.\n"
+    "TEXT No picture Unicode slots have been assigned yet. Use glyph demo or glyph auto sample.bmp sample, then click them in the GUI.\n"
     "END\n";
 static uint8_t ram_glyphmap_buf[GLYPHMAP_CAP];
 static FsWritableFile ram_glyphmap = { "glyphmap.lardd", ram_glyphmap_buf, 0, GLYPHMAP_CAP };
@@ -220,7 +220,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use cfgsh for the settings shell: awake on, style 2, layout 3, http 2, boot 4.\n"
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
-    "li Use glyph demo, glyph auto sample.bmp avatar, glyph list, and glyph insert U+E000 notes.txt to own private-use Unicode picture characters.\n"
+    "li Use glyph demo, glyph auto sample.bmp avatar, glyph live U+E000 on, glyph click U+E000, and glyph insert U+E000 notes.txt to own clickable realtime private-use Unicode picture characters.\n"
     "li Use task list and task set id prio to inspect and change queued task priority.\n"
     "li Priority lev.10 is urgent work the user can grant with task urgent id, task set id 10, or nice 10 cmd.\n"
     "li Use tasktop to see runnable and paused task queues with priority bars.\n"
@@ -276,6 +276,8 @@ static const uint8_t file_lardos_lars[] =
     "cmd glyph demo\n"
     "cmd glyph list\n"
     "cmd glyph show U+E000\n"
+    "cmd glyph live U+E000 on\n"
+    "cmd glyph click U+E000\n"
     "cmd glyph write\n"
     "cmd oslink exec 10.0.2.15 status\n"
     "cmd task list\n"
@@ -389,11 +391,13 @@ static const uint8_t file_glyph_guide[] =
     "ITEM glyph demo -> seed U+E000..U+E003 with built-in picture characters.\n"
     "ITEM glyph load U+E000 sample.bmp avatar -> bind a BMP to a chosen slot.\n"
     "ITEM glyph auto sample.bmp avatar -> bind a BMP to the next free slot.\n"
+    "ITEM glyph live U+E000 on/off -> toggle realtime hover/click rendering.\n"
+    "ITEM glyph click U+E000 -> record the same click event the GUI writes when the picture is clicked.\n"
     "ITEM glyph insert U+E000 notes.txt -> append the actual UTF-8 private-use character.\n"
     "ITEM glyph write -> refresh glyphmap.lardd.\n"
     "SECTION Slots\n"
     "ITEM Range U+E000..U+E0FF is reserved for user-owned image glyphs.\n"
-    "ITEM glyphmap.lardd records source size, average color, name, and revision.\n"
+    "ITEM glyphmap.lardd records source size, average color, name, revision, live state, and click count.\n"
     "END\n";
 
 static const uint8_t file_features_lil[] =

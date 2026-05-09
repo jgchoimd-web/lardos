@@ -18,6 +18,10 @@ budget hits, last steps, max steps, and return codes. GASM and Lafillo VM are
 now step-budgeted, and branchy BOSL falls back from JIT to the budgeted
 interpreter path.
 
+`shrine status`, `shrine verify hello.shrine`, and `shrine run hello.shrine`
+expose LSS, the Lard Subsystem for Shrine. Current `.shrine` files wrap a type
+0 BOSL payload after the `LSS\0` magic and one-byte type.
+
 ---
 
 ## BOSL (lard bytecode language)

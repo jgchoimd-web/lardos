@@ -222,6 +222,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
     "li Use vm status, vm limits, and vm selftest to monitor BOSL, LIL, GASM, Lafillo VM, and OSVM under common step budgets.\n"
+    "li Use shrine status, shrine list, shrine verify hello.shrine, and shrine run hello.shrine for the Lard Subsystem for Shrine.\n"
     "li Use glyph demo, glyph auto sample.bmp avatar, glyph move/copy/rename/pixel, glyph live U+E000 on, glyph click U+E000, and glyph insert U+E000 notes.txt to own and edit clickable realtime private-use Unicode picture characters.\n"
     "li Use cursor set U+E000 to make the GUI cursor render from a user-owned Unicode picture slot; cursor off restores the default block cursor.\n"
     "li Use dir X: for read-only system files and dir Z: for every writable RAM file; the two listings are no longer mixed together.\n"
@@ -285,6 +286,8 @@ static const uint8_t file_lardos_lars[] =
     "cmd dangun\n"
     "cmd vm status\n"
     "cmd vm selftest\n"
+    "cmd shrine status\n"
+    "cmd shrine verify hello.shrine\n"
     "cmd glyph demo\n"
     "cmd glyph list\n"
     "cmd glyph show U+E000\n"
@@ -457,6 +460,23 @@ static const uint8_t file_vm_guide[] =
     "ITEM BOSL JIT falls back to the budgeted interpreter for branchy programs so loops stay interruptible.\n"
     "END\n";
 
+static const uint8_t file_shrine_guide[] =
+    "LARDD 1\n"
+    "TITLE Shrine Subsystem\n"
+    "TEXT LSS is the Lard Subsystem for Shrine: a local compatibility wrapper for Shrine-style programs.\n"
+    "TEXT It keeps the code in LardOS-owned formats and runs the current .shrine payload through BOSL.\n"
+    "SECTION Commands\n"
+    "ITEM shrine status -> show LSS readiness, runs, failures, verified files, and last file.\n"
+    "ITEM shrine list -> list .shrine files visible to the filesystem.\n"
+    "ITEM shrine verify hello.shrine -> check the wrapper magic, type, payload, and size without executing.\n"
+    "ITEM shrine run hello.shrine -> run the Shrine wrapper and show its output.\n"
+    "ITEM shrine test -> run the subsystem selftest.\n"
+    "SECTION Format\n"
+    "ITEM .shrine starts with LSS\\0, then a one-byte type.\n"
+    "ITEM Type 0 is a BOSL payload. Type 1 is reserved for future native Shrine binaries.\n"
+    "ITEM srine is accepted as a typo-friendly alias for shrine.\n"
+    "END\n";
+
 static const uint8_t file_features_lil[] =
     "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
     "(begin\n"
@@ -496,6 +516,9 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command cursor\n"
     "CHECK command vm\n"
     "CHECK command gasm\n"
+    "CHECK command shrine\n"
+    "CHECK file hello.shrine\n"
+    "CHECK file shrine_guide.lardd\n"
     "CHECK file vm_guide.lardd\n"
     "CHECK command time\n"
     "CHECK command lunar\n"
@@ -589,6 +612,7 @@ static const FsFile FS_FILES[] = {
     { "glyph_guide.lardd", file_glyph_guide, sizeof(file_glyph_guide) - 1 },
     { "lardtime_guide.lardd", file_lardtime_guide, sizeof(file_lardtime_guide) - 1 },
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
+    { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },

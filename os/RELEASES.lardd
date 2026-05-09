@@ -4,6 +4,14 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.48.0b
+ITEM Expanded LSS into a visible Shrine subsystem instead of leaving only the hello.shrine sample.
+ITEM Added shrine/lss/srine status, list, info, verify, run, and test commands for .shrine wrappers.
+ITEM LSS now tracks initialization, runs, failures, verified files, unsupported types, last type, last size, last file, and last error.
+ITEM Added shrine_guide.lardd, LardOS control-room links, LUNIT coverage, and POST coverage for hello.shrine plus the LSS wrapper selftest.
+ITEM The .shrine wrapper keeps the current in-tree format: LSS\0, one-byte type, and type 0 BOSL payload; type 1 stays reserved.
+ITEM Release media uses beta b-channel versioning while the Shrine compatibility surface stabilizes.
+
 SECTION v1.47.0b
 ITEM Added VM Monitor for BOSL, LIL, GASM, Lafillo VM, and OSVM.
 ITEM Added vm status, vm limits, vm selftest, and vm clear for per-VM runs, failures, budget hits, last steps, max steps, and return code.

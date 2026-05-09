@@ -15,6 +15,7 @@
 #include "lard_doc.h"
 #include "lil.h"
 #include "lar.h"
+#include "lss.h"
 #include "lvcs.h"
 #include "drfl.h"
 #include "lcontainer.h"
@@ -38,6 +39,7 @@
 #include "vmmon.h"
 #include "io.h"
 #include "pci.h"
+#include "syscall.h"
 #include "string.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -290,7 +292,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
-    { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 },
+    { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
     { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
     { "lcnt", 1 }, { "container", 1 },
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
@@ -1309,7 +1311,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control status time date lunar dangun release [policy] ver post baseline selftest magic mode vm cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control status time date lunar dangun release [policy] ver post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
@@ -1334,6 +1336,7 @@ static void cmd_help(const char* args)
     out_append("  awake on|off|status|test\n");
     out_append("  write file text  append file text  copy src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
+    out_append("  shrine status|list|info|verify|run|test [file.shrine]\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
     out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM\n");
     out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
@@ -1370,6 +1373,7 @@ static void cmd_control(const char* args)
     out_append("  time                show LardOS Time ticks, 5-digit CE year, Dangun year, and lunar view\n");
     out_append("  mode guard          guarded real16 <-> long64 roundtrip with restore check\n");
     out_append("  vm selftest         run guarded smoke tests across BOSL, LIL, GASM, Lafillo VM, and OSVM\n");
+    out_append("  shrine run hello.shrine run a Shrine subsystem wrapper through LSS\n");
     out_append("  trace on            record shell/module/oslink/taskprio events in order\n");
     out_append("  netwatch on         watch readable packet/oslink/HTTP activity\n");
     out_append("  journal show        view automatic LARDD system journal\n");
@@ -1664,6 +1668,20 @@ static void cmd_status(const char* args)
     out_append(", budget-hits=");
     out_append_u32(vm_budget_hits);
     out_append(" (vm status for details)\n");
+
+    lss_info_t lss_state;
+    lss_info(&lss_state);
+    out_append("Shrine/LSS: ");
+    out_append(lss_state.initialized ? "ready" : "offline");
+    out_append(", runs=");
+    out_append_u32(lss_state.runs);
+    out_append(", failures=");
+    out_append_u32(lss_state.failures);
+    out_append(", last=");
+    out_append(lss_state.last_name);
+    out_append(", type=");
+    out_append(lss_type_name(lss_state.last_type));
+    out_append("\n");
 
     out_append("CrashLog: events=");
     out_append_u32(crashlog_count());
@@ -5421,6 +5439,135 @@ static void cmd_vm(const char* args)
     out_append("Usage: vm status|limits|selftest|clear\n");
 }
 
+static int lss_has_shrine_suffix(const char* name)
+{
+    uint32_t n = 0;
+    const char* suffix = ".shrine";
+    uint32_t s = 7;
+    while (name && name[n]) n++;
+    if (n < s) return 0;
+    for (uint32_t i = 0; i < s; i++) {
+        if (name[n - s + i] != suffix[i]) return 0;
+    }
+    return 1;
+}
+
+static void lss_list_cb(const char* name, uint32_t size, void* user)
+{
+    uint32_t* count = (uint32_t*)user;
+    if (!lss_has_shrine_suffix(name)) {
+        return;
+    }
+    out_append("  ");
+    out_append(name);
+    out_append(" (");
+    out_append_u32(size);
+    out_append(" bytes)\n");
+    (*count)++;
+}
+
+static void cmd_lss_status(void)
+{
+    lss_info_t info;
+    lss_info(&info);
+    out_append("Shrine Subsystem (LSS)\n");
+    out_append("  state=");
+    out_append(info.initialized ? "ready" : "offline");
+    out_append(", runs=");
+    out_append_u32(info.runs);
+    out_append(", failures=");
+    out_append_u32(info.failures);
+    out_append(", verified=");
+    out_append_u32(info.verified);
+    out_append(", unsupported=");
+    out_append_u32(info.unsupported);
+    out_append("\n  last=");
+    out_append(info.last_name);
+    out_append(", type=");
+    out_append(lss_type_name(info.last_type));
+    out_append(", size=");
+    out_append_u32(info.last_size);
+    out_append(", err=");
+    out_append_i32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_lss_file(const char* file_arg, int run_it)
+{
+    char drv;
+    char path[64];
+    resolve_path(file_arg, &drv, path, sizeof(path));
+    (void)drv;
+    if (!path[0]) {
+        out_append(run_it ? "Usage: shrine run [drive:]file.shrine\n" : "Usage: shrine verify [drive:]file.shrine\n");
+        return;
+    }
+    lss_info_t info;
+    int r;
+    if (run_it) {
+        syscall_clear_output();
+        r = lss_run(path);
+    } else {
+        r = lss_probe(path, &info);
+    }
+    if (r != 0) {
+        out_append(run_it ? "shrine run failed: " : "shrine verify failed: ");
+        out_append_i32(r);
+        out_append("\n");
+        return;
+    }
+    lss_info(&info);
+    out_append(run_it ? "shrine run ok: " : "shrine verify ok: ");
+    out_append(path);
+    out_append(" type=");
+    out_append(lss_type_name(info.last_type));
+    out_append(" size=");
+    out_append_u32(info.last_size);
+    out_append("\n");
+    if (run_it) {
+        const char* text = syscall_get_output();
+        if (text && text[0]) {
+            out_append(text);
+            uint32_t i = 0;
+            while (text[i]) i++;
+            if (i == 0 || text[i - 1] != '\n') {
+                out_append("\n");
+            }
+        }
+    }
+}
+
+static void cmd_lss(const char* args)
+{
+    char sub[16];
+    const char* p = args;
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_lss_status();
+        return;
+    }
+    if (strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0) {
+        uint32_t count = 0;
+        out_append("Shrine files\n");
+        fs_list(lss_list_cb, &count);
+        if (count == 0) out_append("  none\n");
+        return;
+    }
+    if (strcmp(sub, "verify") == 0 || strcmp(sub, "probe") == 0) {
+        cmd_lss_file(p, 0);
+        return;
+    }
+    if (strcmp(sub, "run") == 0 || strcmp(sub, "exec") == 0) {
+        cmd_lss_file(p, 1);
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lss_selftest() == 0 ? "shrine: selftest ok\n" : "shrine: selftest failed\n");
+        return;
+    }
+    out_append("Usage: shrine status|list|info|verify|run|test [file.shrine]\n");
+}
+
 #define BOSL_MAGIC 0x4C534F42u  /* "BOSL" LE */
 
 static void cmd_bosl(const char* args)
@@ -6317,6 +6464,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "buddy") == 0 || strcmp(cmd, "assistant") == 0 || strcmp(cmd, "lardbuddy") == 0) { cmd_buddy(args); return; }
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
     if (strcmp(cmd, "vm") == 0 || strcmp(cmd, "vms") == 0) { cmd_vm(args); return; }
+    if (strcmp(cmd, "lss") == 0 || strcmp(cmd, "shrine") == 0 || strcmp(cmd, "srine") == 0) { cmd_lss(args); return; }
     if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
     if (strcmp(cmd, "netwatch") == 0) { cmd_netwatch(args); return; }
     if (strcmp(cmd, "journal") == 0) { cmd_journal(args); return; }
@@ -6416,6 +6564,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'e' && cmd[1] == 'x' && cmd[2] == 'i' && cmd[3] == 't' && cmd[4] == 's' && cmd[5] == 'a' && cmd[6] == 'n' && cmd[7] == 'd' && cmd[8] == 'b' && cmd[9] == 'o' && cmd[10] == 'x' && cmd[11] == '\0') { cmd_exitsandbox(args); return; }
     if (cmd[0] == 'a' && cmd[1] == 's' && cmd[2] == 'm' && cmd[3] == '_' && cmd[4] == '\0') { cmd_asm_(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 's' && cmd[4] == 'h' && cmd[5] == '\0') { cmd_larsh(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == '\0') { cmd_lss(args); return; }
     if (cmd[0] == 'v' && cmd[1] == 'm' && cmd[2] == '\0') { cmd_vm(args); return; }
     if (cmd[0] == 'b' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 'l' && cmd[4] == '\0') { cmd_bosl(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == '\0') { cmd_lil(args); return; }

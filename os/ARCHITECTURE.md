@@ -73,6 +73,7 @@ flowchart TB
     LardKit["lardkit user-control suite"]
     BugReplay["bugreplay + trace + journal + recovery tools"]
     LPack["lpack packages"]
+    LSS["lss Shrine subsystem"]
     ScreenCheck["screencheck diagnostics"]
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
@@ -95,6 +96,7 @@ flowchart TB
     Storage --> LardKit
     LardKit --> BugReplay
     Storage --> LPack
+    Storage --> LSS
     Kmain --> POST
     Kmain --> Net
     Net --> OSLink
@@ -116,6 +118,11 @@ for the language runtimes. BOSL, LIL, GASM, Lafillo VM, and OSVM report run
 counts, failures, budget hits, last step count, max step count, and last return
 code. GASM and Lafillo VM use the shared step budgets directly, and BOSL's JIT
 falls back to the budgeted interpreter for branchy programs.
+
+LSS (`kernel/lss.c`) is the Lard Subsystem for Shrine. It validates `.shrine`
+wrappers, tracks runs, failures, verified files, unsupported types, and the
+last wrapper state, then runs type 0 payloads through BOSL. The shell exposes
+this as `shrine`, `lss`, and the typo-friendly alias `srine`.
 
 ## Build
 
@@ -210,6 +217,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Crash log | `os/kernel/crashlog.c`, `os/include/crashlog.h` |
 | User-control suite | `os/kernel/lardkit.c`, `os/include/lardkit.h` |
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
+| Shrine subsystem | `os/kernel/lss.c`, `os/include/lss.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
 | Extended GUI shell | `os/kernel/exgui.c`, `os/include/exgui.h` |
 | Sketch split GUI shell | `os/kernel/exexgui.c`, `os/include/exexgui.h` |

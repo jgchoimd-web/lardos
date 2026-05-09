@@ -15,6 +15,8 @@
 - `mode [status|probe|real|guard]` - inspect or run the controlled real16/long64 bridge.
 - `vm status|limits|selftest|clear` - inspect VM Monitor counters and budgets
   for BOSL, LIL, GASM, Lafillo VM, and OSVM.
+- `shrine status|list|info|verify|run|test [file.shrine]` / `lss ...` -
+  inspect and run LSS Shrine subsystem wrappers. `srine` is accepted too.
 - `gasm file.gasm` - run an in-tree GASM source file from LSH.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.

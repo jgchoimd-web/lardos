@@ -20,6 +20,7 @@
 #include "lassist.h"
 #include "lpack.h"
 #include "lsh.h"
+#include "lss.h"
 #include "lvcs.h"
 #include "mem.h"
 #include "oslink.h"
@@ -111,6 +112,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: lardtime guide", fs_open("lardtime_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: releases", fs_open("releases.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: features.lil", fs_open("features.lil") != NULL, emit, user, &pass, &fail);
+    post_check("fs: hello.shrine", fs_open("hello.shrine") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.lguilib", fs_open("default.lguilib") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.ltheme", fs_open("default.ltheme") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
@@ -141,6 +143,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("version: suffix policy", post_version_suffix_known(), emit, user, &pass, &fail);
     post_check("time: lardos time calendar", lardtime_selftest() == 0, emit, user, &pass, &fail);
     post_check("vm: monitor budgets", vmmon_selftest() == 0, emit, user, &pass, &fail);
+    post_check("shrine: subsystem wrapper", lss_selftest() == 0, emit, user, &pass, &fail);
     post_check("pci: rtl8139 option", pci_find_device(0x10ECu, 0x8139u, &pci_addr) == 0, emit, user, &pass, &fail);
     post_check("pci: piix3 ide option", pci_find_device(0x8086u, 0x7010u, &pci_addr) == 0, emit, user, &pass, &fail);
 

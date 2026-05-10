@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.55.0a-ami/lardos-v1.55.0a-ami.iso`. To publish the whole hardware
+`release/v1.56.0a-ami/lardos-v1.56.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -109,8 +109,9 @@ commands:
 - `magic dryrun command [args]` shows the same prediction without executing it.
 - `magic dryrun -f command [args]` previews a forced raw-control prediction
   without running it.
-- `bye` syncs RAM files and requests a user-owned poweroff; `restart` / `reboot`
-  sync RAM files and request a user-owned firmware/VM restart.
+- `bye` / `byebye` sync RAM files and request a user-owned poweroff;
+  `restart` / `reboot` sync RAM files and request a user-owned firmware/VM
+  restart.
 - `mode [status|probe|real]` inspects the CPU mode bridge or runs a controlled
   real-mode window that returns to 64-bit long mode.
 - `mode guard` performs the real-mode roundtrip with a before/after guard and
@@ -224,6 +225,8 @@ commands:
 - `v1.55.0a` officially adds `restart` / `reboot` as explicit user-owned
   restart commands with RAM-file sync, trace/journal records, VM/firmware reset
   ports, keyboard-controller reset, and triple-fault fallback.
+- `v1.56.0a` officially adds `byebye` as a friendlier explicit alias for `bye`
+  while keeping it raw-control for Magic unless the user runs `magic -f byebye`.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

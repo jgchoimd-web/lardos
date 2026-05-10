@@ -299,7 +299,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "vcslog", 1 }, { "vcsshow", 1 },
     { "drivers", 1 }, { "fsstat", 1 }, { "fsload", 1 }, { "fssave", 1 }, { "sync", 1 },
     { "sram", 1 }, { "screenram", 1 }, { "screencheck", 1 }, { "scrcheck", 1 }, { "sandbox", 1 }, { "exitsandbox", 1 },
-    { "bye", 0 }, { "poweroff", 0 }, { "shutdown", 0 }, { "restart", 0 }, { "reboot", 0 },
+    { "bye", 0 }, { "byebye", 0 }, { "poweroff", 0 }, { "shutdown", 0 }, { "restart", 0 }, { "reboot", 0 },
     { "sum", 0 }, { "exitsum", 0 }, { "peek", 0 }, { "poke", 0 }, { "asm_", 0 },
 };
 
@@ -1365,7 +1365,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status time date lunar dangun release [policy] ver bye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
@@ -1402,7 +1402,7 @@ static void cmd_help(const char* args)
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
     out_append("  panicroom texture / panic capsule  draw real16 default texture or collect recovery state\n");
     out_append("  crashlog show|clear|test\n");
-    out_append("  bye                 sync RAM files, then request firmware/VM poweroff\n");
+    out_append("  bye|byebye          sync RAM files, then request firmware/VM poweroff\n");
     out_append("  restart|reboot      sync RAM files, then request firmware/VM restart\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, sync persists them.\n");
@@ -1428,6 +1428,7 @@ static void cmd_control(const char* args)
     out_append("  values              reread the LardOS user-law values\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  magic -f bye        force an explicit raw-control prediction\n");
+    out_append("  magic -f byebye     force the friendlier poweroff alias explicitly\n");
     out_append("  magic -f restart    force an explicit raw-control restart prediction\n");
     out_append("  magic dryrun statsu show what magic would execute without running it\n");
     out_append("  magic dryrun -f bye show a forced raw-control prediction without running it\n");
@@ -1479,7 +1480,7 @@ static void cmd_control(const char* args)
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
     out_append("  lcnt info           inspect syscall-cap containers\n");
-    out_append("  bye                 explicit user-owned poweroff request\n");
+    out_append("  bye/byebye          explicit user-owned poweroff request\n");
     out_append("  restart             explicit user-owned restart request\n");
     out_append("  sum                 enter full-control ring-0 mode\n");
     out_append("  peek 0xb8000 32     read raw memory in SUM\n");
@@ -1534,15 +1535,18 @@ static __attribute__((noreturn)) void lsh_try_reboot_triple_fault(void)
     lsh_halt_forever();
 }
 
-static __attribute__((noreturn)) void cmd_bye(const char* args)
+static __attribute__((noreturn)) void cmd_poweroff_named(const char* label)
 {
-    (void)args;
-    out_append("bye: syncing RAM files before poweroff.\n");
+    out_append(label);
+    out_append(": syncing RAM files before poweroff.\n");
     cmd_fssave("");
-    lardkit_journal_event("power", "bye requested poweroff");
-    lardkit_trace_event("power", "bye", 0);
-    out_append("bye: requesting firmware/VM poweroff now.\n");
-    out_append("bye: if this hardware ignores the request, CPU will halt safely.\n");
+    lardkit_journal_event("power", strcmp(label, "byebye") == 0 ?
+                          "byebye requested poweroff" : "bye requested poweroff");
+    lardkit_trace_event("power", label, 0);
+    out_append(label);
+    out_append(": requesting firmware/VM poweroff now.\n");
+    out_append(label);
+    out_append(": if this hardware ignores the request, CPU will halt safely.\n");
     gui_set_response(s_output);
 
     lsh_try_poweroff_port(0x0604, 0x2000); /* QEMU/ACPI PM1a_CNT */
@@ -1550,6 +1554,18 @@ static __attribute__((noreturn)) void cmd_bye(const char* args)
     lsh_try_poweroff_port(0x4004, 0x3400); /* VirtualBox poweroff */
 
     lsh_halt_forever();
+}
+
+static __attribute__((noreturn)) void cmd_bye(const char* args)
+{
+    (void)args;
+    cmd_poweroff_named("bye");
+}
+
+static __attribute__((noreturn)) void cmd_byebye(const char* args)
+{
+    (void)args;
+    cmd_poweroff_named("byebye");
 }
 
 static __attribute__((noreturn)) void cmd_restart(const char* args)
@@ -6605,6 +6621,9 @@ static void parse_and_run(const char* cmd, const char* args)
         if (strcmp(cmd, "bye") == 0 || strcmp(cmd, "poweroff") == 0 || strcmp(cmd, "shutdown") == 0) {
             cmd_bye(args);
         }
+        if (strcmp(cmd, "byebye") == 0) {
+            cmd_byebye(args);
+        }
         if (strcmp(cmd, "restart") == 0 || strcmp(cmd, "reboot") == 0) {
             cmd_restart(args);
         }
@@ -6634,6 +6653,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lunar") == 0) { cmd_lardtime_mode(args, "lunar"); return; }
     if (strcmp(cmd, "dangun") == 0) { cmd_lardtime_mode(args, "dangun"); return; }
     if (strcmp(cmd, "bye") == 0 || strcmp(cmd, "poweroff") == 0 || strcmp(cmd, "shutdown") == 0) { cmd_bye(args); }
+    if (strcmp(cmd, "byebye") == 0) { cmd_byebye(args); }
     if (strcmp(cmd, "restart") == 0 || strcmp(cmd, "reboot") == 0) { cmd_restart(args); }
     if (strcmp(cmd, "cfgsh") == 0 || strcmp(cmd, "cfg") == 0 || strcmp(cmd, "settings") == 0) { cmd_cfgsh(args); return; }
     if (strcmp(cmd, "exitcfg") == 0) { s_cfgsh_mode = 0; out_append("CFGSH OFF.\n"); return; }

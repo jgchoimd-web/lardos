@@ -78,9 +78,9 @@ static uint32_t glyph_pattern_pixel(uint32_t cp, const char* name, uint16_t x, u
             "KWW.....",
             "KWWW....",
             "KWWWW...",
-            "KWWKKK..",
-            "KWK..KK.",
-            "KK....K."
+            "KWWKK...",
+            "KWK.KK..",
+            "KK..KK.."
         };
         char p = pointer[y][x];
         if (p == 'K') return ink;
@@ -215,12 +215,18 @@ int img_glyph_assign(uint32_t cp, const uint32_t* pixels, uint16_t w, uint16_t h
 int img_glyph_assign_pattern(uint32_t cp, const char* name)
 {
     uint32_t pixels[PIXELS_PER_SLOT];
+    int r;
     for (uint16_t y = 0; y < IMG_GLYPH_SIZE; y++) {
         for (uint16_t x = 0; x < IMG_GLYPH_SIZE; x++) {
             pixels[y * IMG_GLYPH_SIZE + x] = glyph_pattern_pixel(cp, name, x, y);
         }
     }
-    return img_glyph_assign_named(cp, pixels, IMG_GLYPH_SIZE, IMG_GLYPH_SIZE, name ? name : "pattern");
+    r = img_glyph_assign_named(cp, pixels, IMG_GLYPH_SIZE, IMG_GLYPH_SIZE, name ? name : "pattern");
+    if (r == 0 && name && strcmp(name, "mouse") == 0) {
+        int idx = slot_index(cp);
+        if (idx >= 0) s_info[idx].live = 0;
+    }
+    return r;
 }
 
 int img_glyph_ensure_mouse_cursor(void)

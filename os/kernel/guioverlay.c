@@ -210,11 +210,14 @@ static void draw_fields(const guioverlay_state_t* s)
     uint32_t tb_x = s->win_x + 16u;
     uint32_t tb_y = content_y + 118u;
     uint32_t tb_w = 260u;
+    uint32_t tb_h = 24u;
     uint32_t view_x = s->win_x + 16u;
-    uint32_t view_y = s->win_y + 180u;
+    uint32_t view_y = tb_y + tb_h + 28u;
     uint32_t view_w = s->win_w > 32u ? s->win_w - 32u : 0u;
-    uint32_t view_h = s->win_h > 190u ? s->win_h - 190u : 0u;
-    frame(tb_x, tb_y, tb_w, 24u, s->textbox_focused ? th->tab_accent : th->output_frame);
+    uint32_t bottom = s->win_y + s->win_h;
+    uint32_t view_h = bottom > view_y + 12u ? bottom - view_y - 12u : 64u;
+    if (view_h < 64u) view_h = 64u;
+    frame(tb_x, tb_y, tb_w, tb_h, s->textbox_focused ? th->tab_accent : th->output_frame);
     if (view_w > 4u && view_h > 4u) {
         frame(view_x - 2u, view_y - 2u, view_w + 4u, view_h + 4u, th->output_frame);
         fill(view_x - 2u, view_y - 2u, view_w + 4u, 2u, th->tab_accent);

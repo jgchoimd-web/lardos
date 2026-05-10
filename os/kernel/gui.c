@@ -809,14 +809,15 @@ static void gui_draw_cursor_at(int x, int y, uint32_t color)
     uint16_t gw = 0;
     uint16_t gh = 0;
     if (g.cursor_enabled &&
-        img_glyph_render(g.cursor_cp, g.glyph_tick, 1, g.cursor_render_pixels, &gw, &gh)) {
-        int cw = (int)gw * 2;
-        int ch = (int)gh * 2;
+        img_glyph_render(g.cursor_cp, g.glyph_tick, 0, g.cursor_render_pixels, &gw, &gh)) {
+        uint16_t scale = 3;
+        int cw = (int)gw * (int)scale;
+        int ch = (int)gh * (int)scale;
         if (x < 0) x = 0;
         if (y < 0) y = 0;
         if (x > (int)g_fb.w - cw) x = (int)g_fb.w - cw;
         if (y > (int)g_fb.h - ch) y = (int)g_fb.h - ch;
-        fb_draw_image_scaled(tgt, x, y, g.cursor_render_pixels, gw, gh, 2);
+        fb_draw_image_scaled(tgt, x, y, g.cursor_render_pixels, gw, gh, scale);
         g.cursor_render_count++;
         g.cursor_last_error = 0;
         return;
@@ -2344,10 +2345,18 @@ void gui_render(void)
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
     fb_fill_rect(tgt, (uint16_t)(sb_x + sb_w - 1), (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
 
+    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, 1, sb_bd);
+    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)(sb_y + sb_h - 1), (uint16_t)sb_w, 1, sb_bd);
+
+    int max_scroll;
     int thumb_h;
     int thumb_y;
-    gui_scrollbar_metrics(sb_y, sb_h, rows, NULL, &thumb_y, &thumb_h);
-    fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)thumb_y, (uint16_t)(sb_w - 2), (uint16_t)thumb_h, sb_th);
+    gui_scrollbar_metrics(sb_y, sb_h, rows, &max_scroll, &thumb_y, &thumb_h);
+    if (max_scroll > 0) {
+        fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)thumb_y, (uint16_t)(sb_w - 2), (uint16_t)thumb_h, sb_th);
+    } else if (sb_h > 6) {
+        fb_fill_rect(tgt, (uint16_t)(sb_x + 4), (uint16_t)(sb_y + 3), 2, (uint16_t)(sb_h - 6), 0xFF263238u);
+    }
 
     guioverlay_state_t overlay = {
         (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h,

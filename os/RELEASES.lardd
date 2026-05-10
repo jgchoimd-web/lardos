@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.52.3p
+ITEM Hotpatch for the remaining GUI boxed areas reported after v1.52.2p.
+ITEM Aligns the GUI overlay output frame with the real response view so the accent line no longer crosses the input field.
+ITEM Renders the Unicode cursor without hover-border effects, scales it larger for pointer readability, and seeds the default U+E004 mouse glyph as a stable non-live cursor.
+ITEM Hides the bright scrollbar thumb when there is no scrollable overflow and keeps a quiet rail, while preserving proportional thumbs for longer output.
+ITEM Keeps the user-owned cursor and picture Unicode editing path intact.
+ITEM Build, ISO structure checks, and QEMU GUI smoke tests were rerun for hotpatch readiness.
+
 SECTION v1.52.2p
 ITEM Hotpatch for GUI mouse and response-scroll regressions after the v1.52.1p polish release.
 ITEM Keeps the user-owned U+E004 cursor picture path but removes the doubled cursor draw so the glyph appears as one clean pointer.

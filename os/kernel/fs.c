@@ -272,6 +272,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.52.0a officially promotes the LardOS value statement and values command.\n"
     "li v1.52.1p hotpatches the Unicode cursor art and input/output text spacing.\n"
     "li v1.52.2p hotpatches mouse wheel scrolling and visible scrollbar ratios.\n"
+    "li v1.52.3p aligns GUI overlay frames, cleans the Unicode cursor, and quiets non-overflow scrollbars.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

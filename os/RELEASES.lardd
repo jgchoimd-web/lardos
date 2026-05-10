@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.52.5p
+ITEM Hotpatch for scrollbar visibility after v1.52.4p.
+ITEM The response pane now always draws a recognizable scrollbar: outer frame, top and bottom arrow caps, track, and thumb.
+ITEM No-overflow output still shows a full disabled thumb so users can see that the scrollbar exists even when there is nothing to scroll.
+ITEM Scrollable output continues to use a proportional thumb and the drag hit-test now matches the visible track between the arrow caps.
+ITEM Keeps the cursor edge hotpatch and user-owned Unicode cursor path intact.
+ITEM Build, ISO structure checks, and QEMU GUI smoke tests were rerun for hotpatch readiness.
+
 SECTION v1.52.4p
 ITEM Hotpatch for the remaining edge GUI issues reported after v1.52.3p.
 ITEM Lets the Unicode cursor hotspot reach the bottom and right edge while the cursor art clips past the screen like a normal desktop pointer.

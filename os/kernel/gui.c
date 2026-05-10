@@ -938,6 +938,30 @@ static void gui_scrollbar_metrics(int sb_y, int sb_h, int rows,
     if (out_thumb_h) *out_thumb_h = thumb_h;
 }
 
+static void gui_scrollbar_track_rect(int sb_y, int sb_h, int* out_y, int* out_h)
+{
+    int cap = sb_h >= 36 ? 12 : 0;
+    int y = sb_y + cap;
+    int h = sb_h - cap * 2;
+    if (h < 8) {
+        y = sb_y;
+        h = sb_h;
+    }
+    if (out_y) *out_y = y;
+    if (out_h) *out_h = h;
+}
+
+static void gui_draw_scroll_arrow(const fb_t* tgt, int cx, int cy, int dir, uint32_t color)
+{
+    for (int i = 0; i < 4; i++) {
+        int y = cy + (dir > 0 ? i : -i);
+        int x = cx - i;
+        int w = i * 2 + 1;
+        if (x < 0 || y < 0) continue;
+        fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)w, 1, color);
+    }
+}
+
 static void gui_glyph_hits_begin(void)
 {
     g.glyph_hit_count = 0;
@@ -1603,10 +1627,12 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         int view_y;
         int view_w;
         int view_h;
-        int sb_w = 10;
+        int sb_w = 12;
         int sb_x;
         int sb_y;
         int sb_h;
+        int track_y;
+        int track_h;
         int rows;
         int max_scroll;
         int thumb_y;
@@ -1615,22 +1641,33 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         sb_x = view_x + view_w - sb_w;
         sb_y = view_y;
         sb_h = view_h;
+        gui_scrollbar_track_rect(sb_y, sb_h, &track_y, &track_h);
         rows = gui_rows_for_view_h(view_h);
-        gui_scrollbar_metrics(sb_y, sb_h, rows, &max_scroll, &thumb_y, &thumb_h);
+        gui_scrollbar_metrics(track_y, track_h, rows, &max_scroll, &thumb_y, &thumb_h);
         if (l_pressed && in_rect(g.mx, g.my, sb_x, sb_y, sb_w, sb_h)) {
-            g.scroll_drag = 1;
-            if (in_rect(g.mx, g.my, sb_x, thumb_y, sb_w, thumb_h)) {
-                g.scroll_drag_off_y = g.my - thumb_y;
-            } else {
-                g.scroll_drag_off_y = thumb_h / 2;
+            if (max_scroll > 0) {
+                if (g.my < track_y) {
+                    if (g.resp_scroll > 0) g.resp_scroll--;
+                    gui_clamp_scroll_for_rows(rows);
+                } else if (g.my >= track_y + track_h) {
+                    g.resp_scroll++;
+                    gui_clamp_scroll_for_rows(rows);
+                } else {
+                    g.scroll_drag = 1;
+                    if (in_rect(g.mx, g.my, sb_x, thumb_y, sb_w, thumb_h)) {
+                        g.scroll_drag_off_y = g.my - thumb_y;
+                    } else {
+                        g.scroll_drag_off_y = thumb_h / 2;
+                    }
+                }
             }
         }
         if (l_released) {
             g.scroll_drag = 0;
         }
         if (g.scroll_drag && max_scroll > 0) {
-            int travel = sb_h - thumb_h;
-            int y = g.my - sb_y - g.scroll_drag_off_y;
+            int travel = track_h - thumb_h;
+            int y = g.my - track_y - g.scroll_drag_off_y;
             if (y < 0) y = 0;
             if (y > travel) y = travel;
             // Map y->scroll line
@@ -2326,31 +2363,52 @@ void gui_render(void)
     gui_clamp_scroll_for_rows(rows);
 
     // Scrollbar
-    int sb_w = 10;
+    int sb_w = 12;
     int sb_x = view_x + view_w - sb_w;
     int sb_y = view_y;
     int sb_h = view_h;
-    uint32_t sb_bg = 0xFF172127;
-    uint32_t sb_bd = 0xFF7D94A0;
+    int track_y;
+    int track_h;
+    uint32_t sb_bg = 0xFF0E171C;
+    uint32_t sb_track = 0xFF22323A;
+    uint32_t sb_bd = 0xFFB4CFD6;
     uint32_t sb_th = 0xFF8FF3EA;
-    uint32_t sb_disabled = 0xFF4A6570;
+    uint32_t sb_disabled = 0xFF6E8790;
+    uint32_t sb_arrow = 0xFFE0FFFF;
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, (uint16_t)sb_h, sb_bg);
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
     fb_fill_rect(tgt, (uint16_t)(sb_x + sb_w - 1), (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
 
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, 1, sb_bd);
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)(sb_y + sb_h - 1), (uint16_t)sb_w, 1, sb_bd);
+    gui_scrollbar_track_rect(sb_y, sb_h, &track_y, &track_h);
+    if (track_y > sb_y) {
+        fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)(sb_y + 1), (uint16_t)(sb_w - 2), (uint16_t)(track_y - sb_y - 1), 0xFF30434Bu);
+        fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)(track_y + track_h), (uint16_t)(sb_w - 2), (uint16_t)(sb_y + sb_h - track_y - track_h - 1), 0xFF30434Bu);
+        gui_draw_scroll_arrow(tgt, sb_x + sb_w / 2, sb_y + 8, -1, sb_arrow);
+        gui_draw_scroll_arrow(tgt, sb_x + sb_w / 2, sb_y + sb_h - 9, 1, sb_arrow);
+    }
+    fb_fill_rect(tgt, (uint16_t)(sb_x + 2), (uint16_t)track_y, (uint16_t)(sb_w - 4), (uint16_t)track_h, sb_track);
 
     int max_scroll;
     int thumb_h;
     int thumb_y;
-    gui_scrollbar_metrics(sb_y, sb_h, rows, &max_scroll, &thumb_y, &thumb_h);
+    gui_scrollbar_metrics(track_y, track_h, rows, &max_scroll, &thumb_y, &thumb_h);
     if (max_scroll > 0) {
         fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)thumb_y, (uint16_t)(sb_w - 2), (uint16_t)thumb_h, sb_th);
+        if (thumb_h > 18) {
+            int gy = thumb_y + thumb_h / 2 - 3;
+            fb_fill_rect(tgt, (uint16_t)(sb_x + 3), (uint16_t)gy, (uint16_t)(sb_w - 6), 1, 0xFF1E6D70u);
+            fb_fill_rect(tgt, (uint16_t)(sb_x + 3), (uint16_t)(gy + 3), (uint16_t)(sb_w - 6), 1, 0xFF1E6D70u);
+        }
     } else if (sb_h > 6) {
-        fb_fill_rect(tgt, (uint16_t)(sb_x + 2), (uint16_t)(sb_y + 2), (uint16_t)(sb_w - 4), (uint16_t)(sb_h - 4), sb_disabled);
-        if (sb_h > 22) {
-            fb_fill_rect(tgt, (uint16_t)(sb_x + 4), (uint16_t)(sb_y + sb_h / 2 - 8), 2, 16, 0xFF8DB8B5u);
+        int disabled_y = track_y + 2;
+        int disabled_h = track_h > 4 ? track_h - 4 : track_h;
+        fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)disabled_y, (uint16_t)(sb_w - 2), (uint16_t)disabled_h, sb_disabled);
+        if (disabled_h > 20) {
+            int gy = disabled_y + disabled_h / 2 - 4;
+            fb_fill_rect(tgt, (uint16_t)(sb_x + 3), (uint16_t)gy, (uint16_t)(sb_w - 6), 1, 0xFF263A40u);
+            fb_fill_rect(tgt, (uint16_t)(sb_x + 3), (uint16_t)(gy + 4), (uint16_t)(sb_w - 6), 1, 0xFF263A40u);
         }
     }
 

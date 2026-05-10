@@ -362,7 +362,7 @@ static const magic_cmd_entry_t* magic_find_exact(const char* cmd)
     return NULL;
 }
 
-static const magic_cmd_entry_t* magic_predict(const char* cmd)
+static const magic_cmd_entry_t* magic_predict(const char* cmd, int include_raw)
 {
     const magic_cmd_entry_t* best = NULL;
     uint32_t best_score = 999u;
@@ -372,7 +372,7 @@ static const magic_cmd_entry_t* magic_predict(const char* cmd)
     if (!cmd || !cmd[0]) return NULL;
     for (uint32_t i = 0; i < count; i++) {
         const magic_cmd_entry_t* c = &s_magic_cmds[i];
-        if (!c->magic_safe) continue;
+        if (!include_raw && !c->magic_safe) continue;
         uint32_t name_len = magic_strlen(c->name);
         uint32_t score = magic_edit_distance(cmd, c->name);
         if (cmd_len >= 2u && name_len >= cmd_len) {
@@ -400,6 +400,7 @@ static void cmd_magic(const char* args)
 {
     char cmd[64];
     char rest[192];
+    int force = 0;
     uint32_t i = 0;
     uint32_t ci = 0;
     uint32_t ri = 0;
@@ -408,8 +409,33 @@ static void cmd_magic(const char* args)
     cmd[ci] = '\0';
     while (args[i] && ri + 1u < sizeof(rest)) rest[ri++] = args[i++];
     rest[ri] = '\0';
+    if (magic_cmd_equals(cmd, "-f") || magic_cmd_equals(cmd, "--force")) {
+        char next[64];
+        char tail[192];
+        uint32_t rp = 0;
+        uint32_t ni = 0;
+        uint32_t ti = 0;
+        force = 1;
+        while (rest[rp] == ' ' || rest[rp] == '\t') rp++;
+        while (rest[rp] && rest[rp] != ' ' && rest[rp] != '\t' && ni + 1u < sizeof(next)) next[ni++] = rest[rp++];
+        next[ni] = '\0';
+        while (rest[rp] && ti + 1u < sizeof(tail)) tail[ti++] = rest[rp++];
+        tail[ti] = '\0';
+        ci = 0;
+        while (next[ci] && ci + 1u < sizeof(cmd)) {
+            cmd[ci] = next[ci];
+            ci++;
+        }
+        cmd[ci] = '\0';
+        ri = 0;
+        while (tail[ri] && ri + 1u < sizeof(rest)) {
+            rest[ri] = tail[ri];
+            ri++;
+        }
+        rest[ri] = '\0';
+    }
     if (!cmd[0]) {
-        out_append("Usage: magic command [args] | magic explain\n");
+        out_append("Usage: magic [-f] command [args] | magic explain\n");
         return;
     }
     if (magic_cmd_equals(cmd, "explain")) {
@@ -433,25 +459,41 @@ static void cmd_magic(const char* args)
     }
     if (magic_cmd_equals(cmd, "dryrun")) {
         char dry[64];
+        char dry_tail[192];
+        int dry_force = force;
         uint32_t di = 0;
         uint32_t rp = 0;
+        uint32_t ti = 0;
         while (rest[rp] == ' ' || rest[rp] == '\t') rp++;
         while (rest[rp] && rest[rp] != ' ' && rest[rp] != '\t' && di + 1u < sizeof(dry)) dry[di++] = rest[rp++];
         dry[di] = '\0';
+        while (rest[rp] && ti + 1u < sizeof(dry_tail)) dry_tail[ti++] = rest[rp++];
+        dry_tail[ti] = '\0';
+        if (magic_cmd_equals(dry, "-f") || magic_cmd_equals(dry, "--force")) {
+            dry_force = 1;
+            rp = 0;
+            di = 0;
+            while (dry_tail[rp] == ' ' || dry_tail[rp] == '\t') rp++;
+            while (dry_tail[rp] && dry_tail[rp] != ' ' && dry_tail[rp] != '\t' && di + 1u < sizeof(dry)) dry[di++] = dry_tail[rp++];
+            dry[di] = '\0';
+        }
         if (!dry[0]) {
-            out_append("Usage: magic dryrun command [args]\n");
+            out_append("Usage: magic dryrun [-f] command [args]\n");
             return;
         }
         const magic_cmd_entry_t* exact_dry = magic_find_exact(dry);
-        const magic_cmd_entry_t* pick_dry = exact_dry ? exact_dry : magic_predict(dry);
-        if (!pick_dry || !pick_dry->magic_safe) {
-            lardkit_magic_record(dry, pick_dry ? pick_dry->name : "", 0, "dryrun found no safe executable prediction");
+        const magic_cmd_entry_t* pick_dry = exact_dry ? exact_dry : magic_predict(dry, dry_force);
+        if (!pick_dry || (!pick_dry->magic_safe && !dry_force)) {
+            lardkit_magic_record(dry, pick_dry ? pick_dry->name : "", 0,
+                                 pick_dry ? "dryrun found raw-control; add -f to force" : "dryrun found no safe executable prediction");
             out_append("magic dryrun: would not execute ");
             out_append(dry);
+            if (pick_dry && !pick_dry->magic_safe) out_append(" (raw-control; add -f)");
             out_append("\n");
             return;
         }
         lardkit_magic_record(dry, pick_dry->name, 0,
+                             !pick_dry->magic_safe ? "dryrun force raw-control override" :
                              exact_dry ? "dryrun exact safe command" : "dryrun edit-distance safe command prediction");
         out_append("magic dryrun: ");
         out_append(dry);
@@ -459,11 +501,11 @@ static void cmd_magic(const char* args)
             out_append(" -> ");
             out_append(pick_dry->name);
         }
-        out_append(" (not executed)\n");
+        out_append(dry_force && !pick_dry->magic_safe ? " (force; not executed)\n" : " (not executed)\n");
         return;
     }
     const magic_cmd_entry_t* exact = magic_find_exact(cmd);
-    const magic_cmd_entry_t* pick = exact ? exact : magic_predict(cmd);
+    const magic_cmd_entry_t* pick = exact ? exact : magic_predict(cmd, force);
     if (!pick) {
         lardkit_magic_record(cmd, "", 0, "no confident safe command match");
         out_append("magic: no confident command match for ");
@@ -471,21 +513,25 @@ static void cmd_magic(const char* args)
         out_append("\n");
         return;
     }
-    if (!pick->magic_safe) {
+    if (!pick->magic_safe && !force) {
         lardkit_magic_record(cmd, pick->name, 0, "matched raw-control command; explicit run required");
         out_append("magic: ");
         out_append(pick->name);
-        out_append(" is raw-control; run it explicitly.\n");
+        out_append(" is raw-control; use magic -f ");
+        out_append(pick->name);
+        out_append(" to force.\n");
         return;
     }
-    out_append("magic: ");
+    out_append(force ? "magic -f: " : "magic: ");
     out_append(cmd);
     if (!magic_cmd_equals(cmd, pick->name)) {
         out_append(" -> ");
         out_append(pick->name);
     }
+    if (force && !pick->magic_safe) out_append(" (raw-control forced)");
     out_append("\n");
     lardkit_magic_record(cmd, pick->name, 1,
+                         force && !pick->magic_safe ? "force raw-control explicit user override" :
                          exact ? "exact safe command" : "edit-distance safe command prediction");
     s_magic_depth++;
     parse_and_run(pick->name, rest);
@@ -1380,7 +1426,9 @@ static void cmd_control(const char* args)
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  values              reread the LardOS user-law values\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
+    out_append("  magic -f bye        force an explicit raw-control prediction\n");
     out_append("  magic dryrun statsu show what magic would execute without running it\n");
+    out_append("  magic dryrun -f bye show a forced raw-control prediction without running it\n");
     out_append("  magic explain       show why magic executed or refused its last prediction\n");
     out_append("  time                show LardOS Time ticks, 5-digit CE year, Dangun year, and lunar view\n");
     out_append("  mode guard          guarded real16 <-> long64 roundtrip with restore check\n");

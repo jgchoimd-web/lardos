@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.53.0a-ami/lardos-v1.53.0a-ami.iso`. To publish the whole hardware
+`release/v1.54.0a-ami/lardos-v1.54.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -104,7 +104,11 @@ commands:
   from the boot option. `post baseline` opens the saved POST baseline report.
 - `magic command [args]` predicts a mistyped safe built-in command and executes
   the predicted command directly, for example `magic statsu`.
+- `magic -f command [args]` force-runs a prediction even when it is
+  raw-control. Plain `magic bye` is still refused; `magic -f bye` is explicit.
 - `magic dryrun command [args]` shows the same prediction without executing it.
+- `magic dryrun -f command [args]` previews a forced raw-control prediction
+  without running it.
 - `mode [status|probe|real]` inspects the CPU mode bridge or runs a controlled
   real-mode window that returns to 64-bit long mode.
 - `mode guard` performs the real-mode roundtrip with a before/after guard and
@@ -212,6 +216,9 @@ commands:
 - `v1.53.0a` officially adds the `bye` command for user-requested poweroff.
   It syncs RAM files, records trace/journal intent, tries native VM/firmware
   poweroff ports, and falls back to a safe CPU halt if hardware ignores them.
+- `v1.54.0a` officially adds `magic -f`, an explicit override that lets the
+  user force Magic to execute raw-control predictions while preserving dryrun
+  and explain audit records.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

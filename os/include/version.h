@@ -1,6 +1,6 @@
 #pragma once
 
-#define LARDOS_VERSION "v1.53.0a"
+#define LARDOS_VERSION "v1.54.0a"
 
 #ifndef LARDOS_HARDWARE_PROFILE
 #define LARDOS_HARDWARE_PROFILE "universal"

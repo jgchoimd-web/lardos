@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.52.2p
+ITEM Hotpatch for GUI mouse and response-scroll regressions after the v1.52.1p polish release.
+ITEM Keeps the user-owned U+E004 cursor picture path but removes the doubled cursor draw so the glyph appears as one clean pointer.
+ITEM Enables PS/2 IntelliMouse 4-byte packets and routes the wheel into response/output pane scrolling.
+ITEM Uses one shared response-view rectangle for rendering, focus, wheel, and scrollbar hit-testing so visible controls and mouse behavior line up.
+ITEM Computes scrollbar thumb length and position from visible rows versus total response lines, matching the actual scroll ratio.
+ITEM Build, ISO structure checks, and QEMU screen smoke tests were rerun for hotpatch readiness.
+
 SECTION v1.52.1p
 ITEM Hotpatch for two small GUI polish regressions after the v1.52.0a official release.
 ITEM Replaces the default U+E004 mouse Unicode picture with a clearer pointer-shaped cursor while keeping the slot user-owned and editable.

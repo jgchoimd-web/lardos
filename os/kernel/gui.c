@@ -816,7 +816,6 @@ static void gui_draw_cursor_at(int x, int y, uint32_t color)
         if (y < 0) y = 0;
         if (x > (int)g_fb.w - cw) x = (int)g_fb.w - cw;
         if (y > (int)g_fb.h - ch) y = (int)g_fb.h - ch;
-        fb_draw_image_scaled(tgt, x + 1, y + 1, g.cursor_render_pixels, gw, gh, 2);
         fb_draw_image_scaled(tgt, x, y, g.cursor_render_pixels, gw, gh, 2);
         g.cursor_render_count++;
         g.cursor_last_error = 0;
@@ -885,6 +884,65 @@ int gui_unicode_cursor_selftest(void)
 static int in_rect(int x, int y, int rx, int ry, int rw, int rh)
 {
     return x >= rx && y >= ry && x < (rx + rw) && y < (ry + rh);
+}
+
+static void gui_view_rect(int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    int content_y = g.win_y + 44;
+    int tb_y = content_y + 118;
+    int tb_h = 24;
+    int view_y = tb_y + tb_h + 28;
+    int view_h = (g.win_y + g.win_h) - view_y - 12;
+    if (view_h < 64) view_h = 64;
+    if (out_x) *out_x = g.win_x + 16;
+    if (out_y) *out_y = view_y;
+    if (out_w) *out_w = g.win_w - 32;
+    if (out_h) *out_h = view_h;
+}
+
+static int gui_rows_for_view_h(int view_h)
+{
+    int rows = view_h / 10;
+    return rows < 4 ? 4 : rows;
+}
+
+static int gui_max_scroll_for_rows(int rows)
+{
+    int max_scroll = g.resp_total_lines - rows;
+    return max_scroll > 0 ? max_scroll : 0;
+}
+
+static void gui_clamp_scroll_for_rows(int rows)
+{
+    int max_scroll = gui_max_scroll_for_rows(rows);
+    if (g.resp_scroll < 0) g.resp_scroll = 0;
+    if (g.resp_scroll > max_scroll) g.resp_scroll = max_scroll;
+}
+
+static void gui_scrollbar_metrics(int sb_y, int sb_h, int rows,
+                                  int* out_max_scroll, int* out_thumb_y, int* out_thumb_h)
+{
+    int total = g.resp_total_lines;
+    int max_scroll;
+    int thumb_h;
+    int thumb_y = sb_y;
+    if (total < 1) total = 1;
+    if (rows < 1) rows = 1;
+    if (total < rows) total = rows;
+
+    max_scroll = gui_max_scroll_for_rows(rows);
+    gui_clamp_scroll_for_rows(rows);
+
+    thumb_h = (sb_h * rows) / total;
+    if (thumb_h < 12) thumb_h = 12;
+    if (thumb_h > sb_h) thumb_h = sb_h;
+    if (max_scroll > 0 && sb_h > thumb_h) {
+        thumb_y = sb_y + (g.resp_scroll * (sb_h - thumb_h)) / max_scroll;
+    }
+
+    if (out_max_scroll) *out_max_scroll = max_scroll;
+    if (out_thumb_y) *out_thumb_y = thumb_y;
+    if (out_thumb_h) *out_thumb_h = thumb_h;
 }
 
 static void gui_glyph_hits_begin(void)
@@ -1133,6 +1191,8 @@ void gui_larsh_play(const char* path)
 
 void gui_handle_mouse(int dx, int dy, int buttons)
 {
+    int wheel = (int8_t)((buttons >> PS2_MOUSE_WHEEL_SHIFT) & 0xFF);
+    buttons &= PS2_MOUSE_BUTTON_MASK;
     if (!g_have_fb) return;
     gui_activity();
     if (g.ss_active) {
@@ -1154,6 +1214,17 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int l_prev = (g.prev_buttons & 0x1) != 0;
     int l_pressed = l_down && !l_prev;
     int l_released = !l_down && l_prev;
+
+    if (wheel != 0) {
+        int view_x, view_y, view_w, view_h;
+        int rows;
+        gui_view_rect(&view_x, &view_y, &view_w, &view_h);
+        rows = gui_rows_for_view_h(view_h);
+        if (in_rect(g.mx, g.my, view_x, view_y - 18, view_w, view_h + 18)) {
+            g.resp_scroll -= wheel * 3;
+            gui_clamp_scroll_for_rows(rows);
+        }
+    }
 
     gui_apply_exexgui_layout();
     if (l_pressed && exexgui_is_enabled()) {
@@ -1508,10 +1579,11 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int tb_y = content_y + 118;
     int tb_w = 260;
     int tb_h = 24;
-    int view_x_focus = g.win_x + 16;
-    int view_y_focus = content_y_m + 168;
-    int view_w_focus = g.win_w - 32;
-    int view_h_focus = g.win_h - 190;
+    int view_x_focus;
+    int view_y_focus;
+    int view_w_focus;
+    int view_h_focus;
+    gui_view_rect(&view_x_focus, &view_y_focus, &view_w_focus, &view_h_focus);
     if (l_pressed) {
         if (g.app_id == 9) {
             if (in_rect(g.mx, g.my, tb_x, tb_y, tb_w, tb_h)) {
@@ -1534,28 +1606,43 @@ void gui_handle_mouse(int dx, int dy, int buttons)
 
     // Scrollbar drag in response view (only when textbox not focused)
     if (!g.tb_focused) {
-        int view_x = g.win_x + 16;
-        int view_y = content_y_m + 168;
-        int view_w = g.win_w - 32;
-        int view_h = g.win_h - 190;
+        int view_x;
+        int view_y;
+        int view_w;
+        int view_h;
         int sb_w = 10;
-        int sb_x = view_x + view_w - sb_w;
-        int sb_y = view_y;
-        int sb_h = view_h;
+        int sb_x;
+        int sb_y;
+        int sb_h;
+        int rows;
+        int max_scroll;
+        int thumb_y;
+        int thumb_h;
+        gui_view_rect(&view_x, &view_y, &view_w, &view_h);
+        sb_x = view_x + view_w - sb_w;
+        sb_y = view_y;
+        sb_h = view_h;
+        rows = gui_rows_for_view_h(view_h);
+        gui_scrollbar_metrics(sb_y, sb_h, rows, &max_scroll, &thumb_y, &thumb_h);
         if (l_pressed && in_rect(g.mx, g.my, sb_x, sb_y, sb_w, sb_h)) {
             g.scroll_drag = 1;
-            g.scroll_drag_off_y = g.my - sb_y;
+            if (in_rect(g.mx, g.my, sb_x, thumb_y, sb_w, thumb_h)) {
+                g.scroll_drag_off_y = g.my - thumb_y;
+            } else {
+                g.scroll_drag_off_y = thumb_h / 2;
+            }
         }
         if (l_released) {
             g.scroll_drag = 0;
         }
-        if (g.scroll_drag && g.resp_total_lines > 0) {
-            int max_scroll = g.resp_total_lines > 1 ? (g.resp_total_lines - 1) : 0;
-            int y = g.my - sb_y;
+        if (g.scroll_drag && max_scroll > 0) {
+            int travel = sb_h - thumb_h;
+            int y = g.my - sb_y - g.scroll_drag_off_y;
             if (y < 0) y = 0;
-            if (y > sb_h - 1) y = sb_h - 1;
+            if (y > travel) y = travel;
             // Map y->scroll line
-            g.resp_scroll = (y * max_scroll) / (sb_h - 1);
+            g.resp_scroll = travel > 0 ? (y * max_scroll) / travel : 0;
+            gui_clamp_scroll_for_rows(rows);
         }
     }
 }
@@ -2088,11 +2175,11 @@ void gui_render(void)
                        (uint16_t)((tb_w - 12) / 8), 0xFFFFFFFF, tb_bg);
     fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)(tb_y - 12), input_label, 0xFFFFFFFF, win_bg);
 
-    int view_x = g.win_x + 16;
-    int view_y = tb_y + tb_h + 28;
-    int view_w = g.win_w - 32;
-    int view_h = (g.win_y + g.win_h) - view_y - 12;
-    if (view_h < 64) view_h = 64;
+    int view_x;
+    int view_y;
+    int view_w;
+    int view_h;
+    gui_view_rect(&view_x, &view_y, &view_w, &view_h);
     int view_label_y = view_y - 14;
     if ((g.tb_focused || (g.app_id == 9 && g.lafaelo_focus && !g.lafaelo_show_run)) && g.caret_on) {
         uint16_t cx, cy;
@@ -2130,9 +2217,8 @@ void gui_render(void)
     fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)view_label_y,
                  g.loading ? "Response: Fetching..." : view_label, 0xFFFFFFFF, win_bg);
     int cols = (view_w - 12) / 8; // leave scrollbar space
-    int rows = view_h / 10;
+    int rows = gui_rows_for_view_h(view_h);
     if (cols < 10) cols = 10;
-    if (rows < 4) rows = 4;
 
     uint16_t rx = (uint16_t)view_x;
     uint16_t ry = (uint16_t)view_y;
@@ -2244,9 +2330,7 @@ void gui_render(void)
     }
     g.resp_total_lines = line + 1;
 
-    // Clamp scroll
-    if (g.resp_scroll < 0) g.resp_scroll = 0;
-    if (g.resp_scroll > g.resp_total_lines) g.resp_scroll = g.resp_total_lines;
+    gui_clamp_scroll_for_rows(rows);
 
     // Scrollbar
     int sb_w = 10;
@@ -2260,14 +2344,9 @@ void gui_render(void)
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
     fb_fill_rect(tgt, (uint16_t)(sb_x + sb_w - 1), (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
 
-    int max_scroll = g.resp_total_lines > 1 ? (g.resp_total_lines - 1) : 0;
-    int thumb_h = sb_h / 4;
-    if (thumb_h < 12) thumb_h = 12;
-    if (thumb_h > sb_h) thumb_h = sb_h;
-    int thumb_y = sb_y;
-    if (max_scroll > 0 && sb_h > thumb_h) {
-        thumb_y = sb_y + (g.resp_scroll * (sb_h - thumb_h)) / max_scroll;
-    }
+    int thumb_h;
+    int thumb_y;
+    gui_scrollbar_metrics(sb_y, sb_h, rows, NULL, &thumb_y, &thumb_h);
     fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)thumb_y, (uint16_t)(sb_w - 2), (uint16_t)thumb_h, sb_th);
 
     guioverlay_state_t overlay = {

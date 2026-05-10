@@ -6,6 +6,9 @@ int ps2_init(void);
 int ps2_mouse_init(void);
 int ps2_mouse_poll(int* out_dx, int* out_dy, int* out_buttons);
 
+#define PS2_MOUSE_BUTTON_MASK 0x07
+#define PS2_MOUSE_WHEEL_SHIFT 8
+
 typedef enum {
     PS2K_NONE = 0,
     PS2K_ASCII = 1,

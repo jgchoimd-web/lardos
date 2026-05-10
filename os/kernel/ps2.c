@@ -5,6 +5,8 @@
 #define PS2_STAT 0x64
 #define PS2_CMD  0x64
 
+static int s_mouse_packet_size = 3;
+
 static void cpu_pause(void)
 {
     __asm__ __volatile__("pause");
@@ -127,8 +129,24 @@ int ps2_mouse_init(void)
     }
     flush_out();
 
+    s_mouse_packet_size = 3;
+
     // Set defaults
     if (mouse_write(0xF6) != 0) return -1;
+    /*
+     * Try the IntelliMouse sample-rate knock so VirtualBox/QEMU PS/2 mice
+     * expose a fourth packet byte for the vertical wheel. Fall back to the
+     * plain 3-byte packet path if the mouse does not support it.
+     */
+    if (mouse_write(0xF3) == 0 && mouse_write(200) == 0 &&
+        mouse_write(0xF3) == 0 && mouse_write(100) == 0 &&
+        mouse_write(0xF3) == 0 && mouse_write(80) == 0 &&
+        mouse_write(0xF2) == 0) {
+        uint8_t id = 0;
+        if (read_data(&id) == 0 && (id == 3u || id == 4u)) {
+            s_mouse_packet_size = 4;
+        }
+    }
     // Enable data reporting (streaming)
     if (mouse_write(0xF4) != 0) return -2;
     return 0;
@@ -136,7 +154,7 @@ int ps2_mouse_init(void)
 
 int ps2_mouse_poll(int* out_dx, int* out_dy, int* out_buttons)
 {
-    static uint8_t pkt[3];
+    static uint8_t pkt[4];
     static int idx;
 
     // Need a mouse byte: status bit 0=out full, bit5=aux data
@@ -153,16 +171,25 @@ int ps2_mouse_poll(int* out_dx, int* out_dy, int* out_buttons)
         return 1;
     }
     pkt[idx++] = b;
-    if (idx < 3) return 1;
+    if (idx < s_mouse_packet_size) return 1;
     idx = 0;
 
     int dx = (int8_t)pkt[1];
     int dy = (int8_t)pkt[2];
     int btn = pkt[0] & 0x07;
+    int wheel = 0;
+
+    if (s_mouse_packet_size >= 4) {
+        int z = pkt[3] & 0x0F;
+        if (z & 0x08) z |= ~0x0F;
+        wheel = z;
+        if ((pkt[3] & 0x10) != 0) btn |= 0x08;
+        if ((pkt[3] & 0x20) != 0) btn |= 0x10;
+    }
 
     *out_dx = dx;
     *out_dy = -dy; // screen y grows down
-    *out_buttons = btn;
+    *out_buttons = btn | ((wheel & 0xFF) << PS2_MOUSE_WHEEL_SHIFT);
     return 0;
 }
 

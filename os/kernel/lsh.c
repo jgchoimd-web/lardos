@@ -680,9 +680,14 @@ static void cmd_release(const char* args)
         out_append(" (");
         out_append(lardos_version_channel());
         out_append(")\n");
+        out_append("  hardware: ");
+        out_append(LARDOS_HARDWARE_PROFILE);
+        out_append("\n");
         out_append("  a = official: promoted stable builds after boot, POST, GUI, and media checks.\n");
         out_append("  b = beta-experimental: new or risky feature bundles before promotion.\n");
         out_append("  p = hotpatch: narrow emergency fixes for an existing release line.\n");
+        out_append("  hardware profiles: universal, seabios, ami, vbox, usb, realpc.\n");
+        out_append("  artifact names append the hardware profile, for example vX.Y.Zb-ami.\n");
         out_append("  Do not use a just because a feature was added; choose the channel by risk.\n");
         return;
     }
@@ -1198,6 +1203,8 @@ static void cmd_ver(const char* args)
     out_append(LARDOS_VERSION);
     out_append(" (");
     out_append(lardos_version_channel());
+    out_append(", ");
+    out_append(LARDOS_HARDWARE_PROFILE);
     out_append(")\n");
 }
 
@@ -1362,6 +1369,7 @@ static void cmd_control(const char* args)
     out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
     out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
     out_append("  Release suffix: a=official, b=beta-experimental, p=hotpatch.\n");
+    out_append("  Hardware release profiles: universal, seabios, ami, vbox, usb, realpc.\n");
     out_append("  Do not default to a: risky or broad feature bundles ship as b first.\n");
     out_append("  Each feature addition gets a version bump and releases.lardd entry.\n");
     out_append("\n");
@@ -1444,6 +1452,8 @@ static void cmd_status(const char* args)
     out_append(LARDOS_VERSION);
     out_append(" (");
     out_append(lardos_version_channel());
+    out_append(", ");
+    out_append(LARDOS_HARDWARE_PROFILE);
     out_append(")\n");
     if (lardtime_now(&time_now) == 0) {
         out_append("Time: ");

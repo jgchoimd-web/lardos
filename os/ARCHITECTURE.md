@@ -404,16 +404,25 @@ include assertions, `when`/`unless`, `repeat` with the `it` index, stepped
 Release suffix policy is deliberately small and visible: `a` is official, `b`
 is beta/experimental, and `p` is hotpatch. New feature bundles do not
 automatically get `a`; broad or risky work ships as `b` first, then can be
-promoted once boot media, POST, and user-visible checks are verified.
+promoted once boot media, POST, and user-visible checks are verified. Hardware
+profiles are a second release axis, not a replacement for the suffix:
+`universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc` identify the target
+environment while the base version still says whether the build is official,
+beta, or a hotpatch.
 
 Feature work is released as it lands. A feature release chooses the channel by
 risk, updates the kernel version, records the change in `os/RELEASES.lardd`,
 embeds the matching `releases.lardd` file so the `release` command shows the
 same history inside LardOS, and produces versioned boot media with
-`make release`. `release policy` exposes the same rule from the shell.
+`make release`. Profile-specific media can be built with
+`make release RELEASE_HW=ami` or all known profiles with
+`make release-all-hardware`. `release policy` exposes the same rule from the
+shell.
 
 Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
-bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Release
-ISOs also carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written
-USB media can reuse the same stage2/kernel payload.
+bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
+profiles append their name to the version directory and artifact names, for
+example `release/v1.50.0b-vbox/lardos-v1.50.0b-vbox.iso`. Release ISOs also
+carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
+media can reuse the same stage2/kernel payload.

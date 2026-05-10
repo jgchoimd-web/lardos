@@ -24,13 +24,22 @@ SEEDC     := $(HOST_TOOL_DIR)/seedc
 LIL       := $(HOST_TOOL_DIR)/lil
 BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
-RELEASE_VERSION := v1.49.1p
+RELEASE_BASE_VERSION := v1.50.0b
+RELEASE_HW ?= universal
+RELEASE_HW_LIST := universal seabios ami vbox usb realpc
+RELEASE_HW_UPPER := $(shell printf '%s' '$(RELEASE_HW)' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+RELEASE_VERSION := $(if $(filter universal,$(RELEASE_HW)),$(RELEASE_BASE_VERSION),$(RELEASE_BASE_VERSION)-$(RELEASE_HW))
 RELEASE_NAME := lardos-$(RELEASE_VERSION)
-ISO_VOLUME_ID := LARDOS_V1_49_1P
+ISO_VOLUME_BASE := LARDOS_V1_50_0B
+ISO_VOLUME_ID := $(if $(filter universal,$(RELEASE_HW)),$(ISO_VOLUME_BASE),$(ISO_VOLUME_BASE)_$(RELEASE_HW_UPPER))
 RELEASE_DIR := release/$(RELEASE_VERSION)
 ISO_BOOTIMG_SECTOR := 23
 ISO_STAGE2_LBA := 93
 ISO_KERNEL_LBA := 97
+
+ifneq ($(filter $(RELEASE_HW),$(RELEASE_HW_LIST)),$(RELEASE_HW))
+$(error Unknown RELEASE_HW '$(RELEASE_HW)' (expected one of: $(RELEASE_HW_LIST)))
+endif
 
 LANG_EX   := lang/examples
 LAFILLO_ELF := $(LANG_EX)/lafillo_demo.elf
@@ -58,7 +67,7 @@ KERNEL_LIB_OBJS := $(addprefix $(KERNEL_DIR)/,$(addsuffix .o,$(KERNEL_LIBS)))
 LDLL_INC_DEPS   := $(addprefix $(KERNEL_DIR)/ldll_lib,$(addsuffix .inc,$(LDLL_LIBS)))
 
 HOST_CFLAGS := -std=c11 -O2 -Wall
-CFLAGS    := -std=gnu11 -ffreestanding -O2 -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h
+CFLAGS    := -std=gnu11 -ffreestanding -O2 -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h -DLARDOS_HARDWARE_PROFILE=\"$(RELEASE_HW)\"
 
 LDFLAGS   := -T linker.ld -nostdlib -m elf_x86_64
 
@@ -359,9 +368,20 @@ $(RELEASE_IMG): $(IMG_IMAGE) | $(RELEASE_DIR)
 $(RELEASE_ISO): $(ISO_IMAGE) | $(RELEASE_DIR)
 	cp $< $@
 
-.PHONY: run run-iso release clean
+.PHONY: run run-iso release release-hardware release-all-hardware clean
 
 release: $(RELEASE_IMG) $(RELEASE_ISO)
+
+release-%:
+	$(MAKE) clean
+	$(MAKE) release RELEASE_HW=$*
+
+release-hardware release-all-hardware:
+	@set -e; for hw in $(RELEASE_HW_LIST); do \
+	  echo "==> release hardware profile $$hw"; \
+	  $(MAKE) clean; \
+	  $(MAKE) release RELEASE_HW=$$hw; \
+	done
 
 run: $(RAW_IMAGE)
 	$(QEMU) -drive format=raw,file=$(RAW_IMAGE) -netdev user,id=n1 -device rtl8139,netdev=n1 -smp 3

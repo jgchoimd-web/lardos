@@ -2,7 +2,15 @@ LARDD 1
 TITLE LardOS Releases
 TEXT Every feature addition gets a release entry. The running kernel version is the active release.
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
+TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
+
+SECTION v1.50.0b
+ITEM Adds hardware release profiles as a separate axis from the a/b/p stability suffix.
+ITEM RELEASE_HW=universal, seabios, ami, vbox, usb, or realpc now changes release directory, artifact names, ISO volume label, and embedded hardware profile.
+ITEM make release-all-hardware builds the whole hardware profile set with IMG and ISO media for each target.
+ITEM release policy, ver, and status now show the selected hardware profile inside LardOS.
+ITEM This ships as beta because hardware-specific release packaging should be tested across real machines and virtual machines before promotion.
 
 SECTION v1.49.1p
 ITEM Hotpatch for real-machine and VM boot reliability after the v1.49.0a official release.

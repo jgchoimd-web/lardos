@@ -248,6 +248,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.41.0b makes PanicRoom real16-backed: panicroom texture draws the iconic LPR default texture from the real-mode bridge before long64 recovery.\n"
     "li v1.44.0a promotes the PanicRoom texture and editable Unicode cursor/glyph track to the official channel.\n"
     "li v1.49.1p hotpatches AMI/Rufus/VirtualBox boot rough edges and makes the default cursor an arrow.\n"
+    "li v1.50.0b adds hardware release profiles: universal, seabios, ami, vbox, usb, and realpc.\n"
     "li Use bootmap, bootreplay show, postbaseline show, devmap draw, oldcheck draw, and awakemon to see boot, POST, device, storage, and Awakening progress.\n"
     "li Use ltheme preview default.ltheme and ltheme use night for native shell theme presets.\n"
     "li Use cfgprof save safe-ui and cfgprof load safe-ui for settings profiles.\n"
@@ -348,7 +349,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd post\n"
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
-    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch.\n"
+    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch. Hardware profiles: universal, seabios, ami, vbox, usb, realpc.\n"
     "end\n";
 
 static const uint8_t file_default_lguilib[] =

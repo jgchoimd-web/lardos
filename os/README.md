@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.52.3p-ami/lardos-v1.52.3p-ami.iso`. To publish the whole hardware
+`release/v1.52.4p-ami/lardos-v1.52.4p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -200,6 +200,10 @@ commands:
   framing now matches the real pane, the Unicode cursor renders cleanly, and
   the scrollbar no longer shows a bright full thumb when content does not
   overflow.
+- `v1.52.4p` hotpatches edge GUI input polish: the Unicode cursor can clip past
+  the bottom/right edge like a normal desktop pointer, screenram no longer draws
+  over the cursor, and disabled scrollbars remain visible without pretending to
+  be scrollable.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

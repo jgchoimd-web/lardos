@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.52.4p
+ITEM Hotpatch for the remaining edge GUI issues reported after v1.52.3p.
+ITEM Lets the Unicode cursor hotspot reach the bottom and right edge while the cursor art clips past the screen like a normal desktop pointer.
+ITEM Moves screenram flushing before cursor drawing so screenram corner storage cannot hide the mouse cursor.
+ITEM Makes disabled/no-overflow scrollbars visible with a muted rail and grip instead of disappearing into the output pane.
+ITEM Refines the default U+E004 mouse glyph with a bright tip so it remains visible at the screen edge while staying user-owned and editable.
+ITEM Build, ISO structure checks, and QEMU GUI smoke tests were rerun for hotpatch readiness.
+
 SECTION v1.52.3p
 ITEM Hotpatch for the remaining GUI boxed areas reported after v1.52.2p.
 ITEM Aligns the GUI overlay output frame with the real response view so the accent line no longer crosses the input field.

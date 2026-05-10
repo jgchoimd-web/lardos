@@ -780,10 +780,6 @@ static void gui_draw_default_cursor(const fb_t* tgt, int x, int y, uint32_t colo
     uint32_t button = 0xFF30D5C8u;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
-    if (x > (int)g_fb.w - 16) x = (int)g_fb.w - 16;
-    if (y > (int)g_fb.h - 16) y = (int)g_fb.h - 16;
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
 
     for (int row = 0; row < 8; row++) {
         for (int col = 0; col < 8; col++) {
@@ -811,12 +807,8 @@ static void gui_draw_cursor_at(int x, int y, uint32_t color)
     if (g.cursor_enabled &&
         img_glyph_render(g.cursor_cp, g.glyph_tick, 0, g.cursor_render_pixels, &gw, &gh)) {
         uint16_t scale = 3;
-        int cw = (int)gw * (int)scale;
-        int ch = (int)gh * (int)scale;
         if (x < 0) x = 0;
         if (y < 0) y = 0;
-        if (x > (int)g_fb.w - cw) x = (int)g_fb.w - cw;
-        if (y > (int)g_fb.h - ch) y = (int)g_fb.h - ch;
         fb_draw_image_scaled(tgt, x, y, g.cursor_render_pixels, gw, gh, scale);
         g.cursor_render_count++;
         g.cursor_last_error = 0;
@@ -2338,9 +2330,10 @@ void gui_render(void)
     int sb_x = view_x + view_w - sb_w;
     int sb_y = view_y;
     int sb_h = view_h;
-    uint32_t sb_bg = 0xFF111619;
-    uint32_t sb_bd = 0xFF60717C;
-    uint32_t sb_th = 0xFF7BE0D6;
+    uint32_t sb_bg = 0xFF172127;
+    uint32_t sb_bd = 0xFF7D94A0;
+    uint32_t sb_th = 0xFF8FF3EA;
+    uint32_t sb_disabled = 0xFF4A6570;
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, (uint16_t)sb_h, sb_bg);
     fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
     fb_fill_rect(tgt, (uint16_t)(sb_x + sb_w - 1), (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
@@ -2355,7 +2348,10 @@ void gui_render(void)
     if (max_scroll > 0) {
         fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)thumb_y, (uint16_t)(sb_w - 2), (uint16_t)thumb_h, sb_th);
     } else if (sb_h > 6) {
-        fb_fill_rect(tgt, (uint16_t)(sb_x + 4), (uint16_t)(sb_y + 3), 2, (uint16_t)(sb_h - 6), 0xFF263238u);
+        fb_fill_rect(tgt, (uint16_t)(sb_x + 2), (uint16_t)(sb_y + 2), (uint16_t)(sb_w - 4), (uint16_t)(sb_h - 4), sb_disabled);
+        if (sb_h > 22) {
+            fb_fill_rect(tgt, (uint16_t)(sb_x + 4), (uint16_t)(sb_y + sb_h / 2 - 8), 2, 16, 0xFF8DB8B5u);
+        }
     }
 
     guioverlay_state_t overlay = {
@@ -2402,9 +2398,9 @@ void gui_render(void)
     lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my,
                  (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h);
 
-    // Cursor last
-    gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
     screenram_flush_to_target(tgt);
+    // Cursor last: its hotspot may reach the bottom/right edge while the art clips past it.
+    gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
 
     if (g_have_bb) {
         fb_blit(&g_fb, &g_bb);

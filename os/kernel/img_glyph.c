@@ -73,14 +73,14 @@ static uint32_t glyph_pattern_pixel(uint32_t cp, const char* name, uint16_t x, u
 
     if (name && strcmp(name, "mouse") == 0) {
         static const char* pointer[IMG_GLYPH_SIZE] = {
-            "K.......",
-            "KW......",
-            "KWW.....",
-            "KWWW....",
-            "KWWWW...",
-            "KWWKK...",
-            "KWK.KK..",
-            "KK..KK.."
+            "W.......",
+            "WK......",
+            "WWK.....",
+            "WWWK....",
+            "WWWWK...",
+            "WWKKK...",
+            "WK..KK..",
+            "K....KK."
         };
         char p = pointer[y][x];
         if (p == 'K') return ink;

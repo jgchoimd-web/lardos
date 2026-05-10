@@ -414,4 +414,6 @@ same history inside LardOS, and produces versioned boot media with
 
 Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
-bootable El Torito ISO for `release/<version>/lardos-<version>.iso`.
+bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Release
+ISOs also carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written
+USB media can reuse the same stage2/kernel payload.

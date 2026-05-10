@@ -247,6 +247,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use panic capsule to bundle crashlog, BugEye, boot, trust, priority, and filesystem state.\n"
     "li v1.41.0b makes PanicRoom real16-backed: panicroom texture draws the iconic LPR default texture from the real-mode bridge before long64 recovery.\n"
     "li v1.44.0a promotes the PanicRoom texture and editable Unicode cursor/glyph track to the official channel.\n"
+    "li v1.49.1p hotpatches AMI/Rufus/VirtualBox boot rough edges and makes the default cursor an arrow.\n"
     "li Use bootmap, bootreplay show, postbaseline show, devmap draw, oldcheck draw, and awakemon to see boot, POST, device, storage, and Awakening progress.\n"
     "li Use ltheme preview default.ltheme and ltheme use night for native shell theme presets.\n"
     "li Use cfgprof save safe-ui and cfgprof load safe-ui for settings profiles.\n"

@@ -45,6 +45,8 @@ start:
     sti
 
     mov [boot_drive], dl
+    xor ah, ah
+    int 0x13
 
     mov word [dap_count], STAGE2_SECTORS
     mov word [dap_off], STAGE2_LOAD

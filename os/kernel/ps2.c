@@ -84,9 +84,10 @@ int ps2_init(void)
     uint8_t cfg = 0;
     if (read_data(&cfg) != 0) return -2;
 
-    // Polling mode, mouse clock enabled, keyboard translated to Set 1.
+    // Polling mode, keyboard translated to Set 1, aux/mouse clock enabled.
     cfg &= ~(1u << 0);
     cfg &= ~(1u << 1);
+    cfg &= ~(1u << 5);
     cfg |= (1u << 6);
 
     // Write config byte
@@ -111,6 +112,19 @@ int ps2_mouse_init(void)
 {
     // Enable aux device
     write_cmd(0xA8);
+    flush_out();
+
+    if (write_cmd(0x20) == 0) {
+        uint8_t cfg = 0;
+        if (read_data(&cfg) == 0) {
+            cfg &= ~(1u << 1);
+            cfg &= ~(1u << 5);
+            cfg |= (1u << 6);
+            if (write_cmd(0x60) == 0) {
+                (void)write_data(cfg);
+            }
+        }
+    }
     flush_out();
 
     // Set defaults

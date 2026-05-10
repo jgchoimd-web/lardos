@@ -4,6 +4,15 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.49.1p
+ITEM Hotpatch for real-machine and VM boot reliability after the v1.49.0a official release.
+ITEM Added a hybrid ISO MBR path so the ISO can boot when written raw to USB tools such as Rufus, while keeping El Torito floppy-emulation boot.
+ITEM Added an AMI-friendlier A20 fallback and disk reset path in the BIOS boot stack.
+ITEM Network startup failures now continue offline instead of panicking, improving VirtualBox default-device behavior.
+ITEM PS/2 mouse initialization now explicitly enables the aux clock and the default GUI cursor is an arrow instead of a square.
+ITEM The idle screensaver counter is slowed to avoid immediate tight-loop activation on fast virtual machines.
+ITEM Build, git diff --check, QEMU IMG boot, and QEMU ISO boot were rerun for hotpatch readiness.
+
 SECTION v1.49.0a
 ITEM Official promotion of the VM Monitor and Shrine subsystem beta track without feature loss.
 ITEM Fixed shrine verify so BOSL .shrine payloads must include valid BOSL magic and supported version before they are accepted.

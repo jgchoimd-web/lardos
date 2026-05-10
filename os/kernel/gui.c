@@ -149,6 +149,7 @@ typedef struct {
     /* Screensaver */
     int ss_active;
     uint32_t ss_idle_ticks;
+    uint32_t ss_idle_loops;
     ssav_t ss_ssav;
     const FsFile* ss_file;
     uint16_t ss_frame;
@@ -165,7 +166,8 @@ typedef struct {
     int slider_drag; /* 0=none 1=bright 2=vol 3=quality */
 } gui_state_t;
 
-#define SS_IDLE_THRESHOLD  300   /* ~5 sec at 60 ticks/sec */
+#define SS_IDLE_THRESHOLD  120
+#define SS_IDLE_LOOP_DIVIDER 500000u
 
 static gui_state_t g;
 
@@ -592,6 +594,7 @@ int gui_init(void)
     /* Screensaver: try default.ssav */
     g.ss_active = 0;
     g.ss_idle_ticks = 0;
+    g.ss_idle_loops = 0;
     g.ss_file = NULL;
     g.ss_frame = 0;
     g.ss_anim_tick = 0;
@@ -760,6 +763,40 @@ int gui_screenram_selftest(void)
     return ok ? 0 : -1;
 }
 
+static void gui_draw_default_cursor(const fb_t* tgt, int x, int y, uint32_t color)
+{
+    static const uint16_t bits[16] = {
+        0x8000, 0xC000, 0xE000, 0xF000,
+        0xF800, 0xFC00, 0xFE00, 0xFF00,
+        0xFFC0, 0xF800, 0xD800, 0x8C00,
+        0x0C00, 0x0600, 0x0600, 0x0300
+    };
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x > (int)g_fb.w - 16) x = (int)g_fb.w - 16;
+    if (y > (int)g_fb.h - 16) y = (int)g_fb.h - 16;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+
+    for (int row = 0; row < 16; row++) {
+        for (int col = 0; col < 12; col++) {
+            if ((bits[row] & (uint16_t)(0x8000u >> col)) == 0) continue;
+            for (int oy = -1; oy <= 1; oy++) {
+                for (int ox = -1; ox <= 1; ox++) {
+                    fb_putpixel(tgt, (uint16_t)(x + col + ox), (uint16_t)(y + row + oy), 0xFF000000u);
+                }
+            }
+        }
+    }
+    for (int row = 0; row < 16; row++) {
+        for (int col = 0; col < 12; col++) {
+            if (bits[row] & (uint16_t)(0x8000u >> col)) {
+                fb_putpixel(tgt, (uint16_t)(x + col), (uint16_t)(y + row), color);
+            }
+        }
+    }
+}
+
 static void gui_draw_cursor_at(int x, int y, uint32_t color)
 {
     const fb_t* tgt = g_have_bb ? &g_bb : &g_fb;
@@ -784,12 +821,7 @@ static void gui_draw_cursor_at(int x, int y, uint32_t color)
         g.cursor_last_error = 2;
     }
 
-    // Simple 8x12 fallback cursor.
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x > (int)g_fb.w - 8) x = (int)g_fb.w - 8;
-    if (y > (int)g_fb.h - 12) y = (int)g_fb.h - 12;
-    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 8, 12, color);
+    gui_draw_default_cursor(tgt, x, y, color);
 }
 
 int gui_cursor_set_unicode(uint32_t cp)
@@ -1073,6 +1105,7 @@ static void gui_lar_extract_selected(void)
 void gui_activity(void)
 {
     g.ss_idle_ticks = 0;
+    g.ss_idle_loops = 0;
 }
 
 /* Load and play LARSH file. Switches to Gallery tab with demo.larsh selected. */
@@ -1720,6 +1753,9 @@ void gui_tick(void)
         g.caret_on = !g.caret_on;
     }
     if (!g.ss_active) {
+        g.ss_idle_loops++;
+        if (g.ss_idle_loops < SS_IDLE_LOOP_DIVIDER) return;
+        g.ss_idle_loops = 0;
         g.ss_idle_ticks++;
         if (g.ss_idle_ticks >= SS_IDLE_THRESHOLD) {
             g.ss_active = 1;

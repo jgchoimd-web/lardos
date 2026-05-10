@@ -4,7 +4,7 @@
  * This deliberately avoids host ISO tools. The output is a minimal ISO-9660
  * image with a boot catalog and a 1.2M/1.44M/2.88M floppy-emulation boot image.
  *
- * Usage: mkiso -o lardos.iso -i lardos.img [-v VOLUME_ID]
+ * Usage: mkiso -o lardos.iso -i lardos.img [-m iso_mbr.bin] [-v VOLUME_ID]
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -222,6 +222,24 @@ static void write_boot_catalog(uint8_t* p, uint8_t media_type)
     put_le32(p + 40, ISO_BOOTIMG_SECTOR);
 }
 
+static void write_hybrid_partition(uint8_t* mbr, uint32_t total_512_sectors)
+{
+    uint8_t* e = mbr + 446;
+    memset(e, 0, 64);
+    e[0] = 0x80;       /* bootable */
+    e[1] = 0x00;       /* start CHS: best-effort for ISO hybrids */
+    e[2] = 0x01;
+    e[3] = 0x00;
+    e[4] = 0x17;       /* hidden HPFS/NTFS, used by classic ISOHybrid layouts */
+    e[5] = 0xFE;       /* end CHS saturated */
+    e[6] = 0xFF;
+    e[7] = 0xFF;
+    put_le32(e + 8, 0);
+    put_le32(e + 12, total_512_sectors);
+    mbr[510] = 0x55;
+    mbr[511] = 0xAA;
+}
+
 static void write_root_dir(uint8_t* p, size_t img_len)
 {
     static const uint8_t self_name[1] = { 0 };
@@ -239,6 +257,7 @@ int main(int argc, char** argv)
 {
     const char* out_path = 0;
     const char* img_path = 0;
+    const char* mbr_path = 0;
     const char* volume_id = "LARDOS";
 
     for (int i = 1; i < argc; i++) {
@@ -246,13 +265,15 @@ int main(int argc, char** argv)
             out_path = argv[++i];
         } else if (strcmp(argv[i], "-i") == 0 && i + 1 < argc) {
             img_path = argv[++i];
+        } else if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
+            mbr_path = argv[++i];
         } else if (strcmp(argv[i], "-v") == 0 && i + 1 < argc) {
             volume_id = argv[++i];
         }
     }
 
     if (!out_path || !img_path) {
-        fprintf(stderr, "Usage: mkiso -o <out.iso> -i <boot.img> [-v VOLUME_ID]\n");
+        fprintf(stderr, "Usage: mkiso -o <out.iso> -i <boot.img> [-m <iso_mbr.bin>] [-v VOLUME_ID]\n");
         return 1;
     }
 
@@ -263,12 +284,27 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    uint8_t* mbr = 0;
+    size_t mbr_len = 0;
+    if (mbr_path && read_file(mbr_path, &mbr, &mbr_len) != 0) {
+        fprintf(stderr, "mkiso: cannot read %s\n", mbr_path);
+        free(img);
+        return 1;
+    }
+    if (mbr && mbr_len != 512u) {
+        fprintf(stderr, "mkiso: hybrid MBR must be exactly 512 bytes\n");
+        free(mbr);
+        free(img);
+        return 1;
+    }
+
     uint8_t media_type = 0;
     if (img_len == 1200u * 1024u) media_type = 1;
     else if (img_len == 1440u * 1024u) media_type = 2;
     else if (img_len == 2880u * 1024u) media_type = 3;
     else {
         fprintf(stderr, "mkiso: boot image must be 1.2M, 1.44M, or 2.88M for floppy emulation\n");
+        free(mbr);
         free(img);
         return 1;
     }
@@ -279,8 +315,14 @@ int main(int argc, char** argv)
     uint8_t* iso = (uint8_t*)calloc(1, iso_len);
     if (!iso) {
         fprintf(stderr, "mkiso: out of memory\n");
+        free(mbr);
         free(img);
         return 1;
+    }
+
+    if (mbr) {
+        memcpy(iso, mbr, 512u);
+        write_hybrid_partition(iso, (uint32_t)(iso_len / 512u));
     }
 
     write_pvd(iso + (size_t)ISO_PVD_SECTOR * ISO_SECTOR_SIZE, total_sectors, volume_id);
@@ -296,12 +338,14 @@ int main(int argc, char** argv)
     if (!f) {
         fprintf(stderr, "mkiso: cannot write %s\n", out_path);
         free(iso);
+        free(mbr);
         free(img);
         return 1;
     }
     size_t n = fwrite(iso, 1, iso_len, f);
     fclose(f);
     free(iso);
+    free(mbr);
     free(img);
 
     if (n != iso_len) {

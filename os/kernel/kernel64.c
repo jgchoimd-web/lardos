@@ -432,12 +432,22 @@ static void boot_network_start(int foreground)
     }
     if (net_init(&s_net) != 0) {
         awake_fail(10u, "net init");
-        if (foreground) panic("NET init failed");
+        if (foreground) {
+            vga_puts("NET unavailable; continuing offline\n", 0x4F);
+            append_line(s_boot_report, sizeof(s_boot_report), "NET: unavailable, offline mode\n");
+            gui_set_response(s_boot_report);
+            gui_render();
+        }
         return;
     }
     if (net_dhcp(&s_net, &s_cfg) != 0) {
         awake_fail(11u, "dhcp");
-        if (foreground) panic("DHCP failed");
+        if (foreground) {
+            vga_puts("DHCP unavailable; continuing offline\n", 0x4F);
+            append_line(s_boot_report, sizeof(s_boot_report), "DHCP: unavailable, offline mode\n");
+            gui_set_response(s_boot_report);
+            gui_render();
+        }
         return;
     }
     s_net_ready = 1;
@@ -447,7 +457,12 @@ static void boot_network_start(int foreground)
     ip4_t ip;
     if (net_dns_a(&s_net, s_cfg.dns, "example.com", &ip) != 0) {
         awake_fail(12u, "dns");
-        if (foreground) panic("DNS failed");
+        if (foreground) {
+            vga_puts("DNS unavailable; continuing offline\n", 0x4F);
+            append_line(s_boot_report, sizeof(s_boot_report), "DNS: unavailable, network stays local\n");
+            gui_set_response(s_boot_report);
+            gui_render();
+        }
         return;
     }
     if (foreground) vga_puts("DNS OK\n", 0x2F);

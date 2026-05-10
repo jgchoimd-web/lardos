@@ -24,10 +24,13 @@ SEEDC     := $(HOST_TOOL_DIR)/seedc
 LIL       := $(HOST_TOOL_DIR)/lil
 BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
-RELEASE_VERSION := v1.49.0a
+RELEASE_VERSION := v1.49.1p
 RELEASE_NAME := lardos-$(RELEASE_VERSION)
-ISO_VOLUME_ID := LARDOS_V1_49_0A
+ISO_VOLUME_ID := LARDOS_V1_49_1P
 RELEASE_DIR := release/$(RELEASE_VERSION)
+ISO_BOOTIMG_SECTOR := 23
+ISO_STAGE2_LBA := 93
+ISO_KERNEL_LBA := 97
 
 LANG_EX   := lang/examples
 LAFILLO_ELF := $(LANG_EX)/lafillo_demo.elf
@@ -40,6 +43,7 @@ STAGE2_SECTORS := 4
 KERNEL_LBA := 5
 BOOT_BIN  := $(BOOT_DIR)/stage1.bin
 STAGE2_BIN:= $(BOOT_DIR)/stage2.bin
+ISO_MBR_BIN:= $(BOOT_DIR)/iso_mbr.bin
 KERNEL_ELF:= $(KERNEL_DIR)/kernel.elf
 KERNEL_EXE:= $(KERNEL_DIR)/kernel.bosx
 RAW_IMAGE := os-image.bin
@@ -66,6 +70,9 @@ $(BOOT_BIN): $(BOOT_DIR)/stage1.s
 $(STAGE2_BIN): $(BOOT_DIR)/boot.s
 	$(NASM) -f bin -D KERNEL_LBA=$(KERNEL_LBA) $< -o $@
 	@test $$(wc -c < $@) -le $$(($(STAGE2_SECTORS) * 512))
+
+$(ISO_MBR_BIN): $(BOOT_DIR)/iso_mbr.s
+	$(NASM) -f bin -D ISO_STAGE2_LBA=$(ISO_STAGE2_LBA) -D ISO_KERNEL_LBA=$(ISO_KERNEL_LBA) -D STAGE2_SECTORS=$(STAGE2_SECTORS) $< -o $@
 
 $(KERNEL_ELF): $(KERNEL_DIR)/entry64.o $(KERNEL_DIR)/isr64.o $(KERNEL_DIR)/kernel64.o $(KERNEL_DIR)/smp.o $(KERNEL_DIR)/ap_trampoline.o $(KERNEL_DIR)/aux_kernel.o $(KERNEL_DIR)/pci.o $(KERNEL_DIR)/rtl8139.o $(KERNEL_DIR)/net.o $(KERNEL_DIR)/oslink.o $(KERNEL_DIR)/taskprio.o $(KERNEL_DIR)/awake.o $(KERNEL_DIR)/bootprof.o $(KERNEL_DIR)/crashlog.o $(KERNEL_DIR)/lpack.o $(KERNEL_DIR)/screencheck.o $(KERNEL_DIR)/lardkit.o $(KERNEL_DIR)/exgui.o $(KERNEL_DIR)/exexgui.o $(KERNEL_DIR)/lguilib.o $(KERNEL_DIR)/guioverlay.o $(KERNEL_DIR)/lassist.o $(KERNEL_DIR)/lard_tls.o $(KERNEL_DIR)/rtc.o $(KERNEL_DIR)/lardtime.o $(KERNEL_DIR)/vmmon.o $(KERNEL_DIR)/storage.o $(KERNEL_DIR)/string.o $(KERNEL_DIR)/stdlib_min.o $(KERNEL_DIR)/lard_stdio.o $(KERNEL_DIR)/lard_printf.o $(KERNEL_DIR)/fs.o $(KERNEL_DIR)/bmp.o $(KERNEL_DIR)/lard_inflate.o $(KERNEL_DIR)/lafillo.o $(KERNEL_DIR)/lard_doc.o $(KERNEL_DIR)/ldi.o $(KERNEL_DIR)/lda.o $(KERNEL_DIR)/lar.o $(KERNEL_DIR)/lvcs.o $(KERNEL_DIR)/lcontainer.o $(KERNEL_DIR)/ldll.o $(KERNEL_DIR)/img_glyph.o $(KERNEL_DIR)/drfl.o $(KERNEL_DIR)/post.o $(KERNEL_DIR)/ssav.o $(KERNEL_DIR)/lss.o $(KERNEL_DIR)/lfs.o $(KERNEL_DIR)/lsh.o $(KERNEL_DIR)/larsh.o $(KERNEL_DIR)/kr_basic.o $(KERNEL_LIB_OBJS) $(KERNEL_DIR)/lardx_load.o $(KERNEL_DIR)/gui.o $(KERNEL_DIR)/ps2.o $(KERNEL_DIR)/idt64.o $(KERNEL_DIR)/panic.o $(KERNEL_DIR)/mmu.o $(KERNEL_DIR)/cpumode.o $(KERNEL_DIR)/mode_switch.o $(KERNEL_DIR)/mem.o $(KERNEL_DIR)/gc.o $(KERNEL_DIR)/gc_demo.o $(KERNEL_DIR)/lib3d.o $(KERNEL_DIR)/lib3d_demo.o $(KERNEL_DIR)/unicode.o $(KERNEL_DIR)/console.o $(KERNEL_DIR)/bosl_vm.o $(KERNEL_DIR)/bosl_jit.o $(KERNEL_DIR)/bosl_demo.o $(KERNEL_DIR)/bosl_asm.o $(KERNEL_DIR)/lil.o $(KERNEL_DIR)/lil_demo.o $(KERNEL_DIR)/lml.o $(KERNEL_DIR)/lml_demo.o $(KERNEL_DIR)/gasm_vm.o $(KERNEL_DIR)/gasm_demo.o $(KERNEL_DIR)/lafillo_vm.o $(KERNEL_DIR)/lafillo_demo.o $(KERNEL_DIR)/os_vm.o $(KERNEL_DIR)/os_demo.o $(KERNEL_DIR)/gdt64.o $(KERNEL_DIR)/gdt64_asm.o $(KERNEL_DIR)/lipc.o $(KERNEL_DIR)/syscall.o $(KERNEL_DIR)/usermode.o $(KERNEL_DIR)/usermode_asm.o
 	$(LD) $(LDFLAGS) -o $@ $^
@@ -340,8 +347,8 @@ $(RAW_IMAGE): $(BOOT_BIN) $(STAGE2_BIN) $(KERNEL_EXE) $(MKIMG)
 $(IMG_IMAGE): $(RAW_IMAGE)
 	cp $< $@
 
-$(ISO_IMAGE): $(IMG_IMAGE) $(MKISO)
-	$(MKISO) -o $@ -i $(IMG_IMAGE) -v $(ISO_VOLUME_ID)
+$(ISO_IMAGE): $(IMG_IMAGE) $(MKISO) $(ISO_MBR_BIN)
+	$(MKISO) -o $@ -i $(IMG_IMAGE) -m $(ISO_MBR_BIN) -v $(ISO_VOLUME_ID)
 
 $(RELEASE_DIR):
 	mkdir -p $@
@@ -363,7 +370,7 @@ run-iso: $(ISO_IMAGE)
 	$(QEMU) -cdrom $(ISO_IMAGE) -netdev user,id=n1 -device rtl8139,netdev=n1 -smp 3
 
 clean:
-	rm -f $(BOOT_BIN) $(STAGE2_BIN) $(KERNEL_ELF) $(KERNEL_EXE) $(RAW_IMAGE) $(IMG_IMAGE) $(ISO_IMAGE) \
+	rm -f $(BOOT_BIN) $(STAGE2_BIN) $(ISO_MBR_BIN) $(KERNEL_ELF) $(KERNEL_EXE) $(RAW_IMAGE) $(IMG_IMAGE) $(ISO_IMAGE) \
 	      $(KERNEL_DIR)/*.o $(KERNEL_DIR)/lafillo_demo_data.inc $(RELEASES_INC) \
 	      $(LAFILLO_ELF) $(LAFILLO_BOSX) $(LANG_EX)/lafillo_demo.o \
 	      $(MKLDLL) $(MKARDX) $(MKLFS) $(MK_SSAV) $(MKEXE) $(MKIMG) $(MKISO) $(BIN2INC) $(BOSLA) $(SEEDC) $(LIL)

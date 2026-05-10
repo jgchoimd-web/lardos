@@ -153,6 +153,11 @@ commands:
   without feature loss. `shrine verify` now validates the wrapped BOSL magic
   and version, and the LSS POST selftest no longer changes user-visible LSS
   counters or last-file state.
+- `v1.49.1p` hotpatches boot media and VM rough edges: ISO releases now include
+  a hybrid MBR path for raw USB writing tools, BIOS boot gets an AMI-friendlier
+  A20/disk-reset path, VirtualBox-style network startup failures continue
+  offline instead of panicking, and the default cursor is an arrow with stronger
+  PS/2 mouse enablement.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

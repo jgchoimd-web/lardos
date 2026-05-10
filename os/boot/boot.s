@@ -9,6 +9,12 @@ ORG 0x7E00
 %endif
 
 start:
+    ; Optional handoff for raw-written hybrid ISO boots.
+    ; EAX='LARD' and EBX=absolute kernel LBA lets an ISO MBR reuse this stage2.
+    cmp eax, 0x4452414C
+    jne .no_lba_override
+    mov [cs:kernel_lba_base], ebx
+.no_lba_override:
     cli
     xor ax, ax
     mov ds, ax
@@ -41,7 +47,8 @@ start:
     xor bx, bx
 
     ; Read 1 sector at KERNEL_LBA into ES:BX (0x10000)
-    mov dword [dap_lba], KERNEL_LBA
+    mov eax, [kernel_lba_base]
+    mov dword [dap_lba], eax
     mov word  [dap_count], 1
     mov word  [dap_off], bx
     mov word  [dap_seg], es
@@ -92,7 +99,9 @@ start:
     dec si                      ; remaining count
     jz .done_load
 
-    mov dword [dap_lba], KERNEL_LBA + 1
+    mov eax, [kernel_lba_base]
+    inc eax
+    mov dword [dap_lba], eax
     mov bx, 512                 ; offset into buffer
 .read_loop:
     cmp si, 127
@@ -132,10 +141,7 @@ start:
     jnz .read_loop
 .done_load:
 
-    ; Enable A20 line (very simple fast A20 via BIOS, may not work everywhere)
-    ; Use INT 15h, AX=2401h if available
-    mov ax, 0x2401
-    int 0x15
+    call enable_a20
 
     ; Set up a simple GDT in this sector
     lgdt [gdt_descriptor]
@@ -462,6 +468,16 @@ disk_error:
     hlt
     jmp .halt
 
+enable_a20:
+    ; BIOS A20 first; AMI/USB paths often also need the fast A20 gate.
+    mov ax, 0x2401
+    int 0x15
+    in al, 0x92
+    or al, 0x02
+    and al, 0xFE
+    out 0x92, al
+    ret
+
 ; GDT (Global Descriptor Table)
 
 gdt_start:
@@ -488,6 +504,7 @@ LONG_CODE_SEL equ 0x18
 
 kernel_entry dd 0
 phdr_size   dw 16               ; 16 for BOSX, 20 for LARDX v2
+kernel_lba_base dd KERNEL_LBA
 
 ; -----------------------------
 ; VBE (real mode) framebuffer setup

@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.51.0b
+ITEM Makes the default GUI cursor a pretty mouse picture glyph instead of a plain arrow fallback.
+ITEM The mouse cursor lives in the user-owned picture Unicode range at U+E004 and is named mouse in glyphmap.lardd.
+ITEM cursor mouse and cursor default restore the U+E004 mouse glyph, while cursor set U+E000 still lets the user choose another editable slot.
+ITEM glyph demo now seeds U+E004 with the same mouse picture, and glyph pixel/rename/move/copy can edit it like any other user-owned Unicode picture.
+ITEM Transparent pixels now stay transparent during live image-glyph rendering so shaped cursor glyphs do not grow a solid box.
+ITEM This ships as beta while the new default cursor art and hardware-profile media are tested across targets.
+
 SECTION v1.50.0b
 ITEM Adds hardware release profiles as a separate axis from the a/b/p stability suffix.
 ITEM RELEASE_HW=universal, seabios, ami, vbox, usb, or realpc now changes release directory, artifact names, ISO volume label, and embedded hardware profile.

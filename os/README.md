@@ -41,7 +41,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.50.0b-ami/lardos-v1.50.0b-ami.iso`. To publish the whole hardware
+`release/v1.51.0b-ami/lardos-v1.51.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -178,6 +178,10 @@ commands:
   the stability suffix (`a`, `b`, or `p`), while `RELEASE_HW=universal|seabios|ami|vbox|usb|realpc`
   builds profile-named IMG/ISO media and embeds the selected hardware profile
   into `ver`, `status`, and `release policy`.
+- `v1.51.0b` makes the default GUI cursor a pretty user-editable mouse glyph at
+  `U+E004`. `cursor mouse` restores it, `cursor set U+E000` still lets the user
+  choose another picture Unicode slot, and shaped cursor glyphs keep transparent
+  pixels during live rendering.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
@@ -230,8 +234,9 @@ commands:
 - `glyph move U+E000 U+E010`, `glyph copy U+E000 U+E011`,
   `glyph rename U+E000 name`, and `glyph pixel U+E000 0 0 ff00ff` edit
   assigned picture Unicode slots directly.
-- `cursor status`, `cursor set U+E000`, and `cursor off` bind the mouse cursor
-  to the same user-owned picture Unicode slots managed by `glyph demo/load`.
+- `cursor status`, `cursor mouse`, `cursor set U+E000`, and `cursor off` bind
+  the mouse cursor to the same user-owned picture Unicode slots managed by
+  `glyph demo/load`; the default mouse picture starts at editable `U+E004`.
 - `cfgprof save name` and `cfgprof load name` store/load settings bundles
   (`cfg profile` in the feature map), while `userlaw show` opens the user-right
   policy file.

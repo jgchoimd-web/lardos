@@ -355,7 +355,10 @@ back to HTML.
 The GUI cursor can also be owned through the picture Unicode registry. LSH's
 `cursor set U+E000` stores a PUA codepoint in GUI state; the final cursor pass
 then renders that slot through the same live `img_glyph_render` path used by
-inline picture characters, falling back to the block cursor if the slot is empty.
+inline picture characters. The default cursor is the built-in `mouse` picture
+at editable `U+E004`, and `cursor mouse` restores that slot without hiding the
+user-owned glyph system. If the selected slot is empty, the fallback draw path
+still uses a small mouse shape rather than the old block cursor.
 Assigned Unicode remains user-editable: `glyph move`, `glyph copy`,
 `glyph rename`, and `glyph pixel` can change the codepoint, duplicate the
 slot, relabel it, or patch individual 8x8 pixels. When a cursor-bound slot is
@@ -423,6 +426,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.50.0b-vbox/lardos-v1.50.0b-vbox.iso`. Release ISOs also
+example `release/v1.51.0b-vbox/lardos-v1.51.0b-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

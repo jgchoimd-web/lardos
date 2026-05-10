@@ -7,6 +7,7 @@
 #define IMG_GLYPH_SIZE       8u
 #define IMG_GLYPH_CELLS      1u  /* 8px = 1 char cell */
 #define IMG_GLYPH_NAME_MAX   24u
+#define IMG_GLYPH_MOUSE_CURSOR_CP (IMG_GLYPH_PUA_START + 4u)
 
 typedef struct img_glyph_info {
     uint32_t cp;
@@ -24,6 +25,7 @@ typedef struct img_glyph_info {
 int img_glyph_assign(uint32_t cp, const uint32_t* pixels, uint16_t w, uint16_t h);
 int img_glyph_assign_named(uint32_t cp, const uint32_t* pixels, uint16_t w, uint16_t h, const char* name);
 int img_glyph_assign_pattern(uint32_t cp, const char* name);
+int img_glyph_ensure_mouse_cursor(void);
 int img_glyph_copy(uint32_t from_cp, uint32_t to_cp);
 int img_glyph_move(uint32_t from_cp, uint32_t to_cp);
 int img_glyph_rename(uint32_t cp, const char* name);

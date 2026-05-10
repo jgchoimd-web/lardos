@@ -567,11 +567,11 @@ int gui_init(void)
     g.glyph_last_click_tick = 0;
     g.glyph_rendered_last = 0;
     g.glyph_hit_count = 0;
-    g.cursor_enabled = 0;
-    g.cursor_cp = IMG_GLYPH_PUA_START;
+    g.cursor_enabled = 1;
+    g.cursor_cp = IMG_GLYPH_MOUSE_CURSOR_CP;
     g.cursor_render_count = 0;
     g.cursor_fallback_count = 0;
-    g.cursor_last_error = 0;
+    g.cursor_last_error = img_glyph_ensure_mouse_cursor() == 0 ? 0u : 2u;
     g.larsh_loaded = 0;
     g.larsh_playing = 0;
     g.larsh_tick = 0;
@@ -765,12 +765,19 @@ int gui_screenram_selftest(void)
 
 static void gui_draw_default_cursor(const fb_t* tgt, int x, int y, uint32_t color)
 {
-    static const uint16_t bits[16] = {
-        0x8000, 0xC000, 0xE000, 0xF000,
-        0xF800, 0xFC00, 0xFE00, 0xFF00,
-        0xFFC0, 0xF800, 0xD800, 0x8C00,
-        0x0C00, 0x0600, 0x0600, 0x0300
+    static const uint8_t shape[8][8] = {
+        {0,0,0,1,1,0,0,0},
+        {0,0,1,2,2,1,0,0},
+        {0,1,3,4,4,3,1,0},
+        {0,1,4,3,4,4,1,0},
+        {0,1,3,4,3,4,1,0},
+        {0,1,4,3,4,3,1,0},
+        {0,0,1,3,3,1,0,0},
+        {0,0,0,1,1,0,0,0}
     };
+    uint32_t shell = color;
+    uint32_t shade = 0xFFD7DFEAu;
+    uint32_t button = 0xFF30D5C8u;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     if (x > (int)g_fb.w - 16) x = (int)g_fb.w - 16;
@@ -778,20 +785,19 @@ static void gui_draw_default_cursor(const fb_t* tgt, int x, int y, uint32_t colo
     if (x < 0) x = 0;
     if (y < 0) y = 0;
 
-    for (int row = 0; row < 16; row++) {
-        for (int col = 0; col < 12; col++) {
-            if ((bits[row] & (uint16_t)(0x8000u >> col)) == 0) continue;
-            for (int oy = -1; oy <= 1; oy++) {
-                for (int ox = -1; ox <= 1; ox++) {
-                    fb_putpixel(tgt, (uint16_t)(x + col + ox), (uint16_t)(y + row + oy), 0xFF000000u);
+    for (int row = 0; row < 8; row++) {
+        for (int col = 0; col < 8; col++) {
+            uint8_t px = shape[row][col];
+            uint32_t c = 0;
+            if (!px) continue;
+            if (px == 1) c = 0xFF101018u;
+            else if (px == 2) c = button;
+            else if (px == 3) c = shade;
+            else c = shell;
+            for (int sy = 0; sy < 2; sy++) {
+                for (int sx = 0; sx < 2; sx++) {
+                    fb_putpixel(tgt, (uint16_t)(x + col * 2 + sx), (uint16_t)(y + row * 2 + sy), c);
                 }
-            }
-        }
-    }
-    for (int row = 0; row < 16; row++) {
-        for (int col = 0; col < 12; col++) {
-            if (bits[row] & (uint16_t)(0x8000u >> col)) {
-                fb_putpixel(tgt, (uint16_t)(x + col), (uint16_t)(y + row), color);
             }
         }
     }
@@ -863,9 +869,10 @@ int gui_unicode_cursor_selftest(void)
     uint32_t old_error = g.cursor_last_error;
     gui_cursor_info_t info;
     int ok = 1;
-    if (gui_cursor_set_unicode(IMG_GLYPH_PUA_START) != 0) ok = 0;
+    if (img_glyph_ensure_mouse_cursor() != 0) ok = 0;
+    if (gui_cursor_set_unicode(IMG_GLYPH_MOUSE_CURSOR_CP) != 0) ok = 0;
     gui_cursor_info(&info);
-    if (ok && (!info.enabled || info.cp != IMG_GLYPH_PUA_START)) ok = 0;
+    if (ok && (!info.enabled || info.cp != IMG_GLYPH_MOUSE_CURSOR_CP || !info.assigned)) ok = 0;
     if (ok && gui_cursor_set_unicode(0x41u) == 0) ok = 0;
     g.cursor_enabled = old_enabled;
     g.cursor_cp = old_cp;

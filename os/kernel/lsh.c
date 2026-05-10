@@ -1335,7 +1335,7 @@ static void cmd_help(const char* args)
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
-    out_append("  cursor set U+E000|off           use a picture Unicode slot as the GUI cursor\n");
+    out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
     out_append("  notes show|add|clear            syncs notes.lardd and GUI notes.txt\n");
@@ -1411,6 +1411,7 @@ static void cmd_control(const char* args)
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
     out_append("  glyph live U+E000 on            enable realtime hover/click rendering for a picture glyph\n");
     out_append("  glyph pixel U+E000 0 0 ff00ff  edit an assigned Unicode picture slot in-place\n");
+    out_append("  cursor mouse      restore the pretty mouse at U+E004 as the default Unicode cursor\n");
     out_append("  cursor U+E000     assign the mouse cursor to a user-owned Unicode picture slot\n");
     out_append("  cfgprof save safe-ui save/load a bundle of settings\n");
     out_append("  userlaw show        inspect user-right policy principles\n");
@@ -4595,8 +4596,9 @@ static void cmd_glyph(const char* args)
         img_glyph_assign_pattern(0xE001u, "window");
         img_glyph_assign_pattern(0xE002u, "spark");
         img_glyph_assign_pattern(0xE003u, "badge");
+        img_glyph_assign_pattern(IMG_GLYPH_MOUSE_CURSOR_CP, "mouse");
         img_glyph_write_lardd();
-        out_append("glyph: demo picture characters assigned at U+E000..U+E003.\n");
+        out_append("glyph: demo picture characters assigned at U+E000..U+E004, including mouse at U+E004.\n");
         return;
     }
 
@@ -4947,7 +4949,7 @@ static void cursor_status(void)
 
 static void cursor_usage(void)
 {
-    out_append("Usage: cursor [status]|set U+E000|U+E000|off\n");
+    out_append("Usage: cursor [status]|mouse|default|set U+E000|U+E000|off\n");
 }
 
 static void cmd_cursor(const char* args)
@@ -4962,9 +4964,20 @@ static void cmd_cursor(const char* args)
         cursor_status();
         return;
     }
-    if (strcmp(sub, "off") == 0 || strcmp(sub, "default") == 0 || strcmp(sub, "block") == 0) {
+    if (strcmp(sub, "mouse") == 0 || strcmp(sub, "default") == 0) {
+        if (img_glyph_ensure_mouse_cursor() != 0 || gui_cursor_set_unicode(IMG_GLYPH_MOUSE_CURSOR_CP) != 0) {
+            out_append("cursor: failed to prepare the U+E004 mouse glyph.\n");
+            return;
+        }
+        out_append("cursor: unicode mouse cursor set to ");
+        glyph_out_cp(IMG_GLYPH_MOUSE_CURSOR_CP);
+        out_append(" (mouse)\n");
+        img_glyph_write_lardd();
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "block") == 0 || strcmp(sub, "fallback") == 0) {
         gui_cursor_disable();
-        out_append("cursor: default block cursor\n");
+        out_append("cursor: unicode cursor disabled; fallback mouse cursor active\n");
         return;
     }
     if (strcmp(sub, "set") == 0 || strcmp(sub, "unicode") == 0 || strcmp(sub, "glyph") == 0) {

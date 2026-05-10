@@ -4,6 +4,10 @@ LardOS is a small educational 64-bit x86 operating system. It boots from BIOS,
 switches through protected mode into long mode, then runs the kernel at
 `entry64.s` / `kernel64.c`.
 
+Its core value is user ownership: power should be visible, editable,
+explainable, local, and recoverable. Inside LSH, `values` or `userlaw show`
+renders the built-in `userlaw.lardd` statement.
+
 ### Prerequisites
 
 - `nasm`
@@ -41,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.51.0b-ami/lardos-v1.51.0b-ami.iso`. To publish the whole hardware
+`release/v1.52.0b-ami/lardos-v1.52.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -182,6 +186,9 @@ commands:
   `U+E004`. `cursor mouse` restores it, `cursor set U+E000` still lets the user
   choose another picture Unicode slot, and shaped cursor glyphs keep transparent
   pixels during live rendering.
+- `v1.52.0b` refreshes the LardOS value statement in `userlaw.lardd` and adds
+  `values` / `philosophy` shell aliases so the OS can restate its user-owned,
+  visible, editable, explainable, recoverable design goals from inside LSH.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It
@@ -240,6 +247,7 @@ commands:
 - `cfgprof save name` and `cfgprof load name` store/load settings bundles
   (`cfg profile` in the feature map), while `userlaw show` opens the user-right
   policy file.
+- `values` and `philosophy` are short aliases for rereading `userlaw.lardd`.
 - `larsview open file` tracks native document browsing state, `larsapp` treats
   `.lars` as a small app surface, and `notes show|add|clear` edits the writable
   `notes.lardd` document.

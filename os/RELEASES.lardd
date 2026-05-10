@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.52.0b
+ITEM Refreshes the LardOS user-law value statement so the OS restates its user-owned, visible, editable, explainable, recoverable design goals.
+ITEM Adds values and philosophy shell aliases that render userlaw.lardd directly from inside LardOS.
+ITEM Expands userlaw.lardd and userlaw reset with principles for local self-reliance, explainable automation, reversibility, repair over halt, honest releases, native formats, and visible OSLink communication.
+ITEM The control room and control command now point users toward the values document as a first-class control surface.
+ITEM This ships as beta because the value statement is a visible policy surface that should settle before official promotion.
+
 SECTION v1.51.0b
 ITEM Makes the default GUI cursor a pretty mouse picture glyph instead of a plain arrow fallback.
 ITEM The mouse cursor lives in the user-owned picture Unicode range at U+E004 and is named mouse in glyphmap.lardd.

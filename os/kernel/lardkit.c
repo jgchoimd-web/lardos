@@ -1510,14 +1510,25 @@ int lardkit_userlaw_reset(void)
     FsWritableFile* w = fs_open_writable("userlaw.lardd");
     static const char law[] =
         "LARDD 1\n"
-        "TITLE User Law\n"
-        "TEXT LardOS policy is stored as user-visible law, not hidden magic.\n"
-        "SECTION Principles\n"
-        "ITEM user may grant priority lev.10\n"
-        "ITEM SUM/raw control is visible to the user\n"
-        "ITEM magic must explain automatic execution\n"
-        "ITEM packages must be verifiable and undoable\n"
-        "ITEM operating systems should communicate through OSLink\n"
+        "TITLE LardOS User Law\n"
+        "TEXT LardOS is a user-owned, inspectable, self-hosted-feeling operating system.\n"
+        "TEXT The system should give control first, then explain risks in plain local files.\n"
+        "SECTION Core Values\n"
+        "ITEM User ownership: the user may inspect, change, override, repair, and replace OS behavior.\n"
+        "ITEM Visibility: powerful actions, recovery state, boot state, permissions, and automatic choices must be visible.\n"
+        "ITEM Local self-reliance: OS features use in-tree C, native file formats, and LardOS languages before outside dependencies.\n"
+        "ITEM Explainable automation: magic may execute predicted commands, but magic explain must say why.\n"
+        "ITEM Reversibility: settings, packages, and risky changes should have rollback, history, or capsule trails.\n"
+        "ITEM Repair over halt: panic room, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
+        "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
+        "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, LFS, and picture Unicode keep the system's surface its own.\n"
+        "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
+        "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink paths.\n"
+        "SECTION Commands\n"
+        "ITEM values -> read this law.\n"
+        "ITEM userlaw show -> read this law.\n"
+        "ITEM userlaw reset -> restore this law.\n"
+        "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
         "END\n";
     if (!w) return -1;
     w->size = 0;

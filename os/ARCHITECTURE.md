@@ -20,6 +20,12 @@ lardos/
 There is no `third_party/` TLS tree. TLS work lives in `kernel/lard_tls.c` and
 `include/lard_tls.h`.
 
+LardOS treats user ownership as an architectural constraint, not decoration:
+control surfaces should be visible, editable, explainable, local, and
+recoverable. The in-OS `userlaw.lardd` document, rendered with `values` or
+`userlaw show`, keeps that policy inspectable from the same native document
+stack as the rest of the system.
+
 ## Boot
 
 ```mermaid
@@ -426,6 +432,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.51.0b-vbox/lardos-v1.51.0b-vbox.iso`. Release ISOs also
+example `release/v1.52.0b-vbox/lardos-v1.52.0b-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

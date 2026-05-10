@@ -151,15 +151,28 @@ static const uint8_t cfgprof_init[] =
 static uint8_t ram_cfgprof_buf[CFGPROF_CAP];
 static FsWritableFile ram_cfgprof = { "cfgprof.lardd", ram_cfgprof_buf, 0, CFGPROF_CAP };
 
-#define USERLAW_CAP 2048u
+#define USERLAW_CAP 4096u
 static const uint8_t userlaw_init[] =
     "LARDD 1\n"
-    "TITLE User Law\n"
-    "TEXT LardOS user-right principles live here.\n"
-    "SECTION Principles\n"
-    "ITEM user may grant priority lev.10\n"
-    "ITEM SUM/raw control is visible to the user\n"
-    "ITEM magic must explain automatic execution\n"
+    "TITLE LardOS User Law\n"
+    "TEXT LardOS is a user-owned, inspectable, self-hosted-feeling operating system.\n"
+    "TEXT The system should give control first, then explain risks in plain local files.\n"
+    "SECTION Core Values\n"
+    "ITEM User ownership: the user may inspect, change, override, repair, and replace OS behavior.\n"
+    "ITEM Visibility: powerful actions, recovery state, boot state, permissions, and automatic choices must be visible.\n"
+    "ITEM Local self-reliance: OS features use in-tree C, native file formats, and LardOS languages before outside dependencies.\n"
+    "ITEM Explainable automation: magic may execute predicted commands, but magic explain must say why.\n"
+    "ITEM Reversibility: settings, packages, and risky changes should have rollback, history, or capsule trails.\n"
+    "ITEM Repair over halt: panic room, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
+    "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
+    "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, LFS, and picture Unicode keep the system's surface its own.\n"
+    "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
+    "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink paths.\n"
+    "SECTION Commands\n"
+    "ITEM values -> read this law.\n"
+    "ITEM userlaw show -> read this law.\n"
+    "ITEM userlaw reset -> restore this law.\n"
+    "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
 static FsWritableFile ram_userlaw = { "userlaw.lardd", ram_userlaw_buf, 0, USERLAW_CAP };
@@ -202,6 +215,7 @@ static const uint8_t file_lardos_lars[] =
     "title LardOS Control Room\n"
     "p A TempleOS-inspired, user-owned system built from C, in-tree tools, native filesystems, and LardOS languages.\n"
     "p LardOS local documents use LARS instead of HTML so the system owns its own document surface.\n"
+    "p Core value: the user owns the machine, and the OS must keep power visible, editable, explainable, and recoverable.\n"
     "p A GUI overlay chrome layer now draws clearer titles, safer tabs, button feedback, and output frames above the classic GUI.\n"
     "p LGUILIB files are native GUI library records that theme the overlay without external libraries.\n"
     "p The Doc tab can switch HTTP requests between GET and POST; POST reads the address as URL|body.\n"
@@ -254,6 +268,8 @@ static const uint8_t file_lardos_lars[] =
     "li Use ltheme preview default.ltheme and ltheme use night for native shell theme presets.\n"
     "li Use cfgprof save safe-ui and cfgprof load safe-ui for settings profiles.\n"
     "li Use userlaw show to inspect the OS policy principles that protect user control.\n"
+    "li Use values to reread the LardOS user-law values from inside the OS.\n"
+    "li v1.52.0b refreshes the LardOS value statement and adds a values command.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -339,6 +355,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd ltheme show default.ltheme\n"
     "cmd cfgprof save safe-ui\n"
     "cmd userlaw show\n"
+    "cmd values\n"
     "cmd lunit run tests.lunit\n"
     "cmd larsapp form lardos.lars\n"
     "cmd oschat say hello-from-lardkit\n"

@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.52.0b-ami/lardos-v1.52.0b-ami.iso`. To publish the whole hardware
+`release/v1.52.0a-ami/lardos-v1.52.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -189,6 +189,8 @@ commands:
 - `v1.52.0b` refreshes the LardOS value statement in `userlaw.lardd` and adds
   `values` / `philosophy` shell aliases so the OS can restate its user-owned,
   visible, editable, explainable, recoverable design goals from inside LSH.
+- `v1.52.0a` officially promotes the values/user-law refresh without feature
+  loss and ships universal, seabios, ami, vbox, usb, and realpc IMG/ISO media.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

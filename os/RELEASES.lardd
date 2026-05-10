@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.52.0a
+ITEM Official promotion of the LardOS user-law value statement refresh without feature loss.
+ITEM Keeps values and philosophy as direct shell aliases for rendering userlaw.lardd from inside LardOS.
+ITEM Keeps the expanded userlaw reset text covering user ownership, visibility, local self-reliance, explainable automation, reversibility, repair over halt, user-grantable power, native formats, honest releases, and visible OSLink communication.
+ITEM Keeps the control room and control command pointing users toward the values document as a first-class control surface.
+ITEM Release media uses official a-channel versioning with universal, seabios, ami, vbox, usb, and realpc IMG/ISO artifacts.
+
 SECTION v1.52.0b
 ITEM Refreshes the LardOS user-law value statement so the OS restates its user-owned, visible, editable, explainable, recoverable design goals.
 ITEM Adds values and philosophy shell aliases that render userlaw.lardd directly from inside LardOS.

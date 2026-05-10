@@ -2369,32 +2369,30 @@ void gui_render(void)
     int sb_h = view_h;
     int track_y;
     int track_h;
-    uint32_t sb_bg = 0xFF0E171C;
+    uint32_t sb_bg = 0xFF111619;
     uint32_t sb_track = 0xFF22323A;
-    uint32_t sb_bd = 0xFFB4CFD6;
+    uint32_t sb_bd = 0xFF60717C;
     uint32_t sb_th = 0xFF8FF3EA;
-    uint32_t sb_disabled = 0xFF6E8790;
+    uint32_t sb_disabled = 0xFF35434Au;
     uint32_t sb_arrow = 0xFFE0FFFF;
-    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, (uint16_t)sb_h, sb_bg);
-    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
-    fb_fill_rect(tgt, (uint16_t)(sb_x + sb_w - 1), (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
-
-    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, 1, sb_bd);
-    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)(sb_y + sb_h - 1), (uint16_t)sb_w, 1, sb_bd);
-    gui_scrollbar_track_rect(sb_y, sb_h, &track_y, &track_h);
-    if (track_y > sb_y) {
-        fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)(sb_y + 1), (uint16_t)(sb_w - 2), (uint16_t)(track_y - sb_y - 1), 0xFF30434Bu);
-        fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)(track_y + track_h), (uint16_t)(sb_w - 2), (uint16_t)(sb_y + sb_h - track_y - track_h - 1), 0xFF30434Bu);
-        gui_draw_scroll_arrow(tgt, sb_x + sb_w / 2, sb_y + 8, -1, sb_arrow);
-        gui_draw_scroll_arrow(tgt, sb_x + sb_w / 2, sb_y + sb_h - 9, 1, sb_arrow);
-    }
-    fb_fill_rect(tgt, (uint16_t)(sb_x + 2), (uint16_t)track_y, (uint16_t)(sb_w - 4), (uint16_t)track_h, sb_track);
-
     int max_scroll;
     int thumb_h;
     int thumb_y;
+    gui_scrollbar_track_rect(sb_y, sb_h, &track_y, &track_h);
     gui_scrollbar_metrics(track_y, track_h, rows, &max_scroll, &thumb_y, &thumb_h);
+    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, (uint16_t)sb_h, sb_bg);
+    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
+    fb_fill_rect(tgt, (uint16_t)(sb_x + sb_w - 1), (uint16_t)sb_y, 1, (uint16_t)sb_h, sb_bd);
+    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)sb_y, (uint16_t)sb_w, 1, sb_bd);
+    fb_fill_rect(tgt, (uint16_t)sb_x, (uint16_t)(sb_y + sb_h - 1), (uint16_t)sb_w, 1, sb_bd);
     if (max_scroll > 0) {
+        if (track_y > sb_y) {
+            fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)(sb_y + 1), (uint16_t)(sb_w - 2), (uint16_t)(track_y - sb_y - 1), 0xFF30434Bu);
+            fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)(track_y + track_h), (uint16_t)(sb_w - 2), (uint16_t)(sb_y + sb_h - track_y - track_h - 1), 0xFF30434Bu);
+            gui_draw_scroll_arrow(tgt, sb_x + sb_w / 2, sb_y + 8, -1, sb_arrow);
+            gui_draw_scroll_arrow(tgt, sb_x + sb_w / 2, sb_y + sb_h - 9, 1, sb_arrow);
+        }
+        fb_fill_rect(tgt, (uint16_t)(sb_x + 2), (uint16_t)track_y, (uint16_t)(sb_w - 4), (uint16_t)track_h, sb_track);
         fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)thumb_y, (uint16_t)(sb_w - 2), (uint16_t)thumb_h, sb_th);
         if (thumb_h > 18) {
             int gy = thumb_y + thumb_h / 2 - 3;
@@ -2402,13 +2400,10 @@ void gui_render(void)
             fb_fill_rect(tgt, (uint16_t)(sb_x + 3), (uint16_t)(gy + 3), (uint16_t)(sb_w - 6), 1, 0xFF1E6D70u);
         }
     } else if (sb_h > 6) {
-        int disabled_y = track_y + 2;
-        int disabled_h = track_h > 4 ? track_h - 4 : track_h;
-        fb_fill_rect(tgt, (uint16_t)(sb_x + 1), (uint16_t)disabled_y, (uint16_t)(sb_w - 2), (uint16_t)disabled_h, sb_disabled);
-        if (disabled_h > 20) {
-            int gy = disabled_y + disabled_h / 2 - 4;
-            fb_fill_rect(tgt, (uint16_t)(sb_x + 3), (uint16_t)gy, (uint16_t)(sb_w - 6), 1, 0xFF263A40u);
-            fb_fill_rect(tgt, (uint16_t)(sb_x + 3), (uint16_t)(gy + 4), (uint16_t)(sb_w - 6), 1, 0xFF263A40u);
+        int rail_x = sb_x + sb_w / 2 - 1;
+        fb_fill_rect(tgt, (uint16_t)rail_x, (uint16_t)(sb_y + 3), 3, (uint16_t)(sb_h - 6), sb_disabled);
+        if (sb_h > 16) {
+            fb_fill_rect(tgt, (uint16_t)(rail_x + 1), (uint16_t)(sb_y + 8), 1, (uint16_t)(sb_h - 16), 0xFF53636Au);
         }
     }
 

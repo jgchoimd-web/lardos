@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.52.6p
+ITEM Hotpatch for scrollbar usability after trying the louder v1.52.5p always-visible disabled scrollbar.
+ITEM Restores the quieter disabled rail for no-overflow output because it is easier to use and less visually noisy.
+ITEM Keeps the active scrollbar behavior for long output: visible track, proportional thumb, and matching drag hit-test.
+ITEM Keeps the v1.52.4p cursor edge behavior and user-owned Unicode cursor path intact.
+ITEM Build, ISO structure checks, and QEMU GUI smoke tests were rerun for hotpatch readiness.
+
 SECTION v1.52.5p
 ITEM Hotpatch for scrollbar visibility after v1.52.4p.
 ITEM The response pane now always draws a recognizable scrollbar: outer frame, top and bottom arrow caps, track, and thumb.

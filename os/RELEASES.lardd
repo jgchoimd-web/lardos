@@ -5,9 +5,17 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.55.0a
+ITEM Official release adding restart and reboot as explicit user-owned restart commands.
+ITEM restart and reboot sync writable RAM files, record trace and journal intent, then request a firmware or VM restart.
+ITEM Restart targets cover PCI reset control, BIOS-style 8042 reset, and a triple-fault fallback when ports are ignored.
+ITEM Magic treats restart and reboot as raw-control commands; plain magic refuses them, while magic -f restart is explicit.
+ITEM Keeps v1.54.0a magic -f behavior and v1.53.0a bye poweroff behavior intact.
+ITEM Built as hardware-profiled IMG/ISO artifacts for universal, seabios, ami, vbox, usb, and realpc.
+
 SECTION v1.54.0a
 ITEM Official release adding magic -f as an explicit user override for raw-control Magic predictions.
-ITEM Plain magic still refuses raw-control commands such as bye, poweroff, shutdown, SUM, peek, poke, and asm_.
+ITEM Plain magic still refuses raw-control commands such as bye, poweroff, shutdown, restart, reboot, SUM, peek, poke, and asm_.
 ITEM magic -f command records a force raw-control audit reason in magic explain before running the predicted command.
 ITEM magic dryrun -f command previews the forced prediction without executing it.
 ITEM Keeps v1.53.0a bye poweroff behavior and v1.52.6p quiet disabled scrollbar behavior intact.

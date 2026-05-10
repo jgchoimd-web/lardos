@@ -72,20 +72,19 @@ static uint32_t glyph_pattern_pixel(uint32_t cp, const char* name, uint16_t x, u
     uint32_t cool = 0xFF5E8CFFu;
 
     if (name && strcmp(name, "mouse") == 0) {
-        uint32_t shell = 0xFFF4F7FBu;
-        uint32_t shade = 0xFFD7DFEAu;
-        uint32_t button = 0xFF30D5C8u;
-        if ((x == 3u || x == 4u) && y == 0u) return ink;
-        if ((x == 2u || x == 5u) && y == 1u) return ink;
-        if (x >= 3u && x <= 4u && y == 1u) return button;
-        if ((x == 1u || x == 6u) && y >= 2u && y <= 5u) return ink;
-        if ((x == 2u || x == 5u) && y == 6u) return ink;
-        if ((x == 3u || x == 4u) && y == 7u) return ink;
-        if (x >= 2u && x <= 5u && y >= 2u && y <= 5u) {
-            if (x == 3u && y <= 4u) return 0xFF8B96A6u;
-            if ((x + y) & 1u) return shell;
-            return shade;
-        }
+        static const char* pointer[IMG_GLYPH_SIZE] = {
+            "K.......",
+            "KW......",
+            "KWW.....",
+            "KWWW....",
+            "KWWWW...",
+            "KWWKKK..",
+            "KWK..KK.",
+            "KK....K."
+        };
+        char p = pointer[y][x];
+        if (p == 'K') return ink;
+        if (p == 'W') return light;
         return 0x00000000u;
     }
     if (name && strcmp(name, "face") == 0) {

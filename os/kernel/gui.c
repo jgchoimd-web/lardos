@@ -2089,9 +2089,11 @@ void gui_render(void)
     fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)(tb_y - 12), input_label, 0xFFFFFFFF, win_bg);
 
     int view_x = g.win_x + 16;
-    int view_y = g.win_y + 180;
+    int view_y = tb_y + tb_h + 28;
     int view_w = g.win_w - 32;
-    int view_h = g.win_h - 190;
+    int view_h = (g.win_y + g.win_h) - view_y - 12;
+    if (view_h < 64) view_h = 64;
+    int view_label_y = view_y - 14;
     if ((g.tb_focused || (g.app_id == 9 && g.lafaelo_focus && !g.lafaelo_show_run)) && g.caret_on) {
         uint16_t cx, cy;
         if (g.app_id == 9 && g.lafaelo_focus) {
@@ -2125,7 +2127,7 @@ void gui_render(void)
     else if (g.app_id == 7) view_label = lsh_in_sum_mode() ? "SUM:" : "LSH:";
     else if (g.app_id == 8) view_label = "Output:";
     else if (g.app_id == 9) view_label = "Editor:";
-    fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)(g.win_y + 168),
+    fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)view_label_y,
                  g.loading ? "Response: Fetching..." : view_label, 0xFFFFFFFF, win_bg);
     int cols = (view_w - 12) / 8; // leave scrollbar space
     int rows = view_h / 10;
@@ -2235,9 +2237,9 @@ void gui_render(void)
         char cp_label[8];
         uint32_t cp = g.glyph_hover_cp ? g.glyph_hover_cp : g.glyph_last_cp;
         gui_cp_label(cp, cp_label, sizeof(cp_label));
-        fb_draw_text(tgt, (uint16_t)(g.win_x + 112), (uint16_t)(g.win_y + 168),
+        fb_draw_text(tgt, (uint16_t)(g.win_x + 112), (uint16_t)view_label_y,
                      g.glyph_hover_cp ? "Glyph hover " : "Glyph click ", 0xFFCFE3FFu, win_bg);
-        fb_draw_text(tgt, (uint16_t)(g.win_x + 208), (uint16_t)(g.win_y + 168),
+        fb_draw_text(tgt, (uint16_t)(g.win_x + 208), (uint16_t)view_label_y,
                      cp_label, 0xFFFFD166u, win_bg);
     }
     g.resp_total_lines = line + 1;

@@ -270,6 +270,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use userlaw show to inspect the OS policy principles that protect user control.\n"
     "li Use values to reread the LardOS user-law values from inside the OS.\n"
     "li v1.52.0a officially promotes the LardOS value statement and values command.\n"
+    "li v1.52.1p hotpatches the Unicode cursor art and input/output text spacing.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

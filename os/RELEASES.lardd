@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.52.1p
+ITEM Hotpatch for two small GUI polish regressions after the v1.52.0a official release.
+ITEM Replaces the default U+E004 mouse Unicode picture with a clearer pointer-shaped cursor while keeping the slot user-owned and editable.
+ITEM Moves the response/output pane below the input box using input-relative layout so URL/Cmd text, Response/LSH labels, and output lines no longer overlap.
+ITEM Keeps the values/user-law official release direction unchanged and does not remove any existing feature surface.
+ITEM Build, ISO structure checks, and QEMU screen smoke tests were rerun for hotpatch readiness.
+
 SECTION v1.52.0a
 ITEM Official promotion of the LardOS user-law value statement refresh without feature loss.
 ITEM Keeps values and philosophy as direct shell aliases for rendering userlaw.lardd from inside LardOS.

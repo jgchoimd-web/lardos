@@ -276,6 +276,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.52.4p fixes edge cursor clipping, keeps screenram from hiding the cursor, and restores visible disabled scrollbars.\n"
     "li v1.52.5p makes the response scrollbar always recognizable with arrows, track, and thumb.\n"
     "li v1.52.6p restores the quieter disabled rail while keeping active proportional scrolling.\n"
+    "li v1.53.0a officially adds bye for user-requested poweroff with sync, trace, journal, VM/firmware poweroff, and safe halt fallback.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

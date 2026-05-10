@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.52.6p-ami/lardos-v1.52.6p-ami.iso`. To publish the whole hardware
+`release/v1.53.0a-ami/lardos-v1.53.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -209,6 +209,9 @@ commands:
   the no-overflow state.
 - `v1.52.6p` restores the quieter disabled scrollbar rail for no-overflow
   output while keeping the proportional active scrollbar for long output.
+- `v1.53.0a` officially adds the `bye` command for user-requested poweroff.
+  It syncs RAM files, records trace/journal intent, tries native VM/firmware
+  poweroff ports, and falls back to a safe CPU halt if hardware ignores them.
 - `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
   the left pane hosts the existing GUI as the DE/WM center, the top-right pane
   mirrors the terminal, and the bottom-right pane shows information/status. It

@@ -81,6 +81,7 @@ static int g_have_bb;
 static const fb_t* g_syscall_target_override;
 
 static void gui_clamp_window(void);
+static void gui_apply_fullscreen(void);
 
 #define SCREENRAM_MAX_BYTES 8192u
 #define SCREENRAM_DEFAULT_W 64u
@@ -105,6 +106,11 @@ typedef struct {
 
     // Desktop app window
     int win_visible;
+    int fullscreen;
+    int restore_x;
+    int restore_y;
+    int restore_w;
+    int restore_h;
     int win_x;
     int win_y;
     int win_w;
@@ -570,6 +576,11 @@ int gui_init(void)
     g.win_y = usable_top + (usable_h - g.win_h) / 2;
     if (g.win_x < 0) g.win_x = 0;
     if (g.win_y < 0) g.win_y = 0;
+    g.fullscreen = 0;
+    g.restore_x = g.win_x;
+    g.restore_y = g.win_y;
+    g.restore_w = g.win_w;
+    g.restore_h = g.win_h;
     gui_clamp_window();
     g.win_visible = 1;
     g.dragging = 0;
@@ -913,6 +924,21 @@ static int in_rect(int x, int y, int rx, int ry, int rw, int rh)
     return x >= rx && y >= ry && x < (rx + rw) && y < (ry + rh);
 }
 
+static void gui_title_control_rects(int* out_set_x, int* out_min_x, int* out_full_x,
+                                    int* out_close_x, int* out_y, int* out_h)
+{
+    int close_x = g.win_x + g.win_w - 18;
+    int full_x = close_x - 18;
+    int min_x = full_x - 18;
+    int set_x = min_x - 42;
+    if (out_set_x) *out_set_x = set_x;
+    if (out_min_x) *out_min_x = min_x;
+    if (out_full_x) *out_full_x = full_x;
+    if (out_close_x) *out_close_x = close_x;
+    if (out_y) *out_y = g.win_y;
+    if (out_h) *out_h = 20;
+}
+
 static const char* gui_app_name(int app)
 {
     static const char* names[] = {
@@ -945,26 +971,79 @@ static void gui_dock_rect(int* out_x, int* out_y, int* out_w, int* out_h, int* o
     if (out_cell) *out_cell = cell;
 }
 
+static void gui_apply_fullscreen(void)
+{
+    if (!g_have_fb || !g.fullscreen) return;
+    g.win_x = 0;
+    g.win_y = 0;
+    g.win_w = (int)g_fb.w;
+    g.win_h = (int)g_fb.h;
+}
+
 static void gui_clamp_window(void)
 {
-    int dock_x, dock_y, dock_w, dock_h, cell;
-    int min_y = 28;
+    int min_y = 0;
     int max_x;
     int max_y;
     if (!g_have_fb) return;
-    gui_dock_rect(&dock_x, &dock_y, &dock_w, &dock_h, &cell);
-    (void)dock_x;
-    (void)dock_w;
-    (void)dock_h;
-    (void)cell;
+    if (g.fullscreen) {
+        gui_apply_fullscreen();
+        return;
+    }
+    if (g.win_w > (int)g_fb.w) g.win_w = (int)g_fb.w;
+    if (g.win_h > (int)g_fb.h) g.win_h = (int)g_fb.h;
+    if (g.win_w < 160 && (int)g_fb.w >= 160) g.win_w = 160;
+    if (g.win_h < 160 && (int)g_fb.h >= 160) g.win_h = 160;
     max_x = (int)g_fb.w - g.win_w;
-    max_y = dock_y - 8 - g.win_h;
+    max_y = (int)g_fb.h - g.win_h;
     if (max_x < 0) max_x = 0;
     if (max_y < min_y) max_y = min_y;
     if (g.win_x < 0) g.win_x = 0;
     if (g.win_y < min_y) g.win_y = min_y;
     if (g.win_x > max_x) g.win_x = max_x;
     if (g.win_y > max_y) g.win_y = max_y;
+}
+
+static void gui_toggle_fullscreen(void)
+{
+    if (!g_have_fb) return;
+    if (!g.fullscreen) {
+        g.restore_x = g.win_x;
+        g.restore_y = g.win_y;
+        g.restore_w = g.win_w;
+        g.restore_h = g.win_h;
+        g.fullscreen = 1;
+        gui_apply_fullscreen();
+    } else {
+        g.fullscreen = 0;
+        if (g.restore_w > 0 && g.restore_h > 0) {
+            g.win_x = g.restore_x;
+            g.win_y = g.restore_y;
+            g.win_w = g.restore_w;
+            g.win_h = g.restore_h;
+        }
+        gui_clamp_window();
+    }
+}
+
+static void gui_settings_panel_rect(int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    int panel_w = 196;
+    int panel_h = 108;
+    int panel_x;
+    int panel_y = g.win_y + 24;
+    if (g.win_w < panel_w + 8) panel_w = g.win_w > 8 ? g.win_w - 8 : g.win_w;
+    if (panel_w < 120 && g.win_w >= 120) panel_w = 120;
+    panel_x = g.win_x + g.win_w - panel_w - 4;
+    if (panel_x < g.win_x + 4) panel_x = g.win_x + 4;
+    if (panel_y + panel_h > g.win_y + g.win_h - 4) {
+        panel_h = g.win_y + g.win_h - 4 - panel_y;
+        if (panel_h < 72) panel_h = 72;
+    }
+    if (out_x) *out_x = panel_x;
+    if (out_y) *out_y = panel_y;
+    if (out_w) *out_w = panel_w;
+    if (out_h) *out_h = panel_h;
 }
 
 static void gui_desktop_icon_rect(int index, int* out_x, int* out_y, int* out_w, int* out_h)
@@ -1494,10 +1573,17 @@ void gui_handle_mouse(int dx, int dy, int buttons)
 
     // Title controls.
     int title_h = 20;
-    int close_btn_x = g.win_x + g.win_w - 18;
-    int min_btn_x = close_btn_x - 18;
-    int set_btn_x = min_btn_x - 42;
+    int close_btn_x;
+    int min_btn_x;
+    int full_btn_x;
+    int set_btn_x;
     int set_btn_w = 40;
+    int settings_capture = 0;
+    int settings_panel_x = 0;
+    int settings_panel_y = 0;
+    int settings_panel_w = 0;
+    int settings_panel_h = 0;
+    gui_title_control_rects(&set_btn_x, &min_btn_x, &full_btn_x, &close_btn_x, 0, 0);
     if (l_pressed && in_rect(g.mx, g.my, close_btn_x, g.win_y + 2, 14, 14)) {
         g.win_visible = 0;
         g.settings_open = 0;
@@ -1512,27 +1598,40 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         g.lafaelo_focus = 0;
         return;
     }
+    if (l_pressed && in_rect(g.mx, g.my, full_btn_x, g.win_y + 2, 14, 14)) {
+        gui_toggle_fullscreen();
+        g.slider_drag = 0;
+        return;
+    }
     if (l_pressed && in_rect(g.mx, g.my, set_btn_x, g.win_y, set_btn_w, title_h)) {
         g.settings_open = 1 - g.settings_open;
         g.slider_drag = 0;
+        return;
     }
     /* Slider hit-test on first click */
+    if (g.settings_open) {
+        gui_settings_panel_rect(&settings_panel_x, &settings_panel_y, &settings_panel_w, &settings_panel_h);
+    }
     if (g.settings_open && l_pressed) {
-        int panel_x = g.win_x + g.win_w - 200;
-        int panel_y = g.win_y + title_h + 4;
+        int panel_x = settings_panel_x;
+        int panel_y = settings_panel_y;
         int track_x = panel_x + 100;
-        int track_w = 90;
+        int track_w = settings_panel_w - 106;
         int row_h = 32;
         int th = 20;
+        if (track_w < 24) track_w = 24;
+        if (in_rect(g.mx, g.my, settings_panel_x, settings_panel_y, settings_panel_w, settings_panel_h)) settings_capture = 1;
         if (in_rect(g.mx, g.my, track_x, panel_y + 4, track_w, th)) g.slider_drag = 1;
         else if (in_rect(g.mx, g.my, track_x, panel_y + 4 + row_h, track_w, th)) g.slider_drag = 2;
         else if (in_rect(g.mx, g.my, track_x, panel_y + 4 + row_h * 2, track_w, th)) g.slider_drag = 3;
     }
     /* Slider drag: while dragging, update values from mouse */
     if (g.settings_open && g.slider_drag) {
-        int panel_x = g.win_x + g.win_w - 200;
+        int panel_x = settings_panel_x;
         int track_x = panel_x + 100;
-        int track_w = 90;
+        int track_w = settings_panel_w - 106;
+        settings_capture = 1;
+        if (track_w < 24) track_w = 24;
         if (g.slider_drag == 1) {
             int v = (g.mx - track_x) * 100 / track_w;
             if (v < 0) v = 0;
@@ -1550,12 +1649,20 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             g.quality = (v < 34) ? 0 : (v < 67) ? 1 : 2;
         }
     }
-    if (l_released) g.slider_drag = 0;
+    if (g.settings_open && l_down &&
+        in_rect(g.mx, g.my, settings_panel_x, settings_panel_y, settings_panel_w, settings_panel_h)) {
+        settings_capture = 1;
+    }
+    if (l_released) {
+        if (g.slider_drag) settings_capture = 1;
+        g.slider_drag = 0;
+    }
+    if (settings_capture) return;
 
     // Title bar drag (top 20px of window, exclude settings button)
     int drag_w = set_btn_x - g.win_x - 4;
     if (drag_w < 0) drag_w = 0;
-    if (l_pressed && in_rect(g.mx, g.my, g.win_x, g.win_y, drag_w, title_h)) {
+    if (!g.fullscreen && l_pressed && in_rect(g.mx, g.my, g.win_x, g.win_y, drag_w, title_h)) {
         g.dragging = 1;
         g.drag_off_x = g.mx - g.win_x;
         g.drag_off_y = g.my - g.win_y;
@@ -2307,9 +2414,11 @@ void gui_render(void)
     uint32_t border = 0xFF0B0D10;
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, (uint16_t)g.win_h, win_bg);
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, 20, title_bg);
-    int close_btn_x = g.win_x + g.win_w - 18;
-    int min_btn_x = close_btn_x - 18;
-    int set_btn_x = min_btn_x - 42;
+    int close_btn_x;
+    int min_btn_x;
+    int full_btn_x;
+    int set_btn_x;
+    gui_title_control_rects(&set_btn_x, &min_btn_x, &full_btn_x, &close_btn_x, 0, 0);
     int app_title_x = g.win_x + 96;
     int app_title_cells = (set_btn_x - app_title_x - 4) / 8;
     fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(g.win_y + 7), "LARDOS GUI", 0xFFFFFFFF, title_bg);
@@ -2319,11 +2428,25 @@ void gui_render(void)
     }
     uint32_t set_btn_bg = (g.settings_open || (g.mx >= set_btn_x && g.mx < set_btn_x + 40 && g.my >= g.win_y && g.my < g.win_y + 20)) ? 0xFF235D64 : 0xFF2A2F34;
     uint32_t min_btn_bg = (g.mx >= min_btn_x && g.mx < min_btn_x + 14 && g.my >= g.win_y + 2 && g.my < g.win_y + 16) ? 0xFF42504A : 0xFF2A2F34;
+    uint32_t full_btn_bg = (g.mx >= full_btn_x && g.mx < full_btn_x + 14 && g.my >= g.win_y + 2 && g.my < g.win_y + 16) ? 0xFF42504A : 0xFF2A2F34;
     uint32_t close_btn_bg = (g.mx >= close_btn_x && g.mx < close_btn_x + 14 && g.my >= g.win_y + 2 && g.my < g.win_y + 16) ? 0xFFB94747 : 0xFF803B45;
     fb_fill_rect(tgt, (uint16_t)set_btn_x, (uint16_t)g.win_y, 40, 20, set_btn_bg);
     fb_draw_text(tgt, (uint16_t)(set_btn_x + 8), (uint16_t)(g.win_y + 6), "Set", 0xFFFFFFFF, set_btn_bg);
     fb_fill_rect(tgt, (uint16_t)min_btn_x, (uint16_t)(g.win_y + 2), 14, 14, min_btn_bg);
     fb_fill_rect(tgt, (uint16_t)(min_btn_x + 3), (uint16_t)(g.win_y + 12), 8, 1, 0xFFFFFFFFu);
+    fb_fill_rect(tgt, (uint16_t)full_btn_x, (uint16_t)(g.win_y + 2), 14, 14, full_btn_bg);
+    if (g.fullscreen) {
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 4), (uint16_t)(g.win_y + 5), 6, 1, 0xFFFFFFFFu);
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 4), (uint16_t)(g.win_y + 5), 1, 5, 0xFFFFFFFFu);
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 7), (uint16_t)(g.win_y + 8), 5, 1, 0xFFFFFFFFu);
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 11), (uint16_t)(g.win_y + 8), 1, 5, 0xFFFFFFFFu);
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 7), (uint16_t)(g.win_y + 12), 5, 1, 0xFFFFFFFFu);
+    } else {
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 4), (uint16_t)(g.win_y + 5), 7, 1, 0xFFFFFFFFu);
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 4), (uint16_t)(g.win_y + 5), 1, 7, 0xFFFFFFFFu);
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 10), (uint16_t)(g.win_y + 5), 1, 7, 0xFFFFFFFFu);
+        fb_fill_rect(tgt, (uint16_t)(full_btn_x + 4), (uint16_t)(g.win_y + 11), 7, 1, 0xFFFFFFFFu);
+    }
     fb_fill_rect(tgt, (uint16_t)close_btn_x, (uint16_t)(g.win_y + 2), 14, 14, close_btn_bg);
     fb_draw_text(tgt, (uint16_t)(close_btn_x + 4), (uint16_t)(g.win_y + 6), "x", 0xFFFFFFFFu, close_btn_bg);
     // crude border
@@ -2614,23 +2737,25 @@ void gui_render(void)
         (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h,
         (uint32_t)g.mx, (uint32_t)g.my, (uint32_t)g.app_id, (uint32_t)g.settings_open,
         (uint32_t)g.btn_pressed, (uint32_t)g.tb_focused, (uint32_t)g.loading,
-        (uint32_t)g.http_post_mode, (uint32_t)g.user_sandbox,
+        (uint32_t)g.http_post_mode, (uint32_t)g.user_sandbox, (uint32_t)g.fullscreen,
     };
     guioverlay_draw(&overlay);
 
     /* Settings overlay */
     if (g.settings_open) {
-        int panel_x = g.win_x + g.win_w - 200;
-        int panel_y = g.win_y + 24;
-        int panel_w = 196;
-        int panel_h = 108;
+        int panel_x;
+        int panel_y;
+        int panel_w;
+        int panel_h;
+        gui_settings_panel_rect(&panel_x, &panel_y, &panel_w, &panel_h);
         uint32_t panel_bg = 0xFF20252B;
         fb_fill_rect(tgt, (uint16_t)panel_x, (uint16_t)panel_y, (uint16_t)panel_w, (uint16_t)panel_h, panel_bg);
         fb_fill_rect(tgt, (uint16_t)panel_x, (uint16_t)panel_y, (uint16_t)panel_w, 1, 0xFFFFB84D);
         fb_fill_rect(tgt, (uint16_t)panel_x, (uint16_t)(panel_y + panel_h - 1), (uint16_t)panel_w, 1, 0xFF0B0D10);
         int track_x = panel_x + 100;
-        int track_w = 90;
+        int track_w = panel_w - 106;
         int row_h = 32;
+        if (track_w < 24) track_w = 24;
         fb_draw_text(tgt, (uint16_t)(panel_x + 8), (uint16_t)(panel_y + 8), "Brightness", 0xFFFFFFFF, panel_bg);
         fb_fill_rect(tgt, (uint16_t)track_x, (uint16_t)(panel_y + 12), (uint16_t)track_w, 8, 0xFF111619);
         int br_pos = (g.brightness - 50) * track_w / 100;

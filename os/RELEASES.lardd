@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.58.1p
+ITEM Hotpatch for the latest default desktop GUI.
+ITEM Settings sliders for brightness, volume, and quality now capture mouse input so clicks no longer pass through to the tab bar and close the settings panel.
+ITEM Window dragging is no longer blocked by the bottom dock; normal windows can move across the full visible desktop while staying on-screen.
+ITEM Added a title-bar fullscreen/restore button beside minimize and close so the default GUI can enter and leave fullscreen without EXGUI/EXEXGUI.
+ITEM Keeps v1.58.0a's desktop icons, dock, LGUILIB/LTHEME path, user-owned cursor, and no-feature-loss GUI direction intact.
+ITEM Built as hardware-profiled IMG/ISO artifacts for universal, seabios, ami, vbox, usb, and realpc.
+
 SECTION v1.58.0a
 ITEM Official release promoting the default GUI into a traditional desktop shell.
 ITEM The default GUI now draws a persistent desktop background, top bar, desktop app icons, and a bottom dock without EXGUI or EXEXGUI.

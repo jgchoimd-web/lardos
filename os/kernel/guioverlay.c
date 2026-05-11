@@ -107,7 +107,8 @@ static void draw_title(const guioverlay_state_t* s)
     const lguilib_theme_t* th = overlay_theme();
     uint32_t title_bg = th->title_bg;
     uint32_t close_x = s->win_x + s->win_w - 18u;
-    uint32_t min_x = close_x - 18u;
+    uint32_t full_x = close_x - 18u;
+    uint32_t min_x = full_x - 18u;
     uint32_t set_x = min_x - 42u;
     fill(s->win_x, s->win_y, s->win_w, 20u, title_bg);
     fill(s->win_x, s->win_y + 19u, s->win_w, 1u, th->tab_accent);
@@ -118,6 +119,19 @@ static void draw_title(const guioverlay_state_t* s)
         text(set_x + 8u, s->win_y + 6u, "Set", th->title_fg, set_bg);
         fill(min_x, s->win_y + 2u, 14u, 14u, th->tab_idle);
         fill(min_x + 3u, s->win_y + 12u, 8u, 1u, th->title_fg);
+        fill(full_x, s->win_y + 2u, 14u, 14u, th->tab_idle);
+        if (s->fullscreen) {
+            fill(full_x + 4u, s->win_y + 5u, 6u, 1u, th->title_fg);
+            fill(full_x + 4u, s->win_y + 5u, 1u, 5u, th->title_fg);
+            fill(full_x + 7u, s->win_y + 8u, 5u, 1u, th->title_fg);
+            fill(full_x + 11u, s->win_y + 8u, 1u, 5u, th->title_fg);
+            fill(full_x + 7u, s->win_y + 12u, 5u, 1u, th->title_fg);
+        } else {
+            fill(full_x + 4u, s->win_y + 5u, 7u, 1u, th->title_fg);
+            fill(full_x + 4u, s->win_y + 5u, 1u, 7u, th->title_fg);
+            fill(full_x + 10u, s->win_y + 5u, 1u, 7u, th->title_fg);
+            fill(full_x + 4u, s->win_y + 11u, 7u, 1u, th->title_fg);
+        }
         fill(close_x, s->win_y + 2u, 14u, 14u, 0xFF803B45u);
         text(close_x + 4u, s->win_y + 6u, "x", th->title_fg, 0xFF803B45u);
     }
@@ -258,6 +272,7 @@ int guioverlay_selftest(void)
     s.loading = 0u;
     s.http_post_mode = 0u;
     s.user_sandbox = 0u;
+    s.fullscreen = 0u;
     if (!overlay_layout_ok(&s)) return -1;
     s.win_w = 150u;
     if (overlay_layout_ok(&s)) return -2;

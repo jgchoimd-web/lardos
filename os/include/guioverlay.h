@@ -16,6 +16,7 @@ typedef struct {
     uint32_t loading;
     uint32_t http_post_mode;
     uint32_t user_sandbox;
+    uint32_t fullscreen;
 } guioverlay_state_t;
 
 void guioverlay_draw(const guioverlay_state_t* state);

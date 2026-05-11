@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.58.0a-ami/lardos-v1.58.0a-ami.iso`. To publish the whole hardware
+`release/v1.58.1p-ami/lardos-v1.58.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -127,6 +127,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.58.1p` hotpatches the new default desktop GUI: settings sliders no
+  longer close the settings panel when clicked, normal windows can move across
+  the full visible desktop, and the title bar has a fullscreen/restore button.
 - `v1.58.0a` promotes the default GUI into a traditional desktop: top bar,
   desktop app icons, a bottom dock, app launching from icons, and a window that
   can be minimized or closed and reopened from the dock.
@@ -231,6 +234,9 @@ commands:
   GUI overhaul.
 - `v1.58.0a` officially ships that new default desktop surface with a dock,
   desktop launchers, and hideable app windows.
+- `v1.58.1p` hotpatches that desktop surface so settings sliders keep focus,
+  windows can move to the full screen area, and fullscreen/restore is available
+  from the title bar.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.

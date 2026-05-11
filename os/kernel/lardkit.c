@@ -1,8 +1,6 @@
 #include "lardkit.h"
 
 #include "bootprof.h"
-#include "exexgui.h"
-#include "exgui.h"
 #include "fs.h"
 #include "gui.h"
 #include "lard_doc.h"
@@ -587,13 +585,9 @@ void lardkit_bugeye_info(lardkit_bugeye_info_t* out)
 
 int lardkit_snapshot(const char* label)
 {
-    exgui_info_t eg;
-    exexgui_info_t xg;
     bootprof_info_t bp;
     awake_info_t aw;
     lassist_info_t bi;
-    exgui_info(&eg);
-    exexgui_info(&xg);
     bootprof_info(&bp);
     awake_info(&aw);
     lassist_info(&bi);
@@ -601,11 +595,6 @@ int lardkit_snapshot(const char* label)
     s_lardkit.rollback.snapshots++;
     scopy(s_lardkit.rollback.label, sizeof(s_lardkit.rollback.label),
           label && label[0] ? label : "manual");
-    s_lardkit.rollback.exgui_enabled = eg.enabled;
-    s_lardkit.rollback.exgui_style = eg.style;
-    s_lardkit.rollback.exgui_layout = eg.layout;
-    s_lardkit.rollback.exexgui_enabled = xg.enabled;
-    s_lardkit.rollback.exexgui_focus = xg.focus;
     s_lardkit.rollback.buddy_enabled = bi.enabled;
     s_lardkit.rollback.http_post = (uint32_t)gui_http_post_mode();
     s_lardkit.rollback.task_default = taskprio_default_priority();
@@ -616,35 +605,9 @@ int lardkit_snapshot(const char* label)
     return 0;
 }
 
-static const char* style_name(uint32_t style)
-{
-    if (style == 1u) return "linux";
-    if (style == 2u) return "mac";
-    return "win";
-}
-
-static const char* layout_name(uint32_t layout)
-{
-    if (layout == 1u) return "tile";
-    if (layout == 2u) return "stack";
-    return "float";
-}
-
-static const char* focus_name(uint32_t focus)
-{
-    if (focus == 1u) return "term";
-    if (focus == 2u) return "info";
-    return "gui";
-}
-
 int lardkit_rollback_apply(void)
 {
     if (!s_lardkit.rollback.valid) return -1;
-    exgui_enable((int)s_lardkit.rollback.exgui_enabled);
-    (void)exgui_set_style(style_name(s_lardkit.rollback.exgui_style));
-    (void)exgui_set_layout(layout_name(s_lardkit.rollback.exgui_layout));
-    exexgui_enable((int)s_lardkit.rollback.exexgui_enabled);
-    (void)exexgui_set_focus(focus_name(s_lardkit.rollback.exexgui_focus));
     lassist_enable((int)s_lardkit.rollback.buddy_enabled);
     gui_http_set_post_mode((int)s_lardkit.rollback.http_post);
     taskprio_set_default(s_lardkit.rollback.task_default);
@@ -1136,7 +1099,6 @@ int lardkit_theme_use(const char* name)
     if (idx == 0xFFFFFFFFu) return -1;
     s_lardkit.active_theme = idx;
     s_lardkit.custom_theme_active = 0u;
-    (void)exgui_set_style(style_name(s_themes[idx].style_hint));
     return 0;
 }
 
@@ -1241,7 +1203,6 @@ int lardkit_theme_use_data(const uint8_t* data, uint32_t len)
     if (lardkit_theme_parse(data, len, &parsed) != 0) return -1;
     s_lardkit.custom_theme = parsed;
     s_lardkit.custom_theme_active = 1u;
-    (void)exgui_set_style(style_name(parsed.style_hint));
     return 0;
 }
 
@@ -1281,24 +1242,15 @@ int lardkit_theme_preview_draw(const lardkit_theme_info_t* theme)
 
 static void cfg_profile_from_current(lardkit_cfg_profile_t* p, const char* name)
 {
-    exgui_info_t eg;
-    exexgui_info_t xg;
     bootprof_info_t bp;
     awake_info_t aw;
     lassist_info_t bi;
     if (!p) return;
-    exgui_info(&eg);
-    exexgui_info(&xg);
     bootprof_info(&bp);
     awake_info(&aw);
     lassist_info(&bi);
     p->valid = 1u;
     scopy(p->name, sizeof(p->name), name && name[0] ? name : "profile");
-    p->exgui_enabled = eg.enabled;
-    p->exgui_style = eg.style;
-    p->exgui_layout = eg.layout;
-    p->exexgui_enabled = xg.enabled;
-    p->exexgui_focus = xg.focus;
     p->buddy_enabled = bi.enabled;
     p->http_post = (uint32_t)gui_http_post_mode();
     p->task_default = taskprio_default_priority();
@@ -1310,11 +1262,6 @@ static void cfg_profile_from_current(lardkit_cfg_profile_t* p, const char* name)
 static int cfg_profile_apply(const lardkit_cfg_profile_t* p)
 {
     if (!p || !p->valid) return -1;
-    exgui_enable((int)p->exgui_enabled);
-    (void)exgui_set_style(style_name(p->exgui_style));
-    (void)exgui_set_layout(layout_name(p->exgui_layout));
-    exexgui_enable((int)p->exexgui_enabled);
-    (void)exexgui_set_focus(focus_name(p->exexgui_focus));
     lassist_enable((int)p->buddy_enabled);
     gui_http_set_post_mode((int)p->http_post);
     taskprio_set_default(p->task_default);

@@ -5,8 +5,6 @@
 #include "bootprof.h"
 #include "cpumode.h"
 #include "crashlog.h"
-#include "exgui.h"
-#include "exexgui.h"
 #include "fs.h"
 #include "gui.h"
 #include "img_glyph.h"
@@ -157,8 +155,6 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("gui: clickable image glyphs", gui_img_glyph_interaction_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: unicode cursor slot", gui_unicode_cursor_selftest() == 0, emit, user, &pass, &fail);
     post_check("kit: user feature suite", lardkit_selftest() == 0, emit, user, &pass, &fail);
-    post_check("gui: exgui desktop layer", exgui_selftest() == 0, emit, user, &pass, &fail);
-    post_check("gui: exexgui split layout", exexgui_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: lard buddy assistant", lassist_selftest() == 0, emit, user, &pass, &fail);
 
     post_check("lcnt: defaults", lcontainer_count() >= 3u, emit, user, &pass, &fail);

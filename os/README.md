@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.56.0a-ami/lardos-v1.56.0a-ami.iso`. To publish the whole hardware
+`release/v1.58.0a-ami/lardos-v1.58.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -127,13 +127,12 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
-- `exgui on|off|style|layout|next` enables an optional extended desktop
-  environment and window-manager layer. The classic GUI stays intact, while
-  EXGUI adds familiar Windows-like, Linux-like, or Mac-like panels, docks,
-  launchers, task lists, and floating/tile/stack window chrome.
-- `v1.36.0b` starts the GUI polish track: the classic GUI, EXGUI, EXEXGUI, and
-  LGUILIB default theme share a warmer multi-accent visual style while keeping
-  the previous controls and commands intact.
+- `v1.58.0a` promotes the default GUI into a traditional desktop: top bar,
+  desktop app icons, a bottom dock, app launching from icons, and a window that
+  can be minimized or closed and reopened from the dock.
+- `v1.36.0b` started the GUI polish track; `v1.57.0b` removes the old optional
+  EXGUI/EXEXGUI layers so the default GUI can become the single polished desktop
+  surface.
 - `v1.37.0b` expands TempleOS-style picture Unicode: `glyph demo`,
   `glyph load U+E000 sample.bmp avatar`, `glyph auto sample.bmp avatar`,
   `glyph list`, `glyph show`, `glyph insert`, and `glyph write` let the user
@@ -227,18 +226,18 @@ commands:
   ports, keyboard-controller reset, and triple-fault fallback.
 - `v1.56.0a` officially adds `byebye` as a friendlier explicit alias for `bye`
   while keeping it raw-control for Magic unless the user runs `magic -f byebye`.
-- `exexgui on|off|focus|next|workspace|save|load` enables the sketch-driven extended extended GUI:
-  the left pane hosts the existing GUI as the DE/WM center, the top-right pane
-  mirrors the terminal, and the bottom-right pane shows information/status. It
-  is opt-in, so the previous classic GUI and EXGUI layer remain available.
-  Workspaces `1..3` remember the split shell enabled/focus state.
+- `v1.57.0b` removes the opt-in EXGUI/EXEXGUI shells from the build, command
+  surface, POST, rollback, and cfg profiles as preparation for the next default
+  GUI overhaul.
+- `v1.58.0a` officially ships that new default desktop surface with a dock,
+  desktop launchers, and hideable app windows.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.
 - `cfgsh`, `cfg`, and `settings` provide a settings-focused shell. Enter
   `cfgsh` to get a `CFG#` prompt, then use `mode value` commands such as
-  `awake on`, `style 2`, `layout 3`, `pane 1`, `http 2`, `boot 4`,
-  `priority 10`, `sandbox off`, or `sum on`. Outside the mode, `cfg style 2`
+  `awake on`, `ltheme night`, `http 2`, `boot 4`,
+  `priority 10`, `sandbox off`, or `sum on`. Outside the mode, `cfg ltheme night`
   runs one setting change directly.
 - `buddy on|off|status|joke|next` controls Lard Buddy, an optional roaming
   assistant overlay. It follows the GUI surface, offers casual tips, and tells
@@ -353,13 +352,12 @@ During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
 Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
 descriptors, expected PCI devices, GUI framebuffer/layout state, ScreenRAM
-scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec filtering, TaskPrio
+scratch storage, OSLink packet framing, local bus, and safe exec filtering, TaskPrio
 scheduling, BootProf profile flags, CrashLog writes, LardKit user-control suite, LARS form parsing,
 LardPack package parsing, LPST persistence metadata, LVCS hashing, containers,
 ScreenCheck visual diagnostics, VM Monitor budgets, Shrine/LSS wrappers, and LIL feature forms. The screen checks are there to catch visible boot/UI
 regressions as well as code errors. POST also checks the LGUILIB parser, GUI
-overlay chrome, Awakening background loader tracker, and EXEXGUI's split layout
-math so the drawn regions do not collapse.
+overlay chrome, and Awakening background loader tracker.
 
 Each feature addition gets a release: choose `a`, `b`, or `p` by risk, bump the
 kernel version, add an entry to `os/RELEASES.lardd`, keep the embedded

@@ -33,11 +33,6 @@ typedef struct {
     uint32_t snapshots;
     uint32_t applied;
     char label[LARDKIT_NAME_MAX + 1u];
-    uint32_t exgui_enabled;
-    uint32_t exgui_style;
-    uint32_t exgui_layout;
-    uint32_t exexgui_enabled;
-    uint32_t exexgui_focus;
     uint32_t buddy_enabled;
     uint32_t http_post;
     int32_t task_default;
@@ -110,11 +105,6 @@ typedef struct {
 typedef struct {
     uint32_t valid;
     char name[LARDKIT_NAME_MAX + 1u];
-    uint32_t exgui_enabled;
-    uint32_t exgui_style;
-    uint32_t exgui_layout;
-    uint32_t exexgui_enabled;
-    uint32_t exexgui_focus;
     uint32_t buddy_enabled;
     uint32_t http_post;
     int32_t task_default;

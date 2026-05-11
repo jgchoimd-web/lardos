@@ -25,8 +25,6 @@
 #include "post.h"
 #include "cpumode.h"
 #include "screencheck.h"
-#include "exgui.h"
-#include "exexgui.h"
 #include "lguilib.h"
 #include "lassist.h"
 #include "lardtime.h"
@@ -288,7 +286,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "exgui", 1 }, { "exexgui", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -1365,11 +1363,9 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat exgui exexgui lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
-    out_append("  exgui on|off|style win|linux|mac|layout float|tile|stack|next\n");
-    out_append("  exexgui on|off|focus gui|term|info|next|workspace 1|save 1|load 1|test\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
@@ -1447,10 +1443,8 @@ static void cmd_control(const char* args)
     out_append("  trust history       audit permission allow/deny changes\n");
     out_append("  oslink bus          inspect LardOS-internal OSLink messages\n");
     out_append("  oschat say hello    send a local OSLink chat-style message\n");
-    out_append("  exgui style mac     enable familiar desktop/window chrome\n");
-    out_append("  exexgui on          use sketch split: GUI, terminal, status\n");
     out_append("  cfgsh               enter mode-name value settings shell\n");
-    out_append("  cfg style 2         set desktop style by number\n");
+    out_append("  cfg ltheme night    set default GUI theme preset\n");
     out_append("  buddy on            enable the roaming casual assistant\n");
     out_append("  task list           inspect and reprioritize queued tasks\n");
     out_append("  priority history    show who granted priority lev.10 and when\n");
@@ -1689,32 +1683,6 @@ static void cmd_status(const char* args)
     out_append_u32(sram.capacity);
     out_append(", used=");
     out_append_u32(sram.used);
-    out_append("\n");
-
-    exgui_info_t xg;
-    exgui_info(&xg);
-    out_append("EXGUI: ");
-    out_append(xg.enabled ? "on" : "off");
-    out_append(", style=");
-    out_append(exgui_style_name(xg.style));
-    out_append(", layout=");
-    out_append(exgui_layout_name(xg.layout));
-    out_append("\n");
-
-    exexgui_info_t xxg;
-    exexgui_info(&xxg);
-    out_append("EXEXGUI: ");
-    out_append(xxg.enabled ? "on" : "off");
-    out_append(", focus=");
-    out_append(exexgui_focus_name(xxg.focus));
-    out_append(", gui=");
-    out_append_u32(xxg.layout.gui.w);
-    out_append("x");
-    out_append_u32(xxg.layout.gui.h);
-    out_append(", term=");
-    out_append_u32(xxg.layout.term.w);
-    out_append("x");
-    out_append_u32(xxg.layout.term.h);
     out_append("\n");
 
     lguilib_info_t lgui;
@@ -2141,168 +2109,6 @@ static void cmd_screencheck(const char* args)
         return;
     }
     out_append("Usage: screencheck status|retro|test\n");
-}
-
-static void cmd_exgui_status(void)
-{
-    exgui_info_t info;
-    exgui_info(&info);
-    out_append("EXGUI ");
-    out_append(info.enabled ? "on" : "off");
-    out_append(" style=");
-    out_append(exgui_style_name(info.style));
-    out_append(" layout=");
-    out_append(exgui_layout_name(info.layout));
-    out_append(" focused=");
-    out_append_u32(info.focused);
-    out_append("/");
-    out_append_u32(info.window_count);
-    out_append(" err=");
-    out_append_u32(info.last_error);
-    out_append("\n");
-}
-
-static void cmd_exgui(const char* args)
-{
-    char sub[16];
-    char value[16];
-    if (!args) args = "";
-    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
-        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
-        cmd_exgui_status();
-        return;
-    }
-    if (strcmp(sub, "on") == 0) {
-        exgui_enable(1);
-        out_append("exgui: enabled.\n");
-        return;
-    }
-    if (strcmp(sub, "off") == 0) {
-        exgui_enable(0);
-        out_append("exgui: disabled; classic GUI remains active.\n");
-        return;
-    }
-    if (strcmp(sub, "style") == 0 || strcmp(sub, "theme") == 0) {
-        if (vcs_read_word(&args, value, sizeof(value)) != 0 || exgui_set_style(value) != 0) {
-            out_append("Usage: exgui style win|linux|mac\n");
-            return;
-        }
-        cmd_exgui_status();
-        return;
-    }
-    if (strcmp(sub, "layout") == 0 || strcmp(sub, "wm") == 0) {
-        if (vcs_read_word(&args, value, sizeof(value)) != 0 || exgui_set_layout(value) != 0) {
-            out_append("Usage: exgui layout float|tile|stack\n");
-            return;
-        }
-        cmd_exgui_status();
-        return;
-    }
-    if (strcmp(sub, "next") == 0 || strcmp(sub, "focus") == 0) {
-        exgui_focus_next();
-        cmd_exgui_status();
-        return;
-    }
-    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
-        out_append(exgui_selftest() == 0 ? "exgui: selftest OK\n" : "exgui: selftest failed\n");
-        return;
-    }
-    out_append("Usage: exgui on|off|status|style|layout|next|test\n");
-}
-
-static void cmd_exexgui_status(void)
-{
-    exexgui_info_t info;
-    exexgui_info(&info);
-    out_append("EXEXGUI ");
-    out_append(info.enabled ? "on" : "off");
-    out_append(" focus=");
-    out_append(exexgui_focus_name(info.focus));
-    out_append(" workspace=");
-    out_append_u32(info.workspace);
-    out_append(" gui=");
-    out_append_u32(info.layout.gui.w);
-    out_append("x");
-    out_append_u32(info.layout.gui.h);
-    out_append(" term=");
-    out_append_u32(info.layout.term.w);
-    out_append("x");
-    out_append_u32(info.layout.term.h);
-    out_append(" info=");
-    out_append_u32(info.layout.info.w);
-    out_append("x");
-    out_append_u32(info.layout.info.h);
-    out_append(" err=");
-    out_append_u32(info.last_error);
-    out_append("\n");
-}
-
-static void cmd_exexgui(const char* args)
-{
-    char sub[16];
-    char value[16];
-    if (!args) args = "";
-    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
-        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
-        cmd_exexgui_status();
-        return;
-    }
-    if (strcmp(sub, "on") == 0 || strcmp(sub, "apply") == 0 || strcmp(sub, "sketch") == 0) {
-        exexgui_enable(1);
-        out_append("exexgui: enabled sketch split layout.\n");
-        cmd_exexgui_status();
-        return;
-    }
-    if (strcmp(sub, "off") == 0) {
-        exexgui_enable(0);
-        out_append("exexgui: disabled; classic GUI and EXGUI stay available.\n");
-        return;
-    }
-    if (strcmp(sub, "focus") == 0 || strcmp(sub, "pane") == 0) {
-        if (vcs_read_word(&args, value, sizeof(value)) != 0 || exexgui_set_focus(value) != 0) {
-            out_append("Usage: exexgui focus gui|term|info\n");
-            return;
-        }
-        cmd_exexgui_status();
-        return;
-    }
-    if (strcmp(sub, "next") == 0) {
-        exexgui_focus_next();
-        cmd_exexgui_status();
-        return;
-    }
-    if (strcmp(sub, "workspace") == 0 || strcmp(sub, "ws") == 0) {
-        uint64_t id;
-        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_select((uint32_t)id) != 0) {
-            out_append("Usage: exexgui workspace 1|2|3\n");
-            return;
-        }
-        cmd_exexgui_status();
-        return;
-    }
-    if (strcmp(sub, "save") == 0) {
-        uint64_t id;
-        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_save((uint32_t)id) != 0) {
-            out_append("Usage: exexgui save 1|2|3\n");
-            return;
-        }
-        out_append("exexgui: workspace saved.\n");
-        return;
-    }
-    if (strcmp(sub, "load") == 0) {
-        uint64_t id;
-        if (lsh_parse_u64(&args, &id) != 0 || exexgui_workspace_load((uint32_t)id) != 0) {
-            out_append("Usage: exexgui load 1|2|3\n");
-            return;
-        }
-        cmd_exexgui_status();
-        return;
-    }
-    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
-        out_append(exexgui_selftest() == 0 ? "exexgui: selftest OK\n" : "exexgui: selftest failed\n");
-        return;
-    }
-    out_append("Usage: exexgui on|off|status|focus|next|workspace 1|save 1|load 1|test\n");
 }
 
 static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
@@ -3002,15 +2808,7 @@ static void cmd_rollback_status(void)
     out_append_u32(info.applied);
     out_append("\n");
     if (info.valid) {
-        out_append("exgui=");
-        out_append_u32(info.exgui_enabled);
-        out_append(" style=");
-        out_append_u32(info.exgui_style);
-        out_append(" layout=");
-        out_append_u32(info.exgui_layout);
-        out_append(" split=");
-        out_append_u32(info.exexgui_enabled);
-        out_append(" buddy=");
+        out_append("buddy=");
         out_append_u32(info.buddy_enabled);
         out_append(" http=");
         out_append(info.http_post ? "POST" : "GET");
@@ -6142,39 +5940,6 @@ static int cfgsh_bool_value(const char* value, int* out)
     return -1;
 }
 
-static const char* cfgsh_style_value(const char* value)
-{
-    if (strcmp(value, "1") == 0) return "win";
-    if (strcmp(value, "2") == 0) return "linux";
-    if (strcmp(value, "3") == 0) return "mac";
-    if (strcmp(value, "win") == 0 || strcmp(value, "windows") == 0) return "win";
-    if (strcmp(value, "linux") == 0 || strcmp(value, "gnome") == 0 || strcmp(value, "kde") == 0) return "linux";
-    if (strcmp(value, "mac") == 0 || strcmp(value, "macos") == 0) return "mac";
-    return NULL;
-}
-
-static const char* cfgsh_layout_value(const char* value)
-{
-    if (strcmp(value, "1") == 0) return "float";
-    if (strcmp(value, "2") == 0) return "tile";
-    if (strcmp(value, "3") == 0) return "stack";
-    if (strcmp(value, "float") == 0 || strcmp(value, "floating") == 0) return "float";
-    if (strcmp(value, "tile") == 0 || strcmp(value, "tiling") == 0) return "tile";
-    if (strcmp(value, "stack") == 0 || strcmp(value, "stacked") == 0) return "stack";
-    return NULL;
-}
-
-static const char* cfgsh_focus_value(const char* value)
-{
-    if (strcmp(value, "1") == 0) return "gui";
-    if (strcmp(value, "2") == 0) return "term";
-    if (strcmp(value, "3") == 0) return "info";
-    if (strcmp(value, "gui") == 0 || strcmp(value, "de") == 0 || strcmp(value, "wm") == 0) return "gui";
-    if (strcmp(value, "term") == 0 || strcmp(value, "terminal") == 0 || strcmp(value, "shell") == 0) return "term";
-    if (strcmp(value, "info") == 0 || strcmp(value, "status") == 0) return "info";
-    return NULL;
-}
-
 static const char* cfgsh_boot_value(const char* value)
 {
     if (strcmp(value, "1") == 0) return "normal";
@@ -6194,18 +5959,13 @@ static void cfgsh_help(void)
     out_append("CFGSH settings shell\n");
     out_append("  cfgsh              enter settings shell (CFG# prompt)\n");
     out_append("  exitcfg            leave settings shell\n");
-    out_append("  setting value      e.g. awake on, style 2, layout 3, boot 4\n");
+    out_append("  setting value      e.g. awake on, ltheme night, http 2, boot 4\n");
     out_append("Settings:\n");
     out_append("  awake on|off       next boot fast-surface mode\n");
-    out_append("  exgui on|off       extended desktop layer\n");
-    out_append("  style 1|2|3        win|linux|mac\n");
-    out_append("  layout 1|2|3       float|tile|stack\n");
-    out_append("  split on|off       EXEXGUI sketch split\n");
     out_append("  buddy on|off|mood  roaming easygoing assistant\n");
     out_append("  bugeye on|off      visual bug monitor\n");
     out_append("  ltheme name        classic|contrast|night|amber\n");
     out_append("  rollback snap|apply settings snapshot restore\n");
-    out_append("  pane 1|2|3         gui|term|info focus\n");
     out_append("  sram on|off        screen scratch RAM\n");
     out_append("  http 1|2           GET|POST mode\n");
     out_append("  boot 1..5          normal|safe|netoff|dev|awakening\n");
@@ -6219,8 +5979,6 @@ static void cfgsh_status(void)
 {
     bootprof_info_t bp;
     awake_info_t aw;
-    exgui_info_t eg;
-    exexgui_info_t xx;
     gui_screenram_info_t sr;
     taskprio_info_t tp;
     lassist_info_t buddy;
@@ -6229,8 +5987,6 @@ static void cfgsh_status(void)
     lardkit_rollback_info_t rb;
     bootprof_info(&bp);
     awake_info(&aw);
-    exgui_info(&eg);
-    exexgui_info(&xx);
     gui_screenram_info(&sr);
     taskprio_info(&tp);
     lassist_info(&buddy);
@@ -6244,17 +6000,7 @@ static void cfgsh_status(void)
     out_append(bp.awakening_mode ? "on" : "off");
     out_append(" loader=");
     out_append(aw.enabled ? (aw.done ? "done" : "background") : "off");
-    out_append("\n  exgui=");
-    out_append(eg.enabled ? "on" : "off");
-    out_append(" style=");
-    out_append(exgui_style_name(eg.style));
-    out_append(" layout=");
-    out_append(exgui_layout_name(eg.layout));
-    out_append(" split=");
-    out_append(xx.enabled ? "on" : "off");
-    out_append(" pane=");
-    out_append(exexgui_focus_name(xx.focus));
-    out_append(" buddy=");
+    out_append("\n  buddy=");
     out_append(buddy.enabled ? "on" : "off");
     out_append(" bugeye=");
     out_append(be.enabled ? "on" : "off");
@@ -6308,44 +6054,6 @@ static int cfgsh_apply(const char* setting, const char* args)
         else out_append("Usage: awake on|off\n");
         return 1;
     }
-    if (strcmp(setting, "exgui") == 0 || strcmp(setting, "desktop") == 0 || strcmp(setting, "de") == 0) {
-        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
-        if (cfgsh_bool_value(value, &on) == 0) {
-            exgui_enable(on);
-            out_append(on ? "cfgsh: exgui on\n" : "cfgsh: exgui off\n");
-            return 1;
-        }
-        mapped = cfgsh_style_value(value);
-        if (mapped && exgui_set_style(mapped) == 0) { cmd_exgui_status(); return 1; }
-        mapped = cfgsh_layout_value(value);
-        if (mapped && exgui_set_layout(mapped) == 0) { cmd_exgui_status(); return 1; }
-        out_append("Usage: exgui on|off or style/layout value\n");
-        return 1;
-    }
-    if (strcmp(setting, "style") == 0 || strcmp(setting, "theme") == 0) {
-        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
-        mapped = cfgsh_style_value(value);
-        if (mapped && exgui_set_style(mapped) == 0) cmd_exgui_status();
-        else out_append("Usage: style 1|2|3 (win|linux|mac)\n");
-        return 1;
-    }
-    if (strcmp(setting, "layout") == 0 || strcmp(setting, "wm") == 0) {
-        if (!have_value || cfgsh_is_status_word(value)) { cmd_exgui_status(); return 1; }
-        mapped = cfgsh_layout_value(value);
-        if (mapped && exgui_set_layout(mapped) == 0) cmd_exgui_status();
-        else out_append("Usage: layout 1|2|3 (float|tile|stack)\n");
-        return 1;
-    }
-    if (strcmp(setting, "split") == 0 || strcmp(setting, "exexgui") == 0) {
-        if (!have_value || cfgsh_is_status_word(value)) { cmd_exexgui_status(); return 1; }
-        if (cfgsh_bool_value(value, &on) == 0) {
-            exexgui_enable(on);
-            out_append(on ? "cfgsh: split on\n" : "cfgsh: split off\n");
-        } else {
-            out_append("Usage: split on|off\n");
-        }
-        return 1;
-    }
     if (strcmp(setting, "buddy") == 0 || strcmp(setting, "assistant") == 0 ||
         strcmp(setting, "helper") == 0 || strcmp(setting, "lardbuddy") == 0) {
         if (!have_value || cfgsh_is_status_word(value)) { cmd_buddy_status(); return 1; }
@@ -6396,13 +6104,6 @@ static int cfgsh_apply(const char* setting, const char* args)
         } else {
             out_append("Usage: rollback snap|apply\n");
         }
-        return 1;
-    }
-    if (strcmp(setting, "pane") == 0 || strcmp(setting, "focus") == 0) {
-        if (!have_value || cfgsh_is_status_word(value)) { cmd_exexgui_status(); return 1; }
-        mapped = cfgsh_focus_value(value);
-        if (mapped && exexgui_set_focus(mapped) == 0) cmd_exexgui_status();
-        else out_append("Usage: pane 1|2|3 (gui|term|info)\n");
         return 1;
     }
     if (strcmp(setting, "sram") == 0 || strcmp(setting, "screenram") == 0) {
@@ -6534,18 +6235,10 @@ static void cmd_cfgsh(const char* args)
 int lsh_cfgsh_selftest(void)
 {
     int on = -1;
-    const char* s;
     if (cfgsh_bool_value("on", &on) != 0 || on != 1) return -1;
     if (cfgsh_bool_value("0", &on) != 0 || on != 0) return -2;
-    s = cfgsh_style_value("2");
-    if (!s || strcmp(s, "linux") != 0) return -3;
-    s = cfgsh_layout_value("3");
-    if (!s || strcmp(s, "stack") != 0) return -4;
-    s = cfgsh_focus_value("1");
-    if (!s || strcmp(s, "gui") != 0) return -5;
-    s = cfgsh_boot_value("5");
+    const char* s = cfgsh_boot_value("5");
     if (!s || strcmp(s, "awakening") != 0) return -6;
-    if (cfgsh_style_value("bad") != NULL) return -7;
     return 0;
 }
 
@@ -6596,7 +6289,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
-    if (strcmp(cmd, "exgui") == 0 || strcmp(cmd, "exexgui") == 0 || strcmp(cmd, "ltheme") == 0 ||
+    if (strcmp(cmd, "ltheme") == 0 ||
         strcmp(cmd, "glyph") == 0 || strcmp(cmd, "glyphs") == 0 || strcmp(cmd, "uglyph") == 0 ||
         strcmp(cmd, "picglyph") == 0) lardkit_trace_event("gui", cmd, 0);
 
@@ -6666,8 +6359,6 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "journal") == 0) { cmd_journal(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "oschat") == 0) { cmd_oschat(args); return; }
-    if (strcmp(cmd, "exgui") == 0) { cmd_exgui(args); return; }
-    if (strcmp(cmd, "exexgui") == 0) { cmd_exexgui(args); return; }
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
     if (strcmp(cmd, "glyph") == 0 || strcmp(cmd, "glyphs") == 0 || strcmp(cmd, "uglyph") == 0 || strcmp(cmd, "picglyph") == 0) { cmd_glyph(args); return; }

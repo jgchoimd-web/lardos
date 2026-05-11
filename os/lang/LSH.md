@@ -21,9 +21,7 @@
 - `gasm file.gasm` - run an in-tree GASM source file from LSH.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
-- `exgui on|off|style|layout|next` - extended desktop and window-manager shell.
-- `exexgui on|off|focus|next|workspace|save|load` - sketch split GUI with GUI, terminal, status panes, and workspaces 1/2/3.
-- GUI polish was beta-tracked in `v1.36.0b` and promoted in official `v1.40.0a` with the glyph and rough-edge repair track.
+- GUI polish was beta-tracked in `v1.36.0b` and promoted in official `v1.40.0a` with the glyph and rough-edge repair track; `v1.58.0a` makes the default GUI a desktop with app icons, a dock, and hideable app windows.
 - `glyph demo|list|load|auto|show|move|copy|rename|pixel|clear|live|click|insert|write` - bind BMP pictures to private-use Unicode slots U+E000..U+E0FF, edit assigned slots, render them inline, click them in the GUI, and toggle realtime hover/click rendering.
 - `cursor status|set U+E000|off` - bind the GUI mouse cursor to a user-owned picture Unicode slot.
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.
@@ -94,7 +92,7 @@
 ## Settings Shell
 
 - `cfgsh` enters the settings-focused `CFG#` prompt; `exitcfg` leaves it
-- Inside `CFG#`, use `setting value`: `awake on`, `style 2`, `layout 3`, `pane 1`, `http 2`, `boot 4`, `priority 10`
+- Inside `CFG#`, use `setting value`: `awake on`, `ltheme night`, `http 2`, `boot 4`, `priority 10`
 - `buddy on` / `buddy off`, `bugeye on`, `ltheme night`, and `rollback snap|apply` can also be changed from `CFG#`
 - Outside `CFG#`, use `cfg setting value` for one-shot changes
-- Number maps: style 1=win 2=linux 3=mac; layout 1=float 2=tile 3=stack; pane 1=gui 2=term 3=info; http 1=GET 2=POST; boot 1=normal 2=safe 3=netoff 4=dev 5=awakening
+- Number maps: http 1=GET 2=POST; boot 1=normal 2=safe 3=netoff 4=dev 5=awakening

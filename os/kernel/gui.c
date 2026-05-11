@@ -15,17 +15,44 @@
 #include "lar.h"
 #include "ps2.h"
 #include "kr_basic.h"
-#include "exgui.h"
-#include "exexgui.h"
 #include "guioverlay.h"
 #include "lguilib.h"
 #include "lassist.h"
 #include "syscall.h"
 #include "lib3d_demo.h"
+#include "version.h"
 
 #define LARSH_VIEW_W 160
 #define LARSH_VIEW_H 120
 #define GUI_GLYPH_HITS_MAX 64u
+
+typedef struct {
+    int app;
+    const char* name;
+    const char* icon;
+    uint32_t color;
+} gui_launcher_t;
+
+static const gui_launcher_t s_desktop_launchers[] = {
+    { 0, "Docs",  "D", 0xFF2E8FBAu },
+    { 7, "Shell", ">", 0xFF3AA66Fu },
+    { 2, "Notes", "N", 0xFFE3A447u },
+    { 3, "Pix",   "P", 0xFFC86DD7u },
+    { 4, "Pak",   "K", 0xFF6F8BDCu },
+    { 9, "Edit",  "E", 0xFFE06A6Au },
+};
+
+static const gui_launcher_t s_dock_launchers[] = {
+    { 0, "Doc",  "D", 0xFF2E8FBAu },
+    { 7, "LSH",  ">", 0xFF3AA66Fu },
+    { 2, "Note", "N", 0xFFE3A447u },
+    { 3, "Pix",  "P", 0xFFC86DD7u },
+    { 4, "Pak",  "K", 0xFF6F8BDCu },
+    { 1, "Calc", "=", 0xFF48A9A6u },
+    { 8, "Play", "R", 0xFF8BC34Au },
+    { 5, "User", "U", 0xFFB88746u },
+    { 9, "Edit", "E", 0xFFE06A6Au },
+};
 
 typedef struct {
     int x;
@@ -53,6 +80,8 @@ static fb_t g_bb;
 static int g_have_bb;
 static const fb_t* g_syscall_target_override;
 
+static void gui_clamp_window(void);
+
 #define SCREENRAM_MAX_BYTES 8192u
 #define SCREENRAM_DEFAULT_W 64u
 #define SCREENRAM_DEFAULT_H 16u
@@ -74,7 +103,8 @@ typedef struct {
     int buttons;
     int prev_buttons;
 
-    // Simple single window
+    // Desktop app window
+    int win_visible;
     int win_x;
     int win_y;
     int win_w;
@@ -505,8 +535,6 @@ int gui_init(void)
     lguilib_init();
     const FsFile* lguilib_file = fs_open("default.lguilib");
     if (lguilib_file) (void)lguilib_load_active(lguilib_file->data, lguilib_file->size);
-    exgui_init();
-    exexgui_init();
     if (g_fb.w <= 1024 && g_fb.h <= 768) {
         g_bb.fb = g_backbuf;
         g_bb.w = g_fb.w;
@@ -530,14 +558,20 @@ int gui_init(void)
     // Window
     int sw = (int)g_fb.w;
     int sh = (int)g_fb.h;
+    int usable_top = 30;
+    int usable_bottom = sh - 58;
+    int usable_h = usable_bottom - usable_top;
+    if (usable_h < 180) usable_h = sh > 24 ? sh - 24 : sh;
     g.win_w = sw >= 660 ? 640 : sw - 20;
-    g.win_h = sh >= 460 ? 420 : sh - 20;
+    g.win_h = usable_h >= 420 ? 420 : usable_h;
     if (g.win_w < 240) g.win_w = sw > 8 ? sw - 8 : sw;
     if (g.win_h < 180) g.win_h = sh > 8 ? sh - 8 : sh;
     g.win_x = (sw - g.win_w) / 2;
-    g.win_y = (sh - g.win_h) / 2;
+    g.win_y = usable_top + (usable_h - g.win_h) / 2;
     if (g.win_x < 0) g.win_x = 0;
     if (g.win_y < 0) g.win_y = 0;
+    gui_clamp_window();
+    g.win_visible = 1;
     g.dragging = 0;
     g.btn_pressed = 0;
     g.btn_clicks = 0;
@@ -879,6 +913,152 @@ static int in_rect(int x, int y, int rx, int ry, int rw, int rh)
     return x >= rx && y >= ry && x < (rx + rw) && y < (ry + rh);
 }
 
+static const char* gui_app_name(int app)
+{
+    static const char* names[] = {
+        "Doc Browser", "Calculator", "Notes", "Pictures", "Package",
+        "User App", "Shrine", "Lard Shell", "Play", "Editor"
+    };
+    if (app >= 0 && app < (int)(sizeof(names) / sizeof(names[0]))) return names[app];
+    return "App";
+}
+
+static void gui_dock_rect(int* out_x, int* out_y, int* out_w, int* out_h, int* out_cell)
+{
+    int count = (int)(sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]));
+    int cell = g_have_fb && g_fb.w < 420 ? 32 : 44;
+    int margin = 8;
+    int w = count * cell + margin * 2;
+    int h = cell + 12;
+    int sw = g_have_fb ? (int)g_fb.w : 0;
+    int sh = g_have_fb ? (int)g_fb.h : 0;
+    if (w > sw - 12 && count > 0) {
+        cell = (sw - 24) / count;
+        if (cell < 24) cell = 24;
+        w = count * cell + margin * 2;
+        h = cell + 10;
+    }
+    if (out_w) *out_w = w;
+    if (out_h) *out_h = h;
+    if (out_x) *out_x = (sw - w) / 2;
+    if (out_y) *out_y = sh - h - 6;
+    if (out_cell) *out_cell = cell;
+}
+
+static void gui_clamp_window(void)
+{
+    int dock_x, dock_y, dock_w, dock_h, cell;
+    int min_y = 28;
+    int max_x;
+    int max_y;
+    if (!g_have_fb) return;
+    gui_dock_rect(&dock_x, &dock_y, &dock_w, &dock_h, &cell);
+    (void)dock_x;
+    (void)dock_w;
+    (void)dock_h;
+    (void)cell;
+    max_x = (int)g_fb.w - g.win_w;
+    max_y = dock_y - 8 - g.win_h;
+    if (max_x < 0) max_x = 0;
+    if (max_y < min_y) max_y = min_y;
+    if (g.win_x < 0) g.win_x = 0;
+    if (g.win_y < min_y) g.win_y = min_y;
+    if (g.win_x > max_x) g.win_x = max_x;
+    if (g.win_y > max_y) g.win_y = max_y;
+}
+
+static void gui_desktop_icon_rect(int index, int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    int cols = g_have_fb && g_fb.w >= 620 ? 2 : 1;
+    int col = index % cols;
+    int row = index / cols;
+    int w = 76;
+    int h = 62;
+    if (out_x) *out_x = 18 + col * 88;
+    if (out_y) *out_y = 44 + row * 74;
+    if (out_w) *out_w = w;
+    if (out_h) *out_h = h;
+}
+
+static int gui_desktop_hit_app(int x, int y)
+{
+    int count = (int)(sizeof(s_desktop_launchers) / sizeof(s_desktop_launchers[0]));
+    for (int i = 0; i < count; i++) {
+        int ix, iy, iw, ih;
+        gui_desktop_icon_rect(i, &ix, &iy, &iw, &ih);
+        if (in_rect(x, y, ix, iy, iw, ih)) return s_desktop_launchers[i].app;
+    }
+    return -1;
+}
+
+static int gui_dock_hit_app(int x, int y)
+{
+    int dx, dy, dw, dh, cell;
+    int count = (int)(sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]));
+    gui_dock_rect(&dx, &dy, &dw, &dh, &cell);
+    if (!in_rect(x, y, dx, dy, dw, dh)) return -1;
+    for (int i = 0; i < count; i++) {
+        int ix = dx + 8 + i * cell;
+        if (in_rect(x, y, ix, dy + 6, cell, cell)) return s_dock_launchers[i].app;
+    }
+    return -1;
+}
+
+static void gui_draw_launcher(const fb_t* tgt, const gui_launcher_t* l, int x, int y,
+                              int w, int h, int active, int label)
+{
+    int icon = h - (label ? 18 : 8);
+    int ix = x + (w - icon) / 2;
+    int iy = y + 4;
+    uint32_t bg = active ? 0xFF2B3C46u : 0xFF1A222Bu;
+    uint32_t border = active ? 0xFFFFD166u : 0xFF53636Au;
+    if (icon < 18) icon = 18;
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, bg);
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)w, 1, border);
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)(y + h - 1), (uint16_t)w, 1, 0xFF080B0Fu);
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 1, (uint16_t)h, border);
+    fb_fill_rect(tgt, (uint16_t)(x + w - 1), (uint16_t)y, 1, (uint16_t)h, 0xFF080B0Fu);
+    fb_fill_rect(tgt, (uint16_t)ix, (uint16_t)iy, (uint16_t)icon, (uint16_t)icon, l->color);
+    fb_fill_rect(tgt, (uint16_t)ix, (uint16_t)iy, (uint16_t)icon, 2, 0xFFFFFFFFu);
+    fb_draw_text(tgt, (uint16_t)(ix + icon / 2 - 4), (uint16_t)(iy + icon / 2 - 3), l->icon, 0xFFFFFFFFu, l->color);
+    if (label) {
+        fb_draw_text(tgt, (uint16_t)(x + 6), (uint16_t)(y + h - 13), l->name, 0xFFFFFFFFu, bg);
+    } else if (active) {
+        fb_fill_rect(tgt, (uint16_t)(x + w / 2 - 8), (uint16_t)(y + h - 4), 16, 2, 0xFFFFD166u);
+    }
+}
+
+static void gui_draw_desktop(const fb_t* tgt)
+{
+    int sw = (int)g_fb.w;
+    int sh = (int)g_fb.h;
+    int dock_x, dock_y, dock_w, dock_h, cell;
+    int desktop_count = (int)(sizeof(s_desktop_launchers) / sizeof(s_desktop_launchers[0]));
+    int dock_count = (int)(sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]));
+    fb_fill_rect(tgt, 0, 0, g_fb.w, g_fb.h, 0xFF10151Eu);
+    for (int y = 24; y < sh; y += 28) fb_fill_rect(tgt, 0, (uint16_t)y, g_fb.w, 1, 0xFF151E29u);
+    for (int x = 0; x < sw; x += 36) fb_fill_rect(tgt, (uint16_t)x, 24, 1, (uint16_t)(sh > 24 ? sh - 24 : 0), 0xFF111923u);
+    fb_fill_rect(tgt, 0, 0, g_fb.w, 24, 0xFF121821u);
+    fb_fill_rect(tgt, 0, 23, g_fb.w, 1, 0xFF2F8EA3u);
+    fb_draw_text(tgt, 10, 8, "LARDOS DESKTOP", 0xFFFFFFFFu, 0xFF121821u);
+    fb_draw_text(tgt, (uint16_t)(sw > 116 ? sw - 116 : 10), 8, LARDOS_VERSION, 0xFF9DEAE4u, 0xFF121821u);
+
+    for (int i = 0; i < desktop_count; i++) {
+        int x, y, w, h;
+        gui_desktop_icon_rect(i, &x, &y, &w, &h);
+        gui_draw_launcher(tgt, &s_desktop_launchers[i], x, y, w, h, g.app_id == s_desktop_launchers[i].app, 1);
+    }
+
+    gui_dock_rect(&dock_x, &dock_y, &dock_w, &dock_h, &cell);
+    fb_fill_rect(tgt, (uint16_t)dock_x, (uint16_t)dock_y, (uint16_t)dock_w, (uint16_t)dock_h, 0xFF151B22u);
+    fb_fill_rect(tgt, (uint16_t)dock_x, (uint16_t)dock_y, (uint16_t)dock_w, 1, 0xFF5B6E78u);
+    for (int i = 0; i < dock_count; i++) {
+        int x = dock_x + 8 + i * cell;
+        int y = dock_y + 6;
+        gui_draw_launcher(tgt, &s_dock_launchers[i], x, y, cell - 4, cell, g.app_id == s_dock_launchers[i].app && g.win_visible, 0);
+    }
+}
+
 static void gui_view_rect(int* out_x, int* out_y, int* out_w, int* out_h)
 {
     int content_y = g.win_y + 44;
@@ -1022,34 +1202,6 @@ int gui_img_glyph_interaction_selftest(void)
     return 0;
 }
 
-static void gui_apply_exexgui_layout(void)
-{
-    exexgui_layout_t l;
-    int pad = 6;
-    int label_h = 30;
-    int ww;
-    int wh;
-    if (!g_have_fb || !exexgui_is_enabled()) return;
-    if (exexgui_layout_for(g_fb.w, g_fb.h, &l) != 0) return;
-
-    ww = (int)l.gui.w - pad * 2;
-    wh = (int)l.gui.h - label_h - pad;
-    if (ww < 220) ww = (int)l.gui.w > 8 ? (int)l.gui.w - 8 : (int)l.gui.w;
-    if (wh < 170) wh = (int)l.gui.h > 8 ? (int)l.gui.h - 8 : (int)l.gui.h;
-
-    g.win_x = (int)l.gui.x + pad;
-    g.win_y = (int)l.gui.y + label_h;
-    g.win_w = ww;
-    g.win_h = wh;
-    if (g.win_x < (int)l.gui.x) g.win_x = (int)l.gui.x;
-    if (g.win_y < (int)l.gui.y) g.win_y = (int)l.gui.y;
-    if (g.win_x + g.win_w > (int)(l.gui.x + l.gui.w)) g.win_w = (int)(l.gui.x + l.gui.w) - g.win_x;
-    if (g.win_y + g.win_h > (int)(l.gui.y + l.gui.h)) g.win_h = (int)(l.gui.y + l.gui.h) - g.win_y;
-    if (g.win_w < 1) g.win_w = 1;
-    if (g.win_h < 1) g.win_h = 1;
-    g.dragging = 0;
-}
-
 static void gui_resp_clear(void)
 {
     g.resp[0] = '\0';
@@ -1123,6 +1275,8 @@ void gui_activate_ring0_shortcut(void)
     lsh_enter_sum_shortcut();
     if (!g_have_fb) return;
     g.app_id = 7;
+    g.win_visible = 1;
+    gui_clamp_window();
     g.tb_focused = 1;
     g.lafaelo_focus = 0;
     g.lafaelo_show_run = 1;
@@ -1202,8 +1356,71 @@ void gui_larsh_play(const char* path)
         g.larsh_playing = 1;
         g.larsh_tick = 0;
         g.app_id = 3;
+        g.win_visible = 1;
+        gui_clamp_window();
         g.gallery_sel = 6;
     }
+}
+
+static void gui_select_app(int idx)
+{
+    if (idx < 0 || idx > 9) return;
+    g.app_id = idx;
+    g.win_visible = 1;
+    g.settings_open = 0;
+    g.resp_scroll = 0;
+    gui_clamp_window();
+    if (idx == 2) {
+        FsWritableFile* w = fs_open_writable("notes.txt");
+        if (w && w->size < sizeof(g.resp)) {
+            for (uint32_t i = 0; i < w->size; i++) g.resp[i] = (char)w->data[i];
+            g.resp[w->size] = '\0';
+        }
+    } else if (idx == 3) {
+        const char* glist = "0: hello.txt\n1: readme.txt\n2: sample.bmp\n3: notes.txt\n4: lfs_info.txt\n5: lafillo_saved.txt\n6: demo.larsh";
+        uint32_t gi = 0;
+        while (glist[gi] && gi + 1 < sizeof(g.resp)) { g.resp[gi] = glist[gi]; gi++; }
+        g.resp[gi] = '\0';
+    } else if (idx == 4) {
+        gui_tb_set("hello.txt");
+        gui_lar_show_bundle();
+    } else if (idx == 5) {
+        const char* z = "Click Run to execute user-mode program.";
+        uint32_t i = 0;
+        while (z[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = z[i]; i++; }
+        g.resp[i] = '\0';
+    } else if (idx == 6) {
+        const char* z = "LSS - Run Shrine programs. Click Run for hello.shrine.";
+        uint32_t i = 0;
+        while (z[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = z[i]; i++; }
+        g.resp[i] = '\0';
+    } else if (idx == 7) {
+        gui_lsh_sync_output();
+        g.tb_len = 0;
+        g.tb_cur = 0;
+        g.tb[0] = '\0';
+    } else if (idx == 8) {
+        const char* z = "print \"hello\" or repeat 3x poop end";
+        uint32_t i = 0;
+        while (z[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = z[i]; i++; }
+        g.resp[i] = '\0';
+        g.tb_len = 0;
+        g.tb_cur = 0;
+        g.tb[0] = '\0';
+    } else if (idx == 9) {
+        const char* z = "Lafaelo code editor. Path: file to open/save.";
+        uint32_t i = 0;
+        while (z[i] && i + 1 < sizeof(g.lafaelo_buf)) { g.lafaelo_buf[i] = z[i]; i++; }
+        g.lafaelo_buf[i] = '\0';
+        g.lafaelo_len = i;
+        g.lafaelo_cur = i;
+        g.lafaelo_focus = 0;
+        g.lafaelo_show_run = 0;
+        g.tb_len = 0;
+        g.tb_cur = 0;
+        g.tb[0] = '\0';
+    }
+    g.gallery_sel = -1;
 }
 
 void gui_handle_mouse(int dx, int dy, int buttons)
@@ -1232,7 +1449,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int l_pressed = l_down && !l_prev;
     int l_released = !l_down && l_prev;
 
-    if (wheel != 0) {
+    if (wheel != 0 && g.win_visible) {
         int view_x, view_y, view_w, view_h;
         int rows;
         gui_view_rect(&view_x, &view_y, &view_w, &view_h);
@@ -1243,22 +1460,25 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         }
     }
 
-    gui_apply_exexgui_layout();
-    if (l_pressed && exexgui_is_enabled()) {
-        exexgui_layout_t xl;
-        if (exexgui_layout_for(g_fb.w, g_fb.h, &xl) == 0) {
-            if (in_rect(g.mx, g.my, (int)xl.term.x, (int)xl.term.y, (int)xl.term.w, (int)xl.term.h)) {
-                exexgui_set_focus("term");
-                g.app_id = 7;
-                g.tb_focused = 1;
+    if (l_pressed) {
+        int win_hit = g.win_visible && in_rect(g.mx, g.my, g.win_x, g.win_y, g.win_w, g.win_h);
+        if (!win_hit) {
+            int app = gui_dock_hit_app(g.mx, g.my);
+            if (app < 0) app = gui_desktop_hit_app(g.mx, g.my);
+            if (app >= 0) {
+                gui_select_app(app);
+                g.tb_focused = 0;
                 g.lafaelo_focus = 0;
-                gui_lsh_sync_output();
-            } else if (in_rect(g.mx, g.my, (int)xl.info.x, (int)xl.info.y, (int)xl.info.w, (int)xl.info.h)) {
-                exexgui_set_focus("info");
-            } else if (in_rect(g.mx, g.my, (int)xl.gui.x, (int)xl.gui.y, (int)xl.gui.w, (int)xl.gui.h)) {
-                exexgui_set_focus("gui");
+                return;
             }
+            g.tb_focused = 0;
+            g.lafaelo_focus = 0;
         }
+    }
+
+    if (!g.win_visible) {
+        if (l_released) g.btn_pressed = 0;
+        return;
     }
 
     if (l_pressed) {
@@ -1272,10 +1492,26 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         }
     }
 
-    // Settings button (top-right of title bar)
-    int set_btn_x = g.win_x + g.win_w - 52;
-    int set_btn_w = 48;
+    // Title controls.
     int title_h = 20;
+    int close_btn_x = g.win_x + g.win_w - 18;
+    int min_btn_x = close_btn_x - 18;
+    int set_btn_x = min_btn_x - 42;
+    int set_btn_w = 40;
+    if (l_pressed && in_rect(g.mx, g.my, close_btn_x, g.win_y + 2, 14, 14)) {
+        g.win_visible = 0;
+        g.settings_open = 0;
+        g.tb_focused = 0;
+        g.lafaelo_focus = 0;
+        return;
+    }
+    if (l_pressed && in_rect(g.mx, g.my, min_btn_x, g.win_y + 2, 14, 14)) {
+        g.win_visible = 0;
+        g.settings_open = 0;
+        g.tb_focused = 0;
+        g.lafaelo_focus = 0;
+        return;
+    }
     if (l_pressed && in_rect(g.mx, g.my, set_btn_x, g.win_y, set_btn_w, title_h)) {
         g.settings_open = 1 - g.settings_open;
         g.slider_drag = 0;
@@ -1317,8 +1553,9 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     if (l_released) g.slider_drag = 0;
 
     // Title bar drag (top 20px of window, exclude settings button)
-    if (!exexgui_is_enabled() &&
-        l_pressed && in_rect(g.mx, g.my, g.win_x, g.win_y, g.win_w - set_btn_w - 4, title_h)) {
+    int drag_w = set_btn_x - g.win_x - 4;
+    if (drag_w < 0) drag_w = 0;
+    if (l_pressed && in_rect(g.mx, g.my, g.win_x, g.win_y, drag_w, title_h)) {
         g.dragging = 1;
         g.drag_off_x = g.mx - g.win_x;
         g.drag_off_y = g.my - g.win_y;
@@ -1329,10 +1566,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     if (g.dragging) {
         g.win_x = g.mx - g.drag_off_x;
         g.win_y = g.my - g.drag_off_y;
-        if (g.win_x < 0) g.win_x = 0;
-        if (g.win_y < 0) g.win_y = 0;
-        if (g.win_x > (int)g_fb.w - g.win_w) g.win_x = (int)g_fb.w - g.win_w;
-        if (g.win_y > (int)g_fb.h - g.win_h) g.win_y = (int)g_fb.h - g.win_h;
+        gui_clamp_window();
     }
 
     /* Tab bar: Lafillo | Calc | Notes | Gallery | Zip | User | LSS | LSH | 놀이터 | Lafaelo */
@@ -1344,61 +1578,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             if (g.my >= tab_y && g.my < tab_y + tab_h && g.mx >= g.win_x && g.mx < g.win_x + g.win_w) {
                 int idx = (g.mx - g.win_x) / tab_w;
                 if (idx < 10) {
-                    g.app_id = idx;
-                    if (idx == 2) {
-                        FsWritableFile* w = fs_open_writable("notes.txt");
-                        if (w && w->size < sizeof(g.resp)) {
-                            for (uint32_t i = 0; i < w->size; i++) g.resp[i] = (char)w->data[i];
-                            g.resp[w->size] = '\0';
-                        }
-                    } else if (idx == 3) {
-                        const char* glist = "0: hello.txt\n1: readme.txt\n2: sample.bmp\n3: notes.txt\n4: lfs_info.txt\n5: lafillo_saved.txt\n6: demo.larsh";
-                        uint32_t gi = 0;
-                        while (glist[gi] && gi + 1 < sizeof(g.resp)) { g.resp[gi] = glist[gi]; gi++; }
-                        g.resp[gi] = '\0';
-                    } else if (idx == 4) {
-                        gui_tb_set("hello.txt");
-                        gui_lar_show_bundle();
-                    } else if (idx == 5) {
-                        const char* z = "Click Run to execute user-mode program.";
-                        uint32_t i = 0;
-                        while (z[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = z[i]; i++; }
-                        g.resp[i] = '\0';
-                    } else if (idx == 6) {
-                        const char* z = "LSS - Run Shrine programs. Click Run for hello.shrine.";
-                        uint32_t i = 0;
-                        while (z[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = z[i]; i++; }
-                        g.resp[i] = '\0';
-                    } else if (idx == 7) {
-                        const char* out = lsh_get_output();
-                        uint32_t i = 0;
-                        while (out[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = out[i]; i++; }
-                        g.resp[i] = '\0';
-                        g.tb_len = 0;
-                        g.tb_cur = 0;
-                        g.tb[0] = '\0';
-                    } else if (idx == 8) {
-                        const char* z = "print \"hello\" or repeat 3x poop end";
-                        uint32_t i = 0;
-                        while (z[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = z[i]; i++; }
-                        g.resp[i] = '\0';
-                        g.tb_len = 0;
-                        g.tb_cur = 0;
-                        g.tb[0] = '\0';
-                    } else if (idx == 9) {
-                        const char* z = "Lafaelo code editor. Path: file to open/save.";
-                        uint32_t i = 0;
-                        while (z[i] && i + 1 < sizeof(g.lafaelo_buf)) { g.lafaelo_buf[i] = z[i]; i++; }
-                        g.lafaelo_buf[i] = '\0';
-                        g.lafaelo_len = i;
-                        g.lafaelo_cur = i;
-                        g.lafaelo_focus = 0;
-                        g.lafaelo_show_run = 0;
-                        g.tb_len = 0;
-                        g.tb_cur = 0;
-                        g.tb[0] = '\0';
-                    }
-                    g.gallery_sel = -1;
+                    gui_select_app(idx);
                 }
             }
         }
@@ -1685,6 +1865,7 @@ void gui_handle_key(char ch)
         return;
     }
     if (!g_have_fb) return;
+    if (!g.win_visible) return;
     if (!g.tb_focused) return;
 
     char* edit_buf;
@@ -1797,6 +1978,7 @@ void gui_handle_key_nav(int kind)
         gui_activate_ring0_shortcut();
         return;
     }
+    if (!g.win_visible) return;
     uint32_t* cur = (g.app_id == 1) ? &g.calc_cur : (g.app_id == 9 && g.lafaelo_focus) ? &g.lafaelo_cur : &g.tb_cur;
     uint32_t len = (g.app_id == 1) ? g.calc_len : (g.app_id == 9 && g.lafaelo_focus) ? g.lafaelo_len : g.tb_len;
     if (!g.tb_focused && !(g.app_id == 9 && g.lafaelo_focus)) {
@@ -1968,7 +2150,6 @@ int gui_http_post_mode(void)
 int gui_post_check(gui_post_info_t* out)
 {
     if (!g_have_fb || !g_fb.fb) return -1;
-    gui_apply_exexgui_layout();
     if (out) {
         out->width = g_fb.w;
         out->height = g_fb.h;
@@ -2108,10 +2289,17 @@ void gui_render(void)
 
     // Full redraw for simplicity & correctness.
     fb_clear(tgt, g_bg);
-    exgui_draw_desktop();
-    exexgui_draw_desktop();
-    gui_apply_exexgui_layout();
     gui_glyph_hits_begin();
+    gui_draw_desktop(tgt);
+
+    if (!g.win_visible) {
+        lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my, 8u, 32u, 220u, 160u);
+        screenram_flush_to_target(tgt);
+        gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
+        if (g_have_bb) fb_blit(&g_fb, &g_bb);
+        g_syscall_target_override = 0;
+        return;
+    }
 
     // Window frame
     uint32_t win_bg = 0xFF20252B;
@@ -2119,10 +2307,25 @@ void gui_render(void)
     uint32_t border = 0xFF0B0D10;
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, (uint16_t)g.win_h, win_bg);
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, 20, title_bg);
-    int set_btn_x = g.win_x + g.win_w - 52;
-    uint32_t set_btn_bg = (g.settings_open || (g.mx >= set_btn_x && g.mx < set_btn_x + 48 && g.my >= g.win_y && g.my < g.win_y + 20)) ? 0xFF235D64 : 0xFF2A2F34;
-    fb_fill_rect(tgt, (uint16_t)set_btn_x, (uint16_t)g.win_y, 48, 20, set_btn_bg);
+    int close_btn_x = g.win_x + g.win_w - 18;
+    int min_btn_x = close_btn_x - 18;
+    int set_btn_x = min_btn_x - 42;
+    int app_title_x = g.win_x + 96;
+    int app_title_cells = (set_btn_x - app_title_x - 4) / 8;
+    fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(g.win_y + 7), "LARDOS GUI", 0xFFFFFFFF, title_bg);
+    if (app_title_cells > 1) {
+        fb_draw_text_cells(tgt, (uint16_t)app_title_x, (uint16_t)(g.win_y + 7), gui_app_name(g.app_id),
+                           (uint16_t)app_title_cells, 0xFF9DEAE4u, title_bg);
+    }
+    uint32_t set_btn_bg = (g.settings_open || (g.mx >= set_btn_x && g.mx < set_btn_x + 40 && g.my >= g.win_y && g.my < g.win_y + 20)) ? 0xFF235D64 : 0xFF2A2F34;
+    uint32_t min_btn_bg = (g.mx >= min_btn_x && g.mx < min_btn_x + 14 && g.my >= g.win_y + 2 && g.my < g.win_y + 16) ? 0xFF42504A : 0xFF2A2F34;
+    uint32_t close_btn_bg = (g.mx >= close_btn_x && g.mx < close_btn_x + 14 && g.my >= g.win_y + 2 && g.my < g.win_y + 16) ? 0xFFB94747 : 0xFF803B45;
+    fb_fill_rect(tgt, (uint16_t)set_btn_x, (uint16_t)g.win_y, 40, 20, set_btn_bg);
     fb_draw_text(tgt, (uint16_t)(set_btn_x + 8), (uint16_t)(g.win_y + 6), "Set", 0xFFFFFFFF, set_btn_bg);
+    fb_fill_rect(tgt, (uint16_t)min_btn_x, (uint16_t)(g.win_y + 2), 14, 14, min_btn_bg);
+    fb_fill_rect(tgt, (uint16_t)(min_btn_x + 3), (uint16_t)(g.win_y + 12), 8, 1, 0xFFFFFFFFu);
+    fb_fill_rect(tgt, (uint16_t)close_btn_x, (uint16_t)(g.win_y + 2), 14, 14, close_btn_bg);
+    fb_draw_text(tgt, (uint16_t)(close_btn_x + 4), (uint16_t)(g.win_y + 6), "x", 0xFFFFFFFFu, close_btn_bg);
     // crude border
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, 1, border);
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)(g.win_y + g.win_h - 1), (uint16_t)g.win_w, 1, border);
@@ -2446,8 +2649,6 @@ void gui_render(void)
         fb_fill_rect(tgt, (uint16_t)(track_x + q_pos), (uint16_t)(panel_y + 10 + row_h * 2), 6, 12, 0xFF7BE0D6);
     }
 
-    exgui_draw_overlay();
-    exexgui_draw_overlay();
     lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my,
                  (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h);
 

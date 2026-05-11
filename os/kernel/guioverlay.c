@@ -106,14 +106,20 @@ static void draw_title(const guioverlay_state_t* s)
 {
     const lguilib_theme_t* th = overlay_theme();
     uint32_t title_bg = th->title_bg;
-    uint32_t set_x = s->win_x + s->win_w - 52u;
+    uint32_t close_x = s->win_x + s->win_w - 18u;
+    uint32_t min_x = close_x - 18u;
+    uint32_t set_x = min_x - 42u;
     fill(s->win_x, s->win_y, s->win_w, 20u, title_bg);
     fill(s->win_x, s->win_y + 19u, s->win_w, 1u, th->tab_accent);
     fill(s->win_x + 1u, s->win_y + 1u, s->win_w > 2u ? s->win_w - 2u : 1u, 1u, 0xFF334048u);
-    if (s->win_w > 92u) {
-        fill(s->win_x + s->win_w - 44u, s->win_y + 6u, 8u, 8u, th->title_accent);
-        fill(s->win_x + s->win_w - 30u, s->win_y + 6u, 8u, 8u, 0xFF7BE0D6u);
-        fill(s->win_x + s->win_w - 16u, s->win_y + 6u, 8u, 8u, 0xFFFF6B6Bu);
+    if (s->win_w > 120u) {
+        uint32_t set_bg = s->settings_open ? th->tab_active : th->tab_idle;
+        fill(set_x, s->win_y, 40u, 20u, set_bg);
+        text(set_x + 8u, s->win_y + 6u, "Set", th->title_fg, set_bg);
+        fill(min_x, s->win_y + 2u, 14u, 14u, th->tab_idle);
+        fill(min_x + 3u, s->win_y + 12u, 8u, 1u, th->title_fg);
+        fill(close_x, s->win_y + 2u, 14u, 14u, 0xFF803B45u);
+        text(close_x + 4u, s->win_y + 6u, "x", th->title_fg, 0xFF803B45u);
     }
     if (s->win_w > 150u) text(s->win_x + 8u, s->win_y + 6u, "LardOS GUI", th->title_fg, title_bg);
     if (s->win_w > 300u && s->win_x + 112u + 96u < set_x) {

@@ -83,8 +83,6 @@ flowchart TB
     ScreenCheck["screencheck diagnostics"]
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
-    EXGUI["exgui DE + WM layer"]
-    EXEXGUI["exexgui split DE shell"]
     LGUILIB["lguilib GUI library format"]
     VM["BOSL GASM LIL LML OSVM"]
     VMMon["vmmon budgets + counters"]
@@ -108,8 +106,6 @@ flowchart TB
     Net --> OSLink
     Net --> TLS
     Kmain --> GUI
-    GUI --> EXGUI
-    GUI --> EXEXGUI
     GUI --> LGUILIB
     GUI --> ScreenCheck
     GUI --> TaskPrio
@@ -226,8 +222,6 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
 | Shrine subsystem | `os/kernel/lss.c`, `os/include/lss.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
-| Extended GUI shell | `os/kernel/exgui.c`, `os/include/exgui.h` |
-| Sketch split GUI shell | `os/kernel/exexgui.c`, `os/include/exexgui.h` |
 | LardOS GUI library format | `os/kernel/lguilib.c`, `os/include/lguilib.h` |
 | GUI overlay chrome | `os/kernel/guioverlay.c`, `os/include/guioverlay.h` |
 | VM monitor | `os/kernel/vmmon.c`, `os/include/vmmon.h` |
@@ -270,7 +264,7 @@ testing or app state.
 `lguilib.c` owns the `.lguilib` GUI library/theme format. Files begin with
 `LGUILIB 1` and use `NAME`, `COLOR`, `WIDGET`, and `END` records. The active
 theme is consumed by `guioverlay.c`, so the drawn chrome can change while the
-classic GUI, EXGUI, and EXEXGUI behavior stays in place. `default.lguilib` is
+default GUI behavior stays in place. `default.lguilib` is
 embedded in the filesystem and LSH exposes `lguilib show`, `lguilib use`, and
 `lguilib test`.
 
@@ -280,19 +274,10 @@ window bounds, and response-view health; `screencheck retro` draws a full-screen
 old boot/storage-style scan so visual glitches can be caught by looking at tile
 tracks, edges, and dot-lane visibility.
 
-`exgui.c` is an optional desktop-environment and window-manager layer drawn by
-the existing GUI renderer. It keeps the original single-window GUI available and
-adds familiar shell chrome for users arriving from Windows, Linux, or macOS:
-taskbars, top panels, docks, launchers, focus indicators, and float/tile/stack
-window layouts. LSH controls it with `exgui on`, `exgui style`, `exgui layout`,
-and `exgui next`.
-
-`exexgui.c` is a second opt-in shell based on the user's sketch. It turns the
-screen into three persistent regions: the left region keeps the existing GUI as
-the DE/WM center, the top-right region mirrors the LSH terminal, and the
-bottom-right region shows status information. The split renderer is separate
-from EXGUI, so users can keep the old GUI behavior or enable `exexgui on` when
-they want the sketched layout.
+`v1.57.0b` removes the old opt-in EXGUI and EXEXGUI renderer layers. `v1.58.0a`
+promotes the default GUI path into a desktop shell with a persistent wallpaper,
+top bar, desktop launchers, bottom dock, and hideable app window. LGUILIB/LTHEME
+continue to provide native theme data instead of a parallel shell stack.
 
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a
@@ -381,7 +366,7 @@ boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
-ScreenRAM scratch storage, EXGUI state, OSLink packet framing, local bus, and safe exec filtering,
+ScreenRAM scratch storage, OSLink packet framing, local bus, and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardKit user-control tools, LardPack package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS
 hashing, containers, and LIL feature forms.
@@ -390,7 +375,6 @@ hashing, containers, and LIL feature forms.
 system snapshot (`status`), predicted safe command execution (`magic command`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
 visual screen diagnostics (`screencheck`),
-extended desktop/window-manager chrome (`exgui`),
 OS-to-OS messaging, local bus messages, and safe remote command requests (`oslink`), task priority
 control (`task`, `prio`, `nice`), boot profile control (`bootprof`), crash
 history (`crashlog`), POST reruns (`post`, `selftest`), native document
@@ -432,6 +416,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.56.0a-vbox/lardos-v1.56.0a-vbox.iso`. Release ISOs also
+example `release/v1.58.0a-vbox/lardos-v1.58.0a-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

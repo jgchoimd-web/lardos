@@ -128,7 +128,9 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: user law writable", fs_open_writable("userlaw.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: glyph map writable", fs_open_writable("glyphmap.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode writable", fs_open_writable("dosmode.lardd") != NULL, emit, user, &pass, &fail);
-    post_check("fs: writable directory index", fs_writable_count() >= 20u, emit, user, &pass, &fail);
+    post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: delete overlay parser", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
+    post_check("fs: writable directory index", fs_writable_count() >= 21u, emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
     post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);
 

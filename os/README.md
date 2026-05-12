@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.60.0a-ami/lardos-v1.60.0a-ami.iso`. To publish the whole hardware
+`release/v1.60.1p-ami/lardos-v1.60.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -113,6 +113,9 @@ commands:
   compatibility shell. It uses an `L-DOS C:\>` prompt, case-insensitive
   commands, visible `C:`/`A:`/`R:` mapping to LardOS drives, and logs state in
   `dosmode.lardd`.
+- `DEL -F file` in L-DOS hides a read-only built-in/LFS file through the
+  user-owned `fsdelete.lardd` tombstone overlay. `RESTORE file` or
+  `UNDELETE file` makes it visible again.
 - `bye` / `byebye` sync RAM files and request a user-owned poweroff;
   `restart` / `reboot` sync RAM files and request a user-owned firmware/VM
   restart.
@@ -131,6 +134,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.60.1p` hotpatches L-DOS so `DEL -F file` can force-hide read-only
+  built-in/LFS files through `fsdelete.lardd`, while `RESTORE`/`UNDELETE`
+  keeps that power reversible.
 - `v1.60.0a` officially adds L-DOS mode without external DOS code: `DIR`,
   `TYPE`, `COPY`, `DEL`, `REN`, `MD`, `RD`, `CD`, `CLS`, `VER`, `SET`, `ECHO`,
   `MEM`, and `EXIT` map onto LardOS-owned shell, filesystem, and LARDD history.
@@ -259,6 +265,8 @@ commands:
 - `v1.60.0a` adds the official L-DOS compatibility layer with `dos on`, DOS
   command aliases, drive mapping, `dosmode_guide.lardd`, `dosmode.lardd`, POST,
   and LUNIT checks.
+- `v1.60.1p` adds the force-delete tombstone overlay for L-DOS with
+  `fsdelete.lardd`, `DEL -F`, `RESTORE`, `UNDELETE`, POST, and LUNIT checks.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.

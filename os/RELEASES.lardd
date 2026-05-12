@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.60.1p
+ITEM Hotpatch for L-DOS user-control deletion semantics.
+ITEM DEL still clears writable RAM file contents by default, but DEL -F file now hides read-only built-in or LFS files through a user-owned fsdelete.lardd tombstone overlay.
+ITEM RESTORE file and UNDELETE file remove the tombstone so forced deletions stay reversible.
+ITEM DIR, TYPE, and normal file opens skip tombstoned read-only files, while the HIDE and SHOW records remain visible in fsdelete.lardd and persist through sync.
+ITEM Adds POST and LUNIT coverage for fsdelete.lardd and preserves the native C/LSH/LARDD-only DOS mode direction.
+
 SECTION v1.60.0a
 ITEM Official release adding L-DOS mode, a LardOS-native DOS-style compatibility shell layer.
 ITEM Adds dos on, dos off, dos status, dos help, dos map, dos log, dos test, and dos run command.

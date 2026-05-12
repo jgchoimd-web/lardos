@@ -310,7 +310,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
-    { "del", 1 }, { "erase", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
+    { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
@@ -5164,10 +5164,11 @@ static void dos_help(void)
 {
     out_append("L-DOS mode commands\n");
     out_append("  DOS ON|OFF|STATUS|HELP|MAP|LOG|TEST\n");
-    out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL file  REN src dst\n");
+    out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL [-F] file  RESTORE file  REN src dst\n");
     out_append("  MD name  RD name  CD [dir|\\|..]  CLS  VER  SET  ECHO text  MEM\n");
     out_append("  EXIT leaves DOS mode; LSH command runs one native LardOS command.\n");
     out_append("  Drive map: C: -> LardOS X:, A: -> Y:, R: -> Z: writable RAM files.\n");
+    out_append("  DEL -F hides read-only built-in files through fsdelete.lardd; RESTORE brings them back.\n");
     out_append("  Directories are visible virtual labels; LardOS files remain flat and user-owned.\n");
 }
 
@@ -5300,18 +5301,55 @@ static void dos_copy(const char* args)
 
 static void dos_delete(const char* args)
 {
+    char first[64];
+    char file_arg[64];
     char drv;
     char name[64];
     FsWritableFile* w;
-    dos_resolve_path(args, &drv, name, sizeof(name));
+    int force = 0;
+    if (vcs_read_word(&args, first, sizeof(first)) != 0) {
+        out_append("Usage: DEL [-F] file\n");
+        return;
+    }
+    if (ascii_streq_ci(first, "-f") || ascii_streq_ci(first, "/f") ||
+        ascii_streq_ci(first, "--force") || ascii_streq_ci(first, "/force")) {
+        force = 1;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: DEL -F file\n");
+            return;
+        }
+    } else {
+        uint32_t i = 0;
+        while (first[i] && i + 1u < sizeof(file_arg)) {
+            file_arg[i] = first[i];
+            i++;
+        }
+        file_arg[i] = '\0';
+    }
+    dos_resolve_path(file_arg, &drv, name, sizeof(name));
     (void)drv;
     if (!name[0]) {
-        out_append("Usage: DEL file\n");
+        out_append("Usage: DEL [-F] file\n");
         return;
     }
     w = fs_open_writable(name);
     if (!w) {
-        out_append("DEL: read-only or unknown file; not deleted.\n");
+        int r;
+        if (!force) {
+            out_append("DEL: read-only or unknown file; use DEL -F file for a user-owned read-only tombstone.\n");
+            return;
+        }
+        r = fs_hide_readonly(name);
+        if (r >= 0) {
+            out_append("DEL -F: read-only file hidden by user tombstone: ");
+            out_append(name);
+            out_append("\nUse RESTORE ");
+            out_append(name);
+            out_append(" to show it again. Tombstone log: fsdelete.lardd\n");
+            dos_log_event("force-delete", name);
+            return;
+        }
+        out_append("DEL -F: file not found or tombstone table full.\n");
         return;
     }
     (void)fs_write(w, 0, (const uint8_t*)"", 0);
@@ -5319,6 +5357,31 @@ static void dos_delete(const char* args)
     out_append(name);
     out_append("\n");
     dos_log_event("delete", name);
+}
+
+static void dos_restore(const char* args)
+{
+    char drv;
+    char name[64];
+    int r;
+    dos_resolve_path(args, &drv, name, sizeof(name));
+    (void)drv;
+    if (!name[0]) {
+        out_append("Usage: RESTORE file\n");
+        return;
+    }
+    r = fs_unhide_readonly(name);
+    if (r == 0) {
+        out_append("RESTORE: read-only file visible again: ");
+        out_append(name);
+        out_append("\n");
+        dos_log_event("restore", name);
+    } else if (r == -1) {
+        out_append("RESTORE: read-only file not found.\n");
+    } else {
+        out_append("RESTORE: file was not hidden; SHOW record written for transparency.\n");
+        dos_log_event("restore", name);
+    }
 }
 
 static void dos_rename(const char* args)
@@ -5440,6 +5503,8 @@ static void dos_mem(void)
     out_append_u32(generation);
     out_append(", last=");
     out_append_i32(last);
+    out_append("\n  read-only tombstones: ");
+    out_append_u32(fs_readonly_hidden_count());
     out_append("\n");
 }
 
@@ -5474,6 +5539,7 @@ static int dos_dispatch(const char* cmd, const char* args)
     if (ascii_streq_ci(cmd, "type")) { dos_type(args); return 1; }
     if (ascii_streq_ci(cmd, "copy")) { dos_copy(args); return 1; }
     if (ascii_streq_ci(cmd, "del") || ascii_streq_ci(cmd, "erase")) { dos_delete(args); return 1; }
+    if (ascii_streq_ci(cmd, "restore") || ascii_streq_ci(cmd, "undelete")) { dos_restore(args); return 1; }
     if (ascii_streq_ci(cmd, "ren") || ascii_streq_ci(cmd, "rename")) { dos_rename(args); return 1; }
     if (ascii_streq_ci(cmd, "md") || ascii_streq_ci(cmd, "mkdir")) { dos_dir_label(args, 1); return 1; }
     if (ascii_streq_ci(cmd, "rd") || ascii_streq_ci(cmd, "rmdir")) { dos_dir_label(args, 0); return 1; }
@@ -5579,6 +5645,7 @@ int lsh_dosmode_selftest(void)
     if (drv != 'X' || strcmp(name, "hello.txt") != 0) return -3;
     dos_resolve_path("R:\\NOTES.TXT", &drv, name, sizeof(name));
     if (drv != 'Z' || strcmp(name, "notes.txt") != 0) return -4;
+    if (fs_delete_overlay_selftest() != 0) return -5;
     return 0;
 }
 

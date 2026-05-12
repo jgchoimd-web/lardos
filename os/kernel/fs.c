@@ -195,6 +195,19 @@ static const uint8_t dosmode_init[] =
 static uint8_t ram_dosmode_buf[DOSMODE_CAP];
 static FsWritableFile ram_dosmode = { "dosmode.lardd", ram_dosmode_buf, 0, DOSMODE_CAP };
 
+#define FSDELETE_CAP 2048u
+static const uint8_t fsdelete_init[] =
+    "LARDD 1\n"
+    "TITLE Read-Only Delete Overlay\n"
+    "TEXT DEL -F records user-owned tombstones for built-in read-only files.\n"
+    "SECTION Tombstones\n";
+static uint8_t ram_fsdelete_buf[FSDELETE_CAP];
+static FsWritableFile ram_fsdelete = { "fsdelete.lardd", ram_fsdelete_buf, 0, FSDELETE_CAP };
+
+#define FS_HIDDEN_READONLY_MAX 32u
+static char s_hidden_readonly[FS_HIDDEN_READONLY_MAX][32];
+static uint32_t s_hidden_readonly_count;
+
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
 #define LPST_VERSION     2u
 #define LPST_START_LBA   2752u
@@ -245,6 +258,7 @@ static const uint8_t file_lardos_lars[] =
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
     "li Use dos on for L-DOS mode: a native DOS-style shell layer with C:/A:/R: drive mapping, DIR/TYPE/COPY/DEL/REN/MD/RD/CD, and dosmode.lardd history.\n"
+    "li In L-DOS, DEL -F file hides read-only built-in files through fsdelete.lardd; RESTORE file makes them visible again.\n"
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
@@ -299,6 +313,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.59.0b adds runtime desktop/dock items, folders, draggable/reorderable launchers, per-app windows, and z-order.\n"
     "li v1.59.0a officially promotes the runtime desktop/window-manager model without restoring EXGUI/EXEXGUI.\n"
     "li v1.60.0a officially adds L-DOS mode as a native compatibility shell without external DOS code.\n"
+    "li v1.60.1p hotpatches L-DOS DEL -F read-only tombstones plus RESTORE for user-owned reversibility.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -317,6 +332,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd dos status\n"
     "cmd dos map\n"
     "cmd dos test\n"
+    "cmd dos run mem\n"
     "cmd magic statsu\n"
     "cmd magic dryrun statsu\n"
     "cmd mode probe\n"
@@ -536,6 +552,8 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM dos on -> enter L-DOS mode with an L-DOS C:\\ prompt.\n"
     "ITEM dos off or EXIT -> leave L-DOS mode.\n"
     "ITEM DOS commands are case-insensitive: DIR, TYPE, COPY, DEL, REN, MD, RD, CD, CLS, VER, SET, ECHO, MEM.\n"
+    "ITEM DEL -F file -> hide a read-only built-in or LFS file using the user-owned fsdelete.lardd tombstone overlay.\n"
+    "ITEM RESTORE file or UNDELETE file -> remove that tombstone so the read-only file is visible again.\n"
     "ITEM LSH command -> run one native LardOS command while staying in DOS mode.\n"
     "ITEM dos map -> show C:/A:/R: drive mappings.\n"
     "ITEM dos log -> read dosmode.lardd history.\n"
@@ -545,8 +563,9 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM R: maps to LardOS Z: writable RAM files.\n"
     "SECTION Philosophy\n"
     "ITEM Directories are virtual navigation labels because LardOS currently keeps the core filesystem flat and visible.\n"
-    "ITEM DEL clears writable RAM file contents but refuses read-only embedded files.\n"
+    "ITEM DEL clears writable RAM file contents; DEL -F hides read-only embedded files with a reversible tombstone.\n"
     "ITEM REN moves data into an existing writable slot instead of hiding a mutable filename table.\n"
+    "ITEM fsdelete.lardd keeps HIDE and SHOW records so force deletes are inspectable and persisted by sync.\n"
     "END\n";
 
 static const uint8_t file_features_lil[] =
@@ -592,8 +611,10 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file hello.shrine\n"
     "CHECK file shrine_guide.lardd\n"
     "CHECK command dos\n"
+    "CHECK command restore\n"
     "CHECK file dosmode_guide.lardd\n"
     "CHECK writable dosmode.lardd\n"
+    "CHECK writable fsdelete.lardd\n"
     "CHECK file vm_guide.lardd\n"
     "CHECK command time\n"
     "CHECK command lunar\n"
@@ -708,6 +729,17 @@ static FsFile g_lfs_result;
 static char g_lfs_name[LFS_MAX_NAME];
 static FsFile g_ram_result;
 
+typedef struct {
+    void (*cb)(const char* name, uint32_t size, void* user);
+    void* user;
+} FsListFilterCtx;
+
+static void fs_list_lfs_filter_cb(const char* name, uint32_t size, void* u)
+{
+    FsListFilterCtx* ctx = (FsListFilterCtx*)u;
+    if (ctx && ctx->cb && !fs_readonly_hidden(name)) ctx->cb(name, size, ctx->user);
+}
+
 static uint32_t lpst_read32(const uint8_t* p)
 {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
@@ -729,6 +761,26 @@ static uint32_t lpst_hash(const uint8_t* data, uint32_t len)
         h *= 16777619u;
     }
     return h;
+}
+
+static int fs_name_eq(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && a[i] == b[i]) i++;
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static void fs_copy_name(char* dst, uint32_t cap, const char* src)
+{
+    uint32_t i = 0;
+    if (!dst || cap == 0) return;
+    if (!src) src = "";
+    while (src[i] && i + 1u < cap) {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
 }
 
 static void lpst_zero(void)
@@ -769,9 +821,139 @@ static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
     return 0;
 }
 
+static void fs_hidden_clear(void)
+{
+    for (uint32_t i = 0; i < FS_HIDDEN_READONLY_MAX; i++) s_hidden_readonly[i][0] = '\0';
+    s_hidden_readonly_count = 0;
+}
+
+static int fs_hidden_index(const char* name)
+{
+    for (uint32_t i = 0; i < s_hidden_readonly_count; i++) {
+        if (fs_name_eq(s_hidden_readonly[i], name)) return (int)i;
+    }
+    return -1;
+}
+
+int fs_readonly_hidden(const char* name)
+{
+    return fs_hidden_index(name) >= 0;
+}
+
+uint32_t fs_readonly_hidden_count(void)
+{
+    return s_hidden_readonly_count;
+}
+
+static int fs_track_hide_readonly(const char* name)
+{
+    if (!name || !name[0]) return -1;
+    if (fs_hidden_index(name) >= 0) return 1;
+    if (s_hidden_readonly_count >= FS_HIDDEN_READONLY_MAX) return -2;
+    fs_copy_name(s_hidden_readonly[s_hidden_readonly_count],
+                 sizeof(s_hidden_readonly[s_hidden_readonly_count]), name);
+    s_hidden_readonly_count++;
+    return 0;
+}
+
+static int fs_track_show_readonly(const char* name)
+{
+    int idx = fs_hidden_index(name);
+    if (idx < 0) return -1;
+    for (uint32_t i = (uint32_t)idx; i + 1u < s_hidden_readonly_count; i++) {
+        fs_copy_name(s_hidden_readonly[i], sizeof(s_hidden_readonly[i]), s_hidden_readonly[i + 1u]);
+    }
+    s_hidden_readonly_count--;
+    if (s_hidden_readonly_count < FS_HIDDEN_READONLY_MAX) s_hidden_readonly[s_hidden_readonly_count][0] = '\0';
+    return 0;
+}
+
+static int fs_readonly_physical_exists(const char* name)
+{
+    const uint8_t* data;
+    uint32_t sz;
+    for (uint32_t i = 0; i < FS_FILE_COUNT; i++) {
+        if (fs_name_eq(FS_FILES[i].name, name)) return 1;
+    }
+    return lfs_lookup(name, &data, &sz) ? 1 : 0;
+}
+
+static void fsdelete_append_record(const char* op, const char* name)
+{
+    FsWritableFile* w = &ram_fsdelete;
+    uint32_t on = 0;
+    uint32_t nn = 0;
+    if (w->cap - w->size < 96u) {
+        (void)fs_write(w, 0, fsdelete_init, sizeof(fsdelete_init) - 1u);
+    }
+    while (op && op[on]) on++;
+    while (name && name[nn]) nn++;
+    (void)fs_append(w, (const uint8_t*)op, on);
+    (void)fs_append(w, (const uint8_t*)" ", 1u);
+    (void)fs_append(w, (const uint8_t*)name, nn);
+    (void)fs_append(w, (const uint8_t*)"\n", 1u);
+}
+
+static void fs_apply_delete_log(void)
+{
+    uint32_t i = 0;
+    fs_hidden_clear();
+    while (i < ram_fsdelete.size) {
+        char op[8];
+        char name[32];
+        uint32_t oi = 0;
+        uint32_t ni = 0;
+        while (i < ram_fsdelete.size && (ram_fsdelete.data[i] == ' ' || ram_fsdelete.data[i] == '\t' ||
+               ram_fsdelete.data[i] == '\n' || ram_fsdelete.data[i] == '\r')) i++;
+        while (i < ram_fsdelete.size && ram_fsdelete.data[i] != ' ' && ram_fsdelete.data[i] != '\t' &&
+               ram_fsdelete.data[i] != '\n' && ram_fsdelete.data[i] != '\r' && oi + 1u < sizeof(op)) {
+            op[oi++] = (char)ram_fsdelete.data[i++];
+        }
+        op[oi] = '\0';
+        while (i < ram_fsdelete.size && (ram_fsdelete.data[i] == ' ' || ram_fsdelete.data[i] == '\t')) i++;
+        while (i < ram_fsdelete.size && ram_fsdelete.data[i] != ' ' && ram_fsdelete.data[i] != '\t' &&
+               ram_fsdelete.data[i] != '\n' && ram_fsdelete.data[i] != '\r' && ni + 1u < sizeof(name)) {
+            name[ni++] = (char)ram_fsdelete.data[i++];
+        }
+        name[ni] = '\0';
+        while (i < ram_fsdelete.size && ram_fsdelete.data[i] != '\n' && ram_fsdelete.data[i] != '\r') i++;
+        if (fs_name_eq(op, "HIDE") && name[0]) {
+            (void)fs_track_hide_readonly(name);
+        } else if (fs_name_eq(op, "SHOW") && name[0]) {
+            (void)fs_track_show_readonly(name);
+        }
+    }
+}
+
+int fs_hide_readonly(const char* name)
+{
+    int r;
+    if (!fs_readonly_physical_exists(name)) return -1;
+    r = fs_track_hide_readonly(name);
+    if (r < 0) return r;
+    fsdelete_append_record("HIDE", name);
+    return r;
+}
+
+int fs_unhide_readonly(const char* name)
+{
+    int r;
+    if (!fs_readonly_physical_exists(name)) return -1;
+    r = fs_track_show_readonly(name);
+    fsdelete_append_record("SHOW", name);
+    return r == 0 ? 0 : 1;
+}
+
+int fs_delete_overlay_selftest(void)
+{
+    if (!fs_readonly_physical_exists("hello.txt")) return -1;
+    if (FS_HIDDEN_READONLY_MAX < 8u) return -2;
+    return 0;
+}
+
 static uint32_t writable_count(void)
 {
-    return 20u;
+    return 21u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -796,11 +978,13 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 17) return &ram_userlaw;
     if (idx == 18) return &ram_glyphmap;
     if (idx == 19) return &ram_dosmode;
+    if (idx == 20) return &ram_fsdelete;
     return NULL;
 }
 
 void fs_init(void)
 {
+    fs_hidden_clear();
     for (uint32_t i = 0; i < sizeof(notes_init) - 1 && i < RAM_FILE_CAP; i++) {
         ram_notes_buf[i] = notes_init[i];
     }
@@ -869,8 +1053,13 @@ void fs_init(void)
         ram_dosmode_buf[i] = dosmode_init[i];
     }
     ram_dosmode.size = sizeof(dosmode_init) - 1;
+    for (uint32_t i = 0; i < sizeof(fsdelete_init) - 1 && i < FSDELETE_CAP; i++) {
+        ram_fsdelete_buf[i] = fsdelete_init[i];
+    }
+    ram_fsdelete.size = sizeof(fsdelete_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
+    fs_apply_delete_log();
 }
 
 const FsFile* fs_open(const char* name)
@@ -894,14 +1083,9 @@ const FsFile* fs_open(const char* name)
 
 const FsFile* fs_open_readonly(const char* name)
 {
+    if (fs_readonly_hidden(name)) return 0;
     for (uint32_t i = 0; i < FS_FILE_COUNT; i++) {
-        const char* a = FS_FILES[i].name;
-        const char* b = name;
-        while (*a && *b && *a == *b) {
-            a++;
-            b++;
-        }
-        if (*a == '\0' && *b == '\0') {
+        if (fs_name_eq(FS_FILES[i].name, name)) {
             return &FS_FILES[i];
         }
     }
@@ -950,9 +1134,14 @@ void fs_list_readonly(void (*cb)(const char* name, uint32_t size, void* user), v
 {
     if (!cb) return;
     for (uint32_t i = 0; i < FS_FILE_COUNT; i++) {
-        cb(FS_FILES[i].name, FS_FILES[i].size, user);
+        if (!fs_readonly_hidden(FS_FILES[i].name)) cb(FS_FILES[i].name, FS_FILES[i].size, user);
     }
-    lfs_list(cb, user);
+    {
+        FsListFilterCtx ctx;
+        ctx.cb = cb;
+        ctx.user = user;
+        lfs_list(fs_list_lfs_filter_cb, &ctx);
+    }
 }
 
 void fs_list_writable(void (*cb)(const char* name, uint32_t size, void* user), void* user)
@@ -1126,6 +1315,7 @@ int fs_persist_load(void)
     s_persist_active_bank = best_bank;
     s_persist_generation = best_generation;
     s_persist_last_result = 0;
+    fs_apply_delete_log();
     return 0;
 }
 

@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.59.0b
+ITEM Beta release turning the default GUI desktop from a fixed launcher screen into a small real desktop/window-manager model.
+ITEM Desktop icons and dock entries are now runtime item tables, not only hardcoded launcher arrays.
+ITEM Left-click launches desktop and dock items; dragging desktop icons moves them, and dragging dock icons reorders the dock.
+ITEM Added top-bar controls for New Folder, Pin App, and Dock + so users can add folders and new launchers without editing C tables.
+ITEM Apps now have per-app window records with visibility, geometry, fullscreen state, saved view text, and z-order so clicking a window brings it forward and covered windows render behind it.
+ITEM This is beta because it changes GUI state ownership and render ordering while preserving v1.58.1p controls, LGUILIB/LTHEME, user-owned cursor, and EXGUI/EXEXGUI removal.
+
 SECTION v1.58.1p
 ITEM Hotpatch for the latest default desktop GUI.
 ITEM Settings sliders for brightness, volume, and quality now capture mouse input so clicks no longer pass through to the tab bar and close the settings panel.

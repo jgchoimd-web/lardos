@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.58.1p-ami/lardos-v1.58.1p-ami.iso`. To publish the whole hardware
+`release/v1.59.0b-ami/lardos-v1.59.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -127,6 +127,10 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.59.0b` starts the real desktop/window-manager track: desktop and dock
+  items are runtime tables, left-click launches them, desktop icons can be
+  dragged, dock icons can be reordered, New Folder/Pin App/Dock + add items,
+  and each app has its own window record with z-order.
 - `v1.58.1p` hotpatches the new default desktop GUI: settings sliders no
   longer close the settings panel when clicked, normal windows can move across
   the full visible desktop, and the title bar has a fullscreen/restore button.
@@ -237,6 +241,9 @@ commands:
 - `v1.58.1p` hotpatches that desktop surface so settings sliders keep focus,
   windows can move to the full screen area, and fullscreen/restore is available
   from the title bar.
+- `v1.59.0b` makes the desktop model editable at runtime with addable folders,
+  draggable desktop items, reorderable dock items, per-app windows, saved app
+  view text, and z-order rendering.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.

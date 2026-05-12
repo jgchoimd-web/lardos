@@ -25,6 +25,15 @@
 #define LARSH_VIEW_W 160
 #define LARSH_VIEW_H 120
 #define GUI_GLYPH_HITS_MAX 64u
+#define GUI_APP_COUNT 10
+#define GUI_DESKTOP_ITEM_MAX 24
+#define GUI_DOCK_ITEM_MAX 16
+#define GUI_ITEM_NONE 0
+#define GUI_ITEM_APP 1
+#define GUI_ITEM_FOLDER 2
+#define GUI_TOP_NEW_FOLDER 1
+#define GUI_TOP_PIN_DESKTOP 2
+#define GUI_TOP_PIN_DOCK 3
 
 typedef struct {
     int app;
@@ -55,6 +64,69 @@ static const gui_launcher_t s_dock_launchers[] = {
 };
 
 typedef struct {
+    int used;
+    int kind;
+    int app;
+    int x;
+    int y;
+    int w;
+    int h;
+    char name[24];
+    char icon[4];
+    uint32_t color;
+} gui_item_t;
+
+typedef struct {
+    int app;
+    int initialized;
+    int opened_once;
+    int visible;
+    int x;
+    int y;
+    int w;
+    int h;
+    int fullscreen;
+    int restore_x;
+    int restore_y;
+    int restore_w;
+    int restore_h;
+    uint32_t z;
+} gui_window_t;
+
+typedef struct {
+    int saved;
+    char tb[256];
+    uint32_t tb_len;
+    uint32_t tb_cur;
+    char resp[4096];
+    int resp_scroll;
+    int resp_total_lines;
+    char calc_display[32];
+    uint32_t calc_len;
+    uint32_t calc_cur;
+    int gallery_sel;
+    int user_sandbox;
+    int http_post_mode;
+    int lafillo_src_mode;
+    char lafillo_raw[4096];
+    char lafillo_extracted[4096];
+    char lafaelo_buf[8192];
+    uint32_t lafaelo_len;
+    uint32_t lafaelo_cur;
+    int lafaelo_focus;
+    int lafaelo_show_run;
+} gui_app_view_t;
+
+static gui_item_t g_desktop_items[GUI_DESKTOP_ITEM_MAX];
+static gui_item_t g_dock_items[GUI_DOCK_ITEM_MAX];
+static int g_desktop_item_count;
+static int g_dock_item_count;
+static gui_window_t g_windows[GUI_APP_COUNT];
+static gui_app_view_t g_app_views[GUI_APP_COUNT];
+static uint32_t g_window_z_next = 1u;
+static int g_folder_count;
+
+typedef struct {
     int x;
     int y;
     int w;
@@ -82,6 +154,13 @@ static const fb_t* g_syscall_target_override;
 
 static void gui_clamp_window(void);
 static void gui_apply_fullscreen(void);
+static void gui_select_app(int idx);
+static void gui_resp_clear(void);
+static void gui_resp_append(const char* s);
+static void gui_desktop_init_model(void);
+static void gui_bring_window_front(int app);
+static void gui_sync_active_window(void);
+static void gui_save_app_view(int app);
 
 #define SCREENRAM_MAX_BYTES 8192u
 #define SCREENRAM_DEFAULT_W 64u
@@ -200,6 +279,13 @@ typedef struct {
     int volume;      /* 0-100 */
     int quality;     /* 0=low 1=med 2=high contrast */
     int slider_drag; /* 0=none 1=bright 2=vol 3=quality */
+    int item_drag_area; /* 1=desktop, 2=dock */
+    int item_drag_index;
+    int item_drag_moved;
+    int item_drag_start_x;
+    int item_drag_start_y;
+    int item_drag_off_x;
+    int item_drag_off_y;
 } gui_state_t;
 
 #define SS_IDLE_THRESHOLD  120
@@ -628,6 +714,13 @@ int gui_init(void)
     g.volume = 80;
     g.quality = 1;
     g.slider_drag = 0;
+    g.item_drag_area = 0;
+    g.item_drag_index = -1;
+    g.item_drag_moved = 0;
+    g.item_drag_start_x = 0;
+    g.item_drag_start_y = 0;
+    g.item_drag_off_x = 0;
+    g.item_drag_off_y = 0;
     g.lafillo_extracted[0] = '\0';
 
     // Default URL
@@ -635,6 +728,19 @@ int gui_init(void)
     for (g.tb_len = 0; def[g.tb_len] && g.tb_len + 1 < sizeof(g.tb); g.tb_len++) g.tb[g.tb_len] = def[g.tb_len];
     g.tb[g.tb_len] = '\0';
     g.tb_cur = g.tb_len;
+    gui_desktop_init_model();
+    g_windows[0].x = g.win_x;
+    g_windows[0].y = g.win_y;
+    g_windows[0].w = g.win_w;
+    g_windows[0].h = g.win_h;
+    g_windows[0].restore_x = g.restore_x;
+    g_windows[0].restore_y = g.restore_y;
+    g_windows[0].restore_w = g.restore_w;
+    g_windows[0].restore_h = g.restore_h;
+    g_windows[0].visible = 1;
+    g_windows[0].opened_once = 1;
+    gui_bring_window_front(0);
+    gui_save_app_view(0);
 
     /* Screensaver: try default.ssav */
     g.ss_active = 0;
@@ -949,9 +1055,128 @@ static const char* gui_app_name(int app)
     return "App";
 }
 
+static void gui_copy_text(char* dst, uint32_t cap, const char* src)
+{
+    uint32_t i = 0;
+    if (!dst || cap == 0) return;
+    if (!src) src = "";
+    while (src[i] && i + 1u < cap) {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
+}
+
+static void gui_save_app_view(int app)
+{
+    gui_app_view_t* v;
+    if (app < 0 || app >= GUI_APP_COUNT) return;
+    v = &g_app_views[app];
+    gui_copy_text(v->tb, sizeof(v->tb), g.tb);
+    v->tb_len = g.tb_len;
+    v->tb_cur = g.tb_cur;
+    gui_copy_text(v->resp, sizeof(v->resp), g.resp);
+    v->resp_scroll = g.resp_scroll;
+    v->resp_total_lines = g.resp_total_lines;
+    gui_copy_text(v->calc_display, sizeof(v->calc_display), g.calc_display);
+    v->calc_len = g.calc_len;
+    v->calc_cur = g.calc_cur;
+    v->gallery_sel = g.gallery_sel;
+    v->user_sandbox = g.user_sandbox;
+    v->http_post_mode = g.http_post_mode;
+    v->lafillo_src_mode = g.lafillo_src_mode;
+    gui_copy_text(v->lafillo_raw, sizeof(v->lafillo_raw), g.lafillo_raw);
+    gui_copy_text(v->lafillo_extracted, sizeof(v->lafillo_extracted), g.lafillo_extracted);
+    gui_copy_text(v->lafaelo_buf, sizeof(v->lafaelo_buf), g.lafaelo_buf);
+    v->lafaelo_len = g.lafaelo_len;
+    v->lafaelo_cur = g.lafaelo_cur;
+    v->lafaelo_focus = g.lafaelo_focus;
+    v->lafaelo_show_run = g.lafaelo_show_run;
+    v->saved = 1;
+}
+
+static void gui_load_app_view(int app)
+{
+    gui_app_view_t* v;
+    if (app < 0 || app >= GUI_APP_COUNT) return;
+    v = &g_app_views[app];
+    if (!v->saved) return;
+    gui_copy_text(g.tb, sizeof(g.tb), v->tb);
+    g.tb_len = v->tb_len;
+    g.tb_cur = v->tb_cur;
+    gui_copy_text(g.resp, sizeof(g.resp), v->resp);
+    g.resp_scroll = v->resp_scroll;
+    g.resp_total_lines = v->resp_total_lines;
+    gui_copy_text(g.calc_display, sizeof(g.calc_display), v->calc_display);
+    g.calc_len = v->calc_len;
+    g.calc_cur = v->calc_cur;
+    g.gallery_sel = v->gallery_sel;
+    g.user_sandbox = v->user_sandbox;
+    g.http_post_mode = v->http_post_mode;
+    g.lafillo_src_mode = v->lafillo_src_mode;
+    gui_copy_text(g.lafillo_raw, sizeof(g.lafillo_raw), v->lafillo_raw);
+    gui_copy_text(g.lafillo_extracted, sizeof(g.lafillo_extracted), v->lafillo_extracted);
+    gui_copy_text(g.lafaelo_buf, sizeof(g.lafaelo_buf), v->lafaelo_buf);
+    g.lafaelo_len = v->lafaelo_len;
+    g.lafaelo_cur = v->lafaelo_cur;
+    g.lafaelo_focus = v->lafaelo_focus;
+    g.lafaelo_show_run = v->lafaelo_show_run;
+}
+
+static const gui_launcher_t* gui_launcher_for_app(int app)
+{
+    for (uint32_t i = 0; i < sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]); i++) {
+        if (s_dock_launchers[i].app == app) return &s_dock_launchers[i];
+    }
+    for (uint32_t i = 0; i < sizeof(s_desktop_launchers) / sizeof(s_desktop_launchers[0]); i++) {
+        if (s_desktop_launchers[i].app == app) return &s_desktop_launchers[i];
+    }
+    return &s_dock_launchers[0];
+}
+
+static void gui_item_from_app(gui_item_t* item, int app, int x, int y)
+{
+    const gui_launcher_t* l = gui_launcher_for_app(app);
+    if (!item) return;
+    item->used = 1;
+    item->kind = GUI_ITEM_APP;
+    item->app = app;
+    item->x = x;
+    item->y = y;
+    item->w = 76;
+    item->h = 62;
+    gui_copy_text(item->name, sizeof(item->name), l->name);
+    gui_copy_text(item->icon, sizeof(item->icon), l->icon);
+    item->color = l->color;
+}
+
+static void gui_item_from_folder(gui_item_t* item, int x, int y)
+{
+    char name[24];
+    uint32_t n = (uint32_t)(g_folder_count + 1);
+    uint32_t pos = 0;
+    static const char prefix[] = "Folder ";
+    if (!item) return;
+    for (uint32_t i = 0; prefix[i] && pos + 1u < sizeof(name); i++) name[pos++] = prefix[i];
+    if (n >= 10u && pos + 1u < sizeof(name)) name[pos++] = (char)('0' + (n / 10u) % 10u);
+    if (pos + 1u < sizeof(name)) name[pos++] = (char)('0' + n % 10u);
+    name[pos] = '\0';
+    item->used = 1;
+    item->kind = GUI_ITEM_FOLDER;
+    item->app = -1;
+    item->x = x;
+    item->y = y;
+    item->w = 76;
+    item->h = 62;
+    gui_copy_text(item->name, sizeof(item->name), name);
+    gui_copy_text(item->icon, sizeof(item->icon), "F");
+    item->color = 0xFFD7B45Au;
+    g_folder_count++;
+}
+
 static void gui_dock_rect(int* out_x, int* out_y, int* out_w, int* out_h, int* out_cell)
 {
-    int count = (int)(sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]));
+    int count = g_dock_item_count > 0 ? g_dock_item_count : (int)(sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]));
     int cell = g_have_fb && g_fb.w < 420 ? 32 : 44;
     int margin = 8;
     int w = count * cell + margin * 2;
@@ -1014,6 +1239,7 @@ static void gui_toggle_fullscreen(void)
         g.restore_h = g.win_h;
         g.fullscreen = 1;
         gui_apply_fullscreen();
+        gui_sync_active_window();
     } else {
         g.fullscreen = 0;
         if (g.restore_w > 0 && g.restore_h > 0) {
@@ -1023,6 +1249,7 @@ static void gui_toggle_fullscreen(void)
             g.win_h = g.restore_h;
         }
         gui_clamp_window();
+        gui_sync_active_window();
     }
 }
 
@@ -1046,44 +1273,66 @@ static void gui_settings_panel_rect(int* out_x, int* out_y, int* out_w, int* out
     if (out_h) *out_h = panel_h;
 }
 
-static void gui_desktop_icon_rect(int index, int* out_x, int* out_y, int* out_w, int* out_h)
+static void gui_default_item_rect(int index, int* out_x, int* out_y, int* out_w, int* out_h)
 {
     int cols = g_have_fb && g_fb.w >= 620 ? 2 : 1;
     int col = index % cols;
     int row = index / cols;
-    int w = 76;
-    int h = 62;
     if (out_x) *out_x = 18 + col * 88;
     if (out_y) *out_y = 44 + row * 74;
-    if (out_w) *out_w = w;
-    if (out_h) *out_h = h;
+    if (out_w) *out_w = 76;
+    if (out_h) *out_h = 62;
 }
 
-static int gui_desktop_hit_app(int x, int y)
+static void gui_next_desktop_spot(int* out_x, int* out_y)
 {
-    int count = (int)(sizeof(s_desktop_launchers) / sizeof(s_desktop_launchers[0]));
-    for (int i = 0; i < count; i++) {
-        int ix, iy, iw, ih;
-        gui_desktop_icon_rect(i, &ix, &iy, &iw, &ih);
-        if (in_rect(x, y, ix, iy, iw, ih)) return s_desktop_launchers[i].app;
+    int x, y, w, h;
+    int idx = g_desktop_item_count;
+    if (idx >= GUI_DESKTOP_ITEM_MAX) idx = GUI_DESKTOP_ITEM_MAX - 1;
+    gui_default_item_rect(idx, &x, &y, &w, &h);
+    if (out_x) *out_x = x;
+    if (out_y) *out_y = y;
+}
+
+static int gui_desktop_hit_item(int x, int y)
+{
+    for (int i = g_desktop_item_count - 1; i >= 0; i--) {
+        gui_item_t* item = &g_desktop_items[i];
+        if (item->used && in_rect(x, y, item->x, item->y, item->w, item->h)) return i;
     }
     return -1;
 }
 
-static int gui_dock_hit_app(int x, int y)
+static int gui_dock_hit_item(int x, int y)
 {
     int dx, dy, dw, dh, cell;
-    int count = (int)(sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]));
     gui_dock_rect(&dx, &dy, &dw, &dh, &cell);
     if (!in_rect(x, y, dx, dy, dw, dh)) return -1;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < g_dock_item_count; i++) {
         int ix = dx + 8 + i * cell;
-        if (in_rect(x, y, ix, dy + 6, cell, cell)) return s_dock_launchers[i].app;
+        if (in_rect(x, y, ix, dy + 6, cell, cell)) return i;
     }
     return -1;
 }
 
-static void gui_draw_launcher(const fb_t* tgt, const gui_launcher_t* l, int x, int y,
+static int gui_top_action_hit(int x, int y)
+{
+    if (!in_rect(x, y, 0, 0, (int)g_fb.w, 24)) return 0;
+    if (in_rect(x, y, 126, 3, 86, 18)) return GUI_TOP_NEW_FOLDER;
+    if (in_rect(x, y, 218, 3, 70, 18)) return GUI_TOP_PIN_DESKTOP;
+    if (in_rect(x, y, 294, 3, 64, 18)) return GUI_TOP_PIN_DOCK;
+    return 0;
+}
+
+static void gui_draw_top_button(const fb_t* tgt, int x, const char* label, int w, int hot)
+{
+    uint32_t bg = hot ? 0xFF235D64u : 0xFF1C2632u;
+    fb_fill_rect(tgt, (uint16_t)x, 3, (uint16_t)w, 18, bg);
+    fb_fill_rect(tgt, (uint16_t)x, 3, (uint16_t)w, 1, 0xFF5B6E78u);
+    fb_draw_text(tgt, (uint16_t)(x + 6), 9, label, 0xFFFFFFFFu, bg);
+}
+
+static void gui_draw_launcher(const fb_t* tgt, const gui_item_t* item, int x, int y,
                               int w, int h, int active, int label)
 {
     int icon = h - (label ? 18 : 8);
@@ -1091,17 +1340,20 @@ static void gui_draw_launcher(const fb_t* tgt, const gui_launcher_t* l, int x, i
     int iy = y + 4;
     uint32_t bg = active ? 0xFF2B3C46u : 0xFF1A222Bu;
     uint32_t border = active ? 0xFFFFD166u : 0xFF53636Au;
+    uint32_t color = item ? item->color : 0xFF2E8FBAu;
     if (icon < 18) icon = 18;
     fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, bg);
     fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)w, 1, border);
     fb_fill_rect(tgt, (uint16_t)x, (uint16_t)(y + h - 1), (uint16_t)w, 1, 0xFF080B0Fu);
     fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 1, (uint16_t)h, border);
     fb_fill_rect(tgt, (uint16_t)(x + w - 1), (uint16_t)y, 1, (uint16_t)h, 0xFF080B0Fu);
-    fb_fill_rect(tgt, (uint16_t)ix, (uint16_t)iy, (uint16_t)icon, (uint16_t)icon, l->color);
+    fb_fill_rect(tgt, (uint16_t)ix, (uint16_t)iy, (uint16_t)icon, (uint16_t)icon, color);
     fb_fill_rect(tgt, (uint16_t)ix, (uint16_t)iy, (uint16_t)icon, 2, 0xFFFFFFFFu);
-    fb_draw_text(tgt, (uint16_t)(ix + icon / 2 - 4), (uint16_t)(iy + icon / 2 - 3), l->icon, 0xFFFFFFFFu, l->color);
+    fb_draw_text(tgt, (uint16_t)(ix + icon / 2 - 4), (uint16_t)(iy + icon / 2 - 3),
+                 item ? item->icon : "?", 0xFFFFFFFFu, color);
     if (label) {
-        fb_draw_text(tgt, (uint16_t)(x + 6), (uint16_t)(y + h - 13), l->name, 0xFFFFFFFFu, bg);
+        fb_draw_text(tgt, (uint16_t)(x + 6), (uint16_t)(y + h - 13),
+                     item ? item->name : "Item", 0xFFFFFFFFu, bg);
     } else if (active) {
         fb_fill_rect(tgt, (uint16_t)(x + w / 2 - 8), (uint16_t)(y + h - 4), 16, 2, 0xFFFFD166u);
     }
@@ -1112,29 +1364,316 @@ static void gui_draw_desktop(const fb_t* tgt)
     int sw = (int)g_fb.w;
     int sh = (int)g_fb.h;
     int dock_x, dock_y, dock_w, dock_h, cell;
-    int desktop_count = (int)(sizeof(s_desktop_launchers) / sizeof(s_desktop_launchers[0]));
-    int dock_count = (int)(sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]));
     fb_fill_rect(tgt, 0, 0, g_fb.w, g_fb.h, 0xFF10151Eu);
     for (int y = 24; y < sh; y += 28) fb_fill_rect(tgt, 0, (uint16_t)y, g_fb.w, 1, 0xFF151E29u);
     for (int x = 0; x < sw; x += 36) fb_fill_rect(tgt, (uint16_t)x, 24, 1, (uint16_t)(sh > 24 ? sh - 24 : 0), 0xFF111923u);
     fb_fill_rect(tgt, 0, 0, g_fb.w, 24, 0xFF121821u);
     fb_fill_rect(tgt, 0, 23, g_fb.w, 1, 0xFF2F8EA3u);
     fb_draw_text(tgt, 10, 8, "LARDOS DESKTOP", 0xFFFFFFFFu, 0xFF121821u);
+    gui_draw_top_button(tgt, 126, "New Folder", 86, gui_top_action_hit(g.mx, g.my) == GUI_TOP_NEW_FOLDER);
+    gui_draw_top_button(tgt, 218, "Pin App", 70, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DESKTOP);
+    gui_draw_top_button(tgt, 294, "Dock +", 64, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DOCK);
     fb_draw_text(tgt, (uint16_t)(sw > 116 ? sw - 116 : 10), 8, LARDOS_VERSION, 0xFF9DEAE4u, 0xFF121821u);
 
-    for (int i = 0; i < desktop_count; i++) {
-        int x, y, w, h;
-        gui_desktop_icon_rect(i, &x, &y, &w, &h);
-        gui_draw_launcher(tgt, &s_desktop_launchers[i], x, y, w, h, g.app_id == s_desktop_launchers[i].app, 1);
+    for (int i = 0; i < g_desktop_item_count; i++) {
+        gui_item_t* item = &g_desktop_items[i];
+        if (!item->used) continue;
+        int active = item->kind == GUI_ITEM_APP && item->app == g.app_id && g_windows[item->app].visible;
+        gui_draw_launcher(tgt, item, item->x, item->y, item->w, item->h, active, 1);
     }
 
     gui_dock_rect(&dock_x, &dock_y, &dock_w, &dock_h, &cell);
     fb_fill_rect(tgt, (uint16_t)dock_x, (uint16_t)dock_y, (uint16_t)dock_w, (uint16_t)dock_h, 0xFF151B22u);
     fb_fill_rect(tgt, (uint16_t)dock_x, (uint16_t)dock_y, (uint16_t)dock_w, 1, 0xFF5B6E78u);
-    for (int i = 0; i < dock_count; i++) {
+    for (int i = 0; i < g_dock_item_count; i++) {
         int x = dock_x + 8 + i * cell;
         int y = dock_y + 6;
-        gui_draw_launcher(tgt, &s_dock_launchers[i], x, y, cell - 4, cell, g.app_id == s_dock_launchers[i].app && g.win_visible, 0);
+        gui_item_t* item = &g_dock_items[i];
+        int active = item->kind == GUI_ITEM_APP && item->app == g.app_id && g_windows[item->app].visible;
+        gui_draw_launcher(tgt, item, x, y, cell - 4, cell, active, 0);
+    }
+}
+
+static void gui_default_window_rect(int app, int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    int sw = (int)g_fb.w;
+    int sh = (int)g_fb.h;
+    int w = sw >= 660 ? 640 : sw - 20;
+    int h = sh >= 520 ? 420 : sh - 70;
+    int x;
+    int y;
+    if (w < 240) w = sw > 8 ? sw - 8 : sw;
+    if (h < 180) h = sh > 8 ? sh - 8 : sh;
+    x = (sw - w) / 2 + (app % 4) * 22 - 33;
+    y = 34 + (app % 5) * 18;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x + w > sw) x = sw - w;
+    if (y + h > sh) y = sh - h;
+    if (out_x) *out_x = x;
+    if (out_y) *out_y = y;
+    if (out_w) *out_w = w;
+    if (out_h) *out_h = h;
+}
+
+static void gui_window_ensure(int app)
+{
+    gui_window_t* w;
+    int x, y, ww, wh;
+    if (app < 0 || app >= GUI_APP_COUNT) return;
+    w = &g_windows[app];
+    if (w->initialized) return;
+    gui_default_window_rect(app, &x, &y, &ww, &wh);
+    w->app = app;
+    w->initialized = 1;
+    w->opened_once = 0;
+    w->visible = 0;
+    w->x = x;
+    w->y = y;
+    w->w = ww;
+    w->h = wh;
+    w->fullscreen = 0;
+    w->restore_x = x;
+    w->restore_y = y;
+    w->restore_w = ww;
+    w->restore_h = wh;
+    w->z = 0;
+}
+
+static void gui_load_window_to_legacy(int app)
+{
+    gui_window_t* w;
+    if (app < 0 || app >= GUI_APP_COUNT) return;
+    gui_window_ensure(app);
+    w = &g_windows[app];
+    g.app_id = app;
+    g.win_visible = w->visible;
+    g.win_x = w->x;
+    g.win_y = w->y;
+    g.win_w = w->w;
+    g.win_h = w->h;
+    g.fullscreen = w->fullscreen;
+    g.restore_x = w->restore_x;
+    g.restore_y = w->restore_y;
+    g.restore_w = w->restore_w;
+    g.restore_h = w->restore_h;
+}
+
+static void gui_sync_active_window(void)
+{
+    gui_window_t* w;
+    if (g.app_id < 0 || g.app_id >= GUI_APP_COUNT) return;
+    gui_window_ensure(g.app_id);
+    w = &g_windows[g.app_id];
+    w->visible = g.win_visible;
+    w->x = g.win_x;
+    w->y = g.win_y;
+    w->w = g.win_w;
+    w->h = g.win_h;
+    w->fullscreen = g.fullscreen;
+    w->restore_x = g.restore_x;
+    w->restore_y = g.restore_y;
+    w->restore_w = g.restore_w;
+    w->restore_h = g.restore_h;
+}
+
+static void gui_bring_window_front(int app)
+{
+    if (app < 0 || app >= GUI_APP_COUNT) return;
+    gui_window_ensure(app);
+    g_windows[app].z = ++g_window_z_next;
+}
+
+static int gui_top_window_at(int x, int y)
+{
+    uint32_t best_z = 0;
+    int best = -1;
+    for (int i = 0; i < GUI_APP_COUNT; i++) {
+        gui_window_t* w = &g_windows[i];
+        if (!w->initialized || !w->visible) continue;
+        if (in_rect(x, y, w->x, w->y, w->w, w->h) && w->z >= best_z) {
+            best_z = w->z;
+            best = i;
+        }
+    }
+    return best;
+}
+
+static int gui_top_visible_window(void)
+{
+    uint32_t best_z = 0;
+    int best = -1;
+    for (int i = 0; i < GUI_APP_COUNT; i++) {
+        gui_window_t* w = &g_windows[i];
+        if (!w->initialized || !w->visible) continue;
+        if (w->z >= best_z) {
+            best_z = w->z;
+            best = i;
+        }
+    }
+    return best;
+}
+
+static void gui_activate_top_window_or_none(void)
+{
+    int top = gui_top_visible_window();
+    if (top >= 0) {
+        gui_load_window_to_legacy(top);
+    } else {
+        g.win_visible = 0;
+        g.dragging = 0;
+        g.scroll_drag = 0;
+        g.slider_drag = 0;
+        g.settings_open = 0;
+    }
+}
+
+static int gui_desktop_add_app(int app)
+{
+    int x, y;
+    if (g_desktop_item_count >= GUI_DESKTOP_ITEM_MAX) return -1;
+    gui_next_desktop_spot(&x, &y);
+    gui_item_from_app(&g_desktop_items[g_desktop_item_count++], app, x, y);
+    return 0;
+}
+
+static int gui_desktop_add_folder(void)
+{
+    int x, y;
+    if (g_desktop_item_count >= GUI_DESKTOP_ITEM_MAX) return -1;
+    gui_next_desktop_spot(&x, &y);
+    gui_item_from_folder(&g_desktop_items[g_desktop_item_count++], x, y);
+    return 0;
+}
+
+static int gui_dock_add_app(int app)
+{
+    if (g_dock_item_count >= GUI_DOCK_ITEM_MAX) return -1;
+    for (int i = 0; i < g_dock_item_count; i++) {
+        if (g_dock_items[i].used && g_dock_items[i].kind == GUI_ITEM_APP && g_dock_items[i].app == app) return 0;
+    }
+    gui_item_from_app(&g_dock_items[g_dock_item_count++], app, 0, 0);
+    return 0;
+}
+
+static void gui_desktop_init_model(void)
+{
+    if (g_desktop_item_count == 0) {
+        for (uint32_t i = 0; i < sizeof(s_desktop_launchers) / sizeof(s_desktop_launchers[0]); i++) {
+            int x, y, w, h;
+            gui_default_item_rect((int)i, &x, &y, &w, &h);
+            gui_item_from_app(&g_desktop_items[g_desktop_item_count++], s_desktop_launchers[i].app, x, y);
+        }
+    }
+    if (g_dock_item_count == 0) {
+        for (uint32_t i = 0; i < sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]); i++) {
+            gui_item_from_app(&g_dock_items[g_dock_item_count++], s_dock_launchers[i].app, 0, 0);
+        }
+    }
+    for (int i = 0; i < GUI_APP_COUNT; i++) gui_window_ensure(i);
+}
+
+static void gui_reorder_dock_item(int index, int mouse_x)
+{
+    int dx, dy, dw, dh, cell;
+    int target;
+    gui_item_t moving;
+    if (index < 0 || index >= g_dock_item_count) return;
+    gui_dock_rect(&dx, &dy, &dw, &dh, &cell);
+    (void)dy;
+    (void)dw;
+    (void)dh;
+    target = (mouse_x - dx - 8) / cell;
+    if (target < 0) target = 0;
+    if (target >= g_dock_item_count) target = g_dock_item_count - 1;
+    if (target == index) return;
+    moving = g_dock_items[index];
+    if (target > index) {
+        for (int i = index; i < target; i++) g_dock_items[i] = g_dock_items[i + 1];
+    } else {
+        for (int i = index; i > target; i--) g_dock_items[i] = g_dock_items[i - 1];
+    }
+    g_dock_items[target] = moving;
+    g.item_drag_index = target;
+}
+
+static void gui_item_activate(const gui_item_t* item)
+{
+    if (!item || !item->used) return;
+    if (item->kind == GUI_ITEM_APP) {
+        gui_select_app(item->app);
+    } else if (item->kind == GUI_ITEM_FOLDER) {
+        gui_select_app(2);
+        gui_resp_clear();
+        gui_resp_append(item->name);
+        gui_resp_append("\nEmpty folder. Drag it anywhere on the desktop.\n");
+        gui_save_app_view(2);
+    }
+}
+
+static void gui_draw_window_preview(const fb_t* tgt, const gui_window_t* w)
+{
+    uint32_t frame = 0xFF0B0D10u;
+    uint32_t bg = 0xFF1A222Bu;
+    uint32_t title = 0xFF172126u;
+    const char* preview = "";
+    int px;
+    int py;
+    int cols;
+    int rows;
+    int col = 0;
+    int row = 0;
+    if (!w || !w->visible) return;
+    fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)w->y, (uint16_t)w->w, (uint16_t)w->h, bg);
+    fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)w->y, (uint16_t)w->w, 20, title);
+    fb_draw_text(tgt, (uint16_t)(w->x + 8), (uint16_t)(w->y + 7), gui_app_name(w->app), 0xFFFFFFFFu, title);
+    fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)w->y, (uint16_t)w->w, 1, frame);
+    fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)(w->y + w->h - 1), (uint16_t)w->w, 1, frame);
+    fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)w->y, 1, (uint16_t)w->h, frame);
+    fb_fill_rect(tgt, (uint16_t)(w->x + w->w - 1), (uint16_t)w->y, 1, (uint16_t)w->h, frame);
+    if (w->w > 80 && w->h > 80) {
+        fb_fill_rect(tgt, (uint16_t)(w->x + 14), (uint16_t)(w->y + 44), (uint16_t)(w->w - 28), (uint16_t)(w->h - 62), 0xFF20252Bu);
+        if (w->app >= 0 && w->app < GUI_APP_COUNT && g_app_views[w->app].saved) preview = g_app_views[w->app].resp;
+        if (!preview || !preview[0]) preview = gui_app_name(w->app);
+        px = w->x + 22;
+        py = w->y + 56;
+        cols = (w->w - 44) / 8;
+        rows = (w->h - 78) / 10;
+        if (cols < 4) cols = 4;
+        if (rows < 1) rows = 1;
+        while (*preview && row < rows) {
+            char ch = *preview++;
+            if (ch == '\r') continue;
+            if (ch == '\n' || col >= cols) {
+                row++;
+                col = 0;
+                if (ch == '\n') continue;
+                if (row >= rows) break;
+            }
+            if (ch < 32 || ch > 126) ch = '?';
+            fb_draw_char(tgt, (uint16_t)(px + col * 8), (uint16_t)(py + row * 10), ch, 0xFFCFE3FFu, 0xFF20252Bu);
+            col++;
+        }
+    }
+}
+
+static void gui_draw_inactive_windows(const fb_t* tgt)
+{
+    uint32_t last_z = 0;
+    for (;;) {
+        uint32_t best_z = 0xFFFFFFFFu;
+        int best = -1;
+        for (int i = 0; i < GUI_APP_COUNT; i++) {
+            gui_window_t* w = &g_windows[i];
+            if (!w->initialized || !w->visible || i == g.app_id) continue;
+            if (w->z > last_z && w->z < best_z) {
+                best_z = w->z;
+                best = i;
+            }
+        }
+        if (best < 0) break;
+        gui_draw_window_preview(tgt, &g_windows[best]);
+        last_z = best_z;
     }
 }
 
@@ -1353,9 +1892,7 @@ void gui_activate_ring0_shortcut(void)
     if (g.ss_active) g.ss_active = 0;
     lsh_enter_sum_shortcut();
     if (!g_have_fb) return;
-    g.app_id = 7;
-    g.win_visible = 1;
-    gui_clamp_window();
+    gui_select_app(7);
     g.tb_focused = 1;
     g.lafaelo_focus = 0;
     g.lafaelo_show_run = 1;
@@ -1363,6 +1900,7 @@ void gui_activate_ring0_shortcut(void)
     g.tb_cur = 0;
     g.tb[0] = '\0';
     gui_lsh_sync_output();
+    gui_save_app_view(7);
 }
 
 static void gui_lar_list_cb(const lar_entry_t* entry, void* user)
@@ -1434,21 +1972,41 @@ void gui_larsh_play(const char* path)
         g.larsh_loaded = 1;
         g.larsh_playing = 1;
         g.larsh_tick = 0;
-        g.app_id = 3;
-        g.win_visible = 1;
-        gui_clamp_window();
+        gui_select_app(3);
         g.gallery_sel = 6;
+        gui_save_app_view(3);
     }
 }
 
 static void gui_select_app(int idx)
 {
-    if (idx < 0 || idx > 9) return;
-    g.app_id = idx;
-    g.win_visible = 1;
+    int first_open;
+    uint32_t uidx;
+    gui_window_t* win;
+    if (idx < 0) return;
+    uidx = (uint32_t)idx;
+    if (uidx >= GUI_APP_COUNT) return;
+    gui_sync_active_window();
+    gui_save_app_view(g.app_id);
+    gui_window_ensure(idx);
+    win = g_windows + uidx;
+    first_open = !win->opened_once;
+    win->visible = 1;
+    win->opened_once = 1;
+    gui_bring_window_front(idx);
+    gui_load_window_to_legacy(idx);
+    if (g_app_views[idx].saved) gui_load_app_view(idx);
     g.settings_open = 0;
     g.resp_scroll = 0;
     gui_clamp_window();
+    gui_sync_active_window();
+    if (!first_open && g_app_views[idx].saved) {
+        if (idx == 7) {
+            gui_lsh_sync_output();
+            gui_save_app_view(idx);
+        }
+        return;
+    }
     if (idx == 2) {
         FsWritableFile* w = fs_open_writable("notes.txt");
         if (w && w->size < sizeof(g.resp)) {
@@ -1499,7 +2057,8 @@ static void gui_select_app(int idx)
         g.tb_cur = 0;
         g.tb[0] = '\0';
     }
-    g.gallery_sel = -1;
+    if (idx != 3) g.gallery_sel = -1;
+    gui_save_app_view(idx);
 }
 
 void gui_handle_mouse(int dx, int dy, int buttons)
@@ -1528,26 +2087,93 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int l_pressed = l_down && !l_prev;
     int l_released = !l_down && l_prev;
 
-    if (wheel != 0 && g.win_visible) {
+    if (wheel != 0) {
+        int wheel_win = gui_top_window_at(g.mx, g.my);
         int view_x, view_y, view_w, view_h;
         int rows;
-        gui_view_rect(&view_x, &view_y, &view_w, &view_h);
-        rows = gui_rows_for_view_h(view_h);
-        if (in_rect(g.mx, g.my, view_x, view_y - 18, view_w, view_h + 18)) {
-            g.resp_scroll -= wheel * 3;
-            gui_clamp_scroll_for_rows(rows);
+        if (wheel_win >= 0 && wheel_win != g.app_id) gui_select_app(wheel_win);
+        if (g.win_visible) {
+            gui_view_rect(&view_x, &view_y, &view_w, &view_h);
+            rows = gui_rows_for_view_h(view_h);
+            if (in_rect(g.mx, g.my, view_x, view_y - 18, view_w, view_h + 18)) {
+                g.resp_scroll -= wheel * 3;
+                gui_clamp_scroll_for_rows(rows);
+            }
         }
     }
 
+    if (g.item_drag_area) {
+        int moved_x = g.mx - g.item_drag_start_x;
+        int moved_y = g.my - g.item_drag_start_y;
+        if (moved_x < 0) moved_x = -moved_x;
+        if (moved_y < 0) moved_y = -moved_y;
+        if (moved_x + moved_y > 4) g.item_drag_moved = 1;
+        if (l_down && g.item_drag_area == 1 && g.item_drag_index >= 0 && g.item_drag_index < g_desktop_item_count) {
+            gui_item_t* item = &g_desktop_items[g.item_drag_index];
+            int nx = g.mx - g.item_drag_off_x;
+            int ny = g.my - g.item_drag_off_y;
+            int max_x = (int)g_fb.w - item->w;
+            int max_y = (int)g_fb.h - item->h;
+            if (nx < 0) nx = 0;
+            if (ny < 26) ny = 26;
+            if (nx > max_x) nx = max_x;
+            if (ny > max_y) ny = max_y;
+            item->x = nx;
+            item->y = ny;
+        } else if (l_down && g.item_drag_area == 2 && g.item_drag_index >= 0 && g.item_drag_index < g_dock_item_count) {
+            if (g.item_drag_moved) gui_reorder_dock_item(g.item_drag_index, g.mx);
+        }
+        if (l_released) {
+            if (!g.item_drag_moved) {
+                if (g.item_drag_area == 1 && g.item_drag_index >= 0 && g.item_drag_index < g_desktop_item_count) {
+                    gui_item_activate(&g_desktop_items[g.item_drag_index]);
+                } else if (g.item_drag_area == 2 && g.item_drag_index >= 0 && g.item_drag_index < g_dock_item_count) {
+                    gui_item_activate(&g_dock_items[g.item_drag_index]);
+                }
+            }
+            g.item_drag_area = 0;
+            g.item_drag_index = -1;
+            g.item_drag_moved = 0;
+        }
+        return;
+    }
+
     if (l_pressed) {
-        int win_hit = g.win_visible && in_rect(g.mx, g.my, g.win_x, g.win_y, g.win_w, g.win_h);
-        if (!win_hit) {
-            int app = gui_dock_hit_app(g.mx, g.my);
-            if (app < 0) app = gui_desktop_hit_app(g.mx, g.my);
-            if (app >= 0) {
-                gui_select_app(app);
-                g.tb_focused = 0;
-                g.lafaelo_focus = 0;
+        int hit_window = gui_top_window_at(g.mx, g.my);
+        if (hit_window >= 0) {
+            if (hit_window != g.app_id) gui_select_app(hit_window);
+        } else {
+            int action = gui_top_action_hit(g.mx, g.my);
+            int item = -1;
+            if (action == GUI_TOP_NEW_FOLDER) {
+                (void)gui_desktop_add_folder();
+                return;
+            } else if (action == GUI_TOP_PIN_DESKTOP) {
+                (void)gui_desktop_add_app(g.app_id);
+                return;
+            } else if (action == GUI_TOP_PIN_DOCK) {
+                (void)gui_dock_add_app(g.app_id);
+                return;
+            }
+            item = gui_dock_hit_item(g.mx, g.my);
+            if (item >= 0) {
+                g.item_drag_area = 2;
+                g.item_drag_index = item;
+                g.item_drag_moved = 0;
+                g.item_drag_start_x = g.mx;
+                g.item_drag_start_y = g.my;
+                return;
+            }
+            item = gui_desktop_hit_item(g.mx, g.my);
+            if (item >= 0) {
+                gui_item_t* it = &g_desktop_items[item];
+                g.item_drag_area = 1;
+                g.item_drag_index = item;
+                g.item_drag_moved = 0;
+                g.item_drag_start_x = g.mx;
+                g.item_drag_start_y = g.my;
+                g.item_drag_off_x = g.mx - it->x;
+                g.item_drag_off_y = g.my - it->y;
                 return;
             }
             g.tb_focused = 0;
@@ -1589,6 +2215,9 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         g.settings_open = 0;
         g.tb_focused = 0;
         g.lafaelo_focus = 0;
+        gui_save_app_view(g.app_id);
+        gui_sync_active_window();
+        gui_activate_top_window_or_none();
         return;
     }
     if (l_pressed && in_rect(g.mx, g.my, min_btn_x, g.win_y + 2, 14, 14)) {
@@ -1596,6 +2225,9 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         g.settings_open = 0;
         g.tb_focused = 0;
         g.lafaelo_focus = 0;
+        gui_save_app_view(g.app_id);
+        gui_sync_active_window();
+        gui_activate_top_window_or_none();
         return;
     }
     if (l_pressed && in_rect(g.mx, g.my, full_btn_x, g.win_y + 2, 14, 14)) {
@@ -1674,6 +2306,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         g.win_x = g.mx - g.drag_off_x;
         g.win_y = g.my - g.drag_off_y;
         gui_clamp_window();
+        gui_sync_active_window();
     }
 
     /* Tab bar: Lafillo | Calc | Notes | Gallery | Zip | User | LSS | LSH | 놀이터 | Lafaelo */
@@ -2398,6 +3031,7 @@ void gui_render(void)
     fb_clear(tgt, g_bg);
     gui_glyph_hits_begin();
     gui_draw_desktop(tgt);
+    gui_draw_inactive_windows(tgt);
 
     if (!g.win_visible) {
         lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my, 8u, 32u, 220u, 160u);

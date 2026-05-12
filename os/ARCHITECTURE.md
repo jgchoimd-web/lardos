@@ -280,6 +280,10 @@ top bar, desktop launchers, bottom dock, and hideable app window. LGUILIB/LTHEME
 continue to provide native theme data instead of a parallel shell stack.
 `v1.58.1p` hotpatches that desktop path with settings-panel input capture,
 full-desktop window movement, and a title-bar fullscreen/restore control.
+`v1.59.0b` starts the real window-manager model: desktop/dock launchers become
+runtime item tables, New Folder/Pin App/Dock + mutate those tables, and apps
+own separate window records with geometry, visibility, fullscreen state, saved
+view text, and z-order.
 
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a
@@ -418,6 +422,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.58.1p-vbox/lardos-v1.58.1p-vbox.iso`. Release ISOs also
+example `release/v1.59.0b-vbox/lardos-v1.59.0b-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

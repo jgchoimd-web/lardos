@@ -298,6 +298,10 @@ and `RESTORE`/`UNDELETE` removes the tombstone.
 file`, `TOMB CLEAR`, and `DEL -T file` let the user inspect or delete the
 tombstone records themselves, rewriting `fsdelete.lardd` to the user's chosen
 state.
+`v1.62.0a` changes `DEL -F` from soft hiding to hard deletion in the active
+read-only filesystem view by writing `DELETE` records. `RESTORE` handles only
+soft `TOMB HIDE` records; `TOMB DROP`/`DEL -T`/`TOMB CLEAR` remove the delete
+records when the user explicitly chooses to own that state too.
 
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a
@@ -436,6 +440,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.61.0a-vbox/lardos-v1.61.0a-vbox.iso`. Release ISOs also
+example `release/v1.62.0a-vbox/lardos-v1.62.0a-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

@@ -199,7 +199,7 @@ static FsWritableFile ram_dosmode = { "dosmode.lardd", ram_dosmode_buf, 0, DOSMO
 static const uint8_t fsdelete_init[] =
     "LARDD 1\n"
     "TITLE Read-Only Delete Overlay\n"
-    "TEXT DEL -F records user-owned tombstones for built-in read-only files; TOMB can delete the records too.\n"
+    "TEXT DEL -F hard-deletes built-in read-only files from the active filesystem; TOMB owns the records.\n"
     "SECTION Tombstones\n";
 static uint8_t ram_fsdelete_buf[FSDELETE_CAP];
 static FsWritableFile ram_fsdelete = { "fsdelete.lardd", ram_fsdelete_buf, 0, FSDELETE_CAP };
@@ -207,6 +207,10 @@ static FsWritableFile ram_fsdelete = { "fsdelete.lardd", ram_fsdelete_buf, 0, FS
 #define FS_HIDDEN_READONLY_MAX 32u
 static char s_hidden_readonly[FS_HIDDEN_READONLY_MAX][32];
 static uint32_t s_hidden_readonly_count;
+#define FS_DELETED_READONLY_MAX 32u
+static char s_deleted_readonly[FS_DELETED_READONLY_MAX][32];
+static uint32_t s_deleted_readonly_count;
+static int s_fsdelete_rewriting;
 
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
 #define LPST_VERSION     2u
@@ -258,8 +262,9 @@ static const uint8_t file_lardos_lars[] =
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
     "li Use dos on for L-DOS mode: a native DOS-style shell layer with C:/A:/R: drive mapping, DIR/TYPE/COPY/DEL/REN/MD/RD/CD, and dosmode.lardd history.\n"
-    "li In L-DOS, DEL -F file hides read-only built-in files through fsdelete.lardd; RESTORE file makes them visible again.\n"
-    "li Use TOMB LIST, TOMB SHOW, TOMB DROP file, or TOMB CLEAR when you want to inspect or delete DEL -F tombstone records themselves.\n"
+    "li In L-DOS, DEL -F file hard-deletes read-only built-in files from the active filesystem through fsdelete.lardd, even if that breaks the OS.\n"
+    "li RESTORE only removes soft TOMB HIDE records; use TOMB DROP file or TOMB CLEAR if you choose to delete hard-delete records too.\n"
+    "li Use TOMB LIST, TOMB SHOW, TOMB HIDE file, TOMB DROP file, or TOMB CLEAR when you want to inspect or edit deletion records themselves.\n"
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
@@ -316,6 +321,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.60.0a officially adds L-DOS mode as a native compatibility shell without external DOS code.\n"
     "li v1.60.1p hotpatches L-DOS DEL -F read-only tombstones plus RESTORE for user-owned reversibility.\n"
     "li v1.61.0a officially adds user-owned tombstone deletion: TOMB LIST/SHOW/DROP/CLEAR plus DEL -T.\n"
+    "li v1.62.0a makes DEL -F a hard delete from the active filesystem while preserving TOMB HIDE for soft tombstones.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -554,11 +560,12 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM dos on -> enter L-DOS mode with an L-DOS C:\\ prompt.\n"
     "ITEM dos off or EXIT -> leave L-DOS mode.\n"
     "ITEM DOS commands are case-insensitive: DIR, TYPE, COPY, DEL, REN, MD, RD, CD, CLS, VER, SET, ECHO, MEM.\n"
-    "ITEM DEL -F file -> hide a read-only built-in or LFS file using the user-owned fsdelete.lardd tombstone overlay.\n"
-    "ITEM RESTORE file or UNDELETE file -> remove that tombstone so the read-only file is visible again.\n"
-    "ITEM TOMB LIST or TOMB SHOW -> inspect active tombstones or the raw fsdelete.lardd log.\n"
-    "ITEM TOMB DROP file or DEL -T file -> delete one tombstone record and make that read-only file visible.\n"
-    "ITEM TOMB CLEAR -> delete every tombstone record because the user can own even the deletion overlay.\n"
+    "ITEM DEL -F file -> hard-delete a read-only built-in or LFS file from the active filesystem using fsdelete.lardd DELETE records.\n"
+    "ITEM RESTORE file or UNDELETE file -> remove only a soft TOMB HIDE record; hard deletes remain deleted.\n"
+    "ITEM TOMB LIST or TOMB SHOW -> inspect active soft tombstones, hard deletes, or the raw fsdelete.lardd log.\n"
+    "ITEM TOMB HIDE file -> create the old reversible soft tombstone without using DEL -F.\n"
+    "ITEM TOMB DROP file or DEL -T file -> delete one soft/hard record and make that read-only file visible.\n"
+    "ITEM TOMB CLEAR -> delete every soft/hard record because the user can own even the deletion overlay.\n"
     "ITEM LSH command -> run one native LardOS command while staying in DOS mode.\n"
     "ITEM dos map -> show C:/A:/R: drive mappings.\n"
     "ITEM dos log -> read dosmode.lardd history.\n"
@@ -568,9 +575,9 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM R: maps to LardOS Z: writable RAM files.\n"
     "SECTION Philosophy\n"
     "ITEM Directories are virtual navigation labels because LardOS currently keeps the core filesystem flat and visible.\n"
-    "ITEM DEL clears writable RAM file contents; DEL -F hides read-only embedded files with a reversible tombstone.\n"
+    "ITEM DEL clears writable RAM file contents; DEL -F hard-deletes read-only embedded files from the active filesystem.\n"
     "ITEM REN moves data into an existing writable slot instead of hiding a mutable filename table.\n"
-    "ITEM fsdelete.lardd keeps HIDE and SHOW records so force deletes are inspectable and persisted by sync.\n"
+    "ITEM fsdelete.lardd keeps HIDE, SHOW, and DELETE records so force deletes are inspectable and persisted by sync.\n"
     "ITEM TOMB rewrites fsdelete.lardd on user request, preserving the LardOS rule that visible system state remains user-editable.\n"
     "END\n";
 
@@ -833,6 +840,8 @@ static void fs_hidden_clear(void)
 {
     for (uint32_t i = 0; i < FS_HIDDEN_READONLY_MAX; i++) s_hidden_readonly[i][0] = '\0';
     s_hidden_readonly_count = 0;
+    for (uint32_t i = 0; i < FS_DELETED_READONLY_MAX; i++) s_deleted_readonly[i][0] = '\0';
+    s_deleted_readonly_count = 0;
 }
 
 static int fs_hidden_index(const char* name)
@@ -843,9 +852,22 @@ static int fs_hidden_index(const char* name)
     return -1;
 }
 
+static int fs_deleted_index(const char* name)
+{
+    for (uint32_t i = 0; i < s_deleted_readonly_count; i++) {
+        if (fs_name_eq(s_deleted_readonly[i], name)) return (int)i;
+    }
+    return -1;
+}
+
 int fs_readonly_hidden(const char* name)
 {
-    return fs_hidden_index(name) >= 0;
+    return fs_hidden_index(name) >= 0 || fs_deleted_index(name) >= 0;
+}
+
+int fs_readonly_deleted(const char* name)
+{
+    return fs_deleted_index(name) >= 0;
 }
 
 uint32_t fs_readonly_hidden_count(void)
@@ -859,9 +881,21 @@ const char* fs_readonly_hidden_name(uint32_t index)
     return s_hidden_readonly[index];
 }
 
+uint32_t fs_readonly_deleted_count(void)
+{
+    return s_deleted_readonly_count;
+}
+
+const char* fs_readonly_deleted_name(uint32_t index)
+{
+    if (index >= s_deleted_readonly_count) return NULL;
+    return s_deleted_readonly[index];
+}
+
 static int fs_track_hide_readonly(const char* name)
 {
     if (!name || !name[0]) return -1;
+    if (fs_deleted_index(name) >= 0) return -3;
     if (fs_hidden_index(name) >= 0) return 1;
     if (s_hidden_readonly_count >= FS_HIDDEN_READONLY_MAX) return -2;
     fs_copy_name(s_hidden_readonly[s_hidden_readonly_count],
@@ -882,6 +916,37 @@ static int fs_track_show_readonly(const char* name)
     return 0;
 }
 
+static int fs_track_undelete_readonly(const char* name)
+{
+    int idx = fs_deleted_index(name);
+    if (idx < 0) return -1;
+    for (uint32_t i = (uint32_t)idx; i + 1u < s_deleted_readonly_count; i++) {
+        fs_copy_name(s_deleted_readonly[i], sizeof(s_deleted_readonly[i]), s_deleted_readonly[i + 1u]);
+    }
+    s_deleted_readonly_count--;
+    if (s_deleted_readonly_count < FS_DELETED_READONLY_MAX) s_deleted_readonly[s_deleted_readonly_count][0] = '\0';
+    return 0;
+}
+
+static int fs_track_delete_readonly(const char* name)
+{
+    if (!name || !name[0]) return -1;
+    (void)fs_track_show_readonly(name);
+    if (fs_deleted_index(name) >= 0) return 1;
+    if (s_deleted_readonly_count >= FS_DELETED_READONLY_MAX) return -2;
+    fs_copy_name(s_deleted_readonly[s_deleted_readonly_count],
+                 sizeof(s_deleted_readonly[s_deleted_readonly_count]), name);
+    s_deleted_readonly_count++;
+    return 0;
+}
+
+static int fs_track_purge_readonly_delete(const char* name)
+{
+    int soft = fs_track_show_readonly(name);
+    int hard = fs_track_undelete_readonly(name);
+    return (soft == 0 || hard == 0) ? 0 : -1;
+}
+
 static int fs_readonly_physical_exists(const char* name)
 {
     const uint8_t* data;
@@ -892,13 +957,16 @@ static int fs_readonly_physical_exists(const char* name)
     return lfs_lookup(name, &data, &sz) ? 1 : 0;
 }
 
+static void fsdelete_rewrite_from_state(void);
+
 static void fsdelete_append_record(const char* op, const char* name)
 {
     FsWritableFile* w = &ram_fsdelete;
     uint32_t on = 0;
     uint32_t nn = 0;
-    if (w->cap - w->size < 96u) {
-        (void)fs_write(w, 0, fsdelete_init, sizeof(fsdelete_init) - 1u);
+    if (w->cap - w->size < 96u && !s_fsdelete_rewriting) {
+        fsdelete_rewrite_from_state();
+        return;
     }
     while (op && op[on]) on++;
     while (name && name[nn]) nn++;
@@ -908,13 +976,18 @@ static void fsdelete_append_record(const char* op, const char* name)
     (void)fs_append(w, (const uint8_t*)"\n", 1u);
 }
 
-static void fsdelete_rewrite_from_hidden(void)
+static void fsdelete_rewrite_from_state(void)
 {
     FsWritableFile* w = &ram_fsdelete;
+    s_fsdelete_rewriting = 1;
     (void)fs_write(w, 0, fsdelete_init, sizeof(fsdelete_init) - 1u);
     for (uint32_t i = 0; i < s_hidden_readonly_count; i++) {
         fsdelete_append_record("HIDE", s_hidden_readonly[i]);
     }
+    for (uint32_t i = 0; i < s_deleted_readonly_count; i++) {
+        fsdelete_append_record("DELETE", s_deleted_readonly[i]);
+    }
+    s_fsdelete_rewriting = 0;
 }
 
 static void fs_apply_delete_log(void)
@@ -944,6 +1017,10 @@ static void fs_apply_delete_log(void)
             (void)fs_track_hide_readonly(name);
         } else if (fs_name_eq(op, "SHOW") && name[0]) {
             (void)fs_track_show_readonly(name);
+        } else if ((fs_name_eq(op, "DELETE") || fs_name_eq(op, "KILL") || fs_name_eq(op, "DESTROY")) && name[0]) {
+            (void)fs_track_delete_readonly(name);
+        } else if ((fs_name_eq(op, "PURGE") || fs_name_eq(op, "DROP")) && name[0]) {
+            (void)fs_track_purge_readonly_delete(name);
         }
     }
 }
@@ -958,10 +1035,21 @@ int fs_hide_readonly(const char* name)
     return r;
 }
 
+int fs_delete_readonly(const char* name)
+{
+    int r;
+    if (!fs_readonly_physical_exists(name)) return -1;
+    r = fs_track_delete_readonly(name);
+    if (r < 0) return r;
+    fsdelete_append_record("DELETE", name);
+    return r;
+}
+
 int fs_unhide_readonly(const char* name)
 {
     int r;
     if (!fs_readonly_physical_exists(name)) return -1;
+    if (fs_readonly_deleted(name)) return -2;
     r = fs_track_show_readonly(name);
     fsdelete_append_record("SHOW", name);
     return r == 0 ? 0 : 1;
@@ -971,16 +1059,16 @@ int fs_purge_readonly_tombstone(const char* name)
 {
     int r;
     if (!name || !name[0]) return -1;
-    r = fs_track_show_readonly(name);
-    fsdelete_rewrite_from_hidden();
+    r = fs_track_purge_readonly_delete(name);
+    fsdelete_rewrite_from_state();
     return r == 0 ? 0 : 1;
 }
 
 int fs_purge_all_readonly_tombstones(void)
 {
-    int count = (int)s_hidden_readonly_count;
+    int count = (int)(s_hidden_readonly_count + s_deleted_readonly_count);
     fs_hidden_clear();
-    fsdelete_rewrite_from_hidden();
+    fsdelete_rewrite_from_state();
     return count;
 }
 
@@ -989,6 +1077,7 @@ int fs_delete_overlay_selftest(void)
     if (!fs_readonly_physical_exists("hello.txt")) return -1;
     if (FS_HIDDEN_READONLY_MAX < 8u) return -2;
     if (!fs_open_writable("fsdelete.lardd")) return -3;
+    if (FS_DELETED_READONLY_MAX < 8u) return -4;
     return 0;
 }
 

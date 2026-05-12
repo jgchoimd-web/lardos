@@ -25,6 +25,8 @@ void fs_list_writable(void (*cb)(const char* name, uint32_t size, void* user), v
 uint32_t fs_writable_count(void);
 uint32_t fs_readonly_hidden_count(void);
 const char* fs_readonly_hidden_name(uint32_t index);
+uint32_t fs_readonly_deleted_count(void);
+const char* fs_readonly_deleted_name(uint32_t index);
 
 /* Writable RAM files (notes, temp). Returns NULL if not found. */
 FsWritableFile* fs_open_writable(const char* name);
@@ -33,10 +35,12 @@ uint32_t fs_append(FsWritableFile* f, const uint8_t* buf, uint32_t len);
 
 /* User-owned delete overlay for read-only built-in/LFS files. */
 int fs_hide_readonly(const char* name);
+int fs_delete_readonly(const char* name);
 int fs_unhide_readonly(const char* name);
 int fs_purge_readonly_tombstone(const char* name);
 int fs_purge_all_readonly_tombstones(void);
 int fs_readonly_hidden(const char* name);
+int fs_readonly_deleted(const char* name);
 int fs_delete_overlay_selftest(void);
 
 /* Persistent LPST store on the boot block device. */

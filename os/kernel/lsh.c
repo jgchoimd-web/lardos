@@ -1391,7 +1391,7 @@ static void cmd_help(const char* args)
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
-    out_append("  tomb list|show|drop file|clear       inspect or delete DEL -F tombstone records\n");
+    out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
     out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
@@ -1448,7 +1448,7 @@ static void cmd_control(const char* args)
     out_append("Start points:\n");
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  values              reread the LardOS user-law values\n");
-    out_append("  tomb list           inspect active user-owned read-only delete tombstones\n");
+    out_append("  tomb list           inspect active user-owned read-only deletion records\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  magic -f bye        force an explicit raw-control prediction\n");
     out_append("  magic -f byebye     force the friendlier poweroff alias explicitly\n");
@@ -5166,11 +5166,11 @@ static void dos_help(void)
 {
     out_append("L-DOS mode commands\n");
     out_append("  DOS ON|OFF|STATUS|HELP|MAP|LOG|TEST\n");
-    out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL [-F|-T] file  RESTORE file  TOMB LIST|SHOW|DROP file|CLEAR\n");
+    out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL [-F|-T] file  RESTORE file  TOMB LIST|SHOW|HIDE|DROP|CLEAR\n");
     out_append("  MD name  RD name  CD [dir|\\|..]  CLS  VER  SET  ECHO text  MEM\n");
     out_append("  EXIT leaves DOS mode; LSH command runs one native LardOS command.\n");
     out_append("  Drive map: C: -> LardOS X:, A: -> Y:, R: -> Z: writable RAM files.\n");
-    out_append("  DEL -F hides read-only built-in files; RESTORE shows them, TOMB deletes tombstone records.\n");
+    out_append("  DEL -F hard-deletes read-only files from the active FS; TOMB owns the records.\n");
     out_append("  Directories are visible virtual labels; LardOS files remain flat and user-owned.\n");
 }
 
@@ -5345,12 +5345,12 @@ static void dos_delete(const char* args)
     if (tomb) {
         int r = fs_purge_readonly_tombstone(name);
         if (r == 0) {
-            out_append("DEL -T: tombstone deleted and file visible: ");
+            out_append("DEL -T: deletion/tombstone record deleted and file visible: ");
             out_append(name);
             out_append("\n");
             dos_log_event("tomb-delete", name);
         } else {
-            out_append("DEL -T: no active tombstone; fsdelete.lardd compacted for ");
+            out_append("DEL -T: no active deletion/tombstone record; fsdelete.lardd compacted for ");
             out_append(name);
             out_append("\n");
             dos_log_event("tomb-compact", name);
@@ -5361,20 +5361,20 @@ static void dos_delete(const char* args)
     if (!w) {
         int r;
         if (!force) {
-            out_append("DEL: read-only or unknown file; use DEL -F file for a user-owned read-only tombstone.\n");
+            out_append("DEL: read-only or unknown file; use DEL -F file for a user-owned hard delete.\n");
             return;
         }
-        r = fs_hide_readonly(name);
+        r = fs_delete_readonly(name);
         if (r >= 0) {
-            out_append("DEL -F: read-only file hidden by user tombstone: ");
+            out_append("DEL -F: read-only file hard-deleted from active filesystem: ");
             out_append(name);
-            out_append("\nUse RESTORE ");
+            out_append("\nRESTORE will not soft-undo this. Use TOMB DROP ");
             out_append(name);
-            out_append(" to show it again. Tombstone log: fsdelete.lardd\n");
-            dos_log_event("force-delete", name);
+            out_append(" only if you want to delete the delete record too. Log: fsdelete.lardd\n");
+            dos_log_event("hard-delete", name);
             return;
         }
-        out_append("DEL -F: file not found or tombstone table full.\n");
+        out_append("DEL -F: file not found or hard-delete table full.\n");
         return;
     }
     (void)fs_write(w, 0, (const uint8_t*)"", 0);
@@ -5403,6 +5403,10 @@ static void dos_restore(const char* args)
         dos_log_event("restore", name);
     } else if (r == -1) {
         out_append("RESTORE: read-only file not found.\n");
+    } else if (r == -2) {
+        out_append("RESTORE: file was hard-deleted by DEL -F. Use TOMB DROP ");
+        out_append(name);
+        out_append(" to delete that delete record if you choose.\n");
     } else {
         out_append("RESTORE: file was not hidden; SHOW record written for transparency.\n");
         dos_log_event("restore", name);
@@ -5417,18 +5421,28 @@ static void dos_tombstone(const char* args)
     if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
         ascii_streq_ci(sub, "list") || ascii_streq_ci(sub, "status") ||
         ascii_streq_ci(sub, "ls")) {
-        uint32_t count = fs_readonly_hidden_count();
-        out_append("Read-only tombstones: ");
-        out_append_u32(count);
+        uint32_t soft = fs_readonly_hidden_count();
+        uint32_t hard = fs_readonly_deleted_count();
+        out_append("Read-only delete records: soft=");
+        out_append_u32(soft);
+        out_append(", hard=");
+        out_append_u32(hard);
         out_append("\n");
-        for (uint32_t i = 0; i < count; i++) {
+        for (uint32_t i = 0; i < soft; i++) {
             const char* name = fs_readonly_hidden_name(i);
             if (!name) continue;
-            out_append("  ");
+            out_append("  HIDE ");
             out_append(name);
             out_append("\n");
         }
-        out_append("Use TOMB SHOW for raw fsdelete.lardd, TOMB DROP file to delete one, TOMB CLEAR to delete all.\n");
+        for (uint32_t i = 0; i < hard; i++) {
+            const char* name = fs_readonly_deleted_name(i);
+            if (!name) continue;
+            out_append("  DELETE ");
+            out_append(name);
+            out_append("\n");
+        }
+        out_append("Use TOMB SHOW for raw fsdelete.lardd, TOMB HIDE for soft hide, TOMB DROP file to delete one record, TOMB CLEAR to delete all records.\n");
         return;
     }
     if (ascii_streq_ci(sub, "show") || ascii_streq_ci(sub, "raw") ||
@@ -5441,8 +5455,36 @@ static void dos_tombstone(const char* args)
         int removed = fs_purge_all_readonly_tombstones();
         out_append("TOMB CLEAR: deleted ");
         out_append_i32(removed);
-        out_append(" tombstone(s); all read-only files are visible again.\n");
+        out_append(" deletion/tombstone record(s); all read-only files are visible again.\n");
         dos_log_event("tomb-clear", "all");
+        return;
+    }
+    if (ascii_streq_ci(sub, "hide") || ascii_streq_ci(sub, "soft")) {
+        char file_arg[64];
+        char drv;
+        char name[64];
+        int r;
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: TOMB HIDE file\n");
+            return;
+        }
+        dos_resolve_path(file_arg, &drv, name, sizeof(name));
+        (void)drv;
+        if (!name[0]) {
+            out_append("Usage: TOMB HIDE file\n");
+            return;
+        }
+        r = fs_hide_readonly(name);
+        if (r >= 0) {
+            out_append("TOMB HIDE: reversible tombstone created: ");
+            out_append(name);
+            out_append("\n");
+            dos_log_event("tomb-hide", name);
+        } else if (r == -3) {
+            out_append("TOMB HIDE: file is hard-deleted; use TOMB DROP first if you want soft control.\n");
+        } else {
+            out_append("TOMB HIDE: file not found or soft tombstone table full.\n");
+        }
         return;
     }
     if (ascii_streq_ci(sub, "drop") || ascii_streq_ci(sub, "purge") ||
@@ -5464,19 +5506,19 @@ static void dos_tombstone(const char* args)
         }
         r = fs_purge_readonly_tombstone(name);
         if (r == 0) {
-            out_append("TOMB DROP: tombstone deleted and file visible: ");
+            out_append("TOMB DROP: deletion/tombstone record deleted and file visible: ");
             out_append(name);
             out_append("\n");
             dos_log_event("tomb-drop", name);
         } else {
-            out_append("TOMB DROP: no active tombstone; fsdelete.lardd compacted for ");
+            out_append("TOMB DROP: no active deletion/tombstone record; fsdelete.lardd compacted for ");
             out_append(name);
             out_append("\n");
             dos_log_event("tomb-compact", name);
         }
         return;
     }
-    out_append("Usage: TOMB LIST|SHOW|DROP file|CLEAR\n");
+    out_append("Usage: TOMB LIST|SHOW|HIDE file|DROP file|CLEAR\n");
 }
 
 static void dos_rename(const char* args)
@@ -5600,6 +5642,8 @@ static void dos_mem(void)
     out_append_i32(last);
     out_append("\n  read-only tombstones: ");
     out_append_u32(fs_readonly_hidden_count());
+    out_append(", hard-deletes: ");
+    out_append_u32(fs_readonly_deleted_count());
     out_append("\n");
 }
 

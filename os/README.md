@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.61.0a-ami/lardos-v1.61.0a-ami.iso`. To publish the whole hardware
+`release/v1.62.0a-ami/lardos-v1.62.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -113,11 +113,11 @@ commands:
   compatibility shell. It uses an `L-DOS C:\>` prompt, case-insensitive
   commands, visible `C:`/`A:`/`R:` mapping to LardOS drives, and logs state in
   `dosmode.lardd`.
-- `DEL -F file` in L-DOS hides a read-only built-in/LFS file through the
-  user-owned `fsdelete.lardd` tombstone overlay. `RESTORE file` or
-  `UNDELETE file` makes it visible again.
-- `tomb list|show|drop file|clear` and `DEL -T file` let the user inspect,
-  delete, or clear those tombstone records too.
+- `DEL -F file` in L-DOS hard-deletes a read-only built-in/LFS file from the
+  active filesystem view through a user-owned `fsdelete.lardd` DELETE record.
+  `RESTORE file` / `UNDELETE file` only restores soft `TOMB HIDE` records.
+- `tomb list|show|hide file|drop file|clear` and `DEL -T file` let the user
+  inspect, soft-hide, delete, or clear the hard-delete records too.
 - `bye` / `byebye` sync RAM files and request a user-owned poweroff;
   `restart` / `reboot` sync RAM files and request a user-owned firmware/VM
   restart.
@@ -136,6 +136,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.62.0a` officially makes `DEL -F file` a hard delete from the active
+  read-only filesystem view, while `TOMB HIDE file` keeps the old reversible
+  soft tombstone path available.
 - `v1.61.0a` officially adds user-owned tombstone deletion with `TOMB LIST`,
   `TOMB SHOW`, `TOMB DROP file`, `TOMB CLEAR`, and `DEL -T file`.
 - `v1.60.1p` hotpatches L-DOS so `DEL -F file` can force-hide read-only
@@ -273,6 +276,9 @@ commands:
   `fsdelete.lardd`, `DEL -F`, `RESTORE`, `UNDELETE`, POST, and LUNIT checks.
 - `v1.61.0a` adds tombstone record ownership with `TOMB LIST`, `TOMB SHOW`,
   `TOMB DROP`, `TOMB CLEAR`, `DEL -T`, POST, and LUNIT checks.
+- `v1.62.0a` changes `DEL -F` to hard-delete read-only files from the active
+  filesystem view, adds `TOMB HIDE` for reversible soft tombstones, and makes
+  `TOMB LIST` show soft versus hard records.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.

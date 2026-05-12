@@ -64,6 +64,8 @@ static int s_in_sum_mode;
 /* Sandbox: run LARDX with restricted syscalls (no file/LDLL/network) */
 static int s_sandbox_mode;
 static int s_cfgsh_mode;
+static int s_dos_mode;
+static char s_dos_cwd[32];
 static int s_magic_depth;
 
 static void lsh_putc(char c, void* user);
@@ -277,6 +279,26 @@ static const char* lardos_version_channel(void)
     return "unknown";
 }
 
+static char ascii_lower_char(char c)
+{
+    if (c >= 'A' && c <= 'Z') return (char)(c + ('a' - 'A'));
+    return c;
+}
+
+static char ascii_upper_char(char c)
+{
+    if (c >= 'a' && c <= 'z') return (char)(c - ('a' - 'A'));
+    return c;
+}
+
+static int ascii_streq_ci(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && ascii_lower_char(a[i]) == ascii_lower_char(b[i])) i++;
+    return a[i] == '\0' && b[i] == '\0';
+}
+
 typedef struct {
     const char* name;
     uint8_t magic_safe;
@@ -284,10 +306,11 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
+    { "del", 1 }, { "erase", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
@@ -1363,10 +1386,11 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status dos time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
+    out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
     out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
@@ -1412,6 +1436,7 @@ static void cmd_control(const char* args)
     out_append("  Files live in LFS, RAM files, LPST persistence, and embedded FS tables.\n");
     out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
     out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
+    out_append("  DOS mode is a native compatibility shell layer; it maps C:/A:/R: visibly onto LardOS drives.\n");
     out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
     out_append("  Values: visible power, editable state, local formats, explainable automation, repair over halt.\n");
     out_append("  Release suffix: a=official, b=beta-experimental, p=hotpatch.\n");
@@ -5064,6 +5089,499 @@ static void cmd_append(const char* args)
     cmd_write_like(args, 1);
 }
 
+static void fsw_append_s(FsWritableFile* w, const char* s)
+{
+    uint32_t n = 0;
+    if (!w || !s) return;
+    while (s[n]) n++;
+    (void)fs_append(w, (const uint8_t*)s, n);
+}
+
+static char dos_drive_to_lard(char d)
+{
+    d = ascii_upper_char(d);
+    if (d == 'C') return 'X';
+    if (d == 'A') return 'Y';
+    if (d == 'R') return 'Z';
+    return d;
+}
+
+static char dos_drive_from_lard(char d)
+{
+    d = ascii_upper_char(d);
+    if (d == 'X') return 'C';
+    if (d == 'Y') return 'A';
+    if (d == 'Z') return 'R';
+    return d;
+}
+
+static void dos_resolve_path(const char* arg, char* out_drive, char* out_name, uint32_t name_cap)
+{
+    char drv = s_drive;
+    const char* p = arg ? arg : "";
+    uint32_t ni = 0;
+    while (*p == ' ' || *p == '\t') p++;
+    if (p[0] && p[1] == ':') {
+        drv = dos_drive_to_lard(p[0]);
+        p += 2;
+    }
+    while (*p == '\\' || *p == '/') p++;
+    while (*p && *p != ' ' && *p != '\t') {
+        if (*p == '\\' || *p == '/') {
+            ni = 0; /* flat FS: keep the final component */
+            p++;
+            continue;
+        }
+        if (ni + 1u < name_cap) out_name[ni++] = ascii_lower_char(*p);
+        p++;
+    }
+    out_name[ni] = '\0';
+    *out_drive = drv;
+}
+
+static void dos_log_event(const char* action, const char* detail)
+{
+    FsWritableFile* w = fs_open_writable("dosmode.lardd");
+    static const char header[] =
+        "LARDD 1\n"
+        "TITLE DOS Mode State\n"
+        "TEXT DOS mode is a LardOS-native compatibility shell, not an external DOS clone.\n"
+        "SECTION Events\n";
+    if (!w) return;
+    if (w->size < 8u || w->cap - w->size < 96u) {
+        (void)fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u);
+    }
+    fsw_append_s(w, "ITEM ");
+    fsw_append_s(w, action ? action : "event");
+    if (detail && detail[0]) {
+        fsw_append_s(w, " ");
+        fsw_append_s(w, detail);
+    }
+    fsw_append_s(w, "\n");
+}
+
+static void dos_help(void)
+{
+    out_append("L-DOS mode commands\n");
+    out_append("  DOS ON|OFF|STATUS|HELP|MAP|LOG|TEST\n");
+    out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL file  REN src dst\n");
+    out_append("  MD name  RD name  CD [dir|\\|..]  CLS  VER  SET  ECHO text  MEM\n");
+    out_append("  EXIT leaves DOS mode; LSH command runs one native LardOS command.\n");
+    out_append("  Drive map: C: -> LardOS X:, A: -> Y:, R: -> Z: writable RAM files.\n");
+    out_append("  Directories are visible virtual labels; LardOS files remain flat and user-owned.\n");
+}
+
+static void dos_status(void)
+{
+    out_append("L-DOS mode ");
+    out_append(s_dos_mode ? "ON" : "OFF");
+    out_append("  prompt=");
+    out_append_char(dos_drive_from_lard(s_drive));
+    out_append(":\\");
+    if (s_dos_cwd[0]) {
+        out_append(s_dos_cwd);
+        out_append("\\");
+    }
+    out_append(">\n");
+    out_append("  native shell remains available through LSH command.\n");
+    out_append("  log: dosmode.lardd, guide: dosmode_guide.lardd\n");
+}
+
+static void dos_map(void)
+{
+    out_append("L-DOS drive map\n");
+    out_append("  C: -> X: built-in/LFS main files\n");
+    out_append("  A: -> Y: boot/floppy-style view\n");
+    out_append("  R: -> Z: writable RAM files\n");
+    out_append("  Other letters remain visible aliases; no hidden mount translation is used.\n");
+}
+
+static int dos_read_data_arg(const char* arg, const uint8_t** data, uint32_t* size,
+                             char* name_out, uint32_t name_cap)
+{
+    char drv;
+    char name[64];
+    dos_resolve_path(arg, &drv, name, sizeof(name));
+    if (!name[0]) return -1;
+    if (name_out && name_cap) {
+        uint32_t i = 0;
+        while (name[i] && i + 1u < name_cap) { name_out[i] = name[i]; i++; }
+        name_out[i] = '\0';
+    }
+    if (drive_to_fs(drv) == 1) {
+        FsWritableFile* w = fs_open_writable(name);
+        if (!w) return -2;
+        *data = w->data;
+        *size = w->size;
+        return 0;
+    }
+    {
+        const FsFile* f = fs_open(name);
+        if (!f) return -3;
+        *data = f->data;
+        *size = f->size;
+    }
+    return 0;
+}
+
+static void dos_dir(const char* args)
+{
+    char drv = s_drive;
+    const char* p = args ? args : "";
+    while (*p == ' ' || *p == '\t') p++;
+    if (p[0] && p[1] == ':') drv = dos_drive_to_lard(p[0]);
+    out_append_char(dos_drive_from_lard(drv));
+    out_append(":\\");
+    if (s_dos_cwd[0]) {
+        out_append(s_dos_cwd);
+        out_append("\\");
+    }
+    out_append("\n");
+    if (drive_to_fs(drv) == 0) {
+        fs_list_readonly(dir_cb, NULL);
+    } else if (drive_to_fs(drv) == 1) {
+        fs_list_writable(dir_cb, NULL);
+    } else {
+        out_append("DIR: bad drive.\n");
+    }
+}
+
+static void dos_type(const char* args)
+{
+    const uint8_t* data;
+    uint32_t size;
+    char name[64];
+    if (dos_read_data_arg(args, &data, &size, name, sizeof(name)) != 0) {
+        out_append("File not found.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < size && i < 1024u; i++) out_append_char((char)data[i]);
+    if (size > 0) out_append("\n");
+}
+
+static void dos_copy(const char* args)
+{
+    char src_arg[64];
+    char dst_arg[64];
+    char src_name[64];
+    char dst_name[64];
+    char dst_drive;
+    const uint8_t* data;
+    uint32_t size;
+    FsWritableFile* dst;
+    if (vcs_read_word(&args, src_arg, sizeof(src_arg)) != 0 ||
+        vcs_read_word(&args, dst_arg, sizeof(dst_arg)) != 0) {
+        out_append("Usage: COPY src dst\n");
+        return;
+    }
+    if (dos_read_data_arg(src_arg, &data, &size, src_name, sizeof(src_name)) != 0) {
+        out_append("COPY: source not found.\n");
+        return;
+    }
+    dos_resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    (void)dst_drive;
+    dst = fs_open_writable(dst_name);
+    if (!dst) {
+        out_append("COPY: destination must be an existing writable RAM file.\n");
+        return;
+    }
+    if (size > dst->cap) {
+        out_append("COPY: destination too small.\n");
+        return;
+    }
+    (void)fs_write(dst, 0, data, size);
+    out_append("        1 file(s) copied: ");
+    out_append(src_name);
+    out_append(" -> ");
+    out_append(dst_name);
+    out_append("\n");
+    dos_log_event("copy", dst_name);
+}
+
+static void dos_delete(const char* args)
+{
+    char drv;
+    char name[64];
+    FsWritableFile* w;
+    dos_resolve_path(args, &drv, name, sizeof(name));
+    (void)drv;
+    if (!name[0]) {
+        out_append("Usage: DEL file\n");
+        return;
+    }
+    w = fs_open_writable(name);
+    if (!w) {
+        out_append("DEL: read-only or unknown file; not deleted.\n");
+        return;
+    }
+    (void)fs_write(w, 0, (const uint8_t*)"", 0);
+    out_append("Deleted writable RAM file contents: ");
+    out_append(name);
+    out_append("\n");
+    dos_log_event("delete", name);
+}
+
+static void dos_rename(const char* args)
+{
+    char src_arg[64];
+    char dst_arg[64];
+    char src_name[64];
+    char dst_name[64];
+    char dst_drive;
+    const uint8_t* data;
+    uint32_t size;
+    FsWritableFile* src_w;
+    FsWritableFile* dst_w;
+    if (vcs_read_word(&args, src_arg, sizeof(src_arg)) != 0 ||
+        vcs_read_word(&args, dst_arg, sizeof(dst_arg)) != 0) {
+        out_append("Usage: REN src dst\n");
+        return;
+    }
+    if (dos_read_data_arg(src_arg, &data, &size, src_name, sizeof(src_name)) != 0) {
+        out_append("REN: source not found.\n");
+        return;
+    }
+    dos_resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    (void)dst_drive;
+    dst_w = fs_open_writable(dst_name);
+    if (!dst_w) {
+        out_append("REN: destination must be an existing writable RAM file slot.\n");
+        return;
+    }
+    if (size > dst_w->cap) {
+        out_append("REN: destination too small.\n");
+        return;
+    }
+    (void)fs_write(dst_w, 0, data, size);
+    src_w = fs_open_writable(src_name);
+    if (src_w && src_w != dst_w) (void)fs_write(src_w, 0, (const uint8_t*)"", 0);
+    out_append("Renamed by moving data into writable slot: ");
+    out_append(src_name);
+    out_append(" -> ");
+    out_append(dst_name);
+    out_append("\n");
+    dos_log_event("rename", dst_name);
+}
+
+static void dos_dir_label(const char* args, int make)
+{
+    char drv;
+    char name[64];
+    dos_resolve_path(args, &drv, name, sizeof(name));
+    (void)drv;
+    if (!name[0]) {
+        out_append(make ? "Usage: MD name\n" : "Usage: RD name\n");
+        return;
+    }
+    out_append(make ? "Virtual DOS directory label added: " : "Virtual DOS directory label removed: ");
+    out_append(name);
+    out_append("\n");
+    out_append("LardOS keeps storage flat; this records the user's navigation label only.\n");
+    dos_log_event(make ? "mkdir" : "rmdir", name);
+}
+
+static void dos_cd(const char* args)
+{
+    char drv;
+    char name[64];
+    dos_resolve_path(args, &drv, name, sizeof(name));
+    if (!args || !args[0] || !name[0]) {
+        s_drive = drv;
+        if (args && (args[0] == ' ' || args[0] == '\t')) {
+            const char* p = args;
+            while (*p == ' ' || *p == '\t') p++;
+            if (p[0] == '\\' || p[0] == '/') s_dos_cwd[0] = '\0';
+        }
+        out_append_char(dos_drive_from_lard(s_drive));
+        out_append(":\\");
+        if (s_dos_cwd[0]) {
+            out_append(s_dos_cwd);
+            out_append("\\");
+        }
+        out_append("\n");
+        return;
+    }
+    s_drive = drv;
+    if (strcmp(name, "..") == 0) {
+        s_dos_cwd[0] = '\0';
+    } else {
+        uint32_t i = 0;
+        while (name[i] && i + 1u < sizeof(s_dos_cwd)) {
+            s_dos_cwd[i] = ascii_upper_char(name[i]);
+            i++;
+        }
+        s_dos_cwd[i] = '\0';
+    }
+    out_append("Current virtual directory: ");
+    out_append_char(dos_drive_from_lard(s_drive));
+    out_append(":\\");
+    if (s_dos_cwd[0]) {
+        out_append(s_dos_cwd);
+        out_append("\\");
+    }
+    out_append("\n");
+}
+
+static void dos_mem(void)
+{
+    uint32_t available = 0;
+    uint32_t dirty = 0;
+    int last = 0;
+    uint32_t generation = 0;
+    fs_persist_info(&available, &dirty, &last, NULL, NULL, NULL);
+    fs_persist_detail(NULL, &generation, NULL);
+    out_append("L-DOS memory/storage view\n");
+    out_append("  writable RAM files: ");
+    out_append_u32(fs_writable_count());
+    out_append("\n  LPST storage: ");
+    out_append(available ? "online" : "offline");
+    out_append(dirty ? ", dirty" : ", clean");
+    out_append(", gen=");
+    out_append_u32(generation);
+    out_append(", last=");
+    out_append_i32(last);
+    out_append("\n");
+}
+
+static void cmd_dos(const char* args);
+static void cmd_set(const char* args);
+static void cmd_echo(const char* args);
+
+static int dos_dispatch(const char* cmd, const char* args)
+{
+    if (!cmd || !cmd[0]) return 1;
+    if (ascii_streq_ci(cmd, "dos") || ascii_streq_ci(cmd, "dosmode")) { cmd_dos(args); return 1; }
+    if (ascii_streq_ci(cmd, "exit")) { s_dos_mode = 0; out_append("L-DOS mode OFF.\n"); dos_log_event("off", "exit"); return 1; }
+    if (ascii_streq_ci(cmd, "help") || (cmd[0] == '?' && cmd[1] == '\0')) { dos_help(); return 1; }
+    if (ascii_streq_ci(cmd, "lsh") || ascii_streq_ci(cmd, "lard")) {
+        char native_cmd[64];
+        if (vcs_read_word(&args, native_cmd, sizeof(native_cmd)) != 0) {
+            out_append("Usage: LSH command [args]\n");
+            return 1;
+        }
+        int was_dos = s_dos_mode;
+        s_dos_mode = 0;
+        parse_and_run(native_cmd, args);
+        s_dos_mode = was_dos;
+        return 1;
+    }
+    if (cmd[1] == ':' && cmd[2] == '\0') {
+        s_drive = dos_drive_to_lard(cmd[0]);
+        s_dos_cwd[0] = '\0';
+        return 1;
+    }
+    if (ascii_streq_ci(cmd, "dir")) { dos_dir(args); return 1; }
+    if (ascii_streq_ci(cmd, "type")) { dos_type(args); return 1; }
+    if (ascii_streq_ci(cmd, "copy")) { dos_copy(args); return 1; }
+    if (ascii_streq_ci(cmd, "del") || ascii_streq_ci(cmd, "erase")) { dos_delete(args); return 1; }
+    if (ascii_streq_ci(cmd, "ren") || ascii_streq_ci(cmd, "rename")) { dos_rename(args); return 1; }
+    if (ascii_streq_ci(cmd, "md") || ascii_streq_ci(cmd, "mkdir")) { dos_dir_label(args, 1); return 1; }
+    if (ascii_streq_ci(cmd, "rd") || ascii_streq_ci(cmd, "rmdir")) { dos_dir_label(args, 0); return 1; }
+    if (ascii_streq_ci(cmd, "cd") || ascii_streq_ci(cmd, "chdir")) { dos_cd(args); return 1; }
+    if (ascii_streq_ci(cmd, "cls")) { lsh_clear_output(); return 1; }
+    if (ascii_streq_ci(cmd, "ver")) { cmd_ver(args); return 1; }
+    if (ascii_streq_ci(cmd, "set")) { cmd_set(args); return 1; }
+    if (ascii_streq_ci(cmd, "echo")) { cmd_echo(args); return 1; }
+    if (ascii_streq_ci(cmd, "mem")) { dos_mem(); return 1; }
+    return 0;
+}
+
+static void cmd_dos(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "info")) {
+        dos_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "on") || ascii_streq_ci(sub, "enter") || ascii_streq_ci(sub, "shell")) {
+        s_dos_mode = 1;
+        if (!s_dos_cwd[0]) s_dos_cwd[0] = '\0';
+        out_append("L-DOS mode ON. EXIT leaves it; LSH command runs native LardOS commands.\n");
+        dos_log_event("on", "user entered DOS mode");
+        return;
+    }
+    if (ascii_streq_ci(sub, "off") || ascii_streq_ci(sub, "exit") || ascii_streq_ci(sub, "quit")) {
+        s_dos_mode = 0;
+        out_append("L-DOS mode OFF.\n");
+        dos_log_event("off", "user left DOS mode");
+        return;
+    }
+    if (ascii_streq_ci(sub, "help") || ascii_streq_ci(sub, "?")) {
+        dos_help();
+        return;
+    }
+    if (ascii_streq_ci(sub, "map") || ascii_streq_ci(sub, "drives")) {
+        dos_map();
+        return;
+    }
+    if (ascii_streq_ci(sub, "log") || ascii_streq_ci(sub, "history")) {
+        cmd_larddoc("dosmode.lardd", "Usage: dos log");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(lsh_dosmode_selftest() == 0 ? "dos: selftest OK\n" : "dos: selftest failed\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "run")) {
+        char run_cmd[64];
+        if (vcs_read_word(&args, run_cmd, sizeof(run_cmd)) != 0) {
+            out_append("Usage: dos run command [args]\n");
+            return;
+        }
+        if (!dos_dispatch(run_cmd, args)) {
+            out_append("dos: command not understood by L-DOS mode.\n");
+        }
+        return;
+    }
+    out_append("Usage: dos on|off|status|help|map|log|test|run command\n");
+}
+
+static void append_lsh_prompt(void)
+{
+    if (s_cfgsh_mode) {
+        out_append("CFG# ");
+    } else if (s_in_sum_mode) {
+        out_append("SUM# ");
+    } else if (s_sandbox_mode) {
+        out_append("[sandbox] ");
+        out_append_char(s_drive);
+        out_append(":\\> ");
+    } else if (lcontainer_has_active()) {
+        out_append("[lcnt:");
+        out_append(lcontainer_active_name());
+        out_append("] ");
+        out_append_char(s_drive);
+        out_append(":\\> ");
+    } else if (s_dos_mode) {
+        out_append("L-DOS ");
+        out_append_char(dos_drive_from_lard(s_drive));
+        out_append(":\\");
+        if (s_dos_cwd[0]) {
+            out_append(s_dos_cwd);
+            out_append("\\");
+        }
+        out_append("> ");
+    } else {
+        out_append_char(s_drive);
+        out_append(":\\> ");
+    }
+}
+
+int lsh_dosmode_selftest(void)
+{
+    char drv = 0;
+    char name[64];
+    if (!ascii_streq_ci("DIR", "dir")) return -1;
+    if (dos_drive_to_lard('C') != 'X' || dos_drive_to_lard('A') != 'Y' || dos_drive_to_lard('R') != 'Z') return -2;
+    dos_resolve_path("C:\\DOCS\\HELLO.TXT", &drv, name, sizeof(name));
+    if (drv != 'X' || strcmp(name, "hello.txt") != 0) return -3;
+    dos_resolve_path("R:\\NOTES.TXT", &drv, name, sizeof(name));
+    if (drv != 'Z' || strcmp(name, "notes.txt") != 0) return -4;
+    return 0;
+}
+
 static void cmd_set(const char* args)
 {
     while (*args == ' ' || *args == '\t') args++;
@@ -6329,6 +6847,14 @@ static void parse_and_run(const char* cmd, const char* args)
         return;
     }
 
+    if (s_dos_mode) {
+        if (dos_dispatch(cmd, args)) return;
+        out_append("Bad command or file name: ");
+        out_append(cmd);
+        out_append("\nUse HELP for L-DOS commands or LSH command for native LardOS.\n");
+        return;
+    }
+
     if (strcmp(cmd, "magic") == 0) {
         if (s_magic_depth > 0) {
             out_append("magic: nested magic ignored.\n");
@@ -6341,6 +6867,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
     if (strcmp(cmd, "values") == 0 || strcmp(cmd, "philosophy") == 0) { cmd_values(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
+    if (strcmp(cmd, "dos") == 0 || strcmp(cmd, "dosmode") == 0) { cmd_dos(args); return; }
     if (strcmp(cmd, "time") == 0 || strcmp(cmd, "lardtime") == 0 || strcmp(cmd, "ltime") == 0) { cmd_lardtime_mode(args, "now"); return; }
     if (strcmp(cmd, "date") == 0) { cmd_lardtime_mode(args, "solar"); return; }
     if (strcmp(cmd, "lunar") == 0) { cmd_lardtime_mode(args, "lunar"); return; }
@@ -6488,6 +7015,8 @@ void lsh_init(void)
     s_in_sum_mode = 0;
     s_sandbox_mode = 0;
     s_cfgsh_mode = 0;
+    s_dos_mode = 0;
+    s_dos_cwd[0] = '\0';
     taskprio_init();
     lcontainer_init();
     lvcs_init();
@@ -6537,24 +7066,7 @@ void lsh_exec(const char* line)
     if (background) {
         uint32_t task_id = 0;
         int enqueue_ok = taskprio_enqueue(NULL, buf, taskprio_default_priority(), &task_id) == 0;
-        if (s_cfgsh_mode) {
-            out_append("CFG# ");
-        } else if (s_in_sum_mode) {
-            out_append("SUM# ");
-        } else if (s_sandbox_mode) {
-            out_append("[sandbox] ");
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        } else if (lcontainer_has_active()) {
-            out_append("[lcnt:");
-            out_append(lcontainer_active_name());
-            out_append("] ");
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        } else {
-            out_append_char(s_drive);
-            out_append(":\\> ");
-        }
+        append_lsh_prompt();
         out_append(line);
         out_append("\n");
         if (enqueue_ok) {
@@ -6569,24 +7081,7 @@ void lsh_exec(const char* line)
         return;
     }
 
-    if (s_cfgsh_mode) {
-        out_append("CFG# ");
-    } else if (s_in_sum_mode) {
-        out_append("SUM# ");
-    } else if (s_sandbox_mode) {
-        out_append("[sandbox] ");
-        out_append_char(s_drive);
-        out_append(":\\> ");
-    } else if (lcontainer_has_active()) {
-        out_append("[lcnt:");
-        out_append(lcontainer_active_name());
-        out_append("] ");
-        out_append_char(s_drive);
-        out_append(":\\> ");
-    } else {
-        out_append_char(s_drive);
-        out_append(":\\> ");
-    }
+    append_lsh_prompt();
     out_append(line);
     out_append("\n");
 

@@ -186,6 +186,15 @@ static const uint8_t glyphmap_init[] =
 static uint8_t ram_glyphmap_buf[GLYPHMAP_CAP];
 static FsWritableFile ram_glyphmap = { "glyphmap.lardd", ram_glyphmap_buf, 0, GLYPHMAP_CAP };
 
+#define DOSMODE_CAP 2048u
+static const uint8_t dosmode_init[] =
+    "LARDD 1\n"
+    "TITLE DOS Mode State\n"
+    "TEXT DOS mode is off by default. Use dos on to enter L-DOS mode.\n"
+    "SECTION Events\n";
+static uint8_t ram_dosmode_buf[DOSMODE_CAP];
+static FsWritableFile ram_dosmode = { "dosmode.lardd", ram_dosmode_buf, 0, DOSMODE_CAP };
+
 #define LPST_MAGIC       0x5453504Cu  /* "LPST" LE */
 #define LPST_VERSION     2u
 #define LPST_START_LBA   2752u
@@ -235,6 +244,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
+    "li Use dos on for L-DOS mode: a native DOS-style shell layer with C:/A:/R: drive mapping, DIR/TYPE/COPY/DEL/REN/MD/RD/CD, and dosmode.lardd history.\n"
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
@@ -288,6 +298,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.58.1p hotpatches settings sliders, full-desktop window movement, and fullscreen/restore.\n"
     "li v1.59.0b adds runtime desktop/dock items, folders, draggable/reorderable launchers, per-app windows, and z-order.\n"
     "li v1.59.0a officially promotes the runtime desktop/window-manager model without restoring EXGUI/EXEXGUI.\n"
+    "li v1.60.0a officially adds L-DOS mode as a native compatibility shell without external DOS code.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -303,6 +314,9 @@ static const uint8_t file_lardos_lars[] =
     "li Run lil features.lil to try the native LIL scripting language.\n"
     "li Use sum, peek, poke, and asm_ when you want raw ring-0 control.\n"
     "cmd release\n"
+    "cmd dos status\n"
+    "cmd dos map\n"
+    "cmd dos test\n"
     "cmd magic statsu\n"
     "cmd magic dryrun statsu\n"
     "cmd mode probe\n"
@@ -382,6 +396,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd post\n"
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
+    "cmd lardd dosmode_guide.lardd\n"
     "note Release suffixes: a=official, b=beta-experimental, p=hotpatch. Hardware profiles: universal, seabios, ami, vbox, usb, realpc.\n"
     "end\n";
 
@@ -512,6 +527,28 @@ static const uint8_t file_shrine_guide[] =
     "ITEM srine is accepted as a typo-friendly alias for shrine.\n"
     "END\n";
 
+static const uint8_t file_dosmode_guide[] =
+    "LARDD 1\n"
+    "TITLE L-DOS Mode\n"
+    "TEXT L-DOS mode is a LardOS-native DOS-style compatibility shell layer.\n"
+    "TEXT It does not import external DOS code; it maps familiar commands onto LSH, LFS, RAM files, LPST, and LARDD logs.\n"
+    "SECTION Commands\n"
+    "ITEM dos on -> enter L-DOS mode with an L-DOS C:\\ prompt.\n"
+    "ITEM dos off or EXIT -> leave L-DOS mode.\n"
+    "ITEM DOS commands are case-insensitive: DIR, TYPE, COPY, DEL, REN, MD, RD, CD, CLS, VER, SET, ECHO, MEM.\n"
+    "ITEM LSH command -> run one native LardOS command while staying in DOS mode.\n"
+    "ITEM dos map -> show C:/A:/R: drive mappings.\n"
+    "ITEM dos log -> read dosmode.lardd history.\n"
+    "SECTION Drive Map\n"
+    "ITEM C: maps to LardOS X: built-in and LFS files.\n"
+    "ITEM A: maps to LardOS Y: boot or floppy-style view.\n"
+    "ITEM R: maps to LardOS Z: writable RAM files.\n"
+    "SECTION Philosophy\n"
+    "ITEM Directories are virtual navigation labels because LardOS currently keeps the core filesystem flat and visible.\n"
+    "ITEM DEL clears writable RAM file contents but refuses read-only embedded files.\n"
+    "ITEM REN moves data into an existing writable slot instead of hiding a mutable filename table.\n"
+    "END\n";
+
 static const uint8_t file_features_lil[] =
     "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
     "(begin\n"
@@ -554,6 +591,9 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command shrine\n"
     "CHECK file hello.shrine\n"
     "CHECK file shrine_guide.lardd\n"
+    "CHECK command dos\n"
+    "CHECK file dosmode_guide.lardd\n"
+    "CHECK writable dosmode.lardd\n"
     "CHECK file vm_guide.lardd\n"
     "CHECK command time\n"
     "CHECK command lunar\n"
@@ -648,6 +688,7 @@ static const FsFile FS_FILES[] = {
     { "lardtime_guide.lardd", file_lardtime_guide, sizeof(file_lardtime_guide) - 1 },
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
     { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
+    { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
@@ -730,7 +771,7 @@ static int lpst_validate_bank(const uint8_t* store, uint32_t* header_size,
 
 static uint32_t writable_count(void)
 {
-    return 19u;
+    return 20u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -754,6 +795,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 16) return &ram_cfgprof;
     if (idx == 17) return &ram_userlaw;
     if (idx == 18) return &ram_glyphmap;
+    if (idx == 19) return &ram_dosmode;
     return NULL;
 }
 
@@ -823,6 +865,10 @@ void fs_init(void)
         ram_glyphmap_buf[i] = glyphmap_init[i];
     }
     ram_glyphmap.size = sizeof(glyphmap_init) - 1;
+    for (uint32_t i = 0; i < sizeof(dosmode_init) - 1 && i < DOSMODE_CAP; i++) {
+        ram_dosmode_buf[i] = dosmode_init[i];
+    }
+    ram_dosmode.size = sizeof(dosmode_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
 }

@@ -287,6 +287,11 @@ view text, and z-order.
 `v1.59.0a` promotes that model to the official channel without restoring the old
 EXGUI/EXEXGUI layers.
 
+`v1.60.0a` adds L-DOS mode as a compatibility layer inside LSH rather than a
+foreign DOS runtime. `dos on` switches the prompt to `L-DOS C:\>`, DOS command
+aliases are case-insensitive, `C:`/`A:`/`R:` map visibly onto LardOS
+`X:`/`Y:`/`Z:`, and `dosmode.lardd` records user-visible state/history.
+
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a
 default priority; `task set`, `task default`, `task run`, `task boost`, `task
@@ -424,6 +429,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.59.0a-vbox/lardos-v1.59.0a-vbox.iso`. Release ISOs also
+example `release/v1.60.0a-vbox/lardos-v1.60.0a-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

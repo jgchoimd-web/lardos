@@ -53,3 +53,6 @@ void lsh_enter_sum_shortcut(void);
 
 /* Non-mutating parser selftest for the settings shell. */
 int lsh_cfgsh_selftest(void);
+
+/* Non-mutating parser selftest for DOS mode command aliases. */
+int lsh_dosmode_selftest(void);

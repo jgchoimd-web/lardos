@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.60.0a
+ITEM Official release adding L-DOS mode, a LardOS-native DOS-style compatibility shell layer.
+ITEM Adds dos on, dos off, dos status, dos help, dos map, dos log, dos test, and dos run command.
+ITEM In DOS mode the prompt becomes L-DOS C:\>, commands are case-insensitive, and familiar DIR, TYPE, COPY, DEL, REN, MD, RD, CD, CLS, VER, SET, ECHO, MEM, and EXIT commands map visibly onto LSH behavior.
+ITEM Adds transparent drive mapping: C: maps to LardOS X:, A: maps to Y:, and R: maps to Z: writable RAM files.
+ITEM Adds dosmode_guide.lardd, writable dosmode.lardd history, LUNIT coverage, and POST coverage for the alias parser.
+ITEM Preserves the default GUI/window-manager path, EXGUI/EXEXGUI removal, user-owned Unicode cursor, SUM/raw-control policy, and no-feature-loss LardOS values.
+
 SECTION v1.59.0a
 ITEM Official release promoting the default GUI desktop/window-manager model from v1.59.0b.
 ITEM Keeps runtime desktop and dock item tables, left-click launching, draggable desktop icons, reorderable dock icons, and New Folder, Pin App, and Dock + controls.

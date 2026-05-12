@@ -113,6 +113,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: hello.shrine", fs_open("hello.shrine") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.lguilib", fs_open("default.lguilib") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.ltheme", fs_open("default.ltheme") != NULL, emit, user, &pass, &fail);
+    post_check("fs: dosmode guide", fs_open("dosmode_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreport writable", fs_open_writable("bugreport.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreplay writable", fs_open_writable("bugreplay.lardd") != NULL, emit, user, &pass, &fail);
@@ -126,7 +127,8 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: cfg profile writable", fs_open_writable("cfgprof.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user law writable", fs_open_writable("userlaw.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: glyph map writable", fs_open_writable("glyphmap.lardd") != NULL, emit, user, &pass, &fail);
-    post_check("fs: writable directory index", fs_writable_count() >= 19u, emit, user, &pass, &fail);
+    post_check("fs: dosmode writable", fs_open_writable("dosmode.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: writable directory index", fs_writable_count() >= 20u, emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
     post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);
 
@@ -164,6 +166,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("oslink: packet and local bus", oslink_selftest() == 0, emit, user, &pass, &fail);
     post_check("taskprio: priority queue", taskprio_selftest() == 0, emit, user, &pass, &fail);
     post_check("lsh: settings shell grammar", lsh_cfgsh_selftest() == 0, emit, user, &pass, &fail);
+    post_check("lsh: DOS mode aliases", lsh_dosmode_selftest() == 0, emit, user, &pass, &fail);
     post_check("bootprof: profile flags", bootprof_selftest() == 0, emit, user, &pass, &fail);
     post_check("awake: background boot tracker", awake_selftest() == 0, emit, user, &pass, &fail);
     post_check("crashlog: writable log", crashlog_selftest() == 0, emit, user, &pass, &fail);

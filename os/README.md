@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.59.0a-ami/lardos-v1.59.0a-ami.iso`. To publish the whole hardware
+`release/v1.60.0a-ami/lardos-v1.60.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -109,6 +109,10 @@ commands:
 - `magic dryrun command [args]` shows the same prediction without executing it.
 - `magic dryrun -f command [args]` previews a forced raw-control prediction
   without running it.
+- `dos on|off|status|help|map|log|test` enters L-DOS mode, a native DOS-style
+  compatibility shell. It uses an `L-DOS C:\>` prompt, case-insensitive
+  commands, visible `C:`/`A:`/`R:` mapping to LardOS drives, and logs state in
+  `dosmode.lardd`.
 - `bye` / `byebye` sync RAM files and request a user-owned poweroff;
   `restart` / `reboot` sync RAM files and request a user-owned firmware/VM
   restart.
@@ -127,6 +131,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.60.0a` officially adds L-DOS mode without external DOS code: `DIR`,
+  `TYPE`, `COPY`, `DEL`, `REN`, `MD`, `RD`, `CD`, `CLS`, `VER`, `SET`, `ECHO`,
+  `MEM`, and `EXIT` map onto LardOS-owned shell, filesystem, and LARDD history.
 - `v1.59.0a` officially promotes the real desktop/window-manager model without
   bringing EXGUI/EXEXGUI back.
 - `v1.59.0b` starts the real desktop/window-manager track: desktop and dock
@@ -249,6 +256,9 @@ commands:
 - `v1.59.0a` promotes that desktop/window-manager model to the official channel
   with the same runtime item tables, addable folders, per-app windows, and
   z-order behavior intact.
+- `v1.60.0a` adds the official L-DOS compatibility layer with `dos on`, DOS
+  command aliases, drive mapping, `dosmode_guide.lardd`, `dosmode.lardd`, POST,
+  and LUNIT checks.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.

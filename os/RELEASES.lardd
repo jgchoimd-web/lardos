@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.59.0a
+ITEM Official release promoting the default GUI desktop/window-manager model from v1.59.0b.
+ITEM Keeps runtime desktop and dock item tables, left-click launching, draggable desktop icons, reorderable dock icons, and New Folder, Pin App, and Dock + controls.
+ITEM Keeps per-app window records with visibility, geometry, fullscreen state, saved view text, and z-order so covered windows render behind the active window and can be brought forward.
+ITEM Preserves v1.58.1p settings/fullscreen fixes, LGUILIB/LTHEME, user-owned Unicode cursor, and the no-EXGUI/no-EXEXGUI default GUI direction.
+ITEM Built as hardware-profiled IMG/ISO artifacts for universal, seabios, ami, vbox, usb, and realpc.
+
 SECTION v1.59.0b
 ITEM Beta release turning the default GUI desktop from a fixed launcher screen into a small real desktop/window-manager model.
 ITEM Desktop icons and dock entries are now runtime item tables, not only hardcoded launcher arrays.

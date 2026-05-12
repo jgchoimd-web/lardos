@@ -287,6 +287,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.58.0a officially makes the default GUI a desktop with a top bar, app icons, dock, and hideable app window.\n"
     "li v1.58.1p hotpatches settings sliders, full-desktop window movement, and fullscreen/restore.\n"
     "li v1.59.0b adds runtime desktop/dock items, folders, draggable/reorderable launchers, per-app windows, and z-order.\n"
+    "li v1.59.0a officially promotes the runtime desktop/window-manager model without restoring EXGUI/EXEXGUI.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

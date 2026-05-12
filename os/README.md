@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.59.0b-ami/lardos-v1.59.0b-ami.iso`. To publish the whole hardware
+`release/v1.59.0a-ami/lardos-v1.59.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -127,6 +127,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.59.0a` officially promotes the real desktop/window-manager model without
+  bringing EXGUI/EXEXGUI back.
 - `v1.59.0b` starts the real desktop/window-manager track: desktop and dock
   items are runtime tables, left-click launches them, desktop icons can be
   dragged, dock icons can be reordered, New Folder/Pin App/Dock + add items,
@@ -244,6 +246,9 @@ commands:
 - `v1.59.0b` makes the desktop model editable at runtime with addable folders,
   draggable desktop items, reorderable dock items, per-app windows, saved app
   view text, and z-order rendering.
+- `v1.59.0a` promotes that desktop/window-manager model to the official channel
+  with the same runtime item tables, addable folders, per-app windows, and
+  z-order behavior intact.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native
   GUI library theme files. `lguilib use default.lguilib` reloads the built-in
   overlay theme without leaving LardOS.

@@ -284,6 +284,8 @@ full-desktop window movement, and a title-bar fullscreen/restore control.
 runtime item tables, New Folder/Pin App/Dock + mutate those tables, and apps
 own separate window records with geometry, visibility, fullscreen state, saved
 view text, and z-order.
+`v1.59.0a` promotes that model to the official channel without restoring the old
+EXGUI/EXEXGUI layers.
 
 `taskprio.c` owns the user-changeable task priority queue used by LSH
 background commands. Commands submitted with `&` become numbered tasks with a
@@ -422,6 +424,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.59.0b-vbox/lardos-v1.59.0b-vbox.iso`. Release ISOs also
+example `release/v1.59.0a-vbox/lardos-v1.59.0a-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

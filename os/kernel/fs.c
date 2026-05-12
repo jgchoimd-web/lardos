@@ -254,6 +254,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use magic dryrun -f bye to preview a forced raw-control prediction without running it.\n"
     "li Use bye or byebye to sync RAM files and request a firmware/VM poweroff.\n"
     "li Use restart or reboot to sync RAM files and request a firmware/VM restart.\n"
+    "li Use install status for the HDD/SSD installer preview, or install hdd yes / install ssd yes to write LardOS to the ATA target disk.\n"
     "li Run mode probe to enter a controlled real16 window and return to long64.\n"
     "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
@@ -322,6 +323,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.60.1p hotpatches L-DOS DEL -F read-only tombstones plus RESTORE for user-owned reversibility.\n"
     "li v1.61.0a officially adds user-owned tombstone deletion: TOMB LIST/SHOW/DROP/CLEAR plus DEL -T.\n"
     "li v1.62.0a makes DEL -F a hard delete from the active filesystem while preserving TOMB HIDE for soft tombstones.\n"
+    "li v1.63.0a adds the in-OS HDD/SSD installer option using the native stage1/stage2/kernel layout.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -330,13 +332,14 @@ static const uint8_t file_lardos_lars[] =
     "button Task dashboard | tasktop\n"
     "button Crash history | crashlog show\n"
     "input profile normal\n"
-    "li Press P during boot for POST, or M for the CPU Mode Bridge Test.\n"
+    "li Press P during boot for POST, M for the CPU Mode Bridge Test, or I for the HDD/SSD installer.\n"
     "li Use write notes.txt text and append notes.txt text for the RAM FS.\n"
     "li Use vcs status/log/show to inspect the in-OS history layer.\n"
     "li Use lcnt info to inspect syscall-cap containers.\n"
     "li Run lil features.lil to try the native LIL scripting language.\n"
     "li Use sum, peek, poke, and asm_ when you want raw ring-0 control.\n"
     "cmd release\n"
+    "cmd install status\n"
     "cmd dos status\n"
     "cmd dos map\n"
     "cmd dos test\n"
@@ -581,6 +584,26 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM TOMB rewrites fsdelete.lardd on user request, preserving the LardOS rule that visible system state remains user-editable.\n"
     "END\n";
 
+static const uint8_t file_installer_guide[] =
+    "LARDD 1\n"
+    "TITLE HDD/SSD Installer\n"
+    "TEXT LardOS can install itself to the primary ATA HDD/SSD target from inside the OS.\n"
+    "TEXT The installer is destructive by design: it writes the boot sectors the user chooses to own.\n"
+    "SECTION Commands\n"
+    "ITEM install status -> show driver, detected sectors, stage layout, kernel size, and the exact destructive command.\n"
+    "ITEM install preview -> same as status; no sectors are written.\n"
+    "ITEM install hdd yes -> write stage1 to LBA0, stage2 to LBA1..4, and the loaded kernel image to LBA5..\n"
+    "ITEM install ssd yes -> same target path, named for users thinking in SSD terms.\n"
+    "SECTION Boot Option\n"
+    "ITEM Press I at the power-on options screen to open the installer preview before the normal GUI starts.\n"
+    "ITEM From that installer screen, Y writes the target disk and N returns to normal boot.\n"
+    "SECTION Layout\n"
+    "ITEM LBA0 contains LardOS stage1.\n"
+    "ITEM LBA1..4 contain stage2.\n"
+    "ITEM LBA5.. contain the current loaded LARDX/BOSX kernel image from memory.\n"
+    "ITEM LPST writable storage remains reserved at LBA2752 and beyond.\n"
+    "END\n";
+
 static const uint8_t file_features_lil[] =
     "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
     "(begin\n"
@@ -624,10 +647,12 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file hello.shrine\n"
     "CHECK file shrine_guide.lardd\n"
     "CHECK command dos\n"
+    "CHECK command install\n"
     "CHECK command restore\n"
     "CHECK command tomb\n"
     "CHECK command tombstone\n"
     "CHECK file dosmode_guide.lardd\n"
+    "CHECK file installer_guide.lardd\n"
     "CHECK writable dosmode.lardd\n"
     "CHECK writable fsdelete.lardd\n"
     "CHECK file vm_guide.lardd\n"
@@ -725,6 +750,7 @@ static const FsFile FS_FILES[] = {
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
     { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
     { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
+    { "installer_guide.lardd", file_installer_guide, sizeof(file_installer_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },

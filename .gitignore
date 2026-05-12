@@ -14,6 +14,7 @@ os/kernel/ldll_lib*.inc
 os/kernel/lib*.ldll
 os/kernel/lafillo_demo_data.inc
 os/kernel/releases_lardd.inc
+os/kernel/boot_stage*.inc
 os/lang/examples/*.bosx
 os/lang/examples/*.elf
 os/lang/examples/*.o

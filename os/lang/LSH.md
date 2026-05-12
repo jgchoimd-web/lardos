@@ -12,6 +12,9 @@
 - `magic command [args]` - predict and run a mistyped safe built-in command.
 - `magic dryrun command [args]` - show the Magic prediction without executing it.
 - `magic explain` - show why the last Magic prediction executed or stopped.
+- `install status|preview|hdd yes|ssd yes|guide` - preview or write the current
+  LardOS boot image to an ATA HDD/SSD from inside the OS. `install` is
+  raw-control for Magic, so automatic execution requires `magic -f`.
 - `dos on|off|status|help|map|log|test` - enter L-DOS mode, a native DOS-style shell layer with case-insensitive `DIR`, `TYPE`, `COPY`, `DEL`, `DEL -F`, `DEL -T`, `RESTORE`, `UNDELETE`, `TOMB`, `REN`, `MD`, `RD`, `CD`, `CLS`, `VER`, `SET`, `ECHO`, `MEM`, and `EXIT`.
 - `tomb list|show|hide file|drop file|clear` - inspect, create soft hides, or delete user-owned `DEL -F` hard-delete records from `fsdelete.lardd`.
 - `mode [status|probe|real|guard]` - inspect or run the controlled real16/long64 bridge.
@@ -23,7 +26,7 @@
 - `gasm file.gasm` - run an in-tree GASM source file from LSH.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
-- GUI polish was beta-tracked in `v1.36.0b` and promoted in official `v1.40.0a` with the glyph and rough-edge repair track; `v1.58.0a` makes the default GUI a desktop with app icons, a dock, and hideable app windows, `v1.58.1p` hotpatches settings-panel clicks, full-desktop window movement, and fullscreen/restore, `v1.59.0b` adds runtime desktop/dock items, folders, per-app windows, and z-order, `v1.59.0a` promotes that model officially, `v1.60.0a` adds official L-DOS mode, `v1.60.1p` adds `DEL -F` read-only tombstones plus restore, `v1.61.0a` adds user-owned tombstone record deletion, and `v1.62.0a` makes `DEL -F` hard-delete from the active read-only filesystem view.
+- GUI polish was beta-tracked in `v1.36.0b` and promoted in official `v1.40.0a` with the glyph and rough-edge repair track; `v1.58.0a` makes the default GUI a desktop with app icons, a dock, and hideable app windows, `v1.58.1p` hotpatches settings-panel clicks, full-desktop window movement, and fullscreen/restore, `v1.59.0b` adds runtime desktop/dock items, folders, per-app windows, and z-order, `v1.59.0a` promotes that model officially, `v1.60.0a` adds official L-DOS mode, `v1.60.1p` adds `DEL -F` read-only tombstones plus restore, `v1.61.0a` adds user-owned tombstone record deletion, `v1.62.0a` makes `DEL -F` hard-delete from the active read-only filesystem view, and `v1.63.0a` adds the official in-OS HDD/SSD installer option.
 - `glyph demo|list|load|auto|show|move|copy|rename|pixel|clear|live|click|insert|write` - bind BMP pictures to private-use Unicode slots U+E000..U+E0FF, edit assigned slots, render them inline, click them in the GUI, and toggle realtime hover/click rendering.
 - `cursor status|set U+E000|off` - bind the GUI mouse cursor to a user-owned picture Unicode slot.
 - `cfgsh` / `cfg setting value` - settings shell for `mode-name on|off` or numbered values.

@@ -48,6 +48,14 @@ Stage2 keeps bootinfo at `0x9C000` and its temporary protected-mode stack at
 `0x7F0000`, away from VGA, EBDA, bootinfo, and staging data, so the native boot
 path has room as the in-tree kernel grows.
 
+The in-OS installer reuses that same boot layout. `installer.c` embeds the
+stage1 and stage2 binaries as generated C arrays, validates the loaded
+LARDX/BOSX kernel image at `0x10000`, and can write LBA0, LBA1..4, and LBA5..
+to an ATA HDD/SSD target. The power-on options screen exposes this as `I`, and
+LSH exposes it as `install status`, `install hdd yes`, and `install ssd yes`.
+LPST remains reserved at LBA 2752 so installed disks keep the native writable
+store boundary.
+
 At runtime the kernel also owns a controlled CPU mode bridge. `cpumode.c` copies
 a low-memory trampoline to `0x6000`, and `mode_switch.s` can briefly walk from
 64-bit long mode through a 32-bit protected-mode selector into real mode, then
@@ -79,6 +87,7 @@ flowchart TB
     LardKit["lardkit user-control suite"]
     BugReplay["bugreplay + trace + journal + recovery tools"]
     LPack["lpack packages"]
+    Installer["installer HDD/SSD writer"]
     LSS["lss Shrine subsystem"]
     ScreenCheck["screencheck diagnostics"]
     TLS["lard_tls native TLS"]
@@ -100,6 +109,7 @@ flowchart TB
     Storage --> LardKit
     LardKit --> BugReplay
     Storage --> LPack
+    Storage --> Installer
     Storage --> LSS
     Kmain --> POST
     Kmain --> Net
@@ -220,6 +230,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Crash log | `os/kernel/crashlog.c`, `os/include/crashlog.h` |
 | User-control suite | `os/kernel/lardkit.c`, `os/include/lardkit.h` |
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
+| HDD/SSD installer | `os/kernel/installer.c`, `os/include/installer.h` |
 | Shrine subsystem | `os/kernel/lss.c`, `os/include/lss.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
 | LardOS GUI library format | `os/kernel/lguilib.c`, `os/include/lguilib.h` |
@@ -238,6 +249,12 @@ tab and `lardd_guide.lardd` as the native document-format guide. LardOS uses
 `LARS` instead of HTML for local structured pages and `LARDD` instead of
 Markdown for project documents. `kernel/lard_doc.c` renders both formats with a
 small freestanding C parser.
+
+`installer.c` owns the optional HDD/SSD install path. It is intentionally
+visible and explicit: `install status` only previews the target layout, while
+`install hdd yes` and `install ssd yes` perform the write. Magic treats
+`install` as raw-control so autocorrect cannot silently install, but the direct
+command remains user-owned.
 
 LardKit also owns the local recovery/audit reports. `bugreplay.lardd` stores
 recent BugEye frame summaries and `bugreplay draw` renders a small replay
@@ -393,10 +410,11 @@ archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
 ScreenRAM scratch storage, OSLink packet framing, local bus, and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardKit user-control tools, LardPack package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS
-hashing, containers, and LIL feature forms.
+hashing, containers, the installer boot-stage selftest, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
+HDD/SSD installer preview and write controls (`install`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
 visual screen diagnostics (`screencheck`),
 OS-to-OS messaging, local bus messages, and safe remote command requests (`oslink`), task priority
@@ -440,6 +458,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.62.0a-vbox/lardos-v1.62.0a-vbox.iso`. Release ISOs also
+example `release/v1.63.0a-vbox/lardos-v1.63.0a-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

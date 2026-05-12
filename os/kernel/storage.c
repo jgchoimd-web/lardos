@@ -22,6 +22,7 @@
 
 static int s_inited;
 static int s_present;
+static uint32_t s_sector_count;
 
 static void ata_delay(void)
 {
@@ -55,6 +56,7 @@ static int ata_wait_drq(void)
 
 static int ata_identify(void)
 {
+    uint16_t ident[256];
     outb(ATA_CONTROL, 0x02); /* nIEN: polling mode */
     outb(ATA_DRIVE, 0xA0);
     ata_delay();
@@ -71,7 +73,8 @@ static int ata_identify(void)
     if (inb(ATA_LBA1) != 0 || inb(ATA_LBA2) != 0) return -3;
     if (ata_wait_drq() != 0) return -4;
 
-    for (uint32_t i = 0; i < 256u; i++) (void)inw(ATA_DATA);
+    for (uint32_t i = 0; i < 256u; i++) ident[i] = inw(ATA_DATA);
+    s_sector_count = (uint32_t)ident[60] | ((uint32_t)ident[61] << 16);
     return 0;
 }
 
@@ -92,6 +95,12 @@ int storage_available(void)
 const char* storage_driver_name(void)
 {
     return storage_available() ? "ata-pio" : "none";
+}
+
+uint32_t storage_sector_count(void)
+{
+    if (!s_inited) (void)storage_init();
+    return s_present ? s_sector_count : 0;
 }
 
 static void ata_select_lba(uint32_t lba)

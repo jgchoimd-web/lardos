@@ -36,6 +36,7 @@
 #include "smp.h"
 #include "string.h"
 #include "fs.h"
+#include "installer.h"
 #include "version.h"
 
 static volatile uint16_t* const VGA = (volatile uint16_t*)0xB8000;
@@ -127,6 +128,7 @@ static int boot_post_poll_key(int post_only)
     if (ps2_kbd_poll(&k) == 0) {
         if (k.kind == PS2K_ASCII && (k.ch == 'p' || k.ch == 'P')) return 1;
         if (k.kind == PS2K_ASCII && (k.ch == 'm' || k.ch == 'M')) return 2;
+        if (k.kind == PS2K_ASCII && (k.ch == 'i' || k.ch == 'I')) return 3;
         if (!post_only) return 1;
         return -1;
     }
@@ -153,6 +155,36 @@ static int boot_post_wait_key(uint32_t seconds, uint32_t fallback_loops, int pos
     return 0;
 }
 
+static int boot_install_poll_confirm(void)
+{
+    ps2_key_t k;
+    if (ps2_kbd_poll(&k) == 0 && k.kind == PS2K_ASCII) {
+        if (k.ch == 'y' || k.ch == 'Y') return 1;
+        if (k.ch == 'n' || k.ch == 'N' || k.ch == '\r' || k.ch == '\n') return 2;
+    }
+    return 0;
+}
+
+static int boot_install_wait_confirm(uint32_t seconds, uint32_t fallback_loops)
+{
+    int64_t start = rtc_unix_seconds();
+    if (start > 0) {
+        for (;;) {
+            int r = boot_install_poll_confirm();
+            if (r != 0) return r;
+            int64_t now = rtc_unix_seconds();
+            if (now > 0 && (uint32_t)(now - start) >= seconds) return 0;
+            __asm__ __volatile__("pause");
+        }
+    }
+    for (uint32_t i = 0; i < fallback_loops; i++) {
+        int r = boot_install_poll_confirm();
+        if (r != 0) return r;
+        __asm__ __volatile__("pause");
+    }
+    return 0;
+}
+
 static int boot_post_offer(void)
 {
     static const char* msg =
@@ -160,10 +192,42 @@ static int boot_post_offer(void)
         "\n"
         "P  Power-On Self-Test\n"
         "M  CPU Mode Bridge Test\n"
+        "I  HDD/SSD Installer\n"
         "Enter or timeout  Normal boot\n";
     gui_set_response(msg);
     gui_render();
     return boot_post_wait_key(4u, 240000000u, 1);
+}
+
+static void boot_install_run_screen(void)
+{
+    char report[1200];
+    boot_post_text_t text = { report, sizeof(report) };
+    int choice;
+    int r;
+
+    lard_install_status(report, sizeof(report));
+    boot_post_append(&text, "\nY  write LardOS to HDD/SSD now\n");
+    boot_post_append(&text, "N/Enter/timeout  normal boot without installing\n");
+    gui_set_response(report);
+    gui_render();
+
+    choice = boot_install_wait_confirm(8u, 480000000u);
+    if (choice == 1) {
+        r = lard_install_hdd_ssd(report, sizeof(report));
+        text.buf = report;
+        text.cap = sizeof(report);
+        boot_post_append(&text, "\ninstaller result: ");
+        boot_post_append_i32(&text, r);
+        boot_post_append(&text, "\nContinuing normal boot.\n");
+        gui_set_response(report);
+        gui_render();
+        (void)boot_post_wait_key(5u, 240000000u, 0);
+    } else {
+        gui_set_response("HDD/SSD install skipped.\nContinuing normal boot.\n");
+        gui_render();
+        (void)boot_post_wait_key(1u, 60000000u, 0);
+    }
 }
 
 static void run_language_demos_report(int publish)
@@ -546,6 +610,8 @@ void kmain(void)
                 boot_post_run_screen();
             } else if (boot_choice == 2) {
                 boot_mode_run_screen();
+            } else if (boot_choice == 3) {
+                boot_install_run_screen();
             } else {
                 gui_set_response(s_boot_report);
                 gui_render();

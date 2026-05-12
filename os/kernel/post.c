@@ -8,6 +8,7 @@
 #include "fs.h"
 #include "gui.h"
 #include "img_glyph.h"
+#include "installer.h"
 #include "lar.h"
 #include "lard_doc.h"
 #include "lardkit.h"
@@ -114,6 +115,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: default.lguilib", fs_open("default.lguilib") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.ltheme", fs_open("default.ltheme") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode guide", fs_open("dosmode_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: installer guide", fs_open("installer_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreport writable", fs_open_writable("bugreport.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreplay writable", fs_open_writable("bugreplay.lardd") != NULL, emit, user, &pass, &fail);
@@ -146,6 +148,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("time: lardos time calendar", lardtime_selftest() == 0, emit, user, &pass, &fail);
     post_check("vm: monitor budgets", vmmon_selftest() == 0, emit, user, &pass, &fail);
     post_check("shrine: subsystem wrapper", lss_selftest() == 0, emit, user, &pass, &fail);
+    post_check("installer: boot stages embedded", lard_install_selftest() == 0, emit, user, &pass, &fail);
     post_check("pci: rtl8139 option", pci_find_device(0x10ECu, 0x8139u, &pci_addr) == 0, emit, user, &pass, &fail);
     post_check("pci: piix3 ide option", pci_find_device(0x8086u, 0x7010u, &pci_addr) == 0, emit, user, &pass, &fail);
 

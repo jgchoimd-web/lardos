@@ -5,6 +5,16 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.63.0a
+ITEM Official release adding an in-OS HDD/SSD installer option.
+ITEM The power-on options screen now accepts I for the HDD/SSD Installer, shows the target layout, and requires Y before writing.
+ITEM LSH adds install status, install preview, install hdd yes, install ssd yes, and install guide.
+ITEM The installer embeds the in-tree stage1/stage2 boot code, copies the current loaded LARDX/BOSX kernel image from memory, and writes LBA0, LBA1..4, and LBA5.. without external install tooling.
+ITEM LPST remains reserved at LBA 2752 so installed systems keep the native writable store layout.
+ITEM Magic treats install/installer as raw-control commands, so mistaken auto-execution still requires magic -f while direct user commands remain fully allowed.
+ITEM Adds installer guide documentation plus POST and LUNIT coverage for the boot-stage selftest and command visibility.
+ITEM Built as hardware-profiled IMG/ISO artifacts for universal, seabios, ami, vbox, usb, and realpc.
+
 SECTION v1.62.0a
 ITEM Official release making DEL -F a hard delete from the active read-only filesystem view, not just a reversible tombstone.
 ITEM DEL -F file now writes a DELETE record into fsdelete.lardd, removes the file from DIR, TYPE, and normal opens, and RESTORE/UNDELETE will not soft-restore it.

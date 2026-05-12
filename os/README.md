@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.62.0a-ami/lardos-v1.62.0a-ami.iso`. To publish the whole hardware
+`release/v1.63.0a-ami/lardos-v1.63.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -100,6 +100,10 @@ commands:
 - `help` lists the built-in shell commands by area.
 - `control` prints the system control map and the full-control entry points.
 - `status` prints version, drive, LPST persistence, driver, and container state.
+- `install status` / `install preview` shows the in-OS HDD/SSD installer layout;
+  `install hdd yes` and `install ssd yes` write the current LardOS boot image
+  to the ATA target with an explicit user confirmation. The boot options screen
+  also has `I` for the same installer preview.
 - `post` / `selftest` reruns the same Power-On Self-Test diagnostics available
   from the boot option. `post baseline` opens the saved POST baseline report.
 - `magic command [args]` predicts a mistyped safe built-in command and executes
@@ -136,6 +140,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.63.0a` officially adds the in-OS HDD/SSD installer option with power-on
+  `I`, `install status`, `install hdd yes`, and `install ssd yes`.
 - `v1.62.0a` officially makes `DEL -F file` a hard delete from the active
   read-only filesystem view, while `TOMB HIDE file` keeps the old reversible
   soft tombstone path available.

@@ -33,6 +33,7 @@
 #include "awake.h"
 #include "bootprof.h"
 #include "crashlog.h"
+#include "installer.h"
 #include "version.h"
 #include "vmmon.h"
 #include "io.h"
@@ -305,7 +306,7 @@ typedef struct {
 } magic_cmd_entry_t;
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
-    { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
+    { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
@@ -1386,10 +1387,11 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status install dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
+    out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
@@ -1447,6 +1449,8 @@ static void cmd_control(const char* args)
     out_append("\n");
     out_append("Start points:\n");
     out_append("  status              inspect version, drivers, storage, containers\n");
+    out_append("  install status      preview the HDD/SSD installer layout and target\n");
+    out_append("  install hdd yes     write the current LardOS boot image to the target disk\n");
     out_append("  values              reread the LardOS user-law values\n");
     out_append("  tomb list           inspect active user-owned read-only deletion records\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
@@ -1603,6 +1607,59 @@ static __attribute__((noreturn)) void cmd_restart(const char* args)
     lsh_try_reboot_cf9();       /* PCI reset control: common on QEMU/Bochs/VirtualBox */
     lsh_try_reboot_keyboard();  /* 8042 CPU reset pulse for BIOS-style machines */
     lsh_try_reboot_triple_fault();
+}
+
+static void cmd_install(const char* args)
+{
+    const char* p = args ? args : "";
+    char sub[24];
+    char confirm[24];
+    char report[1024];
+    int r;
+
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") ||
+        ascii_streq_ci(sub, "preview") ||
+        ascii_streq_ci(sub, "info")) {
+        lard_install_status(report, sizeof(report));
+        out_append(report);
+        return;
+    }
+    if (ascii_streq_ci(sub, "guide") || ascii_streq_ci(sub, "help")) {
+        cmd_larddoc("installer_guide.lardd", "Usage: install status|preview|hdd yes|ssd yes|guide");
+        return;
+    }
+    if (ascii_streq_ci(sub, "hdd") ||
+        ascii_streq_ci(sub, "ssd") ||
+        ascii_streq_ci(sub, "disk") ||
+        ascii_streq_ci(sub, "target")) {
+        if (vcs_read_word(&p, confirm, sizeof(confirm)) != 0 ||
+            !(ascii_streq_ci(confirm, "yes") ||
+              ascii_streq_ci(confirm, "confirm") ||
+              ascii_streq_ci(confirm, "write"))) {
+            out_append("install: destructive target write is waiting for explicit user control.\n");
+            out_append("install: run install ");
+            out_append(sub);
+            out_append(" yes to write LardOS to the selected HDD/SSD.\n");
+            lard_install_status(report, sizeof(report));
+            out_append(report);
+            return;
+        }
+        r = lard_install_hdd_ssd(report, sizeof(report));
+        out_append(report);
+        if (r == 0) {
+            lardkit_journal_event("install", "HDD/SSD boot image written");
+            lardkit_trace_event("install", sub, 0);
+        } else {
+            out_append("install: result=");
+            out_append_i32(r);
+            out_append("\n");
+            lardkit_trace_event("install", sub, r);
+        }
+        return;
+    }
+
+    out_append("Usage: install status|preview|hdd yes|ssd yes|guide\n");
 }
 
 static void cmd_status(const char* args)
@@ -7074,6 +7131,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
     if (strcmp(cmd, "values") == 0 || strcmp(cmd, "philosophy") == 0) { cmd_values(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
+    if (strcmp(cmd, "install") == 0 || strcmp(cmd, "installer") == 0) { cmd_install(args); return; }
     if (strcmp(cmd, "dos") == 0 || strcmp(cmd, "dosmode") == 0) { cmd_dos(args); return; }
     if (strcmp(cmd, "tomb") == 0 || strcmp(cmd, "tombstone") == 0 || strcmp(cmd, "tombstones") == 0) { dos_tombstone(args); return; }
     if (strcmp(cmd, "time") == 0 || strcmp(cmd, "lardtime") == 0 || strcmp(cmd, "ltime") == 0) { cmd_lardtime_mode(args, "now"); return; }

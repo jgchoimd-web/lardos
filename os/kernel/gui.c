@@ -21,6 +21,7 @@
 #include "syscall.h"
 #include "lib3d_demo.h"
 #include "version.h"
+#include "string.h"
 
 #define LARSH_VIEW_W 160
 #define LARSH_VIEW_H 120
@@ -34,6 +35,9 @@
 #define GUI_TOP_NEW_FOLDER 1
 #define GUI_TOP_PIN_DESKTOP 2
 #define GUI_TOP_PIN_DOCK 3
+#define GUI_TOP_DELETE_ITEM 4
+#define GUI_TOP_DELETE_FILE 5
+#define GUI_DRAG_THRESHOLD 8
 
 typedef struct {
     int app;
@@ -286,6 +290,10 @@ typedef struct {
     int item_drag_start_y;
     int item_drag_off_x;
     int item_drag_off_y;
+    int item_drag_orig_x;
+    int item_drag_orig_y;
+    int selected_area; /* 0=none, 1=desktop, 2=dock */
+    int selected_index;
 } gui_state_t;
 
 #define SS_IDLE_THRESHOLD  120
@@ -721,6 +729,10 @@ int gui_init(void)
     g.item_drag_start_y = 0;
     g.item_drag_off_x = 0;
     g.item_drag_off_y = 0;
+    g.item_drag_orig_x = 0;
+    g.item_drag_orig_y = 0;
+    g.selected_area = 0;
+    g.selected_index = -1;
     g.lafillo_extracted[0] = '\0';
 
     // Default URL
@@ -1321,6 +1333,8 @@ static int gui_top_action_hit(int x, int y)
     if (in_rect(x, y, 126, 3, 86, 18)) return GUI_TOP_NEW_FOLDER;
     if (in_rect(x, y, 218, 3, 70, 18)) return GUI_TOP_PIN_DESKTOP;
     if (in_rect(x, y, 294, 3, 64, 18)) return GUI_TOP_PIN_DOCK;
+    if (in_rect(x, y, 364, 3, 62, 18)) return GUI_TOP_DELETE_ITEM;
+    if (in_rect(x, y, 432, 3, 70, 18)) return GUI_TOP_DELETE_FILE;
     return 0;
 }
 
@@ -1373,12 +1387,15 @@ static void gui_draw_desktop(const fb_t* tgt)
     gui_draw_top_button(tgt, 126, "New Folder", 86, gui_top_action_hit(g.mx, g.my) == GUI_TOP_NEW_FOLDER);
     gui_draw_top_button(tgt, 218, "Pin App", 70, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DESKTOP);
     gui_draw_top_button(tgt, 294, "Dock +", 64, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DOCK);
+    gui_draw_top_button(tgt, 364, "Delete", 62, gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_ITEM);
+    gui_draw_top_button(tgt, 432, "DelFile", 70, gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_FILE);
     fb_draw_text(tgt, (uint16_t)(sw > 116 ? sw - 116 : 10), 8, LARDOS_VERSION, 0xFF9DEAE4u, 0xFF121821u);
 
     for (int i = 0; i < g_desktop_item_count; i++) {
         gui_item_t* item = &g_desktop_items[i];
         if (!item->used) continue;
-        int active = item->kind == GUI_ITEM_APP && item->app == g.app_id && g_windows[item->app].visible;
+        int selected = g.selected_area == 1 && g.selected_index == i;
+        int active = selected || (item->kind == GUI_ITEM_APP && item->app == g.app_id && g_windows[item->app].visible);
         gui_draw_launcher(tgt, item, item->x, item->y, item->w, item->h, active, 1);
     }
 
@@ -1389,7 +1406,8 @@ static void gui_draw_desktop(const fb_t* tgt)
         int x = dock_x + 8 + i * cell;
         int y = dock_y + 6;
         gui_item_t* item = &g_dock_items[i];
-        int active = item->kind == GUI_ITEM_APP && item->app == g.app_id && g_windows[item->app].visible;
+        int selected = g.selected_area == 2 && g.selected_index == i;
+        int active = selected || (item->kind == GUI_ITEM_APP && item->app == g.app_id && g_windows[item->app].visible);
         gui_draw_launcher(tgt, item, x, y, cell - 4, cell, active, 0);
     }
 }
@@ -1556,6 +1574,93 @@ static int gui_dock_add_app(int app)
     return 0;
 }
 
+static void gui_select_item(int area, int index)
+{
+    g.selected_area = area;
+    g.selected_index = index;
+}
+
+static void gui_clear_item_selection(void)
+{
+    g.selected_area = 0;
+    g.selected_index = -1;
+}
+
+static void gui_fix_selection_after_remove(int area, int index)
+{
+    if (g.selected_area != area) return;
+    if (g.selected_index == index) {
+        gui_clear_item_selection();
+    } else if (g.selected_index > index) {
+        g.selected_index--;
+    }
+}
+
+static void gui_remove_desktop_item(int index)
+{
+    if (index < 0 || index >= g_desktop_item_count) return;
+    for (int i = index; i + 1 < g_desktop_item_count; i++) g_desktop_items[i] = g_desktop_items[i + 1];
+    g_desktop_item_count--;
+    gui_fix_selection_after_remove(1, index);
+}
+
+static void gui_remove_dock_item(int index)
+{
+    if (index < 0 || index >= g_dock_item_count) return;
+    for (int i = index; i + 1 < g_dock_item_count; i++) g_dock_items[i] = g_dock_items[i + 1];
+    g_dock_item_count--;
+    gui_fix_selection_after_remove(2, index);
+}
+
+static int gui_desktop_add_copy_at(const gui_item_t* item, int x, int y)
+{
+    gui_item_t* out;
+    int max_x;
+    int max_y;
+    if (!item || !item->used || g_desktop_item_count >= GUI_DESKTOP_ITEM_MAX) return -1;
+    out = &g_desktop_items[g_desktop_item_count];
+    *out = *item;
+    out->w = 76;
+    out->h = 62;
+    max_x = (int)g_fb.w - out->w;
+    max_y = (int)g_fb.h - out->h;
+    if (x < 0) x = 0;
+    if (y < 26) y = 26;
+    if (x > max_x) x = max_x;
+    if (y > max_y) y = max_y;
+    out->x = x;
+    out->y = y;
+    g_desktop_item_count++;
+    return g_desktop_item_count - 1;
+}
+
+static int gui_point_in_dock(int x, int y)
+{
+    int dx, dy, dw, dh, cell;
+    gui_dock_rect(&dx, &dy, &dw, &dh, &cell);
+    (void)cell;
+    return in_rect(x, y, dx, dy, dw, dh);
+}
+
+static int gui_dock_find_equivalent(const gui_item_t* item)
+{
+    if (!item || !item->used) return -1;
+    for (int i = 0; i < g_dock_item_count; i++) {
+        if (!g_dock_items[i].used) continue;
+        if (item->kind == GUI_ITEM_APP &&
+            g_dock_items[i].kind == GUI_ITEM_APP &&
+            g_dock_items[i].app == item->app) {
+            return i;
+        }
+        if (item->kind == GUI_ITEM_FOLDER &&
+            g_dock_items[i].kind == GUI_ITEM_FOLDER &&
+            strcmp(g_dock_items[i].name, item->name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 static void gui_desktop_init_model(void)
 {
     if (g_desktop_item_count == 0) {
@@ -1573,12 +1678,12 @@ static void gui_desktop_init_model(void)
     for (int i = 0; i < GUI_APP_COUNT; i++) gui_window_ensure(i);
 }
 
-static void gui_reorder_dock_item(int index, int mouse_x)
+static int gui_reorder_dock_item(int index, int mouse_x)
 {
     int dx, dy, dw, dh, cell;
     int target;
     gui_item_t moving;
-    if (index < 0 || index >= g_dock_item_count) return;
+    if (index < 0 || index >= g_dock_item_count) return index;
     gui_dock_rect(&dx, &dy, &dw, &dh, &cell);
     (void)dy;
     (void)dw;
@@ -1586,7 +1691,7 @@ static void gui_reorder_dock_item(int index, int mouse_x)
     target = (mouse_x - dx - 8) / cell;
     if (target < 0) target = 0;
     if (target >= g_dock_item_count) target = g_dock_item_count - 1;
-    if (target == index) return;
+    if (target == index) return index;
     moving = g_dock_items[index];
     if (target > index) {
         for (int i = index; i < target; i++) g_dock_items[i] = g_dock_items[i + 1];
@@ -1595,6 +1700,131 @@ static void gui_reorder_dock_item(int index, int mouse_x)
     }
     g_dock_items[target] = moving;
     g.item_drag_index = target;
+    if (g.selected_area == 2) g.selected_index = target;
+    return target;
+}
+
+static int gui_dock_add_or_move_item(const gui_item_t* item, int mouse_x)
+{
+    int idx;
+    gui_item_t copy;
+    if (!item || !item->used) return -1;
+    idx = gui_dock_find_equivalent(item);
+    if (idx >= 0) {
+        return gui_reorder_dock_item(idx, mouse_x);
+    }
+    if (g_dock_item_count >= GUI_DOCK_ITEM_MAX) return -1;
+    copy = *item;
+    copy.x = 0;
+    copy.y = 0;
+    g_dock_items[g_dock_item_count] = copy;
+    idx = g_dock_item_count;
+    g_dock_item_count++;
+    return gui_reorder_dock_item(idx, mouse_x);
+}
+
+static void gui_report_line(const char* line)
+{
+    gui_resp_clear();
+    gui_resp_append(line ? line : "");
+    gui_resp_append("\n");
+    gui_save_app_view(g.app_id);
+}
+
+static void gui_delete_selected_item(void)
+{
+    char msg[96];
+    gui_item_t item;
+    if (g.selected_area == 1 && g.selected_index >= 0 && g.selected_index < g_desktop_item_count) {
+        item = g_desktop_items[g.selected_index];
+        gui_remove_desktop_item(g.selected_index);
+        snprintf(msg, sizeof(msg), "GUI deleted desktop item: %s", item.name);
+        gui_report_line(msg);
+        return;
+    }
+    if (g.selected_area == 2 && g.selected_index >= 0 && g.selected_index < g_dock_item_count) {
+        item = g_dock_items[g.selected_index];
+        gui_remove_dock_item(g.selected_index);
+        snprintf(msg, sizeof(msg), "GUI deleted dock item: %s", item.name);
+        gui_report_line(msg);
+        return;
+    }
+    gui_report_line("GUI delete: select a desktop or dock item first.");
+}
+
+static int gui_file_is_space(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+static char gui_file_lower(char c)
+{
+    if (c >= 'A' && c <= 'Z') return (char)(c - 'A' + 'a');
+    return c;
+}
+
+static int gui_prefix_ci(const char* s, const char* p)
+{
+    uint32_t i = 0;
+    while (p[i]) {
+        if (!s[i]) return 0;
+        if (gui_file_lower(s[i]) != gui_file_lower(p[i])) return 0;
+        i++;
+    }
+    return 1;
+}
+
+static uint32_t gui_local_file_from_textbox(char* out, uint32_t cap)
+{
+    const char* s = g.tb;
+    uint32_t i = 0;
+    uint32_t start;
+    uint32_t last_sep = 0;
+    uint32_t n = 0;
+    if (!out || cap == 0) return 0;
+    out[0] = '\0';
+    while (s[i] && gui_file_is_space(s[i])) i++;
+    if (gui_prefix_ci(&s[i], "http://") || gui_prefix_ci(&s[i], "https://")) return 0;
+    if (gui_prefix_ci(&s[i], "file://")) i += 7;
+    if (s[i] && s[i + 1] == ':') {
+        i += 2;
+        while (s[i] == '/' || s[i] == '\\') i++;
+    }
+    start = i;
+    while (s[i] && !gui_file_is_space(s[i]) && s[i] != '|') {
+        if (s[i] == '/' || s[i] == '\\') last_sep = i + 1;
+        i++;
+    }
+    if (last_sep > start) start = last_sep;
+    while (start < i && n + 1u < cap) out[n++] = gui_file_lower(s[start++]);
+    out[n] = '\0';
+    return n;
+}
+
+static void gui_delete_file_from_textbox(void)
+{
+    char name[64];
+    char msg[128];
+    FsWritableFile* writable;
+    static const uint8_t empty[] = "";
+    if (gui_local_file_from_textbox(name, sizeof(name)) == 0) {
+        gui_report_line("GUI file delete: type a local file name in the input field first.");
+        return;
+    }
+    writable = fs_open_writable(name);
+    if (writable) {
+        (void)fs_write(writable, 0, empty, 0);
+        snprintf(msg, sizeof(msg), "GUI file delete: cleared writable file %s", name);
+        gui_report_line(msg);
+        return;
+    }
+    if (fs_delete_readonly(name) == 0) {
+        snprintf(msg, sizeof(msg), "GUI file delete: hard-deleted read-only file %s", name);
+        gui_report_line(msg);
+        return;
+    }
+    snprintf(msg, sizeof(msg), "GUI file delete: file not found: %s", name);
+    gui_report_line(msg);
 }
 
 static void gui_item_activate(const gui_item_t* item)
@@ -1609,6 +1839,63 @@ static void gui_item_activate(const gui_item_t* item)
         gui_resp_append("\nEmpty folder. Drag it anywhere on the desktop.\n");
         gui_save_app_view(2);
     }
+}
+
+int gui_desktop_interaction_selftest(void)
+{
+    gui_item_t desktop_backup[GUI_DESKTOP_ITEM_MAX];
+    gui_item_t dock_backup[GUI_DOCK_ITEM_MAX];
+    int desktop_count = g_desktop_item_count;
+    int dock_count = g_dock_item_count;
+    int folder_count = g_folder_count;
+    int selected_area = g.selected_area;
+    int selected_index = g.selected_index;
+    int drag_area = g.item_drag_area;
+    int drag_index = g.item_drag_index;
+    int drag_moved = g.item_drag_moved;
+    int ok = 1;
+    gui_item_t probe;
+    int dock_idx;
+    int desktop_idx;
+
+    if (!g_have_fb) return -1;
+    for (int i = 0; i < GUI_DESKTOP_ITEM_MAX; i++) desktop_backup[i] = g_desktop_items[i];
+    for (int i = 0; i < GUI_DOCK_ITEM_MAX; i++) dock_backup[i] = g_dock_items[i];
+
+    g_desktop_item_count = 0;
+    g_dock_item_count = 0;
+    g_folder_count = 0;
+    gui_clear_item_selection();
+    g.item_drag_area = 0;
+    g.item_drag_index = -1;
+    g.item_drag_moved = 0;
+
+    gui_item_from_app(&probe, 0, 32, 48);
+    dock_idx = gui_dock_add_or_move_item(&probe, (int)g_fb.w / 2);
+    if (dock_idx < 0 || dock_idx >= g_dock_item_count) ok = 0;
+
+    desktop_idx = gui_desktop_add_copy_at(&probe, 64, 88);
+    if (desktop_idx < 0 || desktop_idx >= g_desktop_item_count) ok = 0;
+    else {
+        gui_select_item(1, desktop_idx);
+        gui_remove_desktop_item(desktop_idx);
+        if (g.selected_area != 0) ok = 0;
+    }
+
+    if (GUI_DRAG_THRESHOLD < 6) ok = 0;
+    if (GUI_TOP_DELETE_ITEM == 0 || GUI_TOP_DELETE_FILE == 0) ok = 0;
+
+    for (int i = 0; i < GUI_DESKTOP_ITEM_MAX; i++) g_desktop_items[i] = desktop_backup[i];
+    for (int i = 0; i < GUI_DOCK_ITEM_MAX; i++) g_dock_items[i] = dock_backup[i];
+    g_desktop_item_count = desktop_count;
+    g_dock_item_count = dock_count;
+    g_folder_count = folder_count;
+    g.selected_area = selected_area;
+    g.selected_index = selected_index;
+    g.item_drag_area = drag_area;
+    g.item_drag_index = drag_index;
+    g.item_drag_moved = drag_moved;
+    return ok ? 0 : -1;
 }
 
 static void gui_draw_window_preview(const fb_t* tgt, const gui_window_t* w)
@@ -2107,7 +2394,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         int moved_y = g.my - g.item_drag_start_y;
         if (moved_x < 0) moved_x = -moved_x;
         if (moved_y < 0) moved_y = -moved_y;
-        if (moved_x + moved_y > 4) g.item_drag_moved = 1;
+        if (moved_x + moved_y > GUI_DRAG_THRESHOLD) g.item_drag_moved = 1;
         if (l_down && g.item_drag_area == 1 && g.item_drag_index >= 0 && g.item_drag_index < g_desktop_item_count) {
             gui_item_t* item = &g_desktop_items[g.item_drag_index];
             int nx = g.mx - g.item_drag_off_x;
@@ -2126,10 +2413,48 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         if (l_released) {
             if (!g.item_drag_moved) {
                 if (g.item_drag_area == 1 && g.item_drag_index >= 0 && g.item_drag_index < g_desktop_item_count) {
+                    gui_select_item(1, g.item_drag_index);
                     gui_item_activate(&g_desktop_items[g.item_drag_index]);
                 } else if (g.item_drag_area == 2 && g.item_drag_index >= 0 && g.item_drag_index < g_dock_item_count) {
+                    gui_select_item(2, g.item_drag_index);
                     gui_item_activate(&g_dock_items[g.item_drag_index]);
                 }
+            } else if (gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_ITEM) {
+                if (g.item_drag_area == 1 && g.item_drag_index >= 0 && g.item_drag_index < g_desktop_item_count) {
+                    gui_select_item(1, g.item_drag_index);
+                    gui_delete_selected_item();
+                } else if (g.item_drag_area == 2 && g.item_drag_index >= 0 && g.item_drag_index < g_dock_item_count) {
+                    gui_select_item(2, g.item_drag_index);
+                    gui_delete_selected_item();
+                }
+            } else if (g.item_drag_area == 1 && g.item_drag_index >= 0 && g.item_drag_index < g_desktop_item_count &&
+                       gui_point_in_dock(g.mx, g.my)) {
+                gui_item_t item = g_desktop_items[g.item_drag_index];
+                int dock_index = gui_dock_add_or_move_item(&item, g.mx);
+                if (dock_index >= 0) {
+                    gui_remove_desktop_item(g.item_drag_index);
+                    gui_select_item(2, dock_index);
+                    gui_report_line("GUI drag: moved item to dock.");
+                } else {
+                    g_desktop_items[g.item_drag_index].x = g.item_drag_orig_x;
+                    g_desktop_items[g.item_drag_index].y = g.item_drag_orig_y;
+                    gui_select_item(1, g.item_drag_index);
+                    gui_report_line("GUI drag: dock is full.");
+                }
+            } else if (g.item_drag_area == 2 && g.item_drag_index >= 0 && g.item_drag_index < g_dock_item_count) {
+                gui_select_item(2, g.item_drag_index);
+                if (!gui_point_in_dock(g.mx, g.my)) {
+                    gui_item_t item = g_dock_items[g.item_drag_index];
+                    int desktop_index = gui_desktop_add_copy_at(&item, g.mx - 38, g.my - 31);
+                    if (desktop_index >= 0) {
+                        gui_select_item(1, desktop_index);
+                        gui_report_line("GUI drag: copied dock item to desktop.");
+                    } else {
+                        gui_report_line("GUI drag: desktop is full.");
+                    }
+                }
+            } else if (g.item_drag_area == 1 && g.item_drag_index >= 0 && g.item_drag_index < g_desktop_item_count) {
+                gui_select_item(1, g.item_drag_index);
             }
             g.item_drag_area = 0;
             g.item_drag_index = -1;
@@ -2141,32 +2466,46 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     if (l_pressed) {
         int hit_window = gui_top_window_at(g.mx, g.my);
         if (hit_window >= 0) {
+            gui_clear_item_selection();
             if (hit_window != g.app_id) gui_select_app(hit_window);
         } else {
             int action = gui_top_action_hit(g.mx, g.my);
             int item = -1;
             if (action == GUI_TOP_NEW_FOLDER) {
+                gui_clear_item_selection();
                 (void)gui_desktop_add_folder();
                 return;
             } else if (action == GUI_TOP_PIN_DESKTOP) {
+                gui_clear_item_selection();
                 (void)gui_desktop_add_app(g.app_id);
                 return;
             } else if (action == GUI_TOP_PIN_DOCK) {
+                gui_clear_item_selection();
                 (void)gui_dock_add_app(g.app_id);
+                return;
+            } else if (action == GUI_TOP_DELETE_ITEM) {
+                gui_delete_selected_item();
+                return;
+            } else if (action == GUI_TOP_DELETE_FILE) {
+                gui_delete_file_from_textbox();
                 return;
             }
             item = gui_dock_hit_item(g.mx, g.my);
             if (item >= 0) {
+                gui_select_item(2, item);
                 g.item_drag_area = 2;
                 g.item_drag_index = item;
                 g.item_drag_moved = 0;
                 g.item_drag_start_x = g.mx;
                 g.item_drag_start_y = g.my;
+                g.item_drag_orig_x = 0;
+                g.item_drag_orig_y = 0;
                 return;
             }
             item = gui_desktop_hit_item(g.mx, g.my);
             if (item >= 0) {
                 gui_item_t* it = &g_desktop_items[item];
+                gui_select_item(1, item);
                 g.item_drag_area = 1;
                 g.item_drag_index = item;
                 g.item_drag_moved = 0;
@@ -2174,8 +2513,11 @@ void gui_handle_mouse(int dx, int dy, int buttons)
                 g.item_drag_start_y = g.my;
                 g.item_drag_off_x = g.mx - it->x;
                 g.item_drag_off_y = g.my - it->y;
+                g.item_drag_orig_x = it->x;
+                g.item_drag_orig_y = it->y;
                 return;
             }
+            gui_clear_item_selection();
             g.tb_focused = 0;
             g.lafaelo_focus = 0;
         }

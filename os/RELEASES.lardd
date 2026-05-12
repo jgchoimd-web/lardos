@@ -5,6 +5,15 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.63.2p
+ITEM Hotpatch for default GUI desktop interaction regressions after the installer and VM boot fixes.
+ITEM Desktop and dock items now keep an explicit selected state, so left-click feedback is visible and Delete knows what the user chose.
+ITEM Dragging a desktop app or folder onto the dock moves it into the dock model; dragging a dock entry out onto the desktop creates a desktop launcher copy.
+ITEM Dragging an item onto the Delete top-bar action deletes that desktop or dock entry, and the Delete button removes the selected entry.
+ITEM Added DelFile in the desktop top bar: it uses the current local input path to clear writable RAM files or hard-delete read-only built-in/LFS files through the existing user-owned delete path.
+ITEM POST now checks the desktop interaction model so click/drag/delete regressions are caught with screen diagnostics.
+ITEM Keeps v1.63.1p VirtualBox boot layout, v1.63.0a installer, DEL -F ownership policy, and the no-EXGUI/no-EXEXGUI default GUI direction intact.
+
 SECTION v1.63.1p
 ITEM Hotpatch for VirtualBox black-screen boot regression after the HDD/SSD installer release.
 ITEM Stage2 now stages the kernel at 0x9000 so the loaded boot image stays below the VGA/EBDA boundary on current builds.

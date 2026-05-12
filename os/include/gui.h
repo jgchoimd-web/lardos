@@ -42,6 +42,7 @@ typedef struct {
 /* POST-visible screen sanity checks. Returns 0 when a framebuffer is present. */
 int gui_post_check(gui_post_info_t* out);
 int gui_img_glyph_interaction_selftest(void);
+int gui_desktop_interaction_selftest(void);
 
 typedef struct {
     uint32_t enabled;

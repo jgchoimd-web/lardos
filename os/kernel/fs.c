@@ -199,7 +199,7 @@ static FsWritableFile ram_dosmode = { "dosmode.lardd", ram_dosmode_buf, 0, DOSMO
 static const uint8_t fsdelete_init[] =
     "LARDD 1\n"
     "TITLE Read-Only Delete Overlay\n"
-    "TEXT DEL -F records user-owned tombstones for built-in read-only files.\n"
+    "TEXT DEL -F records user-owned tombstones for built-in read-only files; TOMB can delete the records too.\n"
     "SECTION Tombstones\n";
 static uint8_t ram_fsdelete_buf[FSDELETE_CAP];
 static FsWritableFile ram_fsdelete = { "fsdelete.lardd", ram_fsdelete_buf, 0, FSDELETE_CAP };
@@ -259,6 +259,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
     "li Use dos on for L-DOS mode: a native DOS-style shell layer with C:/A:/R: drive mapping, DIR/TYPE/COPY/DEL/REN/MD/RD/CD, and dosmode.lardd history.\n"
     "li In L-DOS, DEL -F file hides read-only built-in files through fsdelete.lardd; RESTORE file makes them visible again.\n"
+    "li Use TOMB LIST, TOMB SHOW, TOMB DROP file, or TOMB CLEAR when you want to inspect or delete DEL -F tombstone records themselves.\n"
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
     "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
@@ -314,6 +315,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.59.0a officially promotes the runtime desktop/window-manager model without restoring EXGUI/EXEXGUI.\n"
     "li v1.60.0a officially adds L-DOS mode as a native compatibility shell without external DOS code.\n"
     "li v1.60.1p hotpatches L-DOS DEL -F read-only tombstones plus RESTORE for user-owned reversibility.\n"
+    "li v1.61.0a officially adds user-owned tombstone deletion: TOMB LIST/SHOW/DROP/CLEAR plus DEL -T.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -554,6 +556,9 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM DOS commands are case-insensitive: DIR, TYPE, COPY, DEL, REN, MD, RD, CD, CLS, VER, SET, ECHO, MEM.\n"
     "ITEM DEL -F file -> hide a read-only built-in or LFS file using the user-owned fsdelete.lardd tombstone overlay.\n"
     "ITEM RESTORE file or UNDELETE file -> remove that tombstone so the read-only file is visible again.\n"
+    "ITEM TOMB LIST or TOMB SHOW -> inspect active tombstones or the raw fsdelete.lardd log.\n"
+    "ITEM TOMB DROP file or DEL -T file -> delete one tombstone record and make that read-only file visible.\n"
+    "ITEM TOMB CLEAR -> delete every tombstone record because the user can own even the deletion overlay.\n"
     "ITEM LSH command -> run one native LardOS command while staying in DOS mode.\n"
     "ITEM dos map -> show C:/A:/R: drive mappings.\n"
     "ITEM dos log -> read dosmode.lardd history.\n"
@@ -566,6 +571,7 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM DEL clears writable RAM file contents; DEL -F hides read-only embedded files with a reversible tombstone.\n"
     "ITEM REN moves data into an existing writable slot instead of hiding a mutable filename table.\n"
     "ITEM fsdelete.lardd keeps HIDE and SHOW records so force deletes are inspectable and persisted by sync.\n"
+    "ITEM TOMB rewrites fsdelete.lardd on user request, preserving the LardOS rule that visible system state remains user-editable.\n"
     "END\n";
 
 static const uint8_t file_features_lil[] =
@@ -612,6 +618,8 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file shrine_guide.lardd\n"
     "CHECK command dos\n"
     "CHECK command restore\n"
+    "CHECK command tomb\n"
+    "CHECK command tombstone\n"
     "CHECK file dosmode_guide.lardd\n"
     "CHECK writable dosmode.lardd\n"
     "CHECK writable fsdelete.lardd\n"
@@ -845,6 +853,12 @@ uint32_t fs_readonly_hidden_count(void)
     return s_hidden_readonly_count;
 }
 
+const char* fs_readonly_hidden_name(uint32_t index)
+{
+    if (index >= s_hidden_readonly_count) return NULL;
+    return s_hidden_readonly[index];
+}
+
 static int fs_track_hide_readonly(const char* name)
 {
     if (!name || !name[0]) return -1;
@@ -892,6 +906,15 @@ static void fsdelete_append_record(const char* op, const char* name)
     (void)fs_append(w, (const uint8_t*)" ", 1u);
     (void)fs_append(w, (const uint8_t*)name, nn);
     (void)fs_append(w, (const uint8_t*)"\n", 1u);
+}
+
+static void fsdelete_rewrite_from_hidden(void)
+{
+    FsWritableFile* w = &ram_fsdelete;
+    (void)fs_write(w, 0, fsdelete_init, sizeof(fsdelete_init) - 1u);
+    for (uint32_t i = 0; i < s_hidden_readonly_count; i++) {
+        fsdelete_append_record("HIDE", s_hidden_readonly[i]);
+    }
 }
 
 static void fs_apply_delete_log(void)
@@ -944,10 +967,28 @@ int fs_unhide_readonly(const char* name)
     return r == 0 ? 0 : 1;
 }
 
+int fs_purge_readonly_tombstone(const char* name)
+{
+    int r;
+    if (!name || !name[0]) return -1;
+    r = fs_track_show_readonly(name);
+    fsdelete_rewrite_from_hidden();
+    return r == 0 ? 0 : 1;
+}
+
+int fs_purge_all_readonly_tombstones(void)
+{
+    int count = (int)s_hidden_readonly_count;
+    fs_hidden_clear();
+    fsdelete_rewrite_from_hidden();
+    return count;
+}
+
 int fs_delete_overlay_selftest(void)
 {
     if (!fs_readonly_physical_exists("hello.txt")) return -1;
     if (FS_HIDDEN_READONLY_MAX < 8u) return -2;
+    if (!fs_open_writable("fsdelete.lardd")) return -3;
     return 0;
 }
 

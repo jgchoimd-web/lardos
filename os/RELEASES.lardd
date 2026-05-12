@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.61.0a
+ITEM Official release extending L-DOS tombstone ownership to the tombstone records themselves.
+ITEM Adds TOMB LIST, TOMB SHOW, TOMB DROP file, TOMB CLEAR, and DEL -T file so users can inspect, delete, or clear fsdelete.lardd tombstones without external tools.
+ITEM DEL -F still hides read-only built-in or LFS files through user-owned fsdelete.lardd, while RESTORE and UNDELETE remain available for reversible visibility.
+ITEM TOMB rewrites fsdelete.lardd to the user's chosen state, keeping LardOS aligned with the rule that user-visible system policy files are also user-editable.
+ITEM Preserves v1.60.0a L-DOS mode, v1.60.1p read-only force-delete semantics, default GUI direction, SUM/raw-control policy, and no-feature-loss values.
+ITEM Built as hardware-profiled IMG/ISO artifacts for universal, seabios, ami, vbox, usb, and realpc.
+
 SECTION v1.60.1p
 ITEM Hotpatch for L-DOS user-control deletion semantics.
 ITEM DEL still clears writable RAM file contents by default, but DEL -F file now hides read-only built-in or LFS files through a user-owned fsdelete.lardd tombstone overlay.

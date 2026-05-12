@@ -310,7 +310,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
-    { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
+    { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
@@ -1386,11 +1386,12 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status dos time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
+    out_append("  tomb list|show|drop file|clear       inspect or delete DEL -F tombstone records\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
     out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
@@ -1447,6 +1448,7 @@ static void cmd_control(const char* args)
     out_append("Start points:\n");
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  values              reread the LardOS user-law values\n");
+    out_append("  tomb list           inspect active user-owned read-only delete tombstones\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  magic -f bye        force an explicit raw-control prediction\n");
     out_append("  magic -f byebye     force the friendlier poweroff alias explicitly\n");
@@ -5164,11 +5166,11 @@ static void dos_help(void)
 {
     out_append("L-DOS mode commands\n");
     out_append("  DOS ON|OFF|STATUS|HELP|MAP|LOG|TEST\n");
-    out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL [-F] file  RESTORE file  REN src dst\n");
+    out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL [-F|-T] file  RESTORE file  TOMB LIST|SHOW|DROP file|CLEAR\n");
     out_append("  MD name  RD name  CD [dir|\\|..]  CLS  VER  SET  ECHO text  MEM\n");
     out_append("  EXIT leaves DOS mode; LSH command runs one native LardOS command.\n");
     out_append("  Drive map: C: -> LardOS X:, A: -> Y:, R: -> Z: writable RAM files.\n");
-    out_append("  DEL -F hides read-only built-in files through fsdelete.lardd; RESTORE brings them back.\n");
+    out_append("  DEL -F hides read-only built-in files; RESTORE shows them, TOMB deletes tombstone records.\n");
     out_append("  Directories are visible virtual labels; LardOS files remain flat and user-owned.\n");
 }
 
@@ -5307,8 +5309,9 @@ static void dos_delete(const char* args)
     char name[64];
     FsWritableFile* w;
     int force = 0;
+    int tomb = 0;
     if (vcs_read_word(&args, first, sizeof(first)) != 0) {
-        out_append("Usage: DEL [-F] file\n");
+        out_append("Usage: DEL [-F|-T] file\n");
         return;
     }
     if (ascii_streq_ci(first, "-f") || ascii_streq_ci(first, "/f") ||
@@ -5316,6 +5319,13 @@ static void dos_delete(const char* args)
         force = 1;
         if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
             out_append("Usage: DEL -F file\n");
+            return;
+        }
+    } else if (ascii_streq_ci(first, "-t") || ascii_streq_ci(first, "/t") ||
+               ascii_streq_ci(first, "--tomb") || ascii_streq_ci(first, "--tombstone")) {
+        tomb = 1;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: DEL -T file\n");
             return;
         }
     } else {
@@ -5329,7 +5339,22 @@ static void dos_delete(const char* args)
     dos_resolve_path(file_arg, &drv, name, sizeof(name));
     (void)drv;
     if (!name[0]) {
-        out_append("Usage: DEL [-F] file\n");
+        out_append("Usage: DEL [-F|-T] file\n");
+        return;
+    }
+    if (tomb) {
+        int r = fs_purge_readonly_tombstone(name);
+        if (r == 0) {
+            out_append("DEL -T: tombstone deleted and file visible: ");
+            out_append(name);
+            out_append("\n");
+            dos_log_event("tomb-delete", name);
+        } else {
+            out_append("DEL -T: no active tombstone; fsdelete.lardd compacted for ");
+            out_append(name);
+            out_append("\n");
+            dos_log_event("tomb-compact", name);
+        }
         return;
     }
     w = fs_open_writable(name);
@@ -5382,6 +5407,76 @@ static void dos_restore(const char* args)
         out_append("RESTORE: file was not hidden; SHOW record written for transparency.\n");
         dos_log_event("restore", name);
     }
+}
+
+static void dos_tombstone(const char* args)
+{
+    char sub[16];
+    const char* p = args ? args : "";
+    while (*p == ' ' || *p == '\t') p++;
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "list") || ascii_streq_ci(sub, "status") ||
+        ascii_streq_ci(sub, "ls")) {
+        uint32_t count = fs_readonly_hidden_count();
+        out_append("Read-only tombstones: ");
+        out_append_u32(count);
+        out_append("\n");
+        for (uint32_t i = 0; i < count; i++) {
+            const char* name = fs_readonly_hidden_name(i);
+            if (!name) continue;
+            out_append("  ");
+            out_append(name);
+            out_append("\n");
+        }
+        out_append("Use TOMB SHOW for raw fsdelete.lardd, TOMB DROP file to delete one, TOMB CLEAR to delete all.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "show") || ascii_streq_ci(sub, "raw") ||
+        ascii_streq_ci(sub, "log")) {
+        cmd_larddoc("fsdelete.lardd", "Usage: TOMB SHOW");
+        return;
+    }
+    if (ascii_streq_ci(sub, "clear") || ascii_streq_ci(sub, "wipe") ||
+        ascii_streq_ci(sub, "reset")) {
+        int removed = fs_purge_all_readonly_tombstones();
+        out_append("TOMB CLEAR: deleted ");
+        out_append_i32(removed);
+        out_append(" tombstone(s); all read-only files are visible again.\n");
+        dos_log_event("tomb-clear", "all");
+        return;
+    }
+    if (ascii_streq_ci(sub, "drop") || ascii_streq_ci(sub, "purge") ||
+        ascii_streq_ci(sub, "delete") || ascii_streq_ci(sub, "del") ||
+        ascii_streq_ci(sub, "rm")) {
+        char file_arg[64];
+        char drv;
+        char name[64];
+        int r;
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: TOMB DROP file\n");
+            return;
+        }
+        dos_resolve_path(file_arg, &drv, name, sizeof(name));
+        (void)drv;
+        if (!name[0]) {
+            out_append("Usage: TOMB DROP file\n");
+            return;
+        }
+        r = fs_purge_readonly_tombstone(name);
+        if (r == 0) {
+            out_append("TOMB DROP: tombstone deleted and file visible: ");
+            out_append(name);
+            out_append("\n");
+            dos_log_event("tomb-drop", name);
+        } else {
+            out_append("TOMB DROP: no active tombstone; fsdelete.lardd compacted for ");
+            out_append(name);
+            out_append("\n");
+            dos_log_event("tomb-compact", name);
+        }
+        return;
+    }
+    out_append("Usage: TOMB LIST|SHOW|DROP file|CLEAR\n");
 }
 
 static void dos_rename(const char* args)
@@ -5540,6 +5635,7 @@ static int dos_dispatch(const char* cmd, const char* args)
     if (ascii_streq_ci(cmd, "copy")) { dos_copy(args); return 1; }
     if (ascii_streq_ci(cmd, "del") || ascii_streq_ci(cmd, "erase")) { dos_delete(args); return 1; }
     if (ascii_streq_ci(cmd, "restore") || ascii_streq_ci(cmd, "undelete")) { dos_restore(args); return 1; }
+    if (ascii_streq_ci(cmd, "tomb") || ascii_streq_ci(cmd, "tombstone") || ascii_streq_ci(cmd, "tombstones")) { dos_tombstone(args); return 1; }
     if (ascii_streq_ci(cmd, "ren") || ascii_streq_ci(cmd, "rename")) { dos_rename(args); return 1; }
     if (ascii_streq_ci(cmd, "md") || ascii_streq_ci(cmd, "mkdir")) { dos_dir_label(args, 1); return 1; }
     if (ascii_streq_ci(cmd, "rd") || ascii_streq_ci(cmd, "rmdir")) { dos_dir_label(args, 0); return 1; }
@@ -6935,6 +7031,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "values") == 0 || strcmp(cmd, "philosophy") == 0) { cmd_values(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
     if (strcmp(cmd, "dos") == 0 || strcmp(cmd, "dosmode") == 0) { cmd_dos(args); return; }
+    if (strcmp(cmd, "tomb") == 0 || strcmp(cmd, "tombstone") == 0 || strcmp(cmd, "tombstones") == 0) { dos_tombstone(args); return; }
     if (strcmp(cmd, "time") == 0 || strcmp(cmd, "lardtime") == 0 || strcmp(cmd, "ltime") == 0) { cmd_lardtime_mode(args, "now"); return; }
     if (strcmp(cmd, "date") == 0) { cmd_lardtime_mode(args, "solar"); return; }
     if (strcmp(cmd, "lunar") == 0) { cmd_lardtime_mode(args, "lunar"); return; }

@@ -10,7 +10,6 @@
 #include "boot_stage1.inc"
 #include "boot_stage2.inc"
 
-#define KERNEL_LOAD_PADDR 0x00010000u
 #define SECTOR_SIZE STORAGE_SECTOR_SIZE
 
 static uint8_t s_install_sector[SECTOR_SIZE];
@@ -44,7 +43,7 @@ static uint32_t rd32(const uint8_t* p)
 
 static const uint8_t* boot_kernel_image(void)
 {
-    return (const uint8_t*)(uintptr_t)KERNEL_LOAD_PADDR;
+    return (const uint8_t*)(uintptr_t)LARD_INSTALL_BOOT_IMAGE_COPY_PADDR;
 }
 
 static int boot_kernel_size(uint32_t* out_size)
@@ -107,8 +106,8 @@ void lard_install_status(char* out, uint32_t cap)
     else inst_append(out, cap, "unknown");
 
     if (boot_kernel_size(&ksize) != 0) {
-        inst_append(out, cap, "\n  boot kernel buffer: unavailable\n");
-        inst_append(out, cap, "  install: blocked until boot kernel image is visible\n");
+        inst_append(out, cap, "\n  preserved boot image: unavailable\n");
+        inst_append(out, cap, "  install: blocked until stage2 preserves the boot image\n");
         return;
     }
     ksectors = (ksize + SECTOR_SIZE - 1u) / SECTOR_SIZE;
@@ -140,7 +139,7 @@ int lard_install_hdd_ssd(char* out, uint32_t cap)
         return -1;
     }
     if (boot_kernel_size(&ksize) != 0) {
-        inst_append(out, cap, "install: boot kernel image at 0x10000 is unavailable.\n");
+        inst_append(out, cap, "install: preserved boot image at 0x01000000 is unavailable.\n");
         return -2;
     }
     if (storage_init() != 0) {

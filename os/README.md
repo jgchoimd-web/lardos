@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.63.0a-ami/lardos-v1.63.0a-ami.iso`. To publish the whole hardware
+`release/v1.63.1p-ami/lardos-v1.63.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,6 +140,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.63.1p` hotpatches the VirtualBox black-screen boot regression by moving
+  bootinfo below the staging buffer, lowering the kernel staging address, and
+  preserving a clean boot-image copy for the installer.
 - `v1.63.0a` officially adds the in-OS HDD/SSD installer option with power-on
   `I`, `install status`, `install hdd yes`, and `install ssd yes`.
 - `v1.62.0a` officially makes `DEL -F file` a hard delete from the active

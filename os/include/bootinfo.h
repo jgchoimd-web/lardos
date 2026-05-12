@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-// Written by the boot sector at physical 0x9C000 (identity-mapped).
+// Written by stage2 at physical 0x5000 (identity-mapped).
 // Keep this struct tiny and stable.
 typedef struct {
     uint32_t magic;      // 'BINF'
@@ -18,4 +18,4 @@ typedef struct {
     uint16_t reserved2;
 } bootinfo_t;
 
-#define BOOTINFO_PADDR 0x0009C000u
+#define BOOTINFO_PADDR 0x00005000u

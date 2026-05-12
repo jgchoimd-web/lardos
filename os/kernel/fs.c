@@ -324,6 +324,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.61.0a officially adds user-owned tombstone deletion: TOMB LIST/SHOW/DROP/CLEAR plus DEL -T.\n"
     "li v1.62.0a makes DEL -F a hard delete from the active filesystem while preserving TOMB HIDE for soft tombstones.\n"
     "li v1.63.0a adds the in-OS HDD/SSD installer option using the native stage1/stage2/kernel layout.\n"
+    "li v1.63.1p hotpatches the VirtualBox black-screen boot memory layout while preserving the installer feature.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

@@ -6,6 +6,7 @@
 #define LARD_INSTALL_STAGE2_SECTORS 4u
 #define LARD_INSTALL_KERNEL_LBA 5u
 #define LARD_INSTALL_LPST_LBA 2752u
+#define LARD_INSTALL_BOOT_IMAGE_COPY_PADDR 0x01000000u
 
 int lard_install_selftest(void);
 void lard_install_status(char* out, uint32_t cap);

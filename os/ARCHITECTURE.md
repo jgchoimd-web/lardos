@@ -43,14 +43,16 @@ flowchart LR
 The boot sector uses the 32-bit phase only as a bridge into long mode. The
 kernel payload is built with `-m64`, linked as `elf_x86_64`, and entered through
 `entry64.s`.
-Stage2 keeps bootinfo at `0x9C000` and its temporary protected-mode stack at
-`0x9F000`, above the kernel staging buffer. The long-mode entry stack starts at
-`0x7F0000`, away from VGA, EBDA, bootinfo, and staging data, so the native boot
-path has room as the in-tree kernel grows.
+Stage2 keeps bootinfo at `0x5000`, stages the kernel at `0x9000`, and uses a
+temporary protected-mode stack at `0x9F000`. The long-mode entry stack starts at
+`0x8F000`. Before page tables and stacks reuse low memory, stage2 preserves a
+full boot-image copy at `0x01000000` for the in-OS installer. This keeps VBE
+bootinfo out of the staging buffer and keeps current builds below the VGA/EBDA
+boundary during disk reads.
 
 The in-OS installer reuses that same boot layout. `installer.c` embeds the
-stage1 and stage2 binaries as generated C arrays, validates the loaded
-LARDX/BOSX kernel image at `0x10000`, and can write LBA0, LBA1..4, and LBA5..
+stage1 and stage2 binaries as generated C arrays, validates the preserved
+LARDX/BOSX boot image at `0x01000000`, and can write LBA0, LBA1..4, and LBA5..
 to an ATA HDD/SSD target. The power-on options screen exposes this as `I`, and
 LSH exposes it as `install status`, `install hdd yes`, and `install ssd yes`.
 LPST remains reserved at LBA 2752 so installed disks keep the native writable
@@ -458,6 +460,6 @@ Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
 bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
 profiles append their name to the version directory and artifact names, for
-example `release/v1.63.0a-vbox/lardos-v1.63.0a-vbox.iso`. Release ISOs also
+example `release/v1.63.1p-vbox/lardos-v1.63.1p-vbox.iso`. Release ISOs also
 carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
 media can reuse the same stage2/kernel payload.

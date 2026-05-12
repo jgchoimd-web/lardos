@@ -7,6 +7,11 @@ ORG 0x7E00
 %ifndef KERNEL_LBA
 %define KERNEL_LBA 5
 %endif
+%ifndef KERNEL_LOAD_SEG
+%define KERNEL_LOAD_SEG 0x0900
+%endif
+%define KERNEL_LOAD_PADDR (KERNEL_LOAD_SEG << 4)
+%define BOOT_IMAGE_COPY_PADDR 0x01000000
 
 start:
     ; Optional handoff for raw-written hybrid ISO boots.
@@ -40,13 +45,13 @@ start:
     ; If it fails, we keep text mode.
     call vbe_try_enable
 
-    ; Load LARDX executable (kernel) from disk into 0x1000:0000.
+    ; Load LARDX executable (kernel) below VGA/EBDA into KERNEL_LOAD_SEG:0000.
     ; We read the first sector to get total file size, then read the rest.
-    mov ax, 0x1000
+    mov ax, KERNEL_LOAD_SEG
     mov es, ax
     xor bx, bx
 
-    ; Read 1 sector at KERNEL_LBA into ES:BX (0x10000)
+    ; Read 1 sector at KERNEL_LBA into ES:BX.
     mov eax, [kernel_lba_base]
     mov dword [dap_lba], eax
     mov word  [dap_count], 1
@@ -81,6 +86,8 @@ start:
     mov ax, [es:0x10]
     mov dx, [es:0x12]
 .fs_done:
+    mov [kernel_file_size], ax
+    mov [kernel_file_size + 2], dx
     ; sectors = (file_size+511)/512
     add ax, 511
     adc dx, 0
@@ -166,8 +173,15 @@ protected_start:
     mov ss, ax
     mov esp, 0x9F000
 
-    ; Parse LARDX/BOSX image at 0x00010000 and load segments to physical addresses.
-    mov esi, 0x00010000
+    ; Preserve a full copy for the in-OS HDD/SSD installer before page tables
+    ; and stacks reuse the low staging buffer.
+    mov esi, KERNEL_LOAD_PADDR
+    mov edi, BOOT_IMAGE_COPY_PADDR
+    mov ecx, [kernel_file_size]
+    rep movsb
+
+    ; Parse LARDX/BOSX image in the low staging buffer and load segments.
+    mov esi, KERNEL_LOAD_PADDR
 
     ; phnum u16 at +0x08, phoff u32 at +0x0E, entry u32 at +0x0A (LARDX v2)
     ; BOSX: phnum +0x06, phoff +0x0C, entry +0x08. LARDX v2: phnum +0x08, phoff +0x0E, entry +0x0A
@@ -219,7 +233,7 @@ protected_start:
     movzx eax, word [phdr_size]
     add ebx, eax
     dec ebp
-    mov esi, 0x00010000
+    mov esi, KERNEL_LOAD_PADDR
     jmp .ph_loop
 
 .jump_entry:
@@ -348,6 +362,7 @@ disk_err_msg db 'Disk read error!', 0
 
 boot_drive db 0
 total_sectors dw 0
+kernel_file_size dd 0
 chs_lba dd 0
 
 ; INT 13h Extensions Disk Address Packet (DAP)
@@ -510,9 +525,8 @@ kernel_lba_base dd KERNEL_LBA
 ; VBE (real mode) framebuffer setup
 ; -----------------------------
 
-; bootinfo struct lives at physical 0x9C000 = 0x9C00:0000.
-; Keep it above the kernel image staging buffer and below the EBDA/VGA area.
-BOOTINFO_SEG equ 0x9C00
+; bootinfo struct lives below stage2 and the kernel staging buffer.
+BOOTINFO_SEG equ 0x0500
 BOOTINFO_OFF equ 0x0000
 VBE_MODEINFO_OFF equ 0x0200
 
@@ -528,7 +542,7 @@ vbe_try_enable:
     mov ax, 0x0003
     int 0x10
 
-    ; ES = 0x9000 to write bootinfo + modeinfo
+    ; ES = BOOTINFO_SEG to write bootinfo + modeinfo
     mov ax, BOOTINFO_SEG
     mov es, ax
 

@@ -38,6 +38,7 @@
 #define GUI_TOP_PIN_DOCK 3
 #define GUI_TOP_DELETE_ITEM 4
 #define GUI_TOP_DELETE_FILE 5
+#define GUI_TOP_RENAME_ITEM 6
 #define GUI_DRAG_THRESHOLD 8
 #define GUI_TITLE_H 20
 #define GUI_CONTENT_TOP 24
@@ -1352,11 +1353,12 @@ static int gui_dock_hit_item(int x, int y)
 static int gui_top_action_hit(int x, int y)
 {
     if (!in_rect(x, y, 0, 0, (int)g_fb.w, 24)) return 0;
-    if (in_rect(x, y, 126, 3, 86, 18)) return GUI_TOP_NEW_FOLDER;
-    if (in_rect(x, y, 218, 3, 70, 18)) return GUI_TOP_PIN_DESKTOP;
-    if (in_rect(x, y, 294, 3, 64, 18)) return GUI_TOP_PIN_DOCK;
-    if (in_rect(x, y, 364, 3, 62, 18)) return GUI_TOP_DELETE_ITEM;
-    if (in_rect(x, y, 432, 3, 70, 18)) return GUI_TOP_DELETE_FILE;
+    if (in_rect(x, y, 126, 3, 54, 18)) return GUI_TOP_NEW_FOLDER;
+    if (in_rect(x, y, 186, 3, 52, 18)) return GUI_TOP_PIN_DESKTOP;
+    if (in_rect(x, y, 244, 3, 52, 18)) return GUI_TOP_PIN_DOCK;
+    if (in_rect(x, y, 302, 3, 62, 18)) return GUI_TOP_RENAME_ITEM;
+    if (in_rect(x, y, 370, 3, 58, 18)) return GUI_TOP_DELETE_ITEM;
+    if (in_rect(x, y, 434, 3, 62, 18)) return GUI_TOP_DELETE_FILE;
     return 0;
 }
 
@@ -1406,11 +1408,12 @@ static void gui_draw_desktop(const fb_t* tgt)
     fb_fill_rect(tgt, 0, 0, g_fb.w, 24, 0xFF121821u);
     fb_fill_rect(tgt, 0, 23, g_fb.w, 1, 0xFF2F8EA3u);
     fb_draw_text(tgt, 10, 8, "LARDOS DESKTOP", 0xFFFFFFFFu, 0xFF121821u);
-    gui_draw_top_button(tgt, 126, "New Folder", 86, gui_top_action_hit(g.mx, g.my) == GUI_TOP_NEW_FOLDER);
-    gui_draw_top_button(tgt, 218, "Pin App", 70, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DESKTOP);
-    gui_draw_top_button(tgt, 294, "Dock +", 64, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DOCK);
-    gui_draw_top_button(tgt, 364, "Delete", 62, gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_ITEM);
-    gui_draw_top_button(tgt, 432, "DelFile", 70, gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_FILE);
+    gui_draw_top_button(tgt, 126, "Folder", 54, gui_top_action_hit(g.mx, g.my) == GUI_TOP_NEW_FOLDER);
+    gui_draw_top_button(tgt, 186, "Pin", 52, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DESKTOP);
+    gui_draw_top_button(tgt, 244, "Dock", 52, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DOCK);
+    gui_draw_top_button(tgt, 302, "Rename", 62, gui_top_action_hit(g.mx, g.my) == GUI_TOP_RENAME_ITEM);
+    gui_draw_top_button(tgt, 370, "Delete", 58, gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_ITEM);
+    gui_draw_top_button(tgt, 434, "File", 62, gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_FILE);
     fb_draw_text(tgt, (uint16_t)(sw > 116 ? sw - 116 : 10), 8, LARDOS_VERSION, 0xFF9DEAE4u, 0xFF121821u);
 
     for (int i = 0; i < g_desktop_item_count; i++) {
@@ -1606,6 +1609,105 @@ static void gui_clear_item_selection(void)
 {
     g.selected_area = 0;
     g.selected_index = -1;
+}
+
+static int gui_label_valid(const char* label)
+{
+    uint32_t i = 0;
+    if (!label) return 0;
+    while (label[i] == ' ' || label[i] == '\t') i++;
+    if (!label[i]) return 0;
+    while (label[i]) {
+        if ((unsigned char)label[i] < 32u) return 0;
+        i++;
+    }
+    return 1;
+}
+
+static void gui_copy_label(char* dst, uint32_t cap, const char* label)
+{
+    uint32_t start = 0;
+    uint32_t end = 0;
+    uint32_t out = 0;
+    if (!dst || cap == 0) return;
+    if (!label) label = "";
+    while (label[start] == ' ' || label[start] == '\t') start++;
+    end = start;
+    while (label[end]) end++;
+    while (end > start && (label[end - 1u] == ' ' || label[end - 1u] == '\t')) end--;
+    while (start < end && out + 1u < cap) dst[out++] = label[start++];
+    dst[out] = '\0';
+}
+
+static int gui_kind_matches_filter(const gui_item_t* item, int kind_filter)
+{
+    if (!item || !item->used) return 0;
+    if (kind_filter == GUI_RENAME_ANY) return 1;
+    if (kind_filter == GUI_RENAME_APP) return item->kind == GUI_ITEM_APP;
+    if (kind_filter == GUI_RENAME_FOLDER) return item->kind == GUI_ITEM_FOLDER;
+    return 0;
+}
+
+static int gui_rename_app_labels(int app, const char* new_name)
+{
+    int count = 0;
+    for (int i = 0; i < g_desktop_item_count; i++) {
+        if (g_desktop_items[i].used && g_desktop_items[i].kind == GUI_ITEM_APP &&
+            g_desktop_items[i].app == app) {
+            gui_copy_label(g_desktop_items[i].name, sizeof(g_desktop_items[i].name), new_name);
+            count++;
+        }
+    }
+    for (int i = 0; i < g_dock_item_count; i++) {
+        if (g_dock_items[i].used && g_dock_items[i].kind == GUI_ITEM_APP &&
+            g_dock_items[i].app == app) {
+            gui_copy_label(g_dock_items[i].name, sizeof(g_dock_items[i].name), new_name);
+            count++;
+        }
+    }
+    return count;
+}
+
+int gui_rename_item_label(const char* old_name, const char* new_name, int kind_filter)
+{
+    int count = 0;
+    if (!old_name || !old_name[0] || !gui_label_valid(new_name)) return -1;
+    for (int i = 0; i < g_desktop_item_count; i++) {
+        gui_item_t* item = &g_desktop_items[i];
+        if (!gui_kind_matches_filter(item, kind_filter) || strcmp(item->name, old_name) != 0) continue;
+        if (item->kind == GUI_ITEM_APP) {
+            count += gui_rename_app_labels(item->app, new_name);
+        } else {
+            gui_copy_label(item->name, sizeof(item->name), new_name);
+            count++;
+        }
+    }
+    for (int i = 0; i < g_dock_item_count; i++) {
+        gui_item_t* item = &g_dock_items[i];
+        if (!gui_kind_matches_filter(item, kind_filter) || strcmp(item->name, old_name) != 0) continue;
+        if (item->kind == GUI_ITEM_APP) {
+            count += gui_rename_app_labels(item->app, new_name);
+        } else {
+            gui_copy_label(item->name, sizeof(item->name), new_name);
+            count++;
+        }
+    }
+    return count > 0 ? count : -2;
+}
+
+int gui_rename_selected_label(const char* new_name)
+{
+    gui_item_t* item = NULL;
+    if (!gui_label_valid(new_name)) return -1;
+    if (g.selected_area == 1 && g.selected_index >= 0 && g.selected_index < g_desktop_item_count) {
+        item = &g_desktop_items[g.selected_index];
+    } else if (g.selected_area == 2 && g.selected_index >= 0 && g.selected_index < g_dock_item_count) {
+        item = &g_dock_items[g.selected_index];
+    }
+    if (!item || !item->used) return -2;
+    if (item->kind == GUI_ITEM_APP) return gui_rename_app_labels(item->app, new_name);
+    gui_copy_label(item->name, sizeof(item->name), new_name);
+    return 1;
 }
 
 static void gui_fix_selection_after_remove(int area, int index)
@@ -1852,9 +1954,9 @@ static int gui_prefix_ci(const char* s, const char* p)
     return 1;
 }
 
-static uint32_t gui_local_file_from_textbox(char* out, uint32_t cap)
+static uint32_t gui_local_file_token(const char** cursor, char* out, uint32_t cap)
 {
-    const char* s = g.tb;
+    const char* s = cursor && *cursor ? *cursor : "";
     uint32_t i = 0;
     uint32_t start;
     uint32_t last_sep = 0;
@@ -1862,6 +1964,10 @@ static uint32_t gui_local_file_from_textbox(char* out, uint32_t cap)
     if (!out || cap == 0) return 0;
     out[0] = '\0';
     while (s[i] && gui_file_is_space(s[i])) i++;
+    if (s[i] == '|') {
+        i++;
+        while (s[i] && gui_file_is_space(s[i])) i++;
+    }
     if (gui_prefix_ci(&s[i], "http://") || gui_prefix_ci(&s[i], "https://")) return 0;
     if (gui_prefix_ci(&s[i], "file://")) i += 7;
     if (s[i] && s[i + 1] == ':') {
@@ -1876,7 +1982,30 @@ static uint32_t gui_local_file_from_textbox(char* out, uint32_t cap)
     if (last_sep > start) start = last_sep;
     while (start < i && n + 1u < cap) out[n++] = gui_file_lower(s[start++]);
     out[n] = '\0';
+    if (cursor) *cursor = &s[i];
     return n;
+}
+
+static uint32_t gui_local_file_from_textbox(char* out, uint32_t cap)
+{
+    const char* p = g.tb;
+    return gui_local_file_token(&p, out, cap);
+}
+
+static void gui_textbox_label(char* out, uint32_t cap)
+{
+    uint32_t start = 0;
+    uint32_t end = 0;
+    uint32_t n = 0;
+    if (!out || cap == 0) return;
+    out[0] = '\0';
+    while (g.tb[start] == ' ' || g.tb[start] == '\t') start++;
+    end = start;
+    while (g.tb[end]) end++;
+    while (end > start && (g.tb[end - 1u] == ' ' || g.tb[end - 1u] == '\t' ||
+           g.tb[end - 1u] == '\r' || g.tb[end - 1u] == '\n')) end--;
+    while (start < end && n + 1u < cap) out[n++] = g.tb[start++];
+    out[n] = '\0';
 }
 
 static void gui_delete_file_from_textbox(void)
@@ -1902,6 +2031,43 @@ static void gui_delete_file_from_textbox(void)
         return;
     }
     snprintf(msg, sizeof(msg), "GUI file delete: file not found: %s", name);
+    gui_report_line(msg);
+}
+
+static void gui_rename_from_textbox(void)
+{
+    char label[32];
+    char src[64];
+    char dst[64];
+    char msg[128];
+    const char* p = g.tb;
+    int r;
+    if (g.selected_area != 0) {
+        gui_textbox_label(label, sizeof(label));
+        r = gui_rename_selected_label(label);
+        if (r > 0) {
+            snprintf(msg, sizeof(msg), "GUI rename: item renamed to %s", label);
+            gui_report_line(msg);
+            return;
+        }
+        gui_report_line("GUI rename: type the new app/folder name in the input field first.");
+        return;
+    }
+    if (gui_local_file_token(&p, src, sizeof(src)) == 0 ||
+        gui_local_file_token(&p, dst, sizeof(dst)) == 0) {
+        gui_report_line("GUI rename: select an app/folder, or type: oldfile newfile");
+        return;
+    }
+    r = fs_rename_writable(src, dst);
+    if (r == 0) {
+        gui_reload_sysrxe_apps();
+        snprintf(msg, sizeof(msg), "GUI file rename: %s -> %s", src, dst);
+        gui_report_line(msg);
+        return;
+    }
+    if (r == -1) snprintf(msg, sizeof(msg), "GUI file rename: writable source not found: %s", src);
+    else if (r == -3) snprintf(msg, sizeof(msg), "GUI file rename: destination already exists: %s", dst);
+    else snprintf(msg, sizeof(msg), "GUI file rename: bad name or unsupported target.");
     gui_report_line(msg);
 }
 
@@ -1956,12 +2122,16 @@ int gui_desktop_interaction_selftest(void)
     if (desktop_idx < 0 || desktop_idx >= g_desktop_item_count) ok = 0;
     else {
         gui_select_item(1, desktop_idx);
+        if (gui_rename_selected_label("ProbeApp") <= 0) ok = 0;
+        if (strcmp(g_desktop_items[desktop_idx].name, "ProbeApp") != 0) ok = 0;
+        if (dock_idx >= 0 && dock_idx < g_dock_item_count &&
+            strcmp(g_dock_items[dock_idx].name, "ProbeApp") != 0) ok = 0;
         gui_remove_desktop_item(desktop_idx);
         if (g.selected_area != 0) ok = 0;
     }
 
     if (GUI_DRAG_THRESHOLD < 6) ok = 0;
-    if (GUI_TOP_DELETE_ITEM == 0 || GUI_TOP_DELETE_FILE == 0) ok = 0;
+    if (GUI_TOP_DELETE_ITEM == 0 || GUI_TOP_DELETE_FILE == 0 || GUI_TOP_RENAME_ITEM == 0) ok = 0;
 
     for (int i = 0; i < GUI_DESKTOP_ITEM_MAX; i++) g_desktop_items[i] = desktop_backup[i];
     for (int i = 0; i < GUI_DOCK_ITEM_MAX; i++) g_dock_items[i] = dock_backup[i];
@@ -2578,6 +2748,9 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             } else if (action == GUI_TOP_PIN_DOCK) {
                 gui_clear_item_selection();
                 (void)gui_dock_add_app(g.app_id);
+                return;
+            } else if (action == GUI_TOP_RENAME_ITEM) {
+                gui_rename_from_textbox();
                 return;
             } else if (action == GUI_TOP_DELETE_ITEM) {
                 gui_delete_selected_item();

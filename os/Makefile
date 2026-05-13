@@ -24,13 +24,13 @@ SEEDC     := $(HOST_TOOL_DIR)/seedc
 LIL       := $(HOST_TOOL_DIR)/lil
 BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
-RELEASE_BASE_VERSION := v1.65.0a
+RELEASE_BASE_VERSION := v1.65.1p
 RELEASE_HW ?= universal
 RELEASE_HW_LIST := universal seabios ami vbox usb realpc
 RELEASE_HW_UPPER := $(shell printf '%s' '$(RELEASE_HW)' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
 RELEASE_VERSION := $(if $(filter universal,$(RELEASE_HW)),$(RELEASE_BASE_VERSION),$(RELEASE_BASE_VERSION)-$(RELEASE_HW))
 RELEASE_NAME := lardos-$(RELEASE_VERSION)
-ISO_VOLUME_BASE := LARDOS_V1_65_0A
+ISO_VOLUME_BASE := LARDOS_V1_65_1P
 ISO_VOLUME_ID := $(if $(filter universal,$(RELEASE_HW)),$(ISO_VOLUME_BASE),$(ISO_VOLUME_BASE)_$(RELEASE_HW_UPPER))
 RELEASE_DIR := release/$(RELEASE_VERSION)
 ISO_BOOTIMG_SECTOR := 23
@@ -130,7 +130,7 @@ $(KERNEL_DIR)/lss.o: $(KERNEL_DIR)/lss.c
 $(KERNEL_DIR)/lfs.o: $(KERNEL_DIR)/lfs.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/installer.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardtime.h $(INCLUDE)/version.h
+$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/fs.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardtime.h $(INCLUDE)/version.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/installer.o: $(KERNEL_DIR)/installer.c $(BOOT_STAGE1_INC) $(BOOT_STAGE2_INC) $(INCLUDE)/installer.h $(INCLUDE)/storage.h
@@ -139,7 +139,7 @@ $(KERNEL_DIR)/installer.o: $(KERNEL_DIR)/installer.c $(BOOT_STAGE1_INC) $(BOOT_S
 $(KERNEL_DIR)/larsh.o: $(KERNEL_DIR)/larsh.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/installer.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardtime.h $(INCLUDE)/version.h
+$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardtime.h $(INCLUDE)/version.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/%.o: $(KERNEL_DIR)/%.c

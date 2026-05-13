@@ -139,6 +139,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: hard delete overlay ownership", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
+    post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable directory index", fs_writable_count() >= 23u, emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
     post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);

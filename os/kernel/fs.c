@@ -287,6 +287,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
     "li Use kmod list and kmod gui/fs/task/oslink/boot/time/vm/sysrxe status to talk directly with kernel modules.\n"
+    "li Use ren old.txt new.txt, rename selected NewName, or the desktop Rename button to rename files, apps, and folders.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
     "li Use dos on for L-DOS mode: a native DOS-style shell layer with C:/A:/R: drive mapping, DIR/TYPE/COPY/DEL/REN/MD/RD/CD, and dosmode.lardd history.\n"
@@ -356,6 +357,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.63.1p hotpatches the VirtualBox black-screen boot memory layout while preserving the installer feature.\n"
     "li v1.64.0b adds SYSRXE so future simple GUI apps can be described as .sysrxe files.\n"
     "li v1.65.0b adds KModTalk so users can talk directly with kernel modules and audit kmodtalk.lardd.\n"
+    "li v1.65.1p hotpatches renaming for writable files, desktop apps, and folders.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -750,6 +752,8 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command notes\n"
     "CHECK command larsview\n"
     "CHECK command dir\n"
+    "CHECK command ren\n"
+    "CHECK command rename\n"
     "CHECK command mode\n"
     "CHECK command panicroom\n"
     "CHECK command paniccapsule\n"
@@ -917,6 +921,42 @@ static void fs_copy_name(char* dst, uint32_t cap, const char* src)
     if (!src) src = "";
     while (src[i] && i + 1u < cap) {
         dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
+}
+
+static int fs_valid_user_name(const char* name)
+{
+    uint32_t i = 0;
+    if (!name || !name[0]) return 0;
+    while (name[i]) {
+        char c = name[i];
+        if (i >= 31u) return 0;
+        if (c <= ' ' || c == '/' || c == '\\' || c == ':' || c == '|') return 0;
+        i++;
+    }
+    return i > 0;
+}
+
+static int lpst_entry_name_valid(const uint8_t* entry)
+{
+    uint32_t i = 0;
+    if (!entry || entry[0] == 0) return 0;
+    while (i < 32u && entry[i]) {
+        char c = (char)entry[i];
+        if (c <= ' ' || c == '/' || c == '\\' || c == ':' || c == '|') return 0;
+        i++;
+    }
+    return i > 0 && i < 32u;
+}
+
+static void lpst_entry_name_copy(char* dst, uint32_t cap, const uint8_t* entry)
+{
+    uint32_t i = 0;
+    if (!dst || cap == 0) return;
+    while (i + 1u < cap && i < 32u && entry[i]) {
+        dst[i] = (char)entry[i];
         i++;
     }
     dst[i] = '\0';
@@ -1202,6 +1242,34 @@ int fs_delete_overlay_selftest(void)
     if (FS_HIDDEN_READONLY_MAX < 8u) return -2;
     if (!fs_open_writable("fsdelete.lardd")) return -3;
     if (FS_DELETED_READONLY_MAX < 8u) return -4;
+    return 0;
+}
+
+int fs_rename_selftest(void)
+{
+    const char* old_name = "notes.txt";
+    const char* tmp_name = "renameprobe.tmp";
+    uint32_t dirty_before = s_fs_dirty;
+    int r;
+    if (!fs_open_writable(old_name)) return -1;
+    if (fs_open(tmp_name)) return -2;
+    r = fs_rename_writable(old_name, tmp_name);
+    if (r != 0) return -3;
+    if (fs_open_writable(old_name) || !fs_open_writable(tmp_name)) {
+        (void)fs_rename_writable(tmp_name, old_name);
+        s_fs_dirty = dirty_before;
+        return -4;
+    }
+    r = fs_rename_writable(tmp_name, old_name);
+    if (r != 0) {
+        s_fs_dirty = dirty_before;
+        return -5;
+    }
+    if (!fs_open_writable(old_name) || fs_open_writable(tmp_name)) {
+        s_fs_dirty = dirty_before;
+        return -6;
+    }
+    s_fs_dirty = dirty_before;
     return 0;
 }
 
@@ -1561,16 +1629,23 @@ int fs_persist_load(void)
         uint32_t hash = lpst_read32(entry + 44);
         FsWritableFile* w = NULL;
 
-        for (uint32_t wi = 0; wi < writable_count(); wi++) {
-            FsWritableFile* cand = writable_at(wi);
-            if (cand && lpst_name_equals(entry, cand->name)) {
-                w = cand;
-                break;
+        if (count == writable_count()) {
+            w = writable_at(i);
+        } else {
+            for (uint32_t wi = 0; wi < writable_count(); wi++) {
+                FsWritableFile* cand = writable_at(wi);
+                if (cand && lpst_name_equals(entry, cand->name)) {
+                    w = cand;
+                    break;
+                }
             }
         }
         if (!w) continue;
         if (cap != w->cap || size > w->cap || data_off > total || size > total - data_off) continue;
         if (lpst_hash(s_lpstore + data_off, size) != hash) continue;
+        if (count == writable_count() && lpst_entry_name_valid(entry)) {
+            lpst_entry_name_copy(w->name, sizeof(w->name), entry);
+        }
         for (uint32_t j = 0; j < size; j++) w->data[j] = s_lpstore[data_off + j];
         w->size = size;
     }
@@ -1611,6 +1686,19 @@ FsWritableFile* fs_open_writable(const char* name)
         if (*a == '\0' && *b == '\0') return w;
     }
     return NULL;
+}
+
+int fs_rename_writable(const char* old_name, const char* new_name)
+{
+    FsWritableFile* w;
+    if (!fs_valid_user_name(old_name) || !fs_valid_user_name(new_name)) return -2;
+    w = fs_open_writable(old_name);
+    if (!w) return -1;
+    if (fs_name_eq(old_name, new_name)) return 0;
+    if (fs_open_writable(new_name) || fs_open_readonly(new_name)) return -3;
+    fs_copy_name(w->name, sizeof(w->name), new_name);
+    s_fs_dirty = 1;
+    return 0;
 }
 
 uint32_t fs_write(FsWritableFile* f, uint32_t offset, const uint8_t* buf, uint32_t len)

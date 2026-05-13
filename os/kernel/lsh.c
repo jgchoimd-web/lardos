@@ -1415,7 +1415,7 @@ static void cmd_help(const char* args)
     out_append("  notes show|add|clear            syncs notes.lardd and GUI notes.txt\n");
     out_append("  lguilib status|show|use|test [file.lguilib]\n");
     out_append("  awake on|off|status|test\n");
-    out_append("  write file text  append file text  copy src dst\n");
+    out_append("  write file text  append file text  copy src dst  ren src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z:\n");
     out_append("  shrine status|list|info|verify|run|test [file.shrine]\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
@@ -5270,6 +5270,101 @@ static void cmd_copy(const char* args)
     out_append(" bytes)\n");
 }
 
+static const char* lsh_skip_spaces(const char* s)
+{
+    while (s && (*s == ' ' || *s == '\t')) s++;
+    return s ? s : "";
+}
+
+static void cmd_rename_file(const char* src_arg, const char* dst_arg)
+{
+    char src_name[64];
+    char dst_name[64];
+    char src_drive;
+    char dst_drive;
+    int r;
+    resolve_path(src_arg, &src_drive, src_name, sizeof(src_name));
+    resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    (void)src_drive;
+    (void)dst_drive;
+    if (!src_name[0] || !dst_name[0]) {
+        out_append("Usage: ren src dst\n");
+        return;
+    }
+    r = fs_rename_writable(src_name, dst_name);
+    if (r == 0) {
+        out_append("Renamed writable file: ");
+        out_append(src_name);
+        out_append(" -> ");
+        out_append(dst_name);
+        out_append("\n");
+        gui_reload_sysrxe_apps();
+        lardkit_journal_event("rename", dst_name);
+        return;
+    }
+    if (r == -1) out_append("ren: writable source not found. Read-only files can be copied or deleted with DEL -F, but not renamed in place.\n");
+    else if (r == -3) out_append("ren: destination already exists.\n");
+    else out_append("ren: bad source/destination name.\n");
+}
+
+static void cmd_rename(const char* args)
+{
+    char first[64];
+    char second[64];
+    const char* rest;
+    int r;
+    if (!args) args = "";
+    rest = args;
+    if (vcs_read_word(&rest, first, sizeof(first)) != 0) {
+        out_append("Usage: ren src dst | rename file src dst | rename selected new-name | rename app old new | rename folder old new\n");
+        return;
+    }
+    if (strcmp(first, "file") == 0) {
+        char dst[64];
+        if (vcs_read_word(&rest, second, sizeof(second)) != 0 ||
+            vcs_read_word(&rest, dst, sizeof(dst)) != 0) {
+            out_append("Usage: rename file src dst\n");
+            return;
+        }
+        cmd_rename_file(second, dst);
+        return;
+    }
+    if (strcmp(first, "selected") == 0 || strcmp(first, "sel") == 0) {
+        rest = lsh_skip_spaces(rest);
+        r = gui_rename_selected_label(rest);
+        if (r > 0) out_append("Renamed selected GUI item.\n");
+        else out_append("rename selected: select a desktop/dock app or folder and provide a new name.\n");
+        return;
+    }
+    if (strcmp(first, "app") == 0 || strcmp(first, "folder") == 0) {
+        int kind = strcmp(first, "app") == 0 ? GUI_RENAME_APP : GUI_RENAME_FOLDER;
+        if (vcs_read_word(&rest, second, sizeof(second)) != 0) {
+            out_append(kind == GUI_RENAME_APP ? "Usage: rename app old-name new-name\n" :
+                                                "Usage: rename folder old-name new-name\n");
+            return;
+        }
+        rest = lsh_skip_spaces(rest);
+        r = gui_rename_item_label(second, rest, kind);
+        if (r > 0) {
+            out_append("Renamed GUI ");
+            out_append(kind == GUI_RENAME_APP ? "app" : "folder");
+            out_append(" label: ");
+            out_append(second);
+            out_append(" -> ");
+            out_append(rest);
+            out_append("\n");
+        } else {
+            out_append("rename: GUI item not found or new name is empty.\n");
+        }
+        return;
+    }
+    if (vcs_read_word(&rest, second, sizeof(second)) != 0) {
+        out_append("Usage: ren src dst\n");
+        return;
+    }
+    cmd_rename_file(first, second);
+}
+
 static void cmd_write_like(const char* args, int append)
 {
     char file_arg[64];
@@ -7379,6 +7474,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lpackverify") == 0) { cmd_lpack_op("verify", args); return; }
     if (strcmp(cmd, "lpackchecksum") == 0) { cmd_lpack_op("checksum", args); return; }
     if (strcmp(cmd, "lpackundo") == 0) { cmd_lpack("undo"); return; }
+    if (strcmp(cmd, "ren") == 0 || strcmp(cmd, "rename") == 0) { cmd_rename(args); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }
     if (strcmp(cmd, "append") == 0) { cmd_append(args); return; }

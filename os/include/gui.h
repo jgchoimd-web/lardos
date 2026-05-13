@@ -31,6 +31,13 @@ void gui_http_set_post_mode(int on);
 int gui_http_post_mode(void);
 void gui_reload_sysrxe_apps(void);
 
+#define GUI_RENAME_ANY 0
+#define GUI_RENAME_APP 1
+#define GUI_RENAME_FOLDER 2
+
+int gui_rename_selected_label(const char* new_name);
+int gui_rename_item_label(const char* old_name, const char* new_name, int kind_filter);
+
 typedef struct {
     uint32_t width;
     uint32_t height;

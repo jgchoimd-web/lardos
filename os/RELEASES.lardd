@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.65.1p
+ITEM Hotpatch fixing rename paths for writable files, GUI app labels, and GUI folder labels.
+ITEM Added native fs_rename_writable so ren and rename change the actual writable file name instead of only copying data.
+ITEM Added desktop Rename action plus rename selected/app/folder shell paths for visible user-owned app and folder labels.
+ITEM Added POST and LUNIT coverage for rename behavior while preserving KModTalk, SYSRXE, OSLink, and the user-control values.
+
 SECTION v1.65.0a
 ITEM Official release promoting KModTalk from v1.65.0b without feature loss or philosophy changes.
 ITEM Keeps kmod and kmodtalk commands, direct handlers for gui/fs/task/oslink/boot/time/vm/sysrxe/lardkit, and writable kmodtalk.lardd history.

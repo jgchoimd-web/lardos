@@ -30,6 +30,7 @@ const char* fs_readonly_deleted_name(uint32_t index);
 
 /* Writable RAM files (notes, temp). Returns NULL if not found. */
 FsWritableFile* fs_open_writable(const char* name);
+int fs_rename_writable(const char* old_name, const char* new_name);
 uint32_t fs_write(FsWritableFile* f, uint32_t offset, const uint8_t* buf, uint32_t len);
 uint32_t fs_append(FsWritableFile* f, const uint8_t* buf, uint32_t len);
 
@@ -42,6 +43,7 @@ int fs_purge_all_readonly_tombstones(void);
 int fs_readonly_hidden(const char* name);
 int fs_readonly_deleted(const char* name);
 int fs_delete_overlay_selftest(void);
+int fs_rename_selftest(void);
 
 /* Persistent LPST store on the boot block device. */
 int fs_persist_load(void);

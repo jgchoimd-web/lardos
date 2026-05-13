@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.67.1a
+ITEM Official release promoting the corrected RXE/SYSRXE split from v1.67.1p without feature loss or philosophy changes.
+ITEM Keeps SYSRXE as the system executable surface: .sysrxe files plus sysrxe list/reload/load/show/run/test.
+ITEM Keeps RXE as the normal executable surface: .rxe files plus rxe list/reload/load/show/run/test, rxe_guide.lardd, GUI/dock integration, and Magic recognition.
+ITEM Keeps demo_game.rxe as the native file-defined RXE maze with arrow-key GUI movement, shell movement through rxe run 0 right, reset support, and TYPE GAME board declarations.
+ITEM Preserves KMO, KModTalk, OSLink, default GUI, hardware-profiled IMG/ISO artifacts, and the LardOS value that executable formats stay native and user-owned.
+
 SECTION v1.67.1p
 ITEM Hotpatch correcting the RXE naming model after v1.67.0b.
 ITEM SYSRXE is now documented and exposed as the system executable surface: .sysrxe files plus the sysrxe command.

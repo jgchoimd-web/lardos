@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.67.1p-ami/lardos-v1.67.1p-ami.iso`. To publish the whole hardware
+`release/v1.67.1a-ami/lardos-v1.67.1a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,6 +140,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.67.1a` officially promotes the corrected RXE/SYSRXE split without
+  feature loss or philosophy changes.
 - `v1.67.1p` hotpatches the RXE naming model: `sysrxe` is reserved for system
   executables, while normal executable/game files use `.rxe` and the `rxe`
   command. `demo_game.rxe` is the native RXE maze demo.

@@ -2,6 +2,7 @@
 
 #include "gui.h"
 #include "lguilib.h"
+#include "sysrxe.h"
 #include "version.h"
 
 #include <stdint.h>
@@ -56,12 +57,16 @@ static const lguilib_theme_t* overlay_theme(void)
 
 static const char* app_title(uint32_t app)
 {
+    const sysrxe_app_t* sx = sysrxe_get_by_app((int)app);
+    if (sx) return sx->name;
     if (app >= sizeof(s_app_titles) / sizeof(s_app_titles[0])) return "LardOS";
     return s_app_titles[app];
 }
 
 static const char* app_hint(uint32_t app)
 {
+    const sysrxe_app_t* sx = sysrxe_get_by_app((int)app);
+    if (sx) return "SYSRXE system app";
     if (app >= sizeof(s_app_hints) / sizeof(s_app_hints[0])) return "ready";
     return s_app_hints[app];
 }

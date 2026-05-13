@@ -15,8 +15,8 @@ LardOS is guided by a simple rule: the user owns the machine.
   behavior.
 - Powerful actions should be visible and explainable.
 - Risky changes should have history, rollback, or recovery paths.
-- Native formats such as LARS, LARDD, LGUILIB, LTHEME, LPACK, and LFS are part
-  of the system identity.
+- Native formats such as LARS, LARDD, LGUILIB, LTHEME, LPACK, SYSRXE, and LFS
+  are part of the system identity.
 - Release channels are explicit: `a` is official, `b` is beta, and `p` is a
   hotpatch.
 

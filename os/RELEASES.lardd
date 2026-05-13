@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.64.0b
+ITEM Beta release adding SYSRXE, the System RXE app-file format for LardOS GUI apps.
+ITEM GUI app slots now keep the existing 10 legacy apps and reserve SYSRXE slots after them, so new simple apps can be loaded from .sysrxe files instead of adding a hand-written gui.c branch each time.
+ITEM Added hello.sysrxe as a built-in demo app and user-editable userapp.sysrxe as a writable starter app.
+ITEM Added sysrxe list, sysrxe reload, sysrxe load, sysrxe show, sysrxe run, and sysrxe test commands in LSH.
+ITEM Added sysrxe_guide.lardd, LUNIT checks, POST checks, GUI launcher integration, and overlay titles/hints for SYSRXE apps.
+ITEM Preserves the separated default GUI, dock/desktop drag/delete behavior, no-EXGUI/no-EXEXGUI direction, and the user-owned native-format LardOS values.
+
 SECTION v1.63.3p
 ITEM Hotpatch for the default GUI window separation issue reported after v1.63.2p.
 ITEM Removed the shared 10-tab main-GUI strip from app windows, so opening an app no longer looks like another copy of the same main window.

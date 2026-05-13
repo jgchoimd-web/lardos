@@ -29,6 +29,7 @@ void gui_set_response(const char* text);
 void gui_set_loading(int on);
 void gui_http_set_post_mode(int on);
 int gui_http_post_mode(void);
+void gui_reload_sysrxe_apps(void);
 
 typedef struct {
     uint32_t width;

@@ -583,6 +583,7 @@ void kmain(void)
     /* Custom language demos: BOSL (bytecode) + LIL (s-expr interpreter). */
     mem_init();
     fs_init();
+    gui_reload_sysrxe_apps();
     crashlog_init();
     bootprof_load();
     lsh_init();

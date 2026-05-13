@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.63.3p-ami/lardos-v1.63.3p-ami.iso`. To publish the whole hardware
+`release/v1.64.0b-ami/lardos-v1.64.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,6 +140,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.64.0b` adds SYSRXE, a native file-defined GUI app format with
+  `hello.sysrxe`, writable `userapp.sysrxe`, and `sysrxe list/reload/show/run`.
 - `v1.63.3p` hotpatches app-window separation: app windows no longer redraw
   the old shared 10-tab main GUI strip, and each app shows its own title/badge
   with desktop/dock/window-stack switching.
@@ -352,6 +354,10 @@ commands:
 - `larsview open file` tracks native document browsing state, `larsapp` treats
   `.lars` as a small app surface, and `notes show|add|clear` edits the writable
   `notes.lardd` document.
+- `sysrxe list|reload|show|run` manages `.sysrxe` System RXE app files, so
+  simple GUI apps can be added as native files instead of writing a new GUI C
+  branch for every app. Built-in `hello.sysrxe` and writable
+  `userapp.sysrxe` are the starter examples.
 - `lunit run tests.lunit` runs small feature tests from the native `LUNIT 1`
   format.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use

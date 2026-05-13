@@ -165,7 +165,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Reversibility: settings, packages, and risky changes should have rollback, history, or capsule trails.\n"
     "ITEM Repair over halt: panic room, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
-    "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, LFS, and picture Unicode keep the system's surface its own.\n"
+    "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, SYSRXE, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink paths.\n"
     "SECTION Commands\n"
@@ -203,6 +203,23 @@ static const uint8_t fsdelete_init[] =
     "SECTION Tombstones\n";
 static uint8_t ram_fsdelete_buf[FSDELETE_CAP];
 static FsWritableFile ram_fsdelete = { "fsdelete.lardd", ram_fsdelete_buf, 0, FSDELETE_CAP };
+
+#define USERAPP_SYSRXE_CAP 2048u
+static const uint8_t userapp_sysrxe_init[] =
+    "SYSRXE 1\n"
+    "ID userapp\n"
+    "NAME User SYSRXE\n"
+    "ICON U\n"
+    "COLOR 0xFF5DB7A6\n"
+    "INPUT Say:\n"
+    "BUTTON Echo\n"
+    "DESKTOP 1\n"
+    "DOCK 0\n"
+    "TEXT This writable app proves that new apps can be edited as files.\n"
+    "TEXT Open userapp.sysrxe in Edit, change NAME/TEXT/COMMAND, then run sysrxe reload.\n"
+    "COMMAND echo user-sysrxe\n";
+static uint8_t ram_userapp_sysrxe_buf[USERAPP_SYSRXE_CAP];
+static FsWritableFile ram_userapp_sysrxe = { "userapp.sysrxe", ram_userapp_sysrxe_buf, 0, USERAPP_SYSRXE_CAP };
 
 #define FS_HIDDEN_READONLY_MAX 32u
 static char s_hidden_readonly[FS_HIDDEN_READONLY_MAX][32];
@@ -281,6 +298,7 @@ static const uint8_t file_lardos_lars[] =
     "li Awakening mode is off by default; use awake on or awake off to choose the next boot path.\n"
     "li Use crashlog show to inspect panic and diagnostic history.\n"
     "li Use lpack verify sample.lpack before install, and lpack undo last to roll back the last install.\n"
+    "li Use sysrxe list, sysrxe reload, sysrxe show userapp.sysrxe, and sysrxe run 0 text for file-defined GUI apps.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
     "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
     "li Use bugreplay show to review the last BugEye screen-health frames.\n"
@@ -325,6 +343,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.62.0a makes DEL -F a hard delete from the active filesystem while preserving TOMB HIDE for soft tombstones.\n"
     "li v1.63.0a adds the in-OS HDD/SSD installer option using the native stage1/stage2/kernel layout.\n"
     "li v1.63.1p hotpatches the VirtualBox black-screen boot memory layout while preserving the installer feature.\n"
+    "li v1.64.0b adds SYSRXE so future simple GUI apps can be described as .sysrxe files.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -630,6 +649,43 @@ static const uint8_t file_sample_lpack[] =
     "ENDFILE\n"
     "END\n";
 
+static const uint8_t file_sysrxe_guide[] =
+    "LARDD 1\n"
+    "TITLE SYSRXE App Format\n"
+    "TEXT SYSRXE is the System RXE app format for LardOS GUI apps.\n"
+    "TEXT It avoids hardcoding one C branch per future app.\n"
+    "SECTION Syntax\n"
+    "ITEM SYSRXE 1\n"
+    "ITEM ID app-id\n"
+    "ITEM NAME App title\n"
+    "ITEM ICON one-to-three chars\n"
+    "ITEM COLOR 0xAARRGGBB\n"
+    "ITEM INPUT label\n"
+    "ITEM BUTTON label\n"
+    "ITEM DESKTOP 1 and DOCK 1 decide launcher placement.\n"
+    "ITEM TEXT app body line\n"
+    "ITEM COMMAND lsh-command optionally receives textbox input.\n"
+    "SECTION Commands\n"
+    "ITEM sysrxe list\n"
+    "ITEM sysrxe reload\n"
+    "ITEM sysrxe show userapp.sysrxe\n"
+    "ITEM edit userapp.sysrxe, save, then sysrxe reload\n"
+    "END\n";
+
+static const uint8_t file_hello_sysrxe[] =
+    "SYSRXE 1\n"
+    "ID hello-sysrxe\n"
+    "NAME SYSRXE Hello\n"
+    "ICON X\n"
+    "COLOR 0xFF4FC3B3\n"
+    "INPUT Text:\n"
+    "BUTTON Echo\n"
+    "DESKTOP 1\n"
+    "DOCK 1\n"
+    "TEXT This app was registered from hello.sysrxe, not hand-coded in gui.c.\n"
+    "TEXT Future simple apps can be new SYSRXE files.\n"
+    "COMMAND echo hello-from-sysrxe\n";
+
 static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"
     "CHECK file lardos.lars\n"
@@ -666,6 +722,10 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command mode\n"
     "CHECK command panicroom\n"
     "CHECK command paniccapsule\n"
+    "CHECK command sysrxe\n"
+    "CHECK file sysrxe_guide.lardd\n"
+    "CHECK file hello.sysrxe\n"
+    "CHECK writable userapp.sysrxe\n"
     "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
@@ -755,6 +815,8 @@ static const FsFile FS_FILES[] = {
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
+    { "sysrxe_guide.lardd", file_sysrxe_guide, sizeof(file_sysrxe_guide) - 1 },
+    { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) - 1 },
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
@@ -1110,7 +1172,7 @@ int fs_delete_overlay_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 21u;
+    return 22u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -1136,6 +1198,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 18) return &ram_glyphmap;
     if (idx == 19) return &ram_dosmode;
     if (idx == 20) return &ram_fsdelete;
+    if (idx == 21) return &ram_userapp_sysrxe;
     return NULL;
 }
 
@@ -1214,6 +1277,10 @@ void fs_init(void)
         ram_fsdelete_buf[i] = fsdelete_init[i];
     }
     ram_fsdelete.size = sizeof(fsdelete_init) - 1;
+    for (uint32_t i = 0; i < sizeof(userapp_sysrxe_init) - 1 && i < USERAPP_SYSRXE_CAP; i++) {
+        ram_userapp_sysrxe_buf[i] = userapp_sysrxe_init[i];
+    }
+    ram_userapp_sysrxe.size = sizeof(userapp_sysrxe_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
     fs_apply_delete_log();

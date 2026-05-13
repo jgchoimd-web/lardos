@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.63.3p
+ITEM Hotpatch for the default GUI window separation issue reported after v1.63.2p.
+ITEM Removed the shared 10-tab main-GUI strip from app windows, so opening an app no longer looks like another copy of the same main window.
+ITEM Each app window now shows its own app title in the title bar and app badge; switching apps is done through the desktop/dock/window stack instead of an internal main-window tab bar.
+ITEM Moved app content upward to fill the space that used to be occupied by the tab strip, keeping input fields, buttons, response panes, scrollbars, and settings controls aligned.
+ITEM Updated GUIOverlay so it no longer redraws the removed tab strip over the separated app windows.
+ITEM Keeps v1.63.2p click/drag/delete fixes, v1.63.1p VirtualBox boot layout, and the no-EXGUI/no-EXEXGUI default GUI direction intact.
+
 SECTION v1.63.2p
 ITEM Hotpatch for default GUI desktop interaction regressions after the installer and VM boot fixes.
 ITEM Desktop and dock items now keep an explicit selected state, so left-click feedback is visible and Delete knows what the user chose.

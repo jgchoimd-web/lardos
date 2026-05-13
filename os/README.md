@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.63.2p-ami/lardos-v1.63.2p-ami.iso`. To publish the whole hardware
+`release/v1.63.3p-ami/lardos-v1.63.3p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,6 +140,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.63.3p` hotpatches app-window separation: app windows no longer redraw
+  the old shared 10-tab main GUI strip, and each app shows its own title/badge
+  with desktop/dock/window-stack switching.
 - `v1.63.2p` hotpatches the default GUI interaction model: selected
   desktop/dock items can be deleted, desktop items can be dragged into the
   dock, dock items can be copied back onto the desktop, and `DelFile` deletes

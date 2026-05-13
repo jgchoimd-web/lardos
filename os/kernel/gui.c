@@ -38,6 +38,8 @@
 #define GUI_TOP_DELETE_ITEM 4
 #define GUI_TOP_DELETE_FILE 5
 #define GUI_DRAG_THRESHOLD 8
+#define GUI_TITLE_H 20
+#define GUI_CONTENT_TOP 24
 
 typedef struct {
     int app;
@@ -1054,7 +1056,7 @@ static void gui_title_control_rects(int* out_set_x, int* out_min_x, int* out_ful
     if (out_full_x) *out_full_x = full_x;
     if (out_close_x) *out_close_x = close_x;
     if (out_y) *out_y = g.win_y;
-    if (out_h) *out_h = 20;
+    if (out_h) *out_h = GUI_TITLE_H;
 }
 
 static const char* gui_app_name(int app)
@@ -1919,13 +1921,14 @@ static void gui_draw_window_preview(const fb_t* tgt, const gui_window_t* w)
     fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)w->y, 1, (uint16_t)w->h, frame);
     fb_fill_rect(tgt, (uint16_t)(w->x + w->w - 1), (uint16_t)w->y, 1, (uint16_t)w->h, frame);
     if (w->w > 80 && w->h > 80) {
-        fb_fill_rect(tgt, (uint16_t)(w->x + 14), (uint16_t)(w->y + 44), (uint16_t)(w->w - 28), (uint16_t)(w->h - 62), 0xFF20252Bu);
+        fb_fill_rect(tgt, (uint16_t)(w->x + 14), (uint16_t)(w->y + GUI_CONTENT_TOP + 12),
+                     (uint16_t)(w->w - 28), (uint16_t)(w->h - GUI_CONTENT_TOP - 30), 0xFF20252Bu);
         if (w->app >= 0 && w->app < GUI_APP_COUNT && g_app_views[w->app].saved) preview = g_app_views[w->app].resp;
         if (!preview || !preview[0]) preview = gui_app_name(w->app);
         px = w->x + 22;
-        py = w->y + 56;
+        py = w->y + GUI_CONTENT_TOP + 24;
         cols = (w->w - 44) / 8;
-        rows = (w->h - 78) / 10;
+        rows = (w->h - GUI_CONTENT_TOP - 42) / 10;
         if (cols < 4) cols = 4;
         if (rows < 1) rows = 1;
         while (*preview && row < rows) {
@@ -1966,7 +1969,7 @@ static void gui_draw_inactive_windows(const fb_t* tgt)
 
 static void gui_view_rect(int* out_x, int* out_y, int* out_w, int* out_h)
 {
-    int content_y = g.win_y + 44;
+    int content_y = g.win_y + GUI_CONTENT_TOP;
     int tb_y = content_y + 118;
     int tb_h = 24;
     int view_y = tb_y + tb_h + 28;
@@ -2540,7 +2543,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     }
 
     // Title controls.
-    int title_h = 20;
+    int title_h = GUI_TITLE_H;
     int close_btn_x;
     int min_btn_x;
     int full_btn_x;
@@ -2651,23 +2654,8 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         gui_sync_active_window();
     }
 
-    /* Tab bar: Lafillo | Calc | Notes | Gallery | Zip | User | LSS | LSH | 놀이터 | Lafaelo */
-    {
-        int tab_y = g.win_y + 20;
-        int tab_h = 24;
-        int tab_w = g.win_w / 10;
-        if (l_pressed) {
-            if (g.my >= tab_y && g.my < tab_y + tab_h && g.mx >= g.win_x && g.mx < g.win_x + g.win_w) {
-                int idx = (g.mx - g.win_x) / tab_w;
-                if (idx < 10) {
-                    gui_select_app(idx);
-                }
-            }
-        }
-    }
-
     // Button inside window
-    int content_y_m = g.win_y + 44;
+    int content_y_m = g.win_y + GUI_CONTENT_TOP;
     int btn_x = g.win_x + 16;
     int btn_y = content_y_m + 36;
     int btn_w = 120;
@@ -2853,7 +2841,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     }
 
     // Textbox focus (path input)
-    int content_y = g.win_y + 44;
+    int content_y = g.win_y + GUI_CONTENT_TOP;
     int tb_x = g.win_x + 16;
     int tb_y = content_y + 118;
     int tb_w = 260;
@@ -3242,7 +3230,6 @@ int gui_post_check(gui_post_info_t* out)
         out->response_view_ok = (g.win_w >= 320 && g.win_h >= 240 &&
                                  g.win_h - 190 >= 40 && g.win_w - 32 >= 160);
         out->chrome_ok = (guioverlay_selftest() == 0 &&
-                          g.win_w / 10 >= 16 &&
                           g.win_w - 32 >= 160 &&
                           g.win_h >= 240);
         uint32_t step_x = g_fb.w >= 64 ? (uint32_t)g_fb.w / 32u : 1u;
@@ -3397,9 +3384,9 @@ void gui_render(void)
     gui_title_control_rects(&set_btn_x, &min_btn_x, &full_btn_x, &close_btn_x, 0, 0);
     int app_title_x = g.win_x + 96;
     int app_title_cells = (set_btn_x - app_title_x - 4) / 8;
-    fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(g.win_y + 7), "LARDOS GUI", 0xFFFFFFFF, title_bg);
+    fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(g.win_y + 7), gui_app_name(g.app_id), 0xFFFFFFFF, title_bg);
     if (app_title_cells > 1) {
-        fb_draw_text_cells(tgt, (uint16_t)app_title_x, (uint16_t)(g.win_y + 7), gui_app_name(g.app_id),
+        fb_draw_text_cells(tgt, (uint16_t)app_title_x, (uint16_t)(g.win_y + 7), LARDOS_VERSION,
                            (uint16_t)app_title_cells, 0xFF9DEAE4u, title_bg);
     }
     uint32_t set_btn_bg = (g.settings_open || (g.mx >= set_btn_x && g.mx < set_btn_x + 40 && g.my >= g.win_y && g.my < g.win_y + 20)) ? 0xFF235D64 : 0xFF2A2F34;
@@ -3431,19 +3418,7 @@ void gui_render(void)
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, 1, (uint16_t)g.win_h, border);
     fb_fill_rect(tgt, (uint16_t)(g.win_x + g.win_w - 1), (uint16_t)g.win_y, 1, (uint16_t)g.win_h, border);
 
-    /* Tab bar */
-    static const char* tab_names[] = { "Doc", "Calc", "Note", "Pix", "Pak", "User", "LSS", "LSH", "Play", "Edit" };
-    int tab_y = g.win_y + 20;
-    int tab_h = 24;
-    int tab_w = g.win_w / 10;
-    for (int t = 0; t < 10; t++) {
-        int tx = g.win_x + t * tab_w;
-        uint32_t tab_bg = (g.app_id == t) ? 0xFF235D64 : 0xFF2A2F34;
-        fb_fill_rect(tgt, (uint16_t)tx, (uint16_t)tab_y, (uint16_t)tab_w, (uint16_t)tab_h, tab_bg);
-        fb_draw_text(tgt, (uint16_t)(tx + 4), (uint16_t)(tab_y + 8), tab_names[t], 0xFFFFFFFF, tab_bg);
-    }
-
-    int content_y = g.win_y + 20 + tab_h;
+    int content_y = g.win_y + GUI_CONTENT_TOP;
 
     fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(content_y + 4), "LardOS", 0xFFFFC857, win_bg);
 

@@ -6,14 +6,6 @@
 
 #include <stdint.h>
 
-static const char* const s_tab_names[] = {
-    "Doc", "Calc", "Note", "Pix", "Pak", "User", "LSS", "LSH", "Play", "Edit",
-};
-
-static const char* const s_tab_short[] = {
-    "D", "C", "N", "P", "K", "U", "S", "H", "R", "E",
-};
-
 static const char* const s_app_titles[] = {
     "Doc Browser", "Calculator", "Notes", "Gallery", "LAR Package",
     "User Run", "Shrine", "Lard Shell", "Play", "Editor",
@@ -78,7 +70,6 @@ static int overlay_layout_ok(const guioverlay_state_t* s)
 {
     if (!s) return 0;
     if (s->win_w < 160u || s->win_h < 240u) return 0;
-    if (s->win_w / 10u < 16u) return 0;
     if (s->win_w <= 32u || s->win_h <= 190u) return 0;
     return 1;
 }
@@ -135,45 +126,19 @@ static void draw_title(const guioverlay_state_t* s)
         fill(close_x, s->win_y + 2u, 14u, 14u, 0xFF803B45u);
         text(close_x + 4u, s->win_y + 6u, "x", th->title_fg, 0xFF803B45u);
     }
-    if (s->win_w > 150u) text(s->win_x + 8u, s->win_y + 6u, "LardOS GUI", th->title_fg, title_bg);
-    if (s->win_w > 300u && s->win_x + 112u + 96u < set_x) {
-        text(s->win_x + 112u, s->win_y + 6u, app_title(s->app_id), th->title_accent, title_bg);
+    if (s->win_w > 150u) text(s->win_x + 8u, s->win_y + 6u, app_title(s->app_id), th->title_fg, title_bg);
+    if (s->win_w > 360u && s->win_x + 176u + 96u < set_x) {
+        text(s->win_x + 176u, s->win_y + 6u, LARDOS_VERSION, th->title_accent, title_bg);
     }
     frame(s->win_x, s->win_y, s->win_w, s->win_h, th->border);
     if (s->win_w > 4u && s->win_h > 4u) frame(s->win_x + 1u, s->win_y + 1u, s->win_w - 2u, s->win_h - 2u, 0xFF384149u);
-}
-
-static void draw_tabs(const guioverlay_state_t* s)
-{
-    const lguilib_theme_t* th = overlay_theme();
-    uint32_t tab_y = s->win_y + 20u;
-    uint32_t tab_h = 24u;
-    uint32_t tab_w = s->win_w / 10u;
-    if (tab_w == 0) return;
-    for (uint32_t t = 0; t < 10u; t++) {
-        uint32_t tx = s->win_x + t * tab_w;
-        uint32_t tw = (t == 9u) ? (s->win_x + s->win_w - tx) : tab_w;
-        int hover = in_rect(s->mouse_x, s->mouse_y, tx, tab_y, tw, tab_h);
-        uint32_t tab_bg = (s->app_id == t) ? th->tab_active : (hover ? th->tab_hover : th->tab_idle);
-        const char* label = tw >= 34u ? s_tab_names[t] : s_tab_short[t];
-        uint32_t label_x = tx + (tw >= 34u ? 4u : (tw > 8u ? (tw - 8u) / 2u : 0u));
-        fill(tx, tab_y, tw, tab_h, tab_bg);
-        if (s->app_id == t) {
-            fill(tx, tab_y, tw, 2u, th->tab_accent);
-            fill(tx, tab_y + tab_h - 3u, tw, 3u, th->tab_accent);
-        } else if (hover) {
-            fill(tx, tab_y + tab_h - 2u, tw, 2u, 0xFF7BE0D6u);
-        }
-        if (tw > 2u) fill(tx + tw - 1u, tab_y + 4u, 1u, tab_h > 8u ? tab_h - 8u : tab_h, 0xFF15191Eu);
-        text(label_x, tab_y + 8u, label, th->title_fg, tab_bg);
-    }
 }
 
 static void draw_content_badge(const guioverlay_state_t* s)
 {
     const lguilib_theme_t* th = overlay_theme();
     uint32_t bg = th->panel_bg;
-    uint32_t y = s->win_y + 44u;
+    uint32_t y = s->win_y + 24u;
     fill(s->win_x + 8u, y + 2u, s->win_w > 16u ? s->win_w - 16u : s->win_w, 18u, bg);
     fill(s->win_x + 8u, y + 2u, 4u, 18u, th->tab_accent);
     text(s->win_x + 16u, y + 8u, app_title(s->app_id), th->title_fg, bg);
@@ -193,7 +158,7 @@ static void button_frame(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int hov
 
 static void draw_button_feedback(const guioverlay_state_t* s)
 {
-    uint32_t content_y = s->win_y + 44u;
+    uint32_t content_y = s->win_y + 24u;
     uint32_t btn_x = s->win_x + 16u;
     uint32_t btn_y = content_y + 36u;
     uint32_t btn_h = 28u;
@@ -226,7 +191,7 @@ static void draw_button_feedback(const guioverlay_state_t* s)
 static void draw_fields(const guioverlay_state_t* s)
 {
     const lguilib_theme_t* th = overlay_theme();
-    uint32_t content_y = s->win_y + 44u;
+    uint32_t content_y = s->win_y + 24u;
     uint32_t tb_x = s->win_x + 16u;
     uint32_t tb_y = content_y + 118u;
     uint32_t tb_w = 260u;
@@ -250,7 +215,6 @@ void guioverlay_draw(const guioverlay_state_t* state)
     if (!overlay_layout_ok(state)) return;
     draw_shadow(state);
     draw_title(state);
-    draw_tabs(state);
     draw_content_badge(state);
     draw_button_feedback(state);
     draw_fields(state);

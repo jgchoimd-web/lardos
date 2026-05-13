@@ -380,6 +380,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.65.1p hotpatches renaming for writable files, desktop apps, and folders.\n"
     "li v1.66.0b adds KMO, a native .kmo kernel module file format with user create/set/delete/run commands.\n"
     "li v1.66.1b adds explicit KMO raw-control mode so users can choose the dangerous path too.\n"
+    "li v1.66.1a officially promotes KMO raw-control without feature loss or value changes.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

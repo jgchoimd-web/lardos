@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.66.1a
+ITEM Official release promoting KMO raw-control from v1.66.1b without feature loss or philosophy changes.
+ITEM Keeps .kmo file modules, KModTalk routing, RAW 1 / TARGET raw explicit dangerous execution, kmo raw, kmo set raw 1, and raw_control.kmo.
+ITEM Keeps visible mode reporting in kmo list/show, POST and LUNIT coverage, hardware-profiled IMG/ISO artifacts, and user-owned KMO create/set/delete behavior.
+ITEM Preserves the LardOS value that the user may choose the risky path when they explicitly ask for it.
+
 SECTION v1.66.1b
 ITEM Beta update adding explicit KMO raw-control mode for the user-chosen dangerous path.
 ITEM Added RAW 1, DANGER 1, UNSAFE 1, MODE raw, CONTROL raw, and TARGET raw parsing in .kmo files.

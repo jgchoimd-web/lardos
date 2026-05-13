@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.66.1b-ami/lardos-v1.66.1b-ami.iso`. To publish the whole hardware
+`release/v1.66.1a-ami/lardos-v1.66.1a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,6 +140,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.66.1a` officially promotes KMO raw-control from `v1.66.1b` without
+  feature loss or philosophy changes.
 - `v1.66.1b` adds explicit KMO raw-control mode: `RAW 1`, `TARGET raw`,
   `kmo raw file.kmo command`, and `kmo set file.kmo raw 1` let the user choose
   direct LSH/SUM/raw command execution from a `.kmo` file when they accept the

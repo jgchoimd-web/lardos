@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.65.0a
+ITEM Official release promoting KModTalk from v1.65.0b without feature loss or philosophy changes.
+ITEM Keeps kmod and kmodtalk commands, direct handlers for gui/fs/task/oslink/boot/time/vm/sysrxe/lardkit, and writable kmodtalk.lardd history.
+ITEM Keeps POST and LUNIT coverage for the direct module channel and ships hardware-profiled IMG/ISO media.
+ITEM Preserves the LardOS values: user-owned control, visible logs, native C implementation, native LARDD docs, and no hidden module control path.
+
 SECTION v1.65.0b
 ITEM Beta release adding KModTalk, a direct user-to-kernel-module message surface.
 ITEM Added kmod and kmodtalk commands: kmod list, kmod module message, kmod ask module message, and kmod history.

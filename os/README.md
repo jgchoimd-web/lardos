@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.65.0b-ami/lardos-v1.65.0b-ami.iso`. To publish the whole hardware
+`release/v1.65.0a-ami/lardos-v1.65.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,6 +140,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.65.0a` promotes KModTalk, the direct user-to-kernel-module message surface,
+  to an official release with the same user-owned control behavior.
 - `v1.65.0b` adds KModTalk, a direct user-to-kernel-module message surface
   with visible replies and writable `kmodtalk.lardd` history.
 - `v1.64.0b` adds SYSRXE, a native file-defined GUI app format with

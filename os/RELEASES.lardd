@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.66.0b
+ITEM Beta release adding KMO, the native .kmo file format for file-stored kernel modules.
+ITEM Added kmo list, kmo reload, kmo show, kmo run, kmo create, kmo set, kmo delete, and kmo test commands.
+ITEM Added gui_status.kmo as a built-in sample plus writable user0.kmo through user3.kmo slots for user-created modules.
+ITEM KMO files route through KModTalk targets, keeping module control visible, logged, and user-owned instead of hiding it in app-specific branches.
+ITEM kmo set can take ownership of a read-only built-in KMO by hiding the original and writing a user-owned replacement; kmo delete removes KMO files from the active registry.
+ITEM Added kmo_guide.lardd, POST coverage, LUNIT checks, and user-law wording without removing SYSRXE, KModTalk, OSLink, or default GUI behavior.
+
 SECTION v1.65.1p
 ITEM Hotpatch fixing rename paths for writable files, GUI app labels, and GUI folder labels.
 ITEM Added native fs_rename_writable so ren and rename change the actual writable file name instead of only copying data.

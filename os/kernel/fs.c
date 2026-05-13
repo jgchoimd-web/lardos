@@ -165,7 +165,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Reversibility: settings, packages, and risky changes should have rollback, history, or capsule trails.\n"
     "ITEM Repair over halt: panic room, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
-    "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, SYSRXE, LFS, and picture Unicode keep the system's surface its own.\n"
+    "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, SYSRXE, KMO, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
     "SECTION Commands\n"
@@ -230,6 +230,24 @@ static const uint8_t kmodtalk_init[] =
 static uint8_t ram_kmodtalk_buf[KMODTALK_CAP];
 static FsWritableFile ram_kmodtalk = { "kmodtalk.lardd", ram_kmodtalk_buf, 0, KMODTALK_CAP };
 
+#define USER_KMO_CAP 2048u
+static const uint8_t user0_kmo_init[] =
+    "KMO 1\n"
+    "ID user-kmo\n"
+    "NAME User KMO\n"
+    "TARGET boot\n"
+    "HELP User-editable kernel module file. Change TARGET/DEFAULT/TEXT, then run kmo reload.\n"
+    "DEFAULT status\n"
+    "TEXT This writable .kmo proves kernel modules can be stored, edited, run, and deleted as native files.\n";
+static uint8_t ram_user0_kmo_buf[USER_KMO_CAP];
+static uint8_t ram_user1_kmo_buf[USER_KMO_CAP];
+static uint8_t ram_user2_kmo_buf[USER_KMO_CAP];
+static uint8_t ram_user3_kmo_buf[USER_KMO_CAP];
+static FsWritableFile ram_user0_kmo = { "user0.kmo", ram_user0_kmo_buf, 0, USER_KMO_CAP };
+static FsWritableFile ram_user1_kmo = { "user1.kmo", ram_user1_kmo_buf, 0, USER_KMO_CAP };
+static FsWritableFile ram_user2_kmo = { "user2.kmo", ram_user2_kmo_buf, 0, USER_KMO_CAP };
+static FsWritableFile ram_user3_kmo = { "user3.kmo", ram_user3_kmo_buf, 0, USER_KMO_CAP };
+
 #define FS_HIDDEN_READONLY_MAX 32u
 static char s_hidden_readonly[FS_HIDDEN_READONLY_MAX][32];
 static uint32_t s_hidden_readonly_count;
@@ -287,6 +305,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
     "li Use kmod list and kmod gui/fs/task/oslink/boot/time/vm/sysrxe status to talk directly with kernel modules.\n"
+    "li Use kmo list, kmo run user-kmo, kmo create mine.kmo gui status, kmo set mine.kmo text hello, and kmo delete mine.kmo for user-owned .kmo kernel module files.\n"
     "li Use ren old.txt new.txt, rename selected NewName, or the desktop Rename button to rename files, apps, and folders.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
@@ -358,6 +377,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.64.0b adds SYSRXE so future simple GUI apps can be described as .sysrxe files.\n"
     "li v1.65.0b adds KModTalk so users can talk directly with kernel modules and audit kmodtalk.lardd.\n"
     "li v1.65.1p hotpatches renaming for writable files, desktop apps, and folders.\n"
+    "li v1.66.0b adds KMO, a native .kmo kernel module file format with user create/set/delete/run commands.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -705,6 +725,43 @@ static const uint8_t file_kmodtalk_guide[] =
     "ITEM Risky control still stays explicit through named module messages.\n"
     "END\n";
 
+static const uint8_t file_kmo_guide[] =
+    "LARDD 1\n"
+    "TITLE KMO Kernel Module Files\n"
+    "TEXT KMO is the native .kmo file format for file-stored LardOS kernel modules.\n"
+    "TEXT A KMO names a KModTalk target and a default message, so users can create, inspect, change, run, and delete module routes as files.\n"
+    "SECTION Syntax\n"
+    "ITEM KMO 1\n"
+    "ITEM ID module-id\n"
+    "ITEM NAME Human module name\n"
+    "ITEM TARGET gui|fs|task|oslink|boot|time|vm|sysrxe|lardkit\n"
+    "ITEM HELP short visible description\n"
+    "ITEM DEFAULT message sent when kmo run has no message\n"
+    "ITEM TEXT body line shown by kmo show\n"
+    "SECTION Commands\n"
+    "ITEM kmo list\n"
+    "ITEM kmo show user0.kmo\n"
+    "ITEM kmo run user-kmo\n"
+    "ITEM kmo create mine.kmo gui status\n"
+    "ITEM kmo set mine.kmo target fs\n"
+    "ITEM kmo set mine.kmo default sync\n"
+    "ITEM kmo delete mine.kmo\n"
+    "SECTION Values\n"
+    "ITEM User-created KMO files live in writable RAM/LPST slots.\n"
+    "ITEM Built-in KMO files can be changed by kmo set, which takes ownership by hiding the read-only original and writing a user-owned replacement.\n"
+    "ITEM kmo delete removes a KMO from the active registry; writable slots become empty and read-only samples are hard-deleted from the active filesystem view.\n"
+    "END\n";
+
+static const uint8_t file_gui_status_kmo[] =
+    "KMO 1\n"
+    "ID gui-status\n"
+    "NAME GUI Status KMO\n"
+    "TARGET gui\n"
+    "HELP Ask the GUI kernel module for cursor and screenram status.\n"
+    "DEFAULT status\n"
+    "TEXT This built-in sample is a normal .kmo file, not a new hand-coded shell branch.\n"
+    "TEXT Use kmo set gui_status.kmo default \"cursor\" to take ownership and change it.\n";
+
 static const uint8_t file_hello_sysrxe[] =
     "SYSRXE 1\n"
     "ID hello-sysrxe\n"
@@ -759,11 +816,15 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command paniccapsule\n"
     "CHECK command sysrxe\n"
     "CHECK command kmod\n"
+    "CHECK command kmo\n"
     "CHECK file sysrxe_guide.lardd\n"
     "CHECK file kmodtalk_guide.lardd\n"
+    "CHECK file kmo_guide.lardd\n"
     "CHECK file hello.sysrxe\n"
+    "CHECK file gui_status.kmo\n"
     "CHECK writable userapp.sysrxe\n"
     "CHECK writable kmodtalk.lardd\n"
+    "CHECK writable user0.kmo\n"
     "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
@@ -855,7 +916,9 @@ static const FsFile FS_FILES[] = {
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
     { "sysrxe_guide.lardd", file_sysrxe_guide, sizeof(file_sysrxe_guide) - 1 },
     { "kmodtalk_guide.lardd", file_kmodtalk_guide, sizeof(file_kmodtalk_guide) - 1 },
+    { "kmo_guide.lardd", file_kmo_guide, sizeof(file_kmo_guide) - 1 },
     { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) - 1 },
+    { "gui_status.kmo", file_gui_status_kmo, sizeof(file_gui_status_kmo) - 1 },
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
@@ -1275,7 +1338,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 23u;
+    return 27u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -1303,6 +1366,10 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 20) return &ram_fsdelete;
     if (idx == 21) return &ram_userapp_sysrxe;
     if (idx == 22) return &ram_kmodtalk;
+    if (idx == 23) return &ram_user0_kmo;
+    if (idx == 24) return &ram_user1_kmo;
+    if (idx == 25) return &ram_user2_kmo;
+    if (idx == 26) return &ram_user3_kmo;
     return NULL;
 }
 
@@ -1389,6 +1456,13 @@ void fs_init(void)
         ram_kmodtalk_buf[i] = kmodtalk_init[i];
     }
     ram_kmodtalk.size = sizeof(kmodtalk_init) - 1;
+    for (uint32_t i = 0; i < sizeof(user0_kmo_init) - 1 && i < USER_KMO_CAP; i++) {
+        ram_user0_kmo_buf[i] = user0_kmo_init[i];
+    }
+    ram_user0_kmo.size = sizeof(user0_kmo_init) - 1;
+    ram_user1_kmo.size = 0;
+    ram_user2_kmo.size = 0;
+    ram_user3_kmo.size = 0;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
     fs_apply_delete_log();

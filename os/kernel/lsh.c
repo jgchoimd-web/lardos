@@ -38,6 +38,7 @@
 #include "vmmon.h"
 #include "sysrxe.h"
 #include "kmodtalk.h"
+#include "kmo.h"
 #include "io.h"
 #include "pci.h"
 #include "syscall.h"
@@ -310,7 +311,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
-    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
@@ -1389,7 +1390,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe kmod cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status install dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
@@ -1397,6 +1398,7 @@ static void cmd_help(const char* args)
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system GUI apps\n");
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
+    out_append("  kmo list|create|set|delete|show|run  user-owned .kmo kernel module files\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
@@ -1504,6 +1506,8 @@ static void cmd_control(const char* args)
     out_append("  crashlog show       inspect panic and diagnostic history\n");
     out_append("  lpack verify sample.lpack inspect package integrity before install\n");
     out_append("  lpack undo last     restore files changed by the last install\n");
+    out_append("  kmo create mine.kmo gui status create a user-owned kernel module file\n");
+    out_append("  kmo run mine.kmo    route that .kmo through KModTalk\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  screencheck retro   draw a retro boot/storage-style screen check\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
@@ -3717,6 +3721,7 @@ static void cmd_kmodtalk_list(void)
         out_append(kmodtalk_module_help(i));
         out_append("\n");
     }
+    out_append("File-defined KMO modules are listed with kmo list.\n");
 }
 
 static void cmd_kmodtalk_history(void)
@@ -3772,6 +3777,139 @@ static void cmd_kmodtalk(const char* args)
     }
     out_append(reply);
     out_append("\n");
+}
+
+static void cmd_kmo(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "list") || ascii_streq_ci(sub, "ls") ||
+        ascii_streq_ci(sub, "status")) {
+        uint32_t count = kmo_reload();
+        out_append("KMO modules: ");
+        out_append_u32(count);
+        out_append("\n");
+        for (uint32_t i = 0; i < count; i++) {
+            const kmo_module_t* m = kmo_get(i);
+            if (!m) continue;
+            out_append("  ");
+            out_append_u32(i);
+            out_append(" ");
+            out_append(m->name);
+            out_append(" file=");
+            out_append(m->file);
+            out_append(" target=");
+            out_append(m->target);
+            out_append(" default=");
+            out_append(m->default_msg);
+            out_append(m->writable ? " writable" : " readonly");
+            out_append("\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "reload")) {
+        uint32_t count = kmo_reload();
+        out_append("KMO reloaded: ");
+        out_append_u32(count);
+        out_append(" module file(s).\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "show") || ascii_streq_ci(sub, "info")) {
+        char key[64];
+        char view[1024];
+        if (vcs_read_word(&args, key, sizeof(key)) != 0) {
+            out_append("Usage: kmo show index|file.kmo|id\n");
+            return;
+        }
+        if (kmo_format(key, view, sizeof(view)) != 0) {
+            out_append(view);
+            out_append("\n");
+            return;
+        }
+        out_append(view);
+        out_append("\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "run") || ascii_streq_ci(sub, "ask")) {
+        char key[64];
+        char reply[KMODTALK_REPLY_MAX];
+        if (vcs_read_word(&args, key, sizeof(key)) != 0) {
+            out_append("Usage: kmo run index|file.kmo|id [message]\n");
+            return;
+        }
+        if (kmo_run(key, args, reply, sizeof(reply)) != 0) {
+            out_append(reply);
+            out_append("\n");
+            return;
+        }
+        out_append(reply);
+        out_append("\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "create") || ascii_streq_ci(sub, "new")) {
+        char file_arg[64];
+        char target[32];
+        int r;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+            vcs_read_word(&args, target, sizeof(target)) != 0) {
+            out_append("Usage: kmo create file.kmo target [default-message]\n");
+            return;
+        }
+        r = kmo_create(file_arg, target, args);
+        if (r == 0) {
+            out_append("KMO created. Use kmo show ");
+            out_append(file_arg);
+            out_append(" or kmo run ");
+            out_append(file_arg);
+            out_append(".\n");
+        } else {
+            out_append("kmo create failed ");
+            out_append_i32(r);
+            out_append("\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "set") || ascii_streq_ci(sub, "edit")) {
+        char file_arg[64];
+        char field[32];
+        int r;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+            vcs_read_word(&args, field, sizeof(field)) != 0 || !args[0]) {
+            out_append("Usage: kmo set file.kmo id|name|target|help|default|text value\n");
+            return;
+        }
+        r = kmo_set_field(file_arg, field, args);
+        if (r == 0) out_append("KMO changed and reloaded.\n");
+        else {
+            out_append("kmo set failed ");
+            out_append_i32(r);
+            out_append("\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "delete") || ascii_streq_ci(sub, "del") ||
+        ascii_streq_ci(sub, "rm")) {
+        char file_arg[64];
+        int r;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: kmo delete file.kmo\n");
+            return;
+        }
+        r = kmo_delete(file_arg);
+        if (r == 0) out_append("KMO deleted from the active module registry.\n");
+        else {
+            out_append("kmo delete failed ");
+            out_append_i32(r);
+            out_append("\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(kmo_selftest() == 0 ? "KMO selftest PASS.\n" : "KMO selftest FAIL.\n");
+        return;
+    }
+    out_append("Usage: kmo list|reload|show key|run key [message]|create file.kmo target [default]|set file.kmo field value|delete file.kmo\n");
 }
 
 static void cmd_ltheme_status(void)
@@ -7345,6 +7483,7 @@ static void parse_and_run(const char* cmd, const char* args)
     lardkit_trace_event("shell", cmd, 0);
     if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) lardkit_trace_event("kmodtalk", cmd, 0);
+    if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
     if (strcmp(cmd, "ltheme") == 0 ||
@@ -7464,6 +7603,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "larsapp") == 0) { cmd_larsapp(args); return; }
     if (strcmp(cmd, "sysrxe") == 0 || strcmp(cmd, "rxe") == 0) { cmd_sysrxe(args); return; }
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) { cmd_kmodtalk(args); return; }
+    if (strcmp(cmd, "kmo") == 0) { cmd_kmo(args); return; }
     if (strcmp(cmd, "larddnotes") == 0 || strcmp(cmd, "notes") == 0) { cmd_larddnotes(args); return; }
     if (strcmp(cmd, "larsform") == 0) { cmd_larsform(args); return; }
     if (strcmp(cmd, "larsact") == 0) { cmd_larsact(args); return; }
@@ -7567,6 +7707,7 @@ void lsh_init(void)
     lvcs_init();
     lardkit_init();
     kmodtalk_init();
+    (void)kmo_reload();
     out_append("Lard Shell ready. Type help for commands.\n");
 }
 

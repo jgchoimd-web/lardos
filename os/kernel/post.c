@@ -9,6 +9,7 @@
 #include "gui.h"
 #include "img_glyph.h"
 #include "installer.h"
+#include "kmo.h"
 #include "kmodtalk.h"
 #include "lar.h"
 #include "lard_doc.h"
@@ -118,7 +119,9 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: default.ltheme", fs_open("default.ltheme") != NULL, emit, user, &pass, &fail);
     post_check("fs: sysrxe guide", fs_open("sysrxe_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk guide", fs_open("kmodtalk_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: kmo guide", fs_open("kmo_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: hello sysrxe", fs_open("hello.sysrxe") != NULL, emit, user, &pass, &fail);
+    post_check("fs: gui status kmo", fs_open("gui_status.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode guide", fs_open("dosmode_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: installer guide", fs_open("installer_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
@@ -138,9 +141,10 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: user kmo writable", fs_open_writable("user0.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: hard delete overlay ownership", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
-    post_check("fs: writable directory index", fs_writable_count() >= 23u, emit, user, &pass, &fail);
+    post_check("fs: writable directory index", fs_writable_count() >= 27u, emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
     post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);
 
@@ -151,6 +155,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);
     post_check("sysrxe: file app parser", sysrxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("kmodtalk: direct module channel", kmodtalk_selftest() == 0, emit, user, &pass, &fail);
+    post_check("kmo: file kernel modules", kmo_selftest() == 0, emit, user, &pass, &fail);
     post_check("imgglyph: user-editable Unicode slots", img_glyph_selftest() == 0, emit, user, &pass, &fail);
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);

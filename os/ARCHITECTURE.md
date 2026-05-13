@@ -306,6 +306,13 @@ view text, and z-order.
 `v1.59.0a` promotes that model to the official channel without restoring the old
 EXGUI/EXEXGUI layers.
 
+`sysrxe.c` is the file-defined app runtime. Text/command apps and `TYPE GAME`
+apps share the same `.sysrxe` registry, desktop/dock launchers, windows, and
+shell commands. Game files declare their own board with `BOARD`, `ROW`,
+`PLAYER`, and `GOAL`; the runtime owns player position, move counts, reset, and
+arrow-key GUI movement so demo games can be added as native files instead of
+new per-app GUI branches.
+
 `v1.60.0a` adds L-DOS mode as a compatibility layer inside LSH rather than a
 foreign DOS runtime. `dos on` switches the prompt to `L-DOS C:\>`, DOS command
 aliases are case-insensitive, `C:`/`A:`/`R:` map visibly onto LardOS

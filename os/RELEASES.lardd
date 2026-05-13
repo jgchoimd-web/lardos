@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.67.0b
+ITEM Beta release adding native SYSRXE game apps for demo RXE games.
+ITEM Extended the .sysrxe format with TYPE GAME, GAME, BOARD, PLAYER/START, GOAL, and ROW map declarations.
+ITEM Added demo_game.sysrxe, a file-defined RXE maze with @ player, # walls, G goal, GUI arrow-key movement, shell play through sysrxe run 1 right, and reset support.
+ITEM Keeps SYSRXE on the shared file-defined app path, so the game is not a one-off hand-coded GUI branch.
+ITEM Added SYSRXE game parser selftests, POST/LUNIT file coverage, docs, and hardware-profile release support while preserving KMO, KModTalk, OSLink, and user-control values.
+
 SECTION v1.66.1a
 ITEM Official release promoting KMO raw-control from v1.66.1b without feature loss or philosophy changes.
 ITEM Keeps .kmo file modules, KModTalk routing, RAW 1 / TARGET raw explicit dangerous execution, kmo raw, kmo set raw 1, and raw_control.kmo.

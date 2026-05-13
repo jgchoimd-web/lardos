@@ -2524,6 +2524,16 @@ static void gui_run_sysrxe_current(void)
     gui_save_app_view(g.app_id);
 }
 
+static void gui_run_sysrxe_input(const char* input)
+{
+    if (!sysrxe_is_app(g.app_id)) return;
+    if (sysrxe_run(g.app_id, input, g.resp, sizeof(g.resp)) != 0) {
+        gui_copy_text(g.resp, sizeof(g.resp), "SYSRXE run failed.");
+    }
+    g.resp_scroll = 0;
+    gui_save_app_view(g.app_id);
+}
+
 static void gui_select_app(int idx)
 {
     int first_open;
@@ -3205,6 +3215,12 @@ void gui_handle_key(char ch)
     }
     if (!g_have_fb) return;
     if (!g.win_visible) return;
+    if (!g.tb_focused && sysrxe_is_game(g.app_id)) {
+        if (ch == 'w' || ch == 'W') { gui_run_sysrxe_input("up"); return; }
+        if (ch == 'a' || ch == 'A') { gui_run_sysrxe_input("left"); return; }
+        if (ch == 's' || ch == 'S') { gui_run_sysrxe_input("down"); return; }
+        if (ch == 'd' || ch == 'D') { gui_run_sysrxe_input("right"); return; }
+    }
     if (!g.tb_focused) return;
 
     char* edit_buf;
@@ -3321,6 +3337,13 @@ void gui_handle_key_nav(int kind)
         return;
     }
     if (!g.win_visible) return;
+    if (sysrxe_is_game(g.app_id)) {
+        if (kind == PS2K_LEFT) { gui_run_sysrxe_input("left"); return; }
+        if (kind == PS2K_RIGHT) { gui_run_sysrxe_input("right"); return; }
+        if (kind == PS2K_UP) { gui_run_sysrxe_input("up"); return; }
+        if (kind == PS2K_DOWN) { gui_run_sysrxe_input("down"); return; }
+        if (kind == PS2K_HOME) { gui_run_sysrxe_input("reset"); return; }
+    }
     uint32_t* cur = (g.app_id == 1) ? &g.calc_cur : (g.app_id == 9 && g.lafaelo_focus) ? &g.lafaelo_cur : &g.tb_cur;
     uint32_t len = (g.app_id == 1) ? g.calc_len : (g.app_id == 9 && g.lafaelo_focus) ? g.lafaelo_len : g.tb_len;
     if (!g.tb_focused && !(g.app_id == 9 && g.lafaelo_focus)) {

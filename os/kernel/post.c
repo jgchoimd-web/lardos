@@ -121,6 +121,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: kmodtalk guide", fs_open("kmodtalk_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmo guide", fs_open("kmo_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: hello sysrxe", fs_open("hello.sysrxe") != NULL, emit, user, &pass, &fail);
+    post_check("fs: demo sysrxe game", fs_open("demo_game.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: gui status kmo", fs_open("gui_status.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: raw control kmo", fs_open("raw_control.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode guide", fs_open("dosmode_guide.lardd") != NULL, emit, user, &pass, &fail);

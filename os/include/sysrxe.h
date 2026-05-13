@@ -4,9 +4,14 @@
 
 #define SYSRXE_MAX_APPS 8
 #define SYSRXE_APP_BASE 10
+#define SYSRXE_TYPE_TEXT 0
+#define SYSRXE_TYPE_GAME 1
+#define SYSRXE_GAME_MAX_W 24
+#define SYSRXE_GAME_MAX_H 12
 
 typedef struct sysrxe_app {
     int used;
+    int type;
     char file[32];
     char id[24];
     char name[24];
@@ -18,6 +23,20 @@ typedef struct sysrxe_app {
     char command[128];
     int show_desktop;
     int show_dock;
+    char game_kind[16];
+    uint32_t game_w;
+    uint32_t game_h;
+    uint32_t game_rows;
+    char game_map[SYSRXE_GAME_MAX_H][SYSRXE_GAME_MAX_W + 1];
+    int game_start_x;
+    int game_start_y;
+    int game_px;
+    int game_py;
+    int game_goal_x;
+    int game_goal_y;
+    uint32_t game_moves;
+    uint32_t game_wins;
+    int game_won;
 } sysrxe_app_t;
 
 void sysrxe_reset(void);
@@ -31,4 +50,5 @@ int sysrxe_index_from_app(int app);
 int sysrxe_load_file(const char* name);
 int sysrxe_format_home(int app, char* out, uint32_t out_cap);
 int sysrxe_run(int app, const char* input, char* out, uint32_t out_cap);
+int sysrxe_is_game(int app);
 int sysrxe_selftest(void);

@@ -330,6 +330,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use crashlog show to inspect panic and diagnostic history.\n"
     "li Use lpack verify sample.lpack before install, and lpack undo last to roll back the last install.\n"
     "li Use sysrxe list, sysrxe reload, sysrxe show userapp.sysrxe, and sysrxe run 0 text for file-defined GUI apps.\n"
+    "li Use sysrxe show demo_game.sysrxe and sysrxe run 1 right to play the native RXE demo game.\n"
     "li Use kmod history to read kmodtalk.lardd after direct kernel-module messages.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
     "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
@@ -381,6 +382,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.66.0b adds KMO, a native .kmo kernel module file format with user create/set/delete/run commands.\n"
     "li v1.66.1b adds explicit KMO raw-control mode so users can choose the dangerous path too.\n"
     "li v1.66.1a officially promotes KMO raw-control without feature loss or value changes.\n"
+    "li v1.67.0b adds SYSRXE GAME apps and demo_game.sysrxe, a native file-defined RXE maze game.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -700,12 +702,17 @@ static const uint8_t file_sysrxe_guide[] =
     "ITEM INPUT label\n"
     "ITEM BUTTON label\n"
     "ITEM DESKTOP 1 and DOCK 1 decide launcher placement.\n"
+    "ITEM TYPE GAME turns the file into a native RXE game instead of a text/command app.\n"
+    "ITEM BOARD width height declares the game map size, up to 24x12.\n"
+    "ITEM ROW map-line adds # walls, . floor, @ start, and G goal.\n"
     "ITEM TEXT app body line\n"
     "ITEM COMMAND lsh-command optionally receives textbox input.\n"
     "SECTION Commands\n"
     "ITEM sysrxe list\n"
     "ITEM sysrxe reload\n"
     "ITEM sysrxe show userapp.sysrxe\n"
+    "ITEM sysrxe show demo_game.sysrxe\n"
+    "ITEM sysrxe run 1 right\n"
     "ITEM edit userapp.sysrxe, save, then sysrxe reload\n"
     "END\n";
 
@@ -795,6 +802,30 @@ static const uint8_t file_hello_sysrxe[] =
     "TEXT Future simple apps can be new SYSRXE files.\n"
     "COMMAND echo hello-from-sysrxe\n";
 
+static const uint8_t file_demo_game_sysrxe[] =
+    "SYSRXE 1\n"
+    "ID rxe-maze\n"
+    "NAME RXE Maze\n"
+    "ICON M\n"
+    "COLOR 0xFF62C370\n"
+    "TYPE GAME\n"
+    "GAME maze\n"
+    "BOARD 16 8\n"
+    "INPUT Move:\n"
+    "BUTTON Step\n"
+    "DESKTOP 1\n"
+    "DOCK 1\n"
+    "TEXT Native SYSRXE game demo. It is a file-defined game, not a hand-coded app branch.\n"
+    "TEXT @ is you, G is the exit, # is wall. Arrow keys move in the GUI.\n"
+    "ROW ################\n"
+    "ROW #@....#........#\n"
+    "ROW #.##..#.####...#\n"
+    "ROW #..#..#....#...#\n"
+    "ROW #..####.##.#...#\n"
+    "ROW #........#.....#\n"
+    "ROW #.######...##G.#\n"
+    "ROW ################\n";
+
 static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"
     "CHECK file lardos.lars\n"
@@ -840,6 +871,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file kmodtalk_guide.lardd\n"
     "CHECK file kmo_guide.lardd\n"
     "CHECK file hello.sysrxe\n"
+    "CHECK file demo_game.sysrxe\n"
     "CHECK file gui_status.kmo\n"
     "CHECK file raw_control.kmo\n"
     "CHECK writable userapp.sysrxe\n"
@@ -938,6 +970,7 @@ static const FsFile FS_FILES[] = {
     { "kmodtalk_guide.lardd", file_kmodtalk_guide, sizeof(file_kmodtalk_guide) - 1 },
     { "kmo_guide.lardd", file_kmo_guide, sizeof(file_kmo_guide) - 1 },
     { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) - 1 },
+    { "demo_game.sysrxe", file_demo_game_sysrxe, sizeof(file_demo_game_sysrxe) - 1 },
     { "gui_status.kmo", file_gui_status_kmo, sizeof(file_gui_status_kmo) - 1 },
     { "raw_control.kmo", file_raw_control_kmo, sizeof(file_raw_control_kmo) - 1 },
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },

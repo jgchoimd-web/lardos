@@ -3625,6 +3625,7 @@ static void cmd_sysrxe(const char* args)
             out_append(a->name);
             out_append(" file=");
             out_append(a->file);
+            if (a->type == SYSRXE_TYPE_GAME) out_append(" game");
             out_append(a->show_dock ? " dock" : "");
             out_append(a->show_desktop ? " desktop" : "");
             out_append("\n");
@@ -3679,6 +3680,18 @@ static void cmd_sysrxe(const char* args)
         out_append(a->file);
         out_append("\n  icon: ");
         out_append(a->icon);
+        out_append("\n  type: ");
+        out_append(a->type == SYSRXE_TYPE_GAME ? "game" : "text");
+        if (a->type == SYSRXE_TYPE_GAME) {
+            out_append("\n  board: ");
+            out_append_u32(a->game_w);
+            out_append("x");
+            out_append_u32(a->game_h);
+            out_append("\n  moves: ");
+            out_append_u32(a->game_moves);
+            out_append("\n  wins: ");
+            out_append_u32(a->game_wins);
+        }
         out_append("\n  input: ");
         out_append(a->input_label);
         out_append("\n  button: ");

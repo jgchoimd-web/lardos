@@ -22,12 +22,13 @@
 #include "lib3d_demo.h"
 #include "version.h"
 #include "sysrxe.h"
+#include "rxe.h"
 #include "string.h"
 
 #define LARSH_VIEW_W 160
 #define LARSH_VIEW_H 120
 #define GUI_GLYPH_HITS_MAX 64u
-#define GUI_APP_COUNT (SYSRXE_APP_BASE + SYSRXE_MAX_APPS)
+#define GUI_APP_COUNT (RXE_APP_BASE + RXE_MAX_APPS)
 #define GUI_DESKTOP_ITEM_MAX 24
 #define GUI_DOCK_ITEM_MAX 16
 #define GUI_ITEM_NONE 0
@@ -1069,9 +1070,35 @@ static const char* gui_app_name(int app)
         "User App", "Shrine", "Lard Shell", "Play", "Editor"
     };
     const sysrxe_app_t* sx = sysrxe_get_by_app(app);
+    const rxe_app_t* rx = rxe_get_by_app(app);
     if (sx) return sx->name;
+    if (rx) return rx->name;
     if (app >= 0 && app < (int)(sizeof(names) / sizeof(names[0]))) return names[app];
     return "App";
+}
+
+static int gui_file_rxe_app(int app)
+{
+    return sysrxe_is_app(app) || rxe_is_app(app);
+}
+
+static int gui_file_rxe_game(int app)
+{
+    return sysrxe_is_game(app) || rxe_is_game(app);
+}
+
+static int gui_file_rxe_run(int app, const char* input, char* out, uint32_t out_cap)
+{
+    if (sysrxe_is_app(app)) return sysrxe_run(app, input, out, out_cap);
+    if (rxe_is_app(app)) return rxe_run(app, input, out, out_cap);
+    return -1;
+}
+
+static int gui_file_rxe_format_home(int app, char* out, uint32_t out_cap)
+{
+    if (sysrxe_is_app(app)) return sysrxe_format_home(app, out, out_cap);
+    if (rxe_is_app(app)) return rxe_format_home(app, out, out_cap);
+    return -1;
 }
 
 static void gui_copy_text(char* dst, uint32_t cap, const char* src)
@@ -1157,6 +1184,7 @@ static void gui_item_from_app(gui_item_t* item, int app, int x, int y)
 {
     const gui_launcher_t* l;
     const sysrxe_app_t* sx;
+    const rxe_app_t* rx;
     if (!item) return;
     sx = sysrxe_get_by_app(app);
     if (sx) {
@@ -1170,6 +1198,20 @@ static void gui_item_from_app(gui_item_t* item, int app, int x, int y)
         gui_copy_text(item->name, sizeof(item->name), sx->name);
         gui_copy_text(item->icon, sizeof(item->icon), sx->icon);
         item->color = sx->color;
+        return;
+    }
+    rx = rxe_get_by_app(app);
+    if (rx) {
+        item->used = 1;
+        item->kind = GUI_ITEM_APP;
+        item->app = app;
+        item->x = x;
+        item->y = y;
+        item->w = 76;
+        item->h = 62;
+        gui_copy_text(item->name, sizeof(item->name), rx->name);
+        gui_copy_text(item->icon, sizeof(item->icon), rx->icon);
+        item->color = rx->color;
         return;
     }
     l = gui_launcher_for_app(app);
@@ -1796,7 +1838,7 @@ static int gui_model_has_app(gui_item_t* items, int count, int app)
 static void gui_model_refresh_sysrxe_items(gui_item_t* items, int count)
 {
     for (int i = 0; i < count; i++) {
-        if (items[i].used && items[i].kind == GUI_ITEM_APP && sysrxe_is_app(items[i].app)) {
+        if (items[i].used && items[i].kind == GUI_ITEM_APP && gui_file_rxe_app(items[i].app)) {
             int x = items[i].x;
             int y = items[i].y;
             gui_item_from_app(&items[i], items[i].app, x, y);
@@ -1807,6 +1849,7 @@ static void gui_model_refresh_sysrxe_items(gui_item_t* items, int count)
 void gui_reload_sysrxe_apps(void)
 {
     (void)sysrxe_reload();
+    (void)rxe_reload();
     if (!g_have_fb) return;
     gui_model_refresh_sysrxe_items(g_desktop_items, g_desktop_item_count);
     gui_model_refresh_sysrxe_items(g_dock_items, g_dock_item_count);
@@ -1826,11 +1869,28 @@ void gui_reload_sysrxe_apps(void)
         }
         gui_window_ensure(app);
     }
+    for (uint32_t i = 0; i < rxe_count(); i++) {
+        const rxe_app_t* rx = rxe_get(i);
+        int app = rxe_app_id(i);
+        if (!rx) continue;
+        if (rx->show_desktop && !gui_model_has_app(g_desktop_items, g_desktop_item_count, app) &&
+            g_desktop_item_count < GUI_DESKTOP_ITEM_MAX) {
+            int x, y;
+            gui_next_desktop_spot(&x, &y);
+            gui_item_from_app(&g_desktop_items[g_desktop_item_count++], app, x, y);
+        }
+        if (rx->show_dock && !gui_model_has_app(g_dock_items, g_dock_item_count, app) &&
+            g_dock_item_count < GUI_DOCK_ITEM_MAX) {
+            gui_item_from_app(&g_dock_items[g_dock_item_count++], app, 0, 0);
+        }
+        gui_window_ensure(app);
+    }
 }
 
 static void gui_desktop_init_model(void)
 {
     if (sysrxe_count() == 0) (void)sysrxe_reload();
+    if (rxe_count() == 0) (void)rxe_reload();
     if (g_desktop_item_count == 0) {
         for (uint32_t i = 0; i < sizeof(s_desktop_launchers) / sizeof(s_desktop_launchers[0]); i++) {
             int x, y, w, h;
@@ -1844,6 +1904,13 @@ static void gui_desktop_init_model(void)
             gui_default_item_rect(g_desktop_item_count, &x, &y, &w, &h);
             gui_item_from_app(&g_desktop_items[g_desktop_item_count++], sysrxe_app_id(i), x, y);
         }
+        for (uint32_t i = 0; i < rxe_count() && g_desktop_item_count < GUI_DESKTOP_ITEM_MAX; i++) {
+            const rxe_app_t* rx = rxe_get(i);
+            int x, y, w, h;
+            if (!rx || !rx->show_desktop) continue;
+            gui_default_item_rect(g_desktop_item_count, &x, &y, &w, &h);
+            gui_item_from_app(&g_desktop_items[g_desktop_item_count++], rxe_app_id(i), x, y);
+        }
     }
     if (g_dock_item_count == 0) {
         for (uint32_t i = 0; i < sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]); i++) {
@@ -1853,6 +1920,11 @@ static void gui_desktop_init_model(void)
             const sysrxe_app_t* sx = sysrxe_get(i);
             if (!sx || !sx->show_dock) continue;
             gui_item_from_app(&g_dock_items[g_dock_item_count++], sysrxe_app_id(i), 0, 0);
+        }
+        for (uint32_t i = 0; i < rxe_count() && g_dock_item_count < GUI_DOCK_ITEM_MAX; i++) {
+            const rxe_app_t* rx = rxe_get(i);
+            if (!rx || !rx->show_dock) continue;
+            gui_item_from_app(&g_dock_items[g_dock_item_count++], rxe_app_id(i), 0, 0);
         }
     }
     for (int i = 0; i < GUI_APP_COUNT; i++) gui_window_ensure(i);
@@ -2516,9 +2588,9 @@ void gui_larsh_play(const char* path)
 
 static void gui_run_sysrxe_current(void)
 {
-    if (!sysrxe_is_app(g.app_id)) return;
-    if (sysrxe_run(g.app_id, g.tb, g.resp, sizeof(g.resp)) != 0) {
-        gui_copy_text(g.resp, sizeof(g.resp), "SYSRXE run failed.");
+    if (!gui_file_rxe_app(g.app_id)) return;
+    if (gui_file_rxe_run(g.app_id, g.tb, g.resp, sizeof(g.resp)) != 0) {
+        gui_copy_text(g.resp, sizeof(g.resp), "RXE run failed.");
     }
     g.resp_scroll = 0;
     gui_save_app_view(g.app_id);
@@ -2526,9 +2598,9 @@ static void gui_run_sysrxe_current(void)
 
 static void gui_run_sysrxe_input(const char* input)
 {
-    if (!sysrxe_is_app(g.app_id)) return;
-    if (sysrxe_run(g.app_id, input, g.resp, sizeof(g.resp)) != 0) {
-        gui_copy_text(g.resp, sizeof(g.resp), "SYSRXE run failed.");
+    if (!gui_file_rxe_app(g.app_id)) return;
+    if (gui_file_rxe_run(g.app_id, input, g.resp, sizeof(g.resp)) != 0) {
+        gui_copy_text(g.resp, sizeof(g.resp), "RXE run failed.");
     }
     g.resp_scroll = 0;
     gui_save_app_view(g.app_id);
@@ -2563,9 +2635,9 @@ static void gui_select_app(int idx)
         }
         return;
     }
-    if (sysrxe_is_app(idx)) {
-        if (sysrxe_format_home(idx, g.resp, sizeof(g.resp)) != 0) {
-            gui_copy_text(g.resp, sizeof(g.resp), "SYSRXE app could not be rendered.");
+    if (gui_file_rxe_app(idx)) {
+        if (gui_file_rxe_format_home(idx, g.resp, sizeof(g.resp)) != 0) {
+            gui_copy_text(g.resp, sizeof(g.resp), "RXE app could not be rendered.");
         }
         g.tb_len = 0;
         g.tb_cur = 0;
@@ -3020,7 +3092,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
                 g.resp[i] = '\0';
                 g.lafaelo_show_run = 1;
             }
-        } else if (g.btn_pressed && sysrxe_is_app(g.app_id) &&
+        } else if (g.btn_pressed && gui_file_rxe_app(g.app_id) &&
                    in_rect(g.mx, g.my, btn_x, btn_y, btn_w, btn_h)) {
             gui_run_sysrxe_current();
         } else if (g.btn_pressed && g.app_id == 5 && in_rect(g.mx, g.my, btn_x + btn_w + 8, btn_y, 70, btn_h)) {
@@ -3215,7 +3287,7 @@ void gui_handle_key(char ch)
     }
     if (!g_have_fb) return;
     if (!g.win_visible) return;
-    if (!g.tb_focused && sysrxe_is_game(g.app_id)) {
+    if (!g.tb_focused && gui_file_rxe_game(g.app_id)) {
         if (ch == 'w' || ch == 'W') { gui_run_sysrxe_input("up"); return; }
         if (ch == 'a' || ch == 'A') { gui_run_sysrxe_input("left"); return; }
         if (ch == 's' || ch == 'S') { gui_run_sysrxe_input("down"); return; }
@@ -3278,7 +3350,7 @@ void gui_handle_key(char ch)
             }
             return;
         }
-        if (sysrxe_is_app(g.app_id)) {
+        if (gui_file_rxe_app(g.app_id)) {
             gui_run_sysrxe_current();
         }
         else if (g.app_id == 0) g.submit_pending = 1;
@@ -3337,7 +3409,7 @@ void gui_handle_key_nav(int kind)
         return;
     }
     if (!g.win_visible) return;
-    if (sysrxe_is_game(g.app_id)) {
+    if (gui_file_rxe_game(g.app_id)) {
         if (kind == PS2K_LEFT) { gui_run_sysrxe_input("left"); return; }
         if (kind == PS2K_RIGHT) { gui_run_sysrxe_input("right"); return; }
         if (kind == PS2K_UP) { gui_run_sysrxe_input("up"); return; }
@@ -3742,7 +3814,8 @@ void gui_render(void)
         }
     } else {
         const sysrxe_app_t* sx = sysrxe_get_by_app(g.app_id);
-        const char* btn_label = sx ? sx->button_label :
+        const rxe_app_t* rx = rxe_get_by_app(g.app_id);
+        const char* btn_label = sx ? sx->button_label : rx ? rx->button_label :
             (g.app_id == 1) ? "=" : (g.app_id == 2) ? "Save" : (g.app_id == 3) ? "View" : (g.app_id == 4) ? "Extract" : (g.app_id == 8) ? "Run" : "Run";
         uint32_t btn_bg = g.btn_pressed ? 0xFFFFB84D : 0xFF2B7A78;
         fb_fill_rect(tgt, (uint16_t)btn_x, (uint16_t)btn_y, (uint16_t)btn_w, (uint16_t)btn_h, btn_bg);
@@ -3769,7 +3842,9 @@ void gui_render(void)
     uint32_t input_cur = (g.app_id == 1) ? g.calc_cur : g.tb_cur;
     const char* input_label = "URL:";
     const sysrxe_app_t* input_sx = sysrxe_get_by_app(g.app_id);
+    const rxe_app_t* input_rx = rxe_get_by_app(g.app_id);
     if (input_sx) input_label = input_sx->input_label;
+    if (input_rx) input_label = input_rx->input_label;
     if (g.app_id == 0 && g.http_post_mode) input_label = "URL|Body:";
     if (g.app_id == 1) input_label = "Expr:";
     else if (g.app_id == 2) input_label = "Add line:";
@@ -3812,7 +3887,9 @@ void gui_render(void)
 
     const char* view_label = "Response:";
     const sysrxe_app_t* view_sx = sysrxe_get_by_app(g.app_id);
+    const rxe_app_t* view_rx = rxe_get_by_app(g.app_id);
     if (view_sx) view_label = view_sx->name;
+    if (view_rx) view_label = view_rx->name;
     if (g.app_id == 1) view_label = "Result:";
     else if (g.app_id == 2) view_label = "Notes:";
     else if (g.app_id == 3) view_label = "Gallery:";

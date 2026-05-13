@@ -306,9 +306,11 @@ view text, and z-order.
 `v1.59.0a` promotes that model to the official channel without restoring the old
 EXGUI/EXEXGUI layers.
 
-`sysrxe.c` is the file-defined app runtime. Text/command apps and `TYPE GAME`
-apps share the same `.sysrxe` registry, desktop/dock launchers, windows, and
-shell commands. Game files declare their own board with `BOARD`, `ROW`,
+`sysrxe.c` owns the file-defined executable family. `SYSRXE` is reserved for
+system executables (`.sysrxe` and the `sysrxe` command); normal executables use
+`RXE` (`.rxe` and the `rxe` command). Both surfaces share the desktop/dock
+launcher and window model, but the user-facing normal demo lives in
+`demo_game.rxe`. Game files declare their own board with `BOARD`, `ROW`,
 `PLAYER`, and `GOAL`; the runtime owns player position, move counts, reset, and
 arrow-key GUI movement so demo games can be added as native files instead of
 new per-app GUI branches.

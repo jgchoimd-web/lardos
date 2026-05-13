@@ -36,6 +36,7 @@
 #include "installer.h"
 #include "version.h"
 #include "vmmon.h"
+#include "rxe.h"
 #include "sysrxe.h"
 #include "kmodtalk.h"
 #include "kmo.h"
@@ -311,7 +312,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
-    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
@@ -1390,13 +1391,14 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status install dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
-    out_append("  sysrxe list|reload|show|run       file-defined system GUI apps\n");
+    out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
+    out_append("  rxe list|reload|show|run          file-defined normal executables\n");
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
     out_append("  kmo list|create|raw|set|delete|show|run  user-owned .kmo kernel module files, including explicit raw-control\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
@@ -3723,6 +3725,128 @@ static void cmd_sysrxe(const char* args)
         return;
     }
     out_append("Usage: sysrxe list|reload|load file.sysrxe|show index|run index [input]\n");
+}
+
+static void cmd_rxe(const char* args)
+{
+    char sub[16];
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "list") || ascii_streq_ci(sub, "status") ||
+        ascii_streq_ci(sub, "ls")) {
+        uint32_t count = rxe_count();
+        if (count == 0) count = rxe_reload();
+        out_append("RXE executables: ");
+        out_append_u32(count);
+        out_append("\n");
+        for (uint32_t i = 0; i < count; i++) {
+            const rxe_app_t* a = rxe_get(i);
+            if (!a) continue;
+            out_append("  ");
+            out_append_u32(i);
+            out_append(" app=");
+            out_append_u32((uint32_t)rxe_app_id(i));
+            out_append(" ");
+            out_append(a->name);
+            out_append(" file=");
+            out_append(a->file);
+            if (a->type == SYSRXE_TYPE_GAME) out_append(" game");
+            out_append(a->show_dock ? " dock" : "");
+            out_append(a->show_desktop ? " desktop" : "");
+            out_append("\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "reload")) {
+        uint32_t count;
+        gui_reload_sysrxe_apps();
+        count = rxe_count();
+        out_append("RXE reloaded: ");
+        out_append_u32(count);
+        out_append(" executable(s). Desktop and dock launchers were refreshed.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "load")) {
+        char file_arg[64];
+        int r;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: rxe load file.rxe\n");
+            return;
+        }
+        r = rxe_load_file(file_arg);
+        out_append(r == 0 ? "RXE loaded.\n" : "RXE load failed.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "show")) {
+        char word[64];
+        uint32_t idx = 0;
+        const rxe_app_t* a = NULL;
+        if (vcs_read_word(&args, word, sizeof(word)) != 0) {
+            out_append("Usage: rxe show index|file.rxe\n");
+            return;
+        }
+        if (word[0] >= '0' && word[0] <= '9') {
+            const char* p = word;
+            if (vcs_parse_u32(&p, &idx) == 0) a = rxe_get(idx);
+        } else {
+            if (rxe_count() == 0) (void)rxe_reload();
+            for (uint32_t i = 0; i < rxe_count(); i++) {
+                const rxe_app_t* cand = rxe_get(i);
+                if (cand && strcmp(cand->file, word) == 0) { a = cand; break; }
+            }
+        }
+        if (!a) {
+            out_append("RXE executable not found.\n");
+            return;
+        }
+        out_append("RXE ");
+        out_append(a->name);
+        out_append("\n  file: ");
+        out_append(a->file);
+        out_append("\n  icon: ");
+        out_append(a->icon);
+        out_append("\n  type: ");
+        out_append(a->type == SYSRXE_TYPE_GAME ? "game" : "text");
+        if (a->type == SYSRXE_TYPE_GAME) {
+            out_append("\n  board: ");
+            out_append_u32(a->game_w);
+            out_append("x");
+            out_append_u32(a->game_h);
+            out_append("\n  moves: ");
+            out_append_u32(a->game_moves);
+            out_append("\n  wins: ");
+            out_append_u32(a->game_wins);
+        }
+        out_append("\n  input: ");
+        out_append(a->input_label);
+        out_append("\n  button: ");
+        out_append(a->button_label);
+        out_append("\n  command: ");
+        out_append(a->command[0] ? a->command : "(none)");
+        out_append("\n\n");
+        out_append(a->body);
+        return;
+    }
+    if (ascii_streq_ci(sub, "run")) {
+        uint32_t idx = 0;
+        char out[1024];
+        if (vcs_parse_u32(&args, &idx) != 0) {
+            out_append("Usage: rxe run index [input]\n");
+            return;
+        }
+        if (rxe_count() == 0) (void)rxe_reload();
+        if (rxe_run(rxe_app_id(idx), args, out, sizeof(out)) != 0) {
+            out_append("RXE run failed.\n");
+            return;
+        }
+        out_append(out);
+        out_append("\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(rxe_selftest() == 0 ? "RXE selftest PASS.\n" : "RXE selftest FAIL.\n");
+        return;
+    }
+    out_append("Usage: rxe list|reload|load file.rxe|show index|run index [input]\n");
 }
 
 static void cmd_kmodtalk_list(void)
@@ -7635,7 +7759,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "doc") == 0) { cmd_larddoc(args, "Usage: doc [drive:]file.lars|file.lardd"); return; }
     if (strcmp(cmd, "larsview") == 0) { cmd_larsview(args); return; }
     if (strcmp(cmd, "larsapp") == 0) { cmd_larsapp(args); return; }
-    if (strcmp(cmd, "sysrxe") == 0 || strcmp(cmd, "rxe") == 0) { cmd_sysrxe(args); return; }
+    if (strcmp(cmd, "sysrxe") == 0) { cmd_sysrxe(args); return; }
+    if (strcmp(cmd, "rxe") == 0) { cmd_rxe(args); return; }
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) { cmd_kmodtalk(args); return; }
     if (strcmp(cmd, "kmo") == 0) { cmd_kmo(args); return; }
     if (strcmp(cmd, "larddnotes") == 0 || strcmp(cmd, "notes") == 0) { cmd_larddnotes(args); return; }

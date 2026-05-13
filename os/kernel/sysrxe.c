@@ -2,6 +2,7 @@
 
 #include "fs.h"
 #include "lsh.h"
+#include "rxe.h"
 #include "string.h"
 
 #include <stddef.h>
@@ -9,6 +10,8 @@
 
 static sysrxe_app_t s_apps[SYSRXE_MAX_APPS];
 static uint32_t s_count;
+static rxe_app_t s_rxe_apps[RXE_MAX_APPS];
+static uint32_t s_rxe_count;
 
 static void copy_text(char* dst, uint32_t cap, const char* src)
 {
@@ -90,6 +93,17 @@ static const char* value_after_key(const char* line, const char* key)
     if (line[i] != ' ' && line[i] != '\t' && line[i] != '=') return NULL;
     while (line[i] == ' ' || line[i] == '\t' || line[i] == '=') i++;
     return line + i;
+}
+
+static int starts_key(const char* line, const char* key)
+{
+    uint32_t i = 0;
+    if (!line || !key) return 0;
+    while (key[i]) {
+        if (line[i] != key[i]) return 0;
+        i++;
+    }
+    return line[i] == '\0' || line[i] == ' ' || line[i] == '\t' || line[i] == '=';
 }
 
 static uint32_t parse_number(const char* s, uint32_t fallback)
@@ -279,7 +293,7 @@ static int parse_line(sysrxe_app_t* app, const char* src)
     strip_tail(line);
     src = skip_ws(line);
     if (!src[0] || src[0] == '#') return 0;
-    if (strncmp(src, "SYSRXE", 6) == 0) return 0;
+    if (starts_key(src, "SYSRXE") || starts_key(src, "RXE")) return 0;
     if ((v = value_after_key(src, "ID")) != NULL) { copy_text(app->id, sizeof(app->id), v); return 0; }
     if ((v = value_after_key(src, "NAME")) != NULL) { copy_text(app->name, sizeof(app->name), v); return 0; }
     if ((v = value_after_key(src, "ICON")) != NULL) { copy_text(app->icon, sizeof(app->icon), v); return 0; }
@@ -324,7 +338,7 @@ static int parse_line(sysrxe_app_t* app, const char* src)
     return 0;
 }
 
-static int parse_sysrxe(sysrxe_app_t* app, const char* file, const char* data, uint32_t size)
+static int parse_rxe_text(sysrxe_app_t* app, const char* file, const char* data, uint32_t size, const char* magic)
 {
     char line[192];
     uint32_t lp = 0;
@@ -335,7 +349,7 @@ static int parse_sysrxe(sysrxe_app_t* app, const char* file, const char* data, u
         char c = data[i];
         if (c == '\n' || lp + 1u >= sizeof(line)) {
             line[lp] = '\0';
-            if (strncmp(skip_ws(line), "SYSRXE", 6) == 0) saw_magic = 1;
+            if (starts_key(skip_ws(line), magic)) saw_magic = 1;
             parse_line(app, line);
             lp = 0;
         } else {
@@ -344,13 +358,23 @@ static int parse_sysrxe(sysrxe_app_t* app, const char* file, const char* data, u
     }
     if (lp > 0) {
         line[lp] = '\0';
-        if (strncmp(skip_ws(line), "SYSRXE", 6) == 0) saw_magic = 1;
+        if (starts_key(skip_ws(line), magic)) saw_magic = 1;
         parse_line(app, line);
     }
     if (!saw_magic) return -2;
     if (!app->body[0]) append_text(app->body, sizeof(app->body), "This app was loaded from SYSRXE.");
     normalize_game(app);
     return 0;
+}
+
+static int parse_sysrxe(sysrxe_app_t* app, const char* file, const char* data, uint32_t size)
+{
+    return parse_rxe_text(app, file, data, size, "SYSRXE");
+}
+
+static int parse_normal_rxe(rxe_app_t* app, const char* file, const char* data, uint32_t size)
+{
+    return parse_rxe_text(app, file, data, size, "RXE");
 }
 
 static int already_loaded(const char* name)
@@ -361,10 +385,24 @@ static int already_loaded(const char* name)
     return 0;
 }
 
+static int rxe_already_loaded(const char* name)
+{
+    for (uint32_t i = 0; i < s_rxe_count; i++) {
+        if (strcmp(s_rxe_apps[i].file, name) == 0) return 1;
+    }
+    return 0;
+}
+
 void sysrxe_reset(void)
 {
     memset(s_apps, 0, sizeof(s_apps));
     s_count = 0;
+}
+
+void rxe_reset(void)
+{
+    memset(s_rxe_apps, 0, sizeof(s_rxe_apps));
+    s_rxe_count = 0;
 }
 
 int sysrxe_load_file(const char* name)
@@ -381,11 +419,32 @@ int sysrxe_load_file(const char* name)
     return 0;
 }
 
+int rxe_load_file(const char* name)
+{
+    const FsFile* f;
+    rxe_app_t app;
+    if (!name || !name[0] || s_rxe_count >= RXE_MAX_APPS) return -1;
+    if (!has_suffix_ci(name, ".rxe")) return -2;
+    if (rxe_already_loaded(name)) return 0;
+    f = fs_open(name);
+    if (!f || !f->data || f->size == 0) return -3;
+    if (parse_normal_rxe(&app, name, (const char*)f->data, f->size) != 0) return -4;
+    s_rxe_apps[s_rxe_count++] = app;
+    return 0;
+}
+
 static void scan_cb(const char* name, uint32_t size, void* user)
 {
     (void)size;
     (void)user;
     if (has_suffix_ci(name, ".sysrxe")) (void)sysrxe_load_file(name);
+}
+
+static void rxe_scan_cb(const char* name, uint32_t size, void* user)
+{
+    (void)size;
+    (void)user;
+    if (has_suffix_ci(name, ".rxe")) (void)rxe_load_file(name);
 }
 
 uint32_t sysrxe_reload(void)
@@ -395,9 +454,21 @@ uint32_t sysrxe_reload(void)
     return s_count;
 }
 
+uint32_t rxe_reload(void)
+{
+    rxe_reset();
+    fs_list(rxe_scan_cb, NULL);
+    return s_rxe_count;
+}
+
 uint32_t sysrxe_count(void)
 {
     return s_count;
+}
+
+uint32_t rxe_count(void)
+{
+    return s_rxe_count;
 }
 
 const sysrxe_app_t* sysrxe_get(uint32_t index)
@@ -406,10 +477,22 @@ const sysrxe_app_t* sysrxe_get(uint32_t index)
     return &s_apps[index];
 }
 
+const rxe_app_t* rxe_get(uint32_t index)
+{
+    if (index >= s_rxe_count) return NULL;
+    return &s_rxe_apps[index];
+}
+
 int sysrxe_app_id(uint32_t index)
 {
     if (index >= SYSRXE_MAX_APPS) return -1;
     return SYSRXE_APP_BASE + (int)index;
+}
+
+int rxe_app_id(uint32_t index)
+{
+    if (index >= RXE_MAX_APPS) return -1;
+    return RXE_APP_BASE + (int)index;
 }
 
 int sysrxe_index_from_app(int app)
@@ -419,10 +502,23 @@ int sysrxe_index_from_app(int app)
     return idx;
 }
 
+int rxe_index_from_app(int app)
+{
+    int idx = app - RXE_APP_BASE;
+    if (idx < 0 || idx >= (int)RXE_MAX_APPS) return -1;
+    return idx;
+}
+
 int sysrxe_is_app(int app)
 {
     int idx = sysrxe_index_from_app(app);
     return idx >= 0 && (uint32_t)idx < s_count && s_apps[idx].used;
+}
+
+int rxe_is_app(int app)
+{
+    int idx = rxe_index_from_app(app);
+    return idx >= 0 && (uint32_t)idx < s_rxe_count && s_rxe_apps[idx].used;
 }
 
 const sysrxe_app_t* sysrxe_get_by_app(int app)
@@ -432,11 +528,25 @@ const sysrxe_app_t* sysrxe_get_by_app(int app)
     return &s_apps[idx];
 }
 
+const rxe_app_t* rxe_get_by_app(int app)
+{
+    int idx = rxe_index_from_app(app);
+    if (idx < 0 || (uint32_t)idx >= s_rxe_count) return NULL;
+    return &s_rxe_apps[idx];
+}
+
 static sysrxe_app_t* sysrxe_get_mutable_by_app(int app)
 {
     int idx = sysrxe_index_from_app(app);
     if (idx < 0 || (uint32_t)idx >= s_count) return NULL;
     return &s_apps[idx];
+}
+
+static rxe_app_t* rxe_get_mutable_by_app(int app)
+{
+    int idx = rxe_index_from_app(app);
+    if (idx < 0 || (uint32_t)idx >= s_rxe_count) return NULL;
+    return &s_rxe_apps[idx];
 }
 
 static void sysrxe_game_render(const sysrxe_app_t* a, char* out, uint32_t out_cap)
@@ -544,6 +654,22 @@ int sysrxe_format_home(int app, char* out, uint32_t out_cap)
     return 0;
 }
 
+int rxe_format_home(int app, char* out, uint32_t out_cap)
+{
+    const rxe_app_t* a = rxe_get_by_app(app);
+    if (!a || !out || out_cap == 0) return -1;
+    if (a->type == SYSRXE_TYPE_GAME) {
+        sysrxe_game_render(a, out, out_cap);
+        return 0;
+    }
+    snprintf(out, out_cap,
+             "RXE executable: %s\nfile: %s\n\n%s%s%s",
+             a->name, a->file, a->body,
+             a->command[0] ? "\nCommand: " : "",
+             a->command[0] ? a->command : "");
+    return 0;
+}
+
 int sysrxe_run(int app, const char* input, char* out, uint32_t out_cap)
 {
     sysrxe_app_t* a = sysrxe_get_mutable_by_app(app);
@@ -568,9 +694,39 @@ int sysrxe_run(int app, const char* input, char* out, uint32_t out_cap)
     return 0;
 }
 
+int rxe_run(int app, const char* input, char* out, uint32_t out_cap)
+{
+    rxe_app_t* a = rxe_get_mutable_by_app(app);
+    if (!a || !out || out_cap == 0) return -1;
+    if (!input) input = "";
+    if (a->type == SYSRXE_TYPE_GAME) return sysrxe_game_run(a, input, out, out_cap);
+    if (a->command[0]) {
+        char cmd[256];
+        uint32_t n = 0;
+        uint32_t i = 0;
+        while (a->command[n] && n + 1u < sizeof(cmd)) { cmd[n] = a->command[n]; n++; }
+        if (input[0] && n + 2u < sizeof(cmd)) {
+            cmd[n++] = ' ';
+            while (input[i] && n + 1u < sizeof(cmd)) cmd[n++] = input[i++];
+        }
+        cmd[n] = '\0';
+        lsh_exec(cmd);
+        copy_text(out, out_cap, lsh_get_output());
+        return 0;
+    }
+    snprintf(out, out_cap, "%s\nInput: %s\n\nNo COMMAND is set, so RXE only rendered the executable body.", a->body, input);
+    return 0;
+}
+
 int sysrxe_is_game(int app)
 {
     const sysrxe_app_t* a = sysrxe_get_by_app(app);
+    return a && a->type == SYSRXE_TYPE_GAME;
+}
+
+int rxe_is_game(int app)
+{
+    const rxe_app_t* a = rxe_get_by_app(app);
     return a && a->type == SYSRXE_TYPE_GAME;
 }
 
@@ -611,5 +767,31 @@ int sysrxe_selftest(void)
     if (game_app.game_goal_x != 3 || game_app.game_goal_y != 1) return -11;
     if (sysrxe_game_run(&game_app, "right", out, sizeof(out)) != 0) return -12;
     if (game_app.game_px != 2 || game_app.game_py != 1 || game_app.game_moves != 1u) return -13;
+    return 0;
+}
+
+int rxe_selftest(void)
+{
+    static const char game[] =
+        "RXE 1\n"
+        "ID game\n"
+        "NAME Normal RXE Game\n"
+        "TYPE GAME\n"
+        "BOARD 5 3\n"
+        "ROW #####\n"
+        "ROW #@.G#\n"
+        "ROW #####\n";
+    rxe_app_t app;
+    char out[512];
+    if (parse_normal_rxe(&app, "game.rxe", game, sizeof(game) - 1) != 0) return -1;
+    if (app.type != SYSRXE_TYPE_GAME) return -2;
+    if (strcmp(app.name, "Normal RXE Game") != 0) return -3;
+    if (app.game_w != 5u || app.game_h != 3u) return -4;
+    if (app.game_px != 1 || app.game_py != 1) return -5;
+    if (app.game_goal_x != 3 || app.game_goal_y != 1) return -6;
+    if (sysrxe_game_run(&app, "right", out, sizeof(out)) != 0) return -7;
+    if (app.game_px != 2 || app.game_py != 1 || app.game_moves != 1u) return -8;
+    if (sysrxe_game_run(&app, "right", out, sizeof(out)) != 0) return -9;
+    if (!app.game_won || app.game_wins != 1u) return -10;
     return 0;
 }

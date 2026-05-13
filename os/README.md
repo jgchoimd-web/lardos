@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.67.0b-ami/lardos-v1.67.0b-ami.iso`. To publish the whole hardware
+`release/v1.67.1p-ami/lardos-v1.67.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,9 +140,11 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
-- `v1.67.0b` adds SYSRXE game apps. `demo_game.sysrxe` is a native file-defined
-  RXE maze game loaded through the same app format as other SYSRXE files, with
-  arrow-key GUI movement and `sysrxe run 1 right` shell play.
+- `v1.67.1p` hotpatches the RXE naming model: `sysrxe` is reserved for system
+  executables, while normal executable/game files use `.rxe` and the `rxe`
+  command. `demo_game.rxe` is the native RXE maze demo.
+- `v1.67.0b` introduced the first RXE game runtime experiment; `v1.67.1p`
+  corrects the naming split so normal games live under `.rxe`.
 - `v1.66.1a` officially promotes KMO raw-control from `v1.66.1b` without
   feature loss or philosophy changes.
 - `v1.66.1b` adds explicit KMO raw-control mode: `RAW 1`, `TARGET raw`,
@@ -375,9 +377,10 @@ commands:
   `notes.lardd` document.
 - `sysrxe list|reload|show|run` manages `.sysrxe` System RXE app files, so
   simple GUI apps can be added as native files instead of writing a new GUI C
-  branch for every app. Built-in `hello.sysrxe` and writable
-  `userapp.sysrxe` are the starter examples; `demo_game.sysrxe` shows the
-  native `TYPE GAME` path for file-defined RXE games.
+  branch for every system app. Built-in `hello.sysrxe` and writable
+  `userapp.sysrxe` are the starter examples.
+- `rxe list|reload|show|run` manages normal `.rxe` executables. Built-in
+  `demo_game.rxe` shows the native `TYPE GAME` path for file-defined RXE games.
 - `kmod list`, `kmod gui status`, `kmod fs sync`, `kmod oslink emit channel
   text`, and `kmod history` provide a direct user-to-kernel-module message
   surface. Replies are shown immediately and logged in writable

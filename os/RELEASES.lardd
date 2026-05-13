@@ -5,12 +5,19 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.67.1p
+ITEM Hotpatch correcting the RXE naming model after v1.67.0b.
+ITEM SYSRXE is now documented and exposed as the system executable surface: .sysrxe files plus the sysrxe command.
+ITEM Added the normal RXE executable surface: .rxe files, rxe list/reload/load/show/run/test, rxe_guide.lardd, GUI/dock integration, and Magic command recognition.
+ITEM Moved the demo maze to demo_game.rxe so the demo game is a normal RXE executable, not a SYSRXE system executable.
+ITEM Removed the rxe alias from sysrxe and from KModTalk's sysrxe module alias, preserving the user's requested split without feature loss.
+
 SECTION v1.67.0b
-ITEM Beta release adding native SYSRXE game apps for demo RXE games.
-ITEM Extended the .sysrxe format with TYPE GAME, GAME, BOARD, PLAYER/START, GOAL, and ROW map declarations.
-ITEM Added demo_game.sysrxe, a file-defined RXE maze with @ player, # walls, G goal, GUI arrow-key movement, shell play through sysrxe run 1 right, and reset support.
-ITEM Keeps SYSRXE on the shared file-defined app path, so the game is not a one-off hand-coded GUI branch.
-ITEM Added SYSRXE game parser selftests, POST/LUNIT file coverage, docs, and hardware-profile release support while preserving KMO, KModTalk, OSLink, and user-control values.
+ITEM Beta release that introduced the first native RXE game runtime experiment.
+ITEM Added TYPE GAME, GAME, BOARD, PLAYER/START, GOAL, and ROW map declarations to prove file-defined games could work.
+ITEM The follow-up v1.67.1p corrected the naming split: SYSRXE is for system executables, normal games use RXE and .rxe.
+ITEM Kept the game on the shared file-defined app path, so it was not a one-off hand-coded GUI branch.
+ITEM Added parser selftests, POST/LUNIT file coverage, docs, and hardware-profile release support while preserving KMO, KModTalk, OSLink, and user-control values.
 
 SECTION v1.66.1a
 ITEM Official release promoting KMO raw-control from v1.66.1b without feature loss or philosophy changes.

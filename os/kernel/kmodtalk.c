@@ -399,7 +399,7 @@ static const kmodtalk_module_t s_modules[] = {
     { "boot", "bootprof", "status", handle_boot },
     { "time", "lardtime", "status", handle_time },
     { "vm", "vmmon", "status, index", handle_vm },
-    { "sysrxe", "rxe", "status, reload", handle_sysrxe },
+    { "sysrxe", "system-exec", "status, reload", handle_sysrxe },
     { "lardkit", "kit", "status, trace-on, trace-off", handle_lardkit },
 };
 

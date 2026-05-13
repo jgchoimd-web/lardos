@@ -37,6 +37,7 @@
 #include "version.h"
 #include "vmmon.h"
 #include "sysrxe.h"
+#include "kmodtalk.h"
 #include "io.h"
 #include "pci.h"
 #include "syscall.h"
@@ -309,7 +310,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
-    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
@@ -1388,13 +1389,14 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status install dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe kmod cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system GUI apps\n");
+    out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
@@ -3703,6 +3705,73 @@ static void cmd_sysrxe(const char* args)
         return;
     }
     out_append("Usage: sysrxe list|reload|load file.sysrxe|show index|run index [input]\n");
+}
+
+static void cmd_kmodtalk_list(void)
+{
+    out_append("KModTalk modules:\n");
+    for (uint32_t i = 0; i < kmodtalk_module_count(); i++) {
+        out_append("  ");
+        out_append(kmodtalk_module_name(i));
+        out_append(" - ");
+        out_append(kmodtalk_module_help(i));
+        out_append("\n");
+    }
+}
+
+static void cmd_kmodtalk_history(void)
+{
+    const FsFile* f = fs_open("kmodtalk.lardd");
+    if (!f || !f->data || f->size == 0) {
+        out_append("kmodtalk: no history.\n");
+        return;
+    }
+    uint32_t n = f->size < 1800u ? f->size : 1800u;
+    for (uint32_t i = 0; i < n; i++) out_append_char((char)f->data[i]);
+    if (n < f->size) out_append("\n...history truncated...\n");
+}
+
+static void cmd_kmodtalk(const char* args)
+{
+    char first[32];
+    const char* rest;
+    char reply[KMODTALK_REPLY_MAX];
+    if (!args) args = "";
+    first[0] = '\0';
+    vcs_read_word(&args, first, sizeof(first));
+    rest = args;
+    if (!first[0] || ascii_streq_ci(first, "list") || ascii_streq_ci(first, "modules") ||
+        ascii_streq_ci(first, "status")) {
+        cmd_kmodtalk_list();
+        return;
+    }
+    if (ascii_streq_ci(first, "history") || ascii_streq_ci(first, "log")) {
+        cmd_kmodtalk_history();
+        return;
+    }
+    if (ascii_streq_ci(first, "ask") || ascii_streq_ci(first, "tell") ||
+        ascii_streq_ci(first, "send")) {
+        char module[32];
+        if (vcs_read_word(&rest, module, sizeof(module)) != 0) {
+            out_append("Usage: kmod module message | kmod ask module message\n");
+            return;
+        }
+        if (kmodtalk_send(module, rest, reply, sizeof(reply)) < 0) {
+            out_append(reply);
+            out_append("\n");
+            return;
+        }
+        out_append(reply);
+        out_append("\n");
+        return;
+    }
+    if (kmodtalk_send(first, rest, reply, sizeof(reply)) < 0) {
+        out_append(reply);
+        out_append("\n");
+        return;
+    }
+    out_append(reply);
+    out_append("\n");
 }
 
 static void cmd_ltheme_status(void)
@@ -7180,6 +7249,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (!cmd || !cmd[0]) return;
     lardkit_trace_event("shell", cmd, 0);
     if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
+    if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) lardkit_trace_event("kmodtalk", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
     if (strcmp(cmd, "ltheme") == 0 ||
@@ -7298,6 +7368,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "larsview") == 0) { cmd_larsview(args); return; }
     if (strcmp(cmd, "larsapp") == 0) { cmd_larsapp(args); return; }
     if (strcmp(cmd, "sysrxe") == 0 || strcmp(cmd, "rxe") == 0) { cmd_sysrxe(args); return; }
+    if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) { cmd_kmodtalk(args); return; }
     if (strcmp(cmd, "larddnotes") == 0 || strcmp(cmd, "notes") == 0) { cmd_larddnotes(args); return; }
     if (strcmp(cmd, "larsform") == 0) { cmd_larsform(args); return; }
     if (strcmp(cmd, "larsact") == 0) { cmd_larsact(args); return; }
@@ -7399,6 +7470,7 @@ void lsh_init(void)
     lcontainer_init();
     lvcs_init();
     lardkit_init();
+    kmodtalk_init();
     out_append("Lard Shell ready. Type help for commands.\n");
 }
 

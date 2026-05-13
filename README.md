@@ -17,6 +17,8 @@ LardOS is guided by a simple rule: the user owns the machine.
 - Risky changes should have history, rollback, or recovery paths.
 - Native formats such as LARS, LARDD, LGUILIB, LTHEME, LPACK, SYSRXE, and LFS
   are part of the system identity.
+- Kernel modules should be reachable through visible user-owned channels such
+  as KModTalk instead of hidden control paths.
 - Release channels are explicit: `a` is official, `b` is beta, and `p` is a
   hotpatch.
 

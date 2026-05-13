@@ -167,7 +167,7 @@ static const uint8_t userlaw_init[] =
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
     "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, SYSRXE, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
-    "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink paths.\n"
+    "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
     "SECTION Commands\n"
     "ITEM values -> read this law.\n"
     "ITEM userlaw show -> read this law.\n"
@@ -220,6 +220,15 @@ static const uint8_t userapp_sysrxe_init[] =
     "COMMAND echo user-sysrxe\n";
 static uint8_t ram_userapp_sysrxe_buf[USERAPP_SYSRXE_CAP];
 static FsWritableFile ram_userapp_sysrxe = { "userapp.sysrxe", ram_userapp_sysrxe_buf, 0, USERAPP_SYSRXE_CAP };
+
+#define KMODTALK_CAP 4096u
+static const uint8_t kmodtalk_init[] =
+    "LARDD 1\n"
+    "TITLE KModTalk\n"
+    "TEXT User-to-kernel-module direct messages are logged here.\n"
+    "SECTION Messages\n";
+static uint8_t ram_kmodtalk_buf[KMODTALK_CAP];
+static FsWritableFile ram_kmodtalk = { "kmodtalk.lardd", ram_kmodtalk_buf, 0, KMODTALK_CAP };
 
 #define FS_HIDDEN_READONLY_MAX 32u
 static char s_hidden_readonly[FS_HIDDEN_READONLY_MAX][32];
@@ -277,6 +286,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
+    "li Use kmod list and kmod gui/fs/task/oslink/boot/time/vm/sysrxe status to talk directly with kernel modules.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
     "li Use dos on for L-DOS mode: a native DOS-style shell layer with C:/A:/R: drive mapping, DIR/TYPE/COPY/DEL/REN/MD/RD/CD, and dosmode.lardd history.\n"
@@ -299,6 +309,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use crashlog show to inspect panic and diagnostic history.\n"
     "li Use lpack verify sample.lpack before install, and lpack undo last to roll back the last install.\n"
     "li Use sysrxe list, sysrxe reload, sysrxe show userapp.sysrxe, and sysrxe run 0 text for file-defined GUI apps.\n"
+    "li Use kmod history to read kmodtalk.lardd after direct kernel-module messages.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
     "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
     "li Use bugreplay show to review the last BugEye screen-health frames.\n"
@@ -344,6 +355,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.63.0a adds the in-OS HDD/SSD installer option using the native stage1/stage2/kernel layout.\n"
     "li v1.63.1p hotpatches the VirtualBox black-screen boot memory layout while preserving the installer feature.\n"
     "li v1.64.0b adds SYSRXE so future simple GUI apps can be described as .sysrxe files.\n"
+    "li v1.65.0b adds KModTalk so users can talk directly with kernel modules and audit kmodtalk.lardd.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -672,6 +684,25 @@ static const uint8_t file_sysrxe_guide[] =
     "ITEM edit userapp.sysrxe, save, then sysrxe reload\n"
     "END\n";
 
+static const uint8_t file_kmodtalk_guide[] =
+    "LARDD 1\n"
+    "TITLE KModTalk Guide\n"
+    "TEXT KModTalk is the direct user-to-kernel-module message surface.\n"
+    "TEXT It does not hide the request behind Magic or an app-specific screen.\n"
+    "SECTION Commands\n"
+    "ITEM kmod list\n"
+    "ITEM kmod gui status\n"
+    "ITEM kmod gui cursor mouse\n"
+    "ITEM kmod fs sync\n"
+    "ITEM kmod oslink emit shell hello\n"
+    "ITEM kmod task default 10\n"
+    "ITEM kmod history\n"
+    "SECTION Values\n"
+    "ITEM Users can ask kernel modules what they are doing.\n"
+    "ITEM Module replies are visible immediately and logged to kmodtalk.lardd.\n"
+    "ITEM Risky control still stays explicit through named module messages.\n"
+    "END\n";
+
 static const uint8_t file_hello_sysrxe[] =
     "SYSRXE 1\n"
     "ID hello-sysrxe\n"
@@ -723,9 +754,12 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command panicroom\n"
     "CHECK command paniccapsule\n"
     "CHECK command sysrxe\n"
+    "CHECK command kmod\n"
     "CHECK file sysrxe_guide.lardd\n"
+    "CHECK file kmodtalk_guide.lardd\n"
     "CHECK file hello.sysrxe\n"
     "CHECK writable userapp.sysrxe\n"
+    "CHECK writable kmodtalk.lardd\n"
     "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
@@ -816,6 +850,7 @@ static const FsFile FS_FILES[] = {
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
     { "sysrxe_guide.lardd", file_sysrxe_guide, sizeof(file_sysrxe_guide) - 1 },
+    { "kmodtalk_guide.lardd", file_kmodtalk_guide, sizeof(file_kmodtalk_guide) - 1 },
     { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) - 1 },
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
@@ -1172,7 +1207,7 @@ int fs_delete_overlay_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 22u;
+    return 23u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -1199,6 +1234,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 19) return &ram_dosmode;
     if (idx == 20) return &ram_fsdelete;
     if (idx == 21) return &ram_userapp_sysrxe;
+    if (idx == 22) return &ram_kmodtalk;
     return NULL;
 }
 
@@ -1281,6 +1317,10 @@ void fs_init(void)
         ram_userapp_sysrxe_buf[i] = userapp_sysrxe_init[i];
     }
     ram_userapp_sysrxe.size = sizeof(userapp_sysrxe_init) - 1;
+    for (uint32_t i = 0; i < sizeof(kmodtalk_init) - 1 && i < KMODTALK_CAP; i++) {
+        ram_kmodtalk_buf[i] = kmodtalk_init[i];
+    }
+    ram_kmodtalk.size = sizeof(kmodtalk_init) - 1;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
     fs_apply_delete_log();

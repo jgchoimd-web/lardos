@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.64.0b-ami/lardos-v1.64.0b-ami.iso`. To publish the whole hardware
+`release/v1.65.0b-ami/lardos-v1.65.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,6 +140,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.65.0b` adds KModTalk, a direct user-to-kernel-module message surface
+  with visible replies and writable `kmodtalk.lardd` history.
 - `v1.64.0b` adds SYSRXE, a native file-defined GUI app format with
   `hello.sysrxe`, writable `userapp.sysrxe`, and `sysrxe list/reload/show/run`.
 - `v1.63.3p` hotpatches app-window separation: app windows no longer redraw
@@ -358,6 +360,10 @@ commands:
   simple GUI apps can be added as native files instead of writing a new GUI C
   branch for every app. Built-in `hello.sysrxe` and writable
   `userapp.sysrxe` are the starter examples.
+- `kmod list`, `kmod gui status`, `kmod fs sync`, `kmod oslink emit channel
+  text`, and `kmod history` provide a direct user-to-kernel-module message
+  surface. Replies are shown immediately and logged in writable
+  `kmodtalk.lardd`.
 - `lunit run tests.lunit` runs small feature tests from the native `LUNIT 1`
   format.
 - `oslink` provides OS-to-OS datagrams over the native UDP stack. Use

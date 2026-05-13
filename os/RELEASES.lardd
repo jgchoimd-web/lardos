@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.65.0b
+ITEM Beta release adding KModTalk, a direct user-to-kernel-module message surface.
+ITEM Added kmod and kmodtalk commands: kmod list, kmod module message, kmod ask module message, and kmod history.
+ITEM Added direct handlers for gui, fs, task, oslink, boot, time, vm, sysrxe, and lardkit kernel modules.
+ITEM Module replies are shown immediately and every message is logged to writable kmodtalk.lardd for user-visible audit history.
+ITEM Added kmodtalk_guide.lardd, POST coverage, LUNIT checks, and user-law wording for visible direct module communication.
+ITEM Preserves SYSRXE file-defined apps, OSLink module bus paths, default GUI desktop/window direction, and user-owned control values.
+
 SECTION v1.64.0b
 ITEM Beta release adding SYSRXE, the System RXE app-file format for LardOS GUI apps.
 ITEM GUI app slots now keep the existing 10 legacy apps and reserve SYSRXE slots after them, so new simple apps can be loaded from .sysrxe files instead of adding a hand-written gui.c branch each time.

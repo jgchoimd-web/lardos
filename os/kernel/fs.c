@@ -306,6 +306,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
     "li Use kmod list and kmod gui/fs/task/oslink/boot/time/vm/sysrxe status to talk directly with kernel modules.\n"
     "li Use kmo list, kmo run user-kmo, kmo create mine.kmo gui status, kmo set mine.kmo text hello, and kmo delete mine.kmo for user-owned .kmo kernel module files.\n"
+    "li Use kmo raw rawdoor.kmo sum or set RAW 1 / TARGET raw in a .kmo when you explicitly want dangerous raw-control behavior.\n"
     "li Use ren old.txt new.txt, rename selected NewName, or the desktop Rename button to rename files, apps, and folders.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
@@ -378,6 +379,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.65.0b adds KModTalk so users can talk directly with kernel modules and audit kmodtalk.lardd.\n"
     "li v1.65.1p hotpatches renaming for writable files, desktop apps, and folders.\n"
     "li v1.66.0b adds KMO, a native .kmo kernel module file format with user create/set/delete/run commands.\n"
+    "li v1.66.1b adds explicit KMO raw-control mode so users can choose the dangerous path too.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -730,19 +732,23 @@ static const uint8_t file_kmo_guide[] =
     "TITLE KMO Kernel Module Files\n"
     "TEXT KMO is the native .kmo file format for file-stored LardOS kernel modules.\n"
     "TEXT A KMO names a KModTalk target and a default message, so users can create, inspect, change, run, and delete module routes as files.\n"
+    "TEXT If the user chooses RAW 1 or TARGET raw, the KMO directly executes an LSH/raw-control command instead of using the safer KModTalk path.\n"
     "SECTION Syntax\n"
     "ITEM KMO 1\n"
     "ITEM ID module-id\n"
     "ITEM NAME Human module name\n"
-    "ITEM TARGET gui|fs|task|oslink|boot|time|vm|sysrxe|lardkit\n"
+    "ITEM TARGET gui|fs|task|oslink|boot|time|vm|sysrxe|lardkit|raw\n"
+    "ITEM RAW 1 turns on dangerous raw-control LSH execution.\n"
     "ITEM HELP short visible description\n"
-    "ITEM DEFAULT message sent when kmo run has no message\n"
+    "ITEM DEFAULT message sent when kmo run has no message; in raw mode it is the LSH command.\n"
     "ITEM TEXT body line shown by kmo show\n"
     "SECTION Commands\n"
     "ITEM kmo list\n"
     "ITEM kmo show user0.kmo\n"
     "ITEM kmo run user-kmo\n"
     "ITEM kmo create mine.kmo gui status\n"
+    "ITEM kmo raw rawdoor.kmo sum\n"
+    "ITEM kmo set mine.kmo raw 1\n"
     "ITEM kmo set mine.kmo target fs\n"
     "ITEM kmo set mine.kmo default sync\n"
     "ITEM kmo delete mine.kmo\n"
@@ -750,6 +756,7 @@ static const uint8_t file_kmo_guide[] =
     "ITEM User-created KMO files live in writable RAM/LPST slots.\n"
     "ITEM Built-in KMO files can be changed by kmo set, which takes ownership by hiding the read-only original and writing a user-owned replacement.\n"
     "ITEM kmo delete removes a KMO from the active registry; writable slots become empty and read-only samples are hard-deleted from the active filesystem view.\n"
+    "ITEM Raw-control KMO is intentionally dangerous. It exists because the user owns the machine, not because it is the safest path.\n"
     "END\n";
 
 static const uint8_t file_gui_status_kmo[] =
@@ -761,6 +768,17 @@ static const uint8_t file_gui_status_kmo[] =
     "DEFAULT status\n"
     "TEXT This built-in sample is a normal .kmo file, not a new hand-coded shell branch.\n"
     "TEXT Use kmo set gui_status.kmo default \"cursor\" to take ownership and change it.\n";
+
+static const uint8_t file_raw_control_kmo[] =
+    "KMO 1\n"
+    "ID raw-control-demo\n"
+    "NAME Raw Control Demo KMO\n"
+    "TARGET raw\n"
+    "RAW 1\n"
+    "HELP Demonstrates explicit user-chosen raw-control KMO execution.\n"
+    "DEFAULT echo raw-kmo-demo\n"
+    "TEXT This sample runs an LSH command directly instead of routing through KModTalk.\n"
+    "TEXT Change DEFAULT to sum, peek, poke, asm_, bye, or any other explicit command only if you accept the risk.\n";
 
 static const uint8_t file_hello_sysrxe[] =
     "SYSRXE 1\n"
@@ -822,6 +840,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file kmo_guide.lardd\n"
     "CHECK file hello.sysrxe\n"
     "CHECK file gui_status.kmo\n"
+    "CHECK file raw_control.kmo\n"
     "CHECK writable userapp.sysrxe\n"
     "CHECK writable kmodtalk.lardd\n"
     "CHECK writable user0.kmo\n"
@@ -919,6 +938,7 @@ static const FsFile FS_FILES[] = {
     { "kmo_guide.lardd", file_kmo_guide, sizeof(file_kmo_guide) - 1 },
     { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) - 1 },
     { "gui_status.kmo", file_gui_status_kmo, sizeof(file_gui_status_kmo) - 1 },
+    { "raw_control.kmo", file_raw_control_kmo, sizeof(file_raw_control_kmo) - 1 },
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },

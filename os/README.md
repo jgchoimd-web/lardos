@@ -45,7 +45,7 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.66.0b-ami/lardos-v1.66.0b-ami.iso`. To publish the whole hardware
+`release/v1.66.1b-ami/lardos-v1.66.1b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
@@ -140,6 +140,10 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.66.1b` adds explicit KMO raw-control mode: `RAW 1`, `TARGET raw`,
+  `kmo raw file.kmo command`, and `kmo set file.kmo raw 1` let the user choose
+  direct LSH/SUM/raw command execution from a `.kmo` file when they accept the
+  risk.
 - `v1.66.0b` adds KMO, a native `.kmo` kernel module file format with
   `kmo list/reload/show/run/create/set/delete`, built-in `gui_status.kmo`, and
   writable `user0.kmo` through `user3.kmo` for user-owned module files.
@@ -376,6 +380,8 @@ commands:
   files. Built-in `gui_status.kmo` demonstrates a file-defined GUI module
   route, while writable `user0.kmo` through `user3.kmo` let the user create,
   change, run, and remove KMO modules without adding a new hard-coded C branch.
+  `kmo raw rawdoor.kmo sum` or `kmo set file.kmo raw 1` intentionally switches
+  a module to direct raw-control LSH execution for user-owned risky workflows.
 - `ren old.txt new.txt`, `rename selected NewName`, `rename app old new`, and
   `rename folder old new` rename writable files and desktop/dock labels.
 - `lunit run tests.lunit` runs small feature tests from the native `LUNIT 1`

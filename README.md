@@ -18,7 +18,9 @@ LardOS is guided by a simple rule: the user owns the machine.
 - Native formats such as LARS, LARDD, LGUILIB, LTHEME, LPACK, SYSRXE, KMO, and LFS
   are part of the system identity.
 - Kernel modules should be reachable through visible user-owned channels such
-  as KModTalk instead of hidden control paths.
+  as KModTalk and KMO instead of hidden control paths; if the user explicitly
+  chooses raw-control, the system should allow that power and make the risk
+  visible.
 - Release channels are explicit: `a` is official, `b` is beta, and `p` is a
   hotpatch.
 

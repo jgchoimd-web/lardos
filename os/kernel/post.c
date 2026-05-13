@@ -122,6 +122,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: kmo guide", fs_open("kmo_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: hello sysrxe", fs_open("hello.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: gui status kmo", fs_open("gui_status.kmo") != NULL, emit, user, &pass, &fail);
+    post_check("fs: raw control kmo", fs_open("raw_control.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode guide", fs_open("dosmode_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: installer guide", fs_open("installer_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
@@ -155,7 +156,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);
     post_check("sysrxe: file app parser", sysrxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("kmodtalk: direct module channel", kmodtalk_selftest() == 0, emit, user, &pass, &fail);
-    post_check("kmo: file kernel modules", kmo_selftest() == 0, emit, user, &pass, &fail);
+    post_check("kmo: file and raw-control modules", kmo_selftest() == 0, emit, user, &pass, &fail);
     post_check("imgglyph: user-editable Unicode slots", img_glyph_selftest() == 0, emit, user, &pass, &fail);
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);

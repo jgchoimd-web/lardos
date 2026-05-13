@@ -1398,7 +1398,7 @@ static void cmd_help(const char* args)
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system GUI apps\n");
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
-    out_append("  kmo list|create|set|delete|show|run  user-owned .kmo kernel module files\n");
+    out_append("  kmo list|create|raw|set|delete|show|run  user-owned .kmo kernel module files, including explicit raw-control\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
@@ -1507,6 +1507,7 @@ static void cmd_control(const char* args)
     out_append("  lpack verify sample.lpack inspect package integrity before install\n");
     out_append("  lpack undo last     restore files changed by the last install\n");
     out_append("  kmo create mine.kmo gui status create a user-owned kernel module file\n");
+    out_append("  kmo raw rawdoor.kmo sum create an explicit risky raw-control KMO\n");
     out_append("  kmo run mine.kmo    route that .kmo through KModTalk\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  screencheck retro   draw a retro boot/storage-style screen check\n");
@@ -3801,6 +3802,7 @@ static void cmd_kmo(const char* args)
             out_append(m->file);
             out_append(" target=");
             out_append(m->target);
+            out_append(m->raw_control ? " raw-control" : " kmodtalk");
             out_append(" default=");
             out_append(m->default_msg);
             out_append(m->writable ? " writable" : " readonly");
@@ -3870,13 +3872,32 @@ static void cmd_kmo(const char* args)
         }
         return;
     }
+    if (ascii_streq_ci(sub, "raw") || ascii_streq_ci(sub, "danger")) {
+        char file_arg[64];
+        int r;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 || !args[0]) {
+            out_append("Usage: kmo raw file.kmo lsh-command\n");
+            return;
+        }
+        r = kmo_create(file_arg, "raw", args);
+        if (r == 0) {
+            out_append("RAW KMO created. kmo run ");
+            out_append(file_arg);
+            out_append(" will execute its LSH command directly.\n");
+        } else {
+            out_append("kmo raw failed ");
+            out_append_i32(r);
+            out_append("\n");
+        }
+        return;
+    }
     if (ascii_streq_ci(sub, "set") || ascii_streq_ci(sub, "edit")) {
         char file_arg[64];
         char field[32];
         int r;
         if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
             vcs_read_word(&args, field, sizeof(field)) != 0 || !args[0]) {
-            out_append("Usage: kmo set file.kmo id|name|target|help|default|text value\n");
+            out_append("Usage: kmo set file.kmo id|name|target|raw|help|default|text value\n");
             return;
         }
         r = kmo_set_field(file_arg, field, args);
@@ -3909,7 +3930,7 @@ static void cmd_kmo(const char* args)
         out_append(kmo_selftest() == 0 ? "KMO selftest PASS.\n" : "KMO selftest FAIL.\n");
         return;
     }
-    out_append("Usage: kmo list|reload|show key|run key [message]|create file.kmo target [default]|set file.kmo field value|delete file.kmo\n");
+    out_append("Usage: kmo list|reload|show key|run key [message]|create file.kmo target [default]|raw file.kmo command|set file.kmo field value|delete file.kmo\n");
 }
 
 static void cmd_ltheme_status(void)

@@ -15,6 +15,7 @@ typedef struct kmo_module {
     char help[96];
     char default_msg[96];
     char body[KMO_BODY_MAX];
+    int raw_control;
 } kmo_module_t;
 
 void kmo_reset(void);

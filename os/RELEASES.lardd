@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.66.1b
+ITEM Beta update adding explicit KMO raw-control mode for the user-chosen dangerous path.
+ITEM Added RAW 1, DANGER 1, UNSAFE 1, MODE raw, CONTROL raw, and TARGET raw parsing in .kmo files.
+ITEM Added kmo raw file.kmo command and kmo set file.kmo raw 1 so users can create or convert a KMO into direct LSH/raw-control execution.
+ITEM Added raw_control.kmo as a visible sample with a safe default command that users can edit into SUM, peek, poke, asm_, power, installer, or other risky commands if they choose.
+ITEM kmo show and kmo list now expose whether a module uses kmodtalk mode or raw-control mode.
+ITEM Preserves KMO delete/set ownership, KModTalk logging for normal KMO, SYSRXE, OSLink, and the LardOS value that the user can choose power even when dangerous.
+
 SECTION v1.66.0b
 ITEM Beta release adding KMO, the native .kmo file format for file-stored kernel modules.
 ITEM Added kmo list, kmo reload, kmo show, kmo run, kmo create, kmo set, kmo delete, and kmo test commands.

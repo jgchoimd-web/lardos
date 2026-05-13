@@ -3,6 +3,7 @@
 #include "fs.h"
 #include "kmodtalk.h"
 #include "lardkit.h"
+#include "lsh.h"
 #include "string.h"
 
 #include <stddef.h>
@@ -18,6 +19,8 @@ static uint32_t slen(const char* s)
     return n;
 }
 
+static const char* skip_ws(const char* s);
+
 static char lower_char(char c)
 {
     if (c >= 'A' && c <= 'Z') return (char)(c + ('a' - 'A'));
@@ -30,6 +33,30 @@ static int streq_ci(const char* a, const char* b)
     if (!a || !b) return 0;
     while (a[i] && b[i] && lower_char(a[i]) == lower_char(b[i])) i++;
     return a[i] == '\0' && b[i] == '\0';
+}
+
+static int truthy_value(const char* s)
+{
+    s = skip_ws(s);
+    if (!s || !s[0]) return 0;
+    if (s[0] == '1' && (!s[1] || s[1] == ' ' || s[1] == '\t')) return 1;
+    return streq_ci(s, "on") || streq_ci(s, "yes") || streq_ci(s, "true") ||
+           streq_ci(s, "raw") || streq_ci(s, "danger") || streq_ci(s, "unsafe");
+}
+
+static int falsey_value(const char* s)
+{
+    s = skip_ws(s);
+    if (!s || !s[0]) return 0;
+    if (s[0] == '0' && (!s[1] || s[1] == ' ' || s[1] == '\t')) return 1;
+    return streq_ci(s, "off") || streq_ci(s, "no") || streq_ci(s, "false") ||
+           streq_ci(s, "safe") || streq_ci(s, "kmodtalk");
+}
+
+static int is_raw_target(const char* target)
+{
+    return streq_ci(target, "raw") || streq_ci(target, "lsh") ||
+           streq_ci(target, "shell") || streq_ci(target, "sum");
 }
 
 static int has_suffix_ci(const char* name, const char* suffix)
@@ -132,6 +159,19 @@ static int parse_line(kmo_module_t* m, const char* src)
     if ((v = value_after_key(src, "NAME")) != NULL) { scopy(m->name, sizeof(m->name), v); return 0; }
     if ((v = value_after_key(src, "TARGET")) != NULL) { scopy(m->target, sizeof(m->target), v); return 0; }
     if ((v = value_after_key(src, "MODULE")) != NULL) { scopy(m->target, sizeof(m->target), v); return 0; }
+    if ((v = value_after_key(src, "RAW")) != NULL) { m->raw_control = truthy_value(v) ? 1 : 0; return 0; }
+    if ((v = value_after_key(src, "DANGER")) != NULL) { m->raw_control = truthy_value(v) ? 1 : 0; return 0; }
+    if ((v = value_after_key(src, "UNSAFE")) != NULL) { m->raw_control = truthy_value(v) ? 1 : 0; return 0; }
+    if ((v = value_after_key(src, "MODE")) != NULL) {
+        if (truthy_value(v)) m->raw_control = 1;
+        else if (falsey_value(v)) m->raw_control = 0;
+        return 0;
+    }
+    if ((v = value_after_key(src, "CONTROL")) != NULL) {
+        if (truthy_value(v)) m->raw_control = 1;
+        else if (falsey_value(v)) m->raw_control = 0;
+        return 0;
+    }
     if ((v = value_after_key(src, "HELP")) != NULL) { scopy(m->help, sizeof(m->help), v); return 0; }
     if ((v = value_after_key(src, "DEFAULT")) != NULL) { scopy(m->default_msg, sizeof(m->default_msg), v); return 0; }
     if ((v = value_after_key(src, "MESSAGE")) != NULL) { scopy(m->default_msg, sizeof(m->default_msg), v); return 0; }
@@ -166,6 +206,7 @@ static int parse_kmo(kmo_module_t* m, const char* file, const char* data, uint32
     }
     if (!saw_magic) return -2;
     if (!m->target[0]) return -3;
+    if (is_raw_target(m->target)) m->raw_control = 1;
     if (!m->default_msg[0]) scopy(m->default_msg, sizeof(m->default_msg), "status");
     if (!m->body[0]) append_body_line(m->body, sizeof(m->body), "This KMO routes a file-defined module request through KModTalk.");
     return 0;
@@ -270,8 +311,9 @@ int kmo_format(const char* key, char* out, uint32_t out_cap)
         return -2;
     }
     snprintf(out, out_cap,
-             "KMO %s\nfile: %s\nid: %s\ntarget: %s\ndefault: %s\nwritable: %s\nhelp: %s\n\n%s",
-             m->name, m->file, m->id, m->target, m->default_msg,
+             "KMO %s\nfile: %s\nid: %s\ntarget: %s\nmode: %s\ndefault: %s\nwritable: %s\nhelp: %s\n\n%s",
+             m->name, m->file, m->id, m->target,
+             m->raw_control ? "raw-control" : "kmodtalk", m->default_msg,
              m->writable ? "yes" : "no", m->help, m->body);
     return 0;
 }
@@ -289,7 +331,13 @@ int kmo_run(const char* key, const char* message, char* out, uint32_t out_cap)
     }
     msg = skip_ws(message);
     if (!msg[0]) msg = m->default_msg;
-    r = kmodtalk_send(m->target, msg, out, out_cap);
+    if (m->raw_control || is_raw_target(m->target)) {
+        lsh_exec(msg);
+        snprintf(out, out_cap, "kmo raw-control executed: %s", msg && msg[0] ? msg : "(empty)");
+        r = 0;
+    } else {
+        r = kmodtalk_send(m->target, msg, out, out_cap);
+    }
     lardkit_trace_event("kmo", m->id, r);
     lardkit_journal_event("kmo", m->file);
     return r;
@@ -391,6 +439,7 @@ static int write_kmo_file(FsWritableFile* w, const kmo_module_t* m)
     sappend(data, sizeof(data), m->name);
     sappend(data, sizeof(data), "\nTARGET ");
     sappend(data, sizeof(data), m->target);
+    if (m->raw_control) sappend(data, sizeof(data), "\nRAW 1");
     sappend(data, sizeof(data), "\nHELP ");
     sappend(data, sizeof(data), m->help);
     sappend(data, sizeof(data), "\nDEFAULT ");
@@ -434,8 +483,9 @@ int kmo_create(const char* name, const char* target, const char* default_msg)
     make_id_from_name(file, m.id, sizeof(m.id));
     scopy(m.name, sizeof(m.name), m.id);
     scopy(m.target, sizeof(m.target), target && target[0] ? target : "boot");
+    if (is_raw_target(m.target)) m.raw_control = 1;
     scopy(m.default_msg, sizeof(m.default_msg), default_msg && default_msg[0] ? default_msg : "status");
-    scopy(m.help, sizeof(m.help), "User-created KMO file; edit with kmo set or write.");
+    scopy(m.help, sizeof(m.help), m.raw_control ? "User-created raw-control KMO file; edit carefully." : "User-created KMO file; edit with kmo set or write.");
     scopy(m.body, sizeof(m.body), "User-owned kernel module file. Change TARGET/DEFAULT/TEXT, then run kmo reload.\n");
     if (write_kmo_file(w, &m) != 0) return -6;
     (void)kmo_reload();
@@ -458,12 +508,20 @@ int kmo_set_field(const char* name, const char* field, const char* value)
     if (streq_ci(field, "id")) scopy(m.id, sizeof(m.id), value);
     else if (streq_ci(field, "name")) scopy(m.name, sizeof(m.name), value);
     else if (streq_ci(field, "target") || streq_ci(field, "module")) scopy(m.target, sizeof(m.target), value);
+    else if (streq_ci(field, "raw") || streq_ci(field, "danger") ||
+             streq_ci(field, "unsafe") || streq_ci(field, "mode") ||
+             streq_ci(field, "control")) {
+        if (truthy_value(value)) m.raw_control = 1;
+        else if (falsey_value(value)) m.raw_control = 0;
+        else return -5;
+    }
     else if (streq_ci(field, "help")) scopy(m.help, sizeof(m.help), value);
     else if (streq_ci(field, "default") || streq_ci(field, "message") || streq_ci(field, "cmd")) scopy(m.default_msg, sizeof(m.default_msg), value);
     else if (streq_ci(field, "text") || streq_ci(field, "body")) scopy(m.body, sizeof(m.body), value);
     else return -5;
     w = prepare_writable_kmo(file, f);
     if (!w) return -6;
+    if (is_raw_target(m.target)) m.raw_control = 1;
     if (write_kmo_file(w, &m) != 0) return -7;
     (void)kmo_reload();
     lardkit_trace_event("kmo", "set", 0);
@@ -505,7 +563,14 @@ int kmo_selftest(void)
         "HELP status route\n"
         "DEFAULT status\n"
         "TEXT hello\n";
+    static const char raw_sample[] =
+        "KMO 1\n"
+        "ID raw-test\n"
+        "TARGET raw\n"
+        "RAW 1\n"
+        "DEFAULT echo raw-kmo\n";
     kmo_module_t m;
+    kmo_module_t raw;
     char out[256];
     if (parse_kmo(&m, "test.kmo", sample, sizeof(sample) - 1) != 0) return -1;
     if (strcmp(m.id, "test-kmo") != 0) return -2;
@@ -513,5 +578,8 @@ int kmo_selftest(void)
     if (strcmp(m.default_msg, "status") != 0) return -4;
     if (kmodtalk_send("boot", "status", out, sizeof(out)) != 0) return -5;
     if (!out[0]) return -6;
+    if (parse_kmo(&raw, "raw.kmo", raw_sample, sizeof(raw_sample) - 1) != 0) return -7;
+    if (!raw.raw_control) return -8;
+    if (strcmp(raw.target, "raw") != 0) return -9;
     return 0;
 }

@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.67.2p
+ITEM Hotpatch fixing the VirtualBox optical-drive boot failure that showed Disk read error before the GUI.
+ITEM ISO boot now uses an El Torito-specific stage1 handoff and CHS-only stage2 reads for floppy-emulation media, avoiding VirtualBox CD/floppy EDD LBA mismatch.
+ITEM Stage2 now preserves BIOS progress-output registers, preventing the dot printer from corrupting the kernel load offset and leaving later kernel sectors zeroed.
+ITEM Stage2 keeps the LARDX/BOSX load below VGA/EBDA, enters protected mode, and then preserves the full boot-image copy at 0x01000000 for the installer.
+ITEM Raw HDD/SSD and hybrid USB paths still use the existing disk-first flow, preserving installer and USB behavior.
+ITEM Keeps the RXE/SYSRXE split, KMO, KModTalk, OSLink, default GUI, hardware-profiled IMG/ISO artifacts, and user-owned control values intact.
+
 SECTION v1.67.1a
 ITEM Official release promoting the corrected RXE/SYSRXE split from v1.67.1p without feature loss or philosophy changes.
 ITEM Keeps SYSRXE as the system executable surface: .sysrxe files plus sysrxe list/reload/load/show/run/test.

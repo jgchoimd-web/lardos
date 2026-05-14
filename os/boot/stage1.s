@@ -8,6 +8,14 @@ ORG 0x7C00
 %define STAGE2_SECTORS 4
 %endif
 
+%ifndef ISO_ELTORITO
+%define ISO_ELTORITO 0
+%endif
+
+%ifndef ISO_KERNEL_LBA
+%define ISO_KERNEL_LBA 5
+%endif
+
 STAGE2_LOAD equ 0x7E00
 
     jmp short start
@@ -54,13 +62,35 @@ start:
     mov dword [dap_lba], 1
     mov dword [dap_lba + 4], 0
 
+    ; El Torito floppy emulation may use either DL<0x80 or CD-style DL>=0xE0.
+    ; Some BIOSes report EDD success there but serve host CD LBAs, so prefer CHS.
+    cmp byte [boot_drive], 0x80
+    jb stage2_chs_first
+    cmp byte [boot_drive], 0xE0
+    jae stage2_chs_first
+
+stage2_edd_first:
+    call read_stage2_edd
+    jnc stage2_ok
+    call read_stage2_chs
+    jc disk_error
+    jmp stage2_ok
+
+stage2_chs_first:
+    call read_stage2_chs
+    jnc stage2_ok
+    call read_stage2_edd
+    jc disk_error
+    jmp stage2_ok
+
+read_stage2_edd:
     mov si, dap
     mov ah, 0x42
     mov dl, [boot_drive]
     int 0x13
-    jnc .stage2_ok
+    ret
 
-    ; El Torito floppy emulation may expose only classic CHS reads.
+read_stage2_chs:
     xor ax, ax
     mov es, ax
     mov bx, STAGE2_LOAD
@@ -70,9 +100,14 @@ start:
     mov dh, 0
     mov dl, [boot_drive]
     int 0x13
-    jc disk_error
+    ret
 
-.stage2_ok:
+stage2_ok:
+%if ISO_ELTORITO
+    mov eax, 0x21534843          ; "CHS!" El Torito floppy-emulation handoff
+%else
+    xor eax, eax                 ; Do not let stale BIOS values trigger handoff.
+%endif
     mov dl, [boot_drive]
     jmp 0x0000:STAGE2_LOAD
 

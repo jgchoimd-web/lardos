@@ -45,10 +45,11 @@ kernel payload is built with `-m64`, linked as `elf_x86_64`, and entered through
 `entry64.s`.
 Stage2 keeps bootinfo at `0x5000`, stages the kernel at `0x9000`, and uses a
 temporary protected-mode stack at `0x9F000`. The long-mode entry stack starts at
-`0x8F000`. Before page tables and stacks reuse low memory, stage2 preserves a
-full boot-image copy at `0x01000000` for the in-OS installer. This keeps VBE
-bootinfo out of the staging buffer and keeps current builds below the VGA/EBDA
-boundary during disk reads.
+`0x8F000`. The bootloader enables VBE before loading the kernel so firmware
+scratch writes cannot corrupt the LARDX header, then performs conservative
+one-sector BIOS reads into the low staging buffer. Before page tables and stacks
+reuse low memory, stage2 preserves a full boot-image copy at `0x01000000` for
+the in-OS installer.
 
 The in-OS installer reuses that same boot layout. `installer.c` embeds the
 stage1 and stage2 binaries as generated C arrays, validates the preserved
@@ -467,8 +468,9 @@ shell.
 
 Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal
-bootable El Torito ISO for `release/<version>/lardos-<version>.iso`. Hardware
-profiles append their name to the version directory and artifact names, for
-example `release/v1.63.1p-vbox/lardos-v1.63.1p-vbox.iso`. Release ISOs also
-carry a tiny hybrid MBR bootstrap in the ISO system area so raw-written USB
-media can reuse the same stage2/kernel payload.
+bootable El Torito floppy-emulation ISO for
+`release/<version>/lardos-<version>.iso`. Release ISOs also carry a tiny hybrid
+MBR bootstrap in the ISO system area so raw-written USB media can reuse the same
+stage2/kernel payload. Hardware profiles append their name to the version
+directory and artifact names, for example
+`release/v1.63.1p-vbox/lardos-v1.63.1p-vbox.iso`.

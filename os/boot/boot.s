@@ -19,14 +19,22 @@ start:
     cmp eax, 0x4452414C
     jne .no_lba_override
     mov [cs:kernel_lba_base], ebx
+    mov byte [cs:iso_boot_mode], 1
+    jmp .handoff_done
 .no_lba_override:
+    cmp eax, 0x21534843
+    jne .handoff_done
+    mov byte [cs:iso_boot_mode], 2
+.handoff_done:
     cli
+    cld
     xor ax, ax
     mov ds, ax
     mov es, ax
     mov ss, ax
     mov sp, 0x7C00
     mov [boot_drive], dl
+    sti
 
     ; Print a short message using BIOS teletype
     mov si, boot_msg
@@ -41,12 +49,14 @@ start:
     jmp .print_char
 .done_print:
 
-    ; Try to switch to a VBE linear framebuffer mode for GUI.
-    ; If it fails, we keep text mode.
+    ; Set up VBE before reading the kernel. Some BIOSes use low memory as
+    ; scratch during VBE calls, so calling it after the low staging read can
+    ; corrupt the LARDX header or entry point.
     call vbe_try_enable
 
     ; Load LARDX executable (kernel) below VGA/EBDA into KERNEL_LOAD_SEG:0000.
-    ; We read the first sector to get total file size, then read the rest.
+    ; v1.67.2p builds the kernel with -Os, keeping the complete native feature
+    ; set small enough for this safer BIOS-loading path.
     mov ax, KERNEL_LOAD_SEG
     mov es, ax
     xor bx, bx
@@ -101,7 +111,7 @@ start:
     jb disk_error
     mov [total_sectors], ax
 
-    ; Read remaining sectors starting at KERNEL_LBA+1 into buffer+512
+    ; Read remaining sectors starting at KERNEL_LBA+1 into buffer+512.
     mov si, [total_sectors]
     dec si                      ; remaining count
     jz .done_load
@@ -111,9 +121,9 @@ start:
     mov dword [dap_lba], eax
     mov bx, 512                 ; offset into buffer
 .read_loop:
-    cmp si, 127
+    cmp si, 1
     jbe .chunk_ok
-    mov cx, 127
+    mov cx, 1
     jmp .have_chunk
 .chunk_ok:
     mov cx, si
@@ -131,6 +141,8 @@ start:
     mov word [dap_off], bx
     mov word [dap_seg], es
     call disk_read_lba
+    mov al, '.'
+    call boot_putc
     ; ES:BX += cx*512
     mov dx, cx
     shl dx, 9
@@ -151,6 +163,7 @@ start:
     call enable_a20
 
     ; Set up a simple GDT in this sector
+    cli
     lgdt [gdt_descriptor]
 
     ; Enter protected mode
@@ -165,6 +178,7 @@ start:
 BITS 32
 
 protected_start:
+    cld
     mov ax, DATA_SEL
     mov ds, ax
     mov es, ax
@@ -250,7 +264,7 @@ protected_start:
 
     ; -----------------------------
     ; Enter long mode (x86_64)
-    ; Identity-map first 8 MiB using 2 MiB pages.
+    ; Identity-map first 128 MiB using 2 MiB pages.
     ; -----------------------------
     cli
 
@@ -289,7 +303,7 @@ setup_identity_paging:
     ; PML4  = 0x70000
     ; PDPT  = 0x71000
     ; PD    = 0x72000
-    ; Identity map 0..8MiB using PD[0..3] 2MiB pages.
+    ; Identity map 0..128MiB using PD[0..63] 2MiB pages.
     pushad
 
     ; Zero 3 pages (PML4/PDPT/PD)
@@ -306,15 +320,16 @@ setup_identity_paging:
     mov dword [0x00071000], 0x00072003
     mov dword [0x00071000 + 4], 0x00000000
 
-    ; PD[0..3] = 0..8MiB | P|RW|PS (2MiB pages)
-    mov dword [0x00072000], 0x00000083
-    mov dword [0x00072000 + 4], 0x00000000
-    mov dword [0x00072000 + 8], 0x00200083
-    mov dword [0x00072000 + 12], 0x00000000
-    mov dword [0x00072000 + 16], 0x00400083
-    mov dword [0x00072000 + 20], 0x00000000
-    mov dword [0x00072000 + 24], 0x00600083
-    mov dword [0x00072000 + 28], 0x00000000
+    ; PD[0..63] = 0..128MiB | P|RW|PS (2MiB pages)
+    mov edi, 0x00072000
+    mov eax, 0x00000083
+    mov ecx, 64
+.map_pd:
+    mov dword [edi], eax
+    mov dword [edi + 4], 0x00000000
+    add eax, 0x00200000
+    add edi, 8
+    loop .map_pd
 
     popad
     ret
@@ -361,9 +376,14 @@ boot_msg db 'Booting lardos...', 0x0D, 0x0A, 0
 disk_err_msg db 'Disk read error!', 0
 
 boot_drive db 0
+iso_boot_mode db 0
 total_sectors dw 0
 kernel_file_size dd 0
 chs_lba dd 0
+chs_count dw 0
+chs_cx dw 0
+chs_dx dw 0
+chs_retry db 0
 
 ; INT 13h Extensions Disk Address Packet (DAP)
 dap:
@@ -385,13 +405,49 @@ disk_read_lba:
     push ds
     xor ax, ax
     mov ds, ax
+    cmp byte [iso_boot_mode], 0
+    jne .edd_only
+    ; VirtualBox and some BIOSes expose El Torito floppy-emulation media as
+    ; either a floppy-class drive or a CD-style 0xE0 drive. In both cases
+    ; classic CHS is more reliable than successful-but-wrong EDD reads.
+    cmp byte [boot_drive], 0x80
+    jb .chs_first
+    cmp byte [boot_drive], 0xE0
+    jae .chs_first
+.edd_first:
     mov si, dap
     mov ah, 0x42
     mov dl, [boot_drive]
+    sti
     int 0x13
     jnc .ok
     call disk_read_chs
     jc disk_error
+    jmp .ok
+.chs_first:
+    call disk_read_chs
+    jnc .ok
+    mov si, dap
+    mov ah, 0x42
+    mov dl, [boot_drive]
+    sti
+    int 0x13
+    jc disk_error
+    jmp .ok
+.edd_only:
+    cmp byte [iso_boot_mode], 2
+    je .chs_only
+    mov si, dap
+    mov ah, 0x42
+    mov dl, [boot_drive]
+    sti
+    int 0x13
+    jc disk_error
+    jmp .ok
+.chs_only:
+    call disk_read_chs
+    jc disk_error
+    jmp .ok
 .ok:
     pop ds
     popa
@@ -405,6 +461,7 @@ disk_read_chs:
     push dx
     push si
     push di
+    push bp
     push es
 
     mov si, [dap_count]
@@ -434,20 +491,63 @@ disk_read_chs:
     mov cl, dl
     inc cl
     or cl, ah
+    mov [chs_cx], cx
+    mov [chs_dx], dx
 
-    mov ax, 0x0201
+    ; Read as many sectors as possible without crossing a track or 64KiB
+    ; DMA window. This keeps VirtualBox El Torito CHS boot from crawling.
+    xor ax, ax
+    mov al, dl
+    mov bp, 18
+    sub bp, ax
+    cmp si, bp
+    jae .count_not_left
+    mov bp, si
+.count_not_left:
+    mov ax, bx
+    shr ax, 9
+    mov di, 128
+    sub di, ax
+    cmp bp, di
+    jbe .count_ok
+    mov bp, di
+.count_ok:
+    mov [chs_count], bp
+    mov byte [chs_retry], 3
+
+.retry:
+    mov cx, [chs_cx]
+    mov dx, [chs_dx]
+    mov ax, 0x0200
+    mov al, [chs_count]
+    mov dl, [boot_drive]
+    push bx
+    push si
+    sti
+    int 0x13
+    pop si
+    pop bx
+    jnc .read_ok
+    xor ah, ah
     mov dl, [boot_drive]
     int 0x13
-    jc .fail
+    dec byte [chs_retry]
+    jnz .retry
+    jmp .fail
 
-    add bx, 512
+.read_ok:
+    mov ax, [chs_count]
+    shl ax, 9
+    add bx, ax
     jnc .same_seg
     mov ax, es
     add ax, 0x1000
     mov es, ax
 .same_seg:
-    inc dword [chs_lba]
-    dec si
+    mov ax, [chs_count]
+    add word [chs_lba], ax
+    adc word [chs_lba+2], 0
+    sub si, [chs_count]
     jmp .loop
 
 .done:
@@ -457,6 +557,7 @@ disk_read_chs:
     stc
 .out:
     pop es
+    pop bp
     pop di
     pop si
     pop dx
@@ -482,6 +583,21 @@ disk_error:
     cli
     hlt
     jmp .halt
+
+boot_putc:
+    push ax
+    push bx
+    push cx
+    push dx
+    mov ah, 0x0E
+    mov bh, 0x00
+    mov bl, 0x07
+    int 0x10
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
 
 enable_a20:
     ; BIOS A20 first; AMI/USB paths often also need the fast A20 gate.

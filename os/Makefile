@@ -24,13 +24,13 @@ SEEDC     := $(HOST_TOOL_DIR)/seedc
 LIL       := $(HOST_TOOL_DIR)/lil
 BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
-RELEASE_BASE_VERSION := v1.67.1a
+RELEASE_BASE_VERSION := v1.67.2p
 RELEASE_HW ?= universal
 RELEASE_HW_LIST := universal seabios ami vbox usb realpc
 RELEASE_HW_UPPER := $(shell printf '%s' '$(RELEASE_HW)' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
 RELEASE_VERSION := $(if $(filter universal,$(RELEASE_HW)),$(RELEASE_BASE_VERSION),$(RELEASE_BASE_VERSION)-$(RELEASE_HW))
 RELEASE_NAME := lardos-$(RELEASE_VERSION)
-ISO_VOLUME_BASE := LARDOS_V1_67_1A
+ISO_VOLUME_BASE := LARDOS_V1_67_2P
 ISO_VOLUME_ID := $(if $(filter universal,$(RELEASE_HW)),$(ISO_VOLUME_BASE),$(ISO_VOLUME_BASE)_$(RELEASE_HW_UPPER))
 RELEASE_DIR := release/$(RELEASE_VERSION)
 ISO_BOOTIMG_SECTOR := 23
@@ -53,11 +53,13 @@ BOOT_STAGE2_INC := $(KERNEL_DIR)/boot_stage2.inc
 STAGE2_SECTORS := 4
 KERNEL_LBA := 5
 BOOT_BIN  := $(BOOT_DIR)/stage1.bin
+BOOT_ISO_BIN := $(BOOT_DIR)/stage1_iso.bin
 STAGE2_BIN:= $(BOOT_DIR)/stage2.bin
 ISO_MBR_BIN:= $(BOOT_DIR)/iso_mbr.bin
 KERNEL_ELF:= $(KERNEL_DIR)/kernel.elf
 KERNEL_EXE:= $(KERNEL_DIR)/kernel.bosx
 RAW_IMAGE := os-image.bin
+ISO_RAW_IMAGE := os-image-iso.bin
 IMG_IMAGE := $(RELEASE_NAME).img
 ISO_IMAGE := $(RELEASE_NAME).iso
 RELEASE_IMG := $(RELEASE_DIR)/$(RELEASE_NAME).img
@@ -69,7 +71,7 @@ KERNEL_LIB_OBJS := $(addprefix $(KERNEL_DIR)/,$(addsuffix .o,$(KERNEL_LIBS)))
 LDLL_INC_DEPS   := $(addprefix $(KERNEL_DIR)/ldll_lib,$(addsuffix .inc,$(LDLL_LIBS)))
 
 HOST_CFLAGS := -std=c11 -O2 -Wall
-CFLAGS    := -std=gnu11 -ffreestanding -O2 -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h -DLARDOS_HARDWARE_PROFILE=\"$(RELEASE_HW)\"
+CFLAGS    := -std=gnu11 -ffreestanding -Os -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -fcf-protection=none -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h -DLARDOS_HARDWARE_PROFILE=\"$(RELEASE_HW)\"
 
 LDFLAGS   := -T linker.ld -nostdlib -m elf_x86_64
 
@@ -77,6 +79,9 @@ all: $(RAW_IMAGE)
 
 $(BOOT_BIN): $(BOOT_DIR)/stage1.s
 	$(NASM) -f bin -D STAGE2_SECTORS=$(STAGE2_SECTORS) $< -o $@
+
+$(BOOT_ISO_BIN): $(BOOT_DIR)/stage1.s
+	$(NASM) -f bin -D STAGE2_SECTORS=$(STAGE2_SECTORS) -D ISO_ELTORITO=1 -D ISO_KERNEL_LBA=$(ISO_KERNEL_LBA) $< -o $@
 
 $(STAGE2_BIN): $(BOOT_DIR)/boot.s
 	$(NASM) -f bin -D KERNEL_LBA=$(KERNEL_LBA) $< -o $@
@@ -370,8 +375,11 @@ $(RAW_IMAGE): $(BOOT_BIN) $(STAGE2_BIN) $(KERNEL_EXE) $(MKIMG)
 $(IMG_IMAGE): $(RAW_IMAGE)
 	cp $< $@
 
-$(ISO_IMAGE): $(IMG_IMAGE) $(MKISO) $(ISO_MBR_BIN)
-	$(MKISO) -o $@ -i $(IMG_IMAGE) -m $(ISO_MBR_BIN) -v $(ISO_VOLUME_ID)
+$(ISO_RAW_IMAGE): $(BOOT_ISO_BIN) $(STAGE2_BIN) $(KERNEL_EXE) $(MKIMG)
+	$(MKIMG) -o $@ -b $(BOOT_ISO_BIN) -s $(STAGE2_BIN) -k $(KERNEL_EXE)
+
+$(ISO_IMAGE): $(ISO_RAW_IMAGE) $(MKISO) $(ISO_MBR_BIN)
+	$(MKISO) -o $@ -i $(ISO_RAW_IMAGE) -m $(ISO_MBR_BIN) -v $(ISO_VOLUME_ID)
 
 $(RELEASE_DIR):
 	mkdir -p $@
@@ -404,7 +412,7 @@ run-iso: $(ISO_IMAGE)
 	$(QEMU) -cdrom $(ISO_IMAGE) -netdev user,id=n1 -device rtl8139,netdev=n1 -smp 3
 
 clean:
-	rm -f $(BOOT_BIN) $(STAGE2_BIN) $(ISO_MBR_BIN) $(KERNEL_ELF) $(KERNEL_EXE) $(RAW_IMAGE) $(IMG_IMAGE) $(ISO_IMAGE) \
+	rm -f $(BOOT_BIN) $(BOOT_ISO_BIN) $(STAGE2_BIN) $(ISO_MBR_BIN) $(KERNEL_ELF) $(KERNEL_EXE) $(RAW_IMAGE) $(ISO_RAW_IMAGE) $(IMG_IMAGE) $(ISO_IMAGE) \
 	      $(KERNEL_DIR)/*.o $(KERNEL_DIR)/lafillo_demo_data.inc $(RELEASES_INC) $(BOOT_STAGE1_INC) $(BOOT_STAGE2_INC) \
 	      $(LAFILLO_ELF) $(LAFILLO_BOSX) $(LANG_EX)/lafillo_demo.o \
 	      $(MKLDLL) $(MKARDX) $(MKLFS) $(MK_SSAV) $(MKEXE) $(MKIMG) $(MKISO) $(BIN2INC) $(BOSLA) $(SEEDC) $(LIL)

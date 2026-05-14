@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.67.1a-ami/lardos-v1.67.1a-ami.iso`. To publish the whole hardware
+`release/v1.67.2p-ami/lardos-v1.67.2p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.67.2p` keeps the `v1.67.1a` RXE/SYSRXE behavior and hotpatches VirtualBox
+optical-drive booting with an ISO-specific stage1, CHS-only El Torito fallback,
+and register-safe stage2 progress output, while leaving raw IMG, HDD/SSD, and
+hybrid-USB boot paths intact.
 
 ### Run in QEMU
 

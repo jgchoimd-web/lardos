@@ -199,7 +199,7 @@ static void write_terminator(uint8_t* p)
     p[6] = 1;
 }
 
-static void write_boot_catalog(uint8_t* p, uint8_t media_type)
+static void write_boot_catalog(uint8_t* p, uint8_t media_type, uint32_t boot_lba, uint16_t sector_count)
 {
     p[0] = 1;
     p[1] = 0;
@@ -218,8 +218,8 @@ static void write_boot_catalog(uint8_t* p, uint8_t media_type)
     put_le16(p + 34, 0);
     p[36] = (media_type == 4) ? 0x80 : 0;
     p[37] = 0;
-    put_le16(p + 38, 1);
-    put_le32(p + 40, ISO_BOOTIMG_SECTOR);
+    put_le16(p + 38, sector_count);
+    put_le32(p + 40, boot_lba);
 }
 
 static void write_hybrid_partition(uint8_t* mbr, uint32_t total_512_sectors)
@@ -331,7 +331,7 @@ int main(int argc, char** argv)
     write_path_table(iso + (size_t)ISO_PATH_LE_SECTOR * ISO_SECTOR_SIZE, 0);
     write_path_table(iso + (size_t)ISO_PATH_BE_SECTOR * ISO_SECTOR_SIZE, 1);
     write_root_dir(iso + (size_t)ISO_ROOT_SECTOR * ISO_SECTOR_SIZE, img_len);
-    write_boot_catalog(iso + (size_t)ISO_BOOTCAT_SECTOR * ISO_SECTOR_SIZE, media_type);
+    write_boot_catalog(iso + (size_t)ISO_BOOTCAT_SECTOR * ISO_SECTOR_SIZE, media_type, ISO_BOOTIMG_SECTOR, 1);
     memcpy(iso + (size_t)ISO_BOOTIMG_SECTOR * ISO_SECTOR_SIZE, img, img_len);
 
     FILE* f = fopen(out_path, "wb");

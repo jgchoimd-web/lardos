@@ -386,6 +386,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.67.1p separates SYSRXE system executables from normal RXE executables and moves the demo game to demo_game.rxe.\n"
     "li v1.67.1a officially promotes the RXE/SYSRXE split without feature loss or value changes.\n"
     "li v1.67.2p hotpatches VirtualBox optical-drive booting with ISO-specific CHS fallback and register-safe stage2 progress output.\n"
+    "li v1.67.2a officially promotes the VirtualBox boot hotpatch without feature loss or value changes.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

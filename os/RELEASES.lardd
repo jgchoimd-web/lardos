@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.67.2a
+ITEM Official release promoting the VirtualBox optical-drive boot hotpatch from v1.67.2p without feature loss or philosophy changes.
+ITEM Keeps the ISO-specific stage1 handoff, CHS-only El Torito fallback, register-safe stage2 progress output, and low-memory LARDX/BOSX staging path.
+ITEM Keeps raw IMG, HDD/SSD installer, hybrid USB, hardware-profiled IMG/ISO artifacts, RXE/SYSRXE, KMO, KModTalk, OSLink, and default GUI behavior intact.
+ITEM Preserves the LardOS value that the system stays user-owned, visible, native, and recoverable.
+
 SECTION v1.67.2p
 ITEM Hotpatch fixing the VirtualBox optical-drive boot failure that showed Disk read error before the GUI.
 ITEM ISO boot now uses an El Torito-specific stage1 handoff and CHS-only stage2 reads for floppy-emulation media, avoiding VirtualBox CD/floppy EDD LBA mismatch.

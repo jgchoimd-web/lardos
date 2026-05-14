@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.68.0a
+ITEM Official release adding APPKIT file-defined and runtime app UI without feature loss or philosophy changes.
+ITEM RXE/SYSRXE apps can declare APPKIT widgets in files and create UI at runtime with APPKIT UI, APPKIT CLEAR, APPKIT COLOR, and APPKIT LAYOUT/SURFACE output lines.
+ITEM Unknown widget names become user-owned custom widgets, preserving extensibility instead of forcing hard-coded OS app branches.
+ITEM GUI text now preserves unknown Unicode as grayscale barcode fallback cells that encode codepoint nibbles instead of replacing text with question marks.
+ITEM The default Unicode mouse cursor and fallback cursor are tail-less, while U+E004 remains user-editable through glyph/cursor tools.
+ITEM Preserves RXE/SYSRXE, KMO, KModTalk, OSLink, hardware-profiled IMG/ISO artifacts, raw IMG, HDD/SSD installer, and user-owned control values.
+
 SECTION v1.67.2a
 ITEM Official release promoting the VirtualBox optical-drive boot hotpatch from v1.67.2p without feature loss or philosophy changes.
 ITEM Keeps the ISO-specific stage1 handoff, CHS-only El Torito fallback, register-safe stage2 progress output, and low-memory LARDX/BOSX staging path.

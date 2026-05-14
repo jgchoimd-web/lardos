@@ -19,5 +19,6 @@ int rxe_index_from_app(int app);
 int rxe_load_file(const char* name);
 int rxe_format_home(int app, char* out, uint32_t out_cap);
 int rxe_run(int app, const char* input, char* out, uint32_t out_cap);
+int rxe_apply_appkit(int app, const char* script);
 int rxe_is_game(int app);
 int rxe_selftest(void);

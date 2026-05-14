@@ -8,6 +8,11 @@
 
 #include <stdint.h>
 
+#define TITLE_BTN_INSET 2u
+#define TITLE_BTN_SIZE 14u
+#define TITLE_BTN_GAP 4u
+#define TITLE_SET_W 36u
+
 static const char* const s_app_titles[] = {
     "Doc Browser", "Calculator", "Notes", "Gallery", "LAR Package",
     "User Run", "Shrine", "Lard Shell", "Play", "Editor",
@@ -70,10 +75,102 @@ static const char* app_hint(uint32_t app)
 {
     const sysrxe_app_t* sx = sysrxe_get_by_app((int)app);
     const rxe_app_t* rx = rxe_get_by_app((int)app);
-    if (sx) return "SYSRXE system app";
-    if (rx) return "RXE executable";
+    if (sx) return sx->file;
+    if (rx) return rx->file;
     if (app >= sizeof(s_app_hints) / sizeof(s_app_hints[0])) return "ready";
     return s_app_hints[app];
+}
+
+static uint32_t solid(uint32_t c)
+{
+    return (c & 0x00FFFFFFu) | 0xFF000000u;
+}
+
+static uint32_t dim(uint32_t c, uint32_t div)
+{
+    uint32_t r;
+    uint32_t g;
+    uint32_t b;
+    if (div == 0u) div = 1u;
+    c = solid(c);
+    r = ((c >> 16) & 0xFFu) / div;
+    g = ((c >> 8) & 0xFFu) / div;
+    b = (c & 0xFFu) / div;
+    return 0xFF000000u | (r << 16) | (g << 8) | b;
+}
+
+static uint32_t app_accent(uint32_t app)
+{
+    const sysrxe_app_t* sx = sysrxe_get_by_app((int)app);
+    const rxe_app_t* rx = rxe_get_by_app((int)app);
+    if (sx) return solid(sx->color);
+    if (rx) return solid(rx->color);
+    switch (app) {
+    case 0: return 0xFF2E8FBAu;
+    case 1: return 0xFF48A9A6u;
+    case 2: return 0xFFE3A447u;
+    case 3: return 0xFFC86DD7u;
+    case 4: return 0xFF6F8BDCu;
+    case 5: return 0xFFB88746u;
+    case 6: return 0xFF7AC86Du;
+    case 7: return 0xFF3AA66Fu;
+    case 8: return 0xFF8BC34Au;
+    case 9: return 0xFFE06A6Au;
+    default: return 0xFF57B8A6u;
+    }
+}
+
+static char lower_ascii(char c)
+{
+    if (c >= 'A' && c <= 'Z') return (char)(c - 'A' + 'a');
+    return c;
+}
+
+static int eq_ci(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i]) {
+        if (lower_ascii(a[i]) != lower_ascii(b[i])) return 0;
+        i++;
+    }
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static const char* layout_surface(const char* layout, const char* fallback)
+{
+    if (!layout || !layout[0] || eq_ci(layout, "auto")) return fallback;
+    if (eq_ci(layout, "document") || eq_ci(layout, "doc")) return "DOCUMENT";
+    if (eq_ci(layout, "terminal") || eq_ci(layout, "shell")) return "TERMINAL";
+    if (eq_ci(layout, "note") || eq_ci(layout, "notes")) return "NOTES";
+    if (eq_ci(layout, "gallery") || eq_ci(layout, "image")) return "GALLERY";
+    if (eq_ci(layout, "package") || eq_ci(layout, "pak")) return "PACKAGE";
+    if (eq_ci(layout, "game")) return "GAME";
+    if (eq_ci(layout, "editor") || eq_ci(layout, "edit")) return "EDITOR";
+    if (eq_ci(layout, "system") || eq_ci(layout, "sys")) return "SYSRXE";
+    if (eq_ci(layout, "exec") || eq_ci(layout, "panel") || eq_ci(layout, "tool")) return "RXE EXEC";
+    return fallback;
+}
+
+static const char* app_surface(uint32_t app)
+{
+    const sysrxe_app_t* sx = sysrxe_get_by_app((int)app);
+    const rxe_app_t* rx = rxe_get_by_app((int)app);
+    if (sx && sx->type == SYSRXE_TYPE_GAME) return layout_surface(sx->layout, "SYSRXE GAME");
+    if (rx && rx->type == SYSRXE_TYPE_GAME) return layout_surface(rx->layout, "RXE GAME");
+    if (sx) return layout_surface(sx->layout, "SYSRXE");
+    if (rx) return layout_surface(rx->layout, "RXE EXEC");
+    switch (app) {
+    case 0: return "DOCUMENT";
+    case 2: return "NOTES";
+    case 3: return "GALLERY";
+    case 4: return "PACKAGE";
+    case 6: return "SYSTEM";
+    case 7: return "TERMINAL";
+    case 8: return "PLAY";
+    case 9: return "EDITOR";
+    default: return "TOOL";
+    }
 }
 
 static int overlay_layout_ok(const guioverlay_state_t* s)
@@ -107,20 +204,23 @@ static void draw_title(const guioverlay_state_t* s)
 {
     const lguilib_theme_t* th = overlay_theme();
     uint32_t title_bg = th->title_bg;
-    uint32_t close_x = s->win_x + s->win_w - 18u;
-    uint32_t full_x = close_x - 18u;
-    uint32_t min_x = full_x - 18u;
-    uint32_t set_x = min_x - 42u;
+    uint32_t btn_y = s->win_y + TITLE_BTN_INSET;
+    uint32_t close_x = s->win_x + s->win_w - TITLE_BTN_GAP - TITLE_BTN_SIZE;
+    uint32_t full_x = close_x - TITLE_BTN_GAP - TITLE_BTN_SIZE;
+    uint32_t min_x = full_x - TITLE_BTN_GAP - TITLE_BTN_SIZE;
+    uint32_t set_x = min_x - TITLE_BTN_GAP - TITLE_SET_W;
+    uint32_t min_set_x = s->win_x + TITLE_BTN_GAP;
+    if (set_x < min_set_x) set_x = min_set_x;
     fill(s->win_x, s->win_y, s->win_w, 20u, title_bg);
     fill(s->win_x, s->win_y + 19u, s->win_w, 1u, th->tab_accent);
     fill(s->win_x + 1u, s->win_y + 1u, s->win_w > 2u ? s->win_w - 2u : 1u, 1u, 0xFF334048u);
     if (s->win_w > 120u) {
         uint32_t set_bg = s->settings_open ? th->tab_active : th->tab_idle;
-        fill(set_x, s->win_y, 40u, 20u, set_bg);
-        text(set_x + 8u, s->win_y + 6u, "Set", th->title_fg, set_bg);
-        fill(min_x, s->win_y + 2u, 14u, 14u, th->tab_idle);
+        fill(set_x, btn_y, TITLE_SET_W, TITLE_BTN_SIZE, set_bg);
+        text(set_x + 6u, s->win_y + 6u, "Set", th->title_fg, set_bg);
+        fill(min_x, btn_y, TITLE_BTN_SIZE, TITLE_BTN_SIZE, th->tab_idle);
         fill(min_x + 3u, s->win_y + 12u, 8u, 1u, th->title_fg);
-        fill(full_x, s->win_y + 2u, 14u, 14u, th->tab_idle);
+        fill(full_x, btn_y, TITLE_BTN_SIZE, TITLE_BTN_SIZE, th->tab_idle);
         if (s->fullscreen) {
             fill(full_x + 4u, s->win_y + 5u, 6u, 1u, th->title_fg);
             fill(full_x + 4u, s->win_y + 5u, 1u, 5u, th->title_fg);
@@ -133,7 +233,7 @@ static void draw_title(const guioverlay_state_t* s)
             fill(full_x + 10u, s->win_y + 5u, 1u, 7u, th->title_fg);
             fill(full_x + 4u, s->win_y + 11u, 7u, 1u, th->title_fg);
         }
-        fill(close_x, s->win_y + 2u, 14u, 14u, 0xFF803B45u);
+        fill(close_x, btn_y, TITLE_BTN_SIZE, TITLE_BTN_SIZE, 0xFF803B45u);
         text(close_x + 4u, s->win_y + 6u, "x", th->title_fg, 0xFF803B45u);
     }
     if (s->win_w > 150u) text(s->win_x + 8u, s->win_y + 6u, app_title(s->app_id), th->title_fg, title_bg);
@@ -147,12 +247,14 @@ static void draw_title(const guioverlay_state_t* s)
 static void draw_content_badge(const guioverlay_state_t* s)
 {
     const lguilib_theme_t* th = overlay_theme();
-    uint32_t bg = th->panel_bg;
+    uint32_t accent = app_accent(s->app_id);
+    uint32_t bg = dim(accent, 5u);
     uint32_t y = s->win_y + 24u;
     fill(s->win_x + 8u, y + 2u, s->win_w > 16u ? s->win_w - 16u : s->win_w, 18u, bg);
-    fill(s->win_x + 8u, y + 2u, 4u, 18u, th->tab_accent);
-    text(s->win_x + 16u, y + 8u, app_title(s->app_id), th->title_fg, bg);
-    if (s->win_w > 420u) text(s->win_x + 176u, y + 8u, app_hint(s->app_id), th->hint_fg, bg);
+    fill(s->win_x + 8u, y + 2u, 4u, 18u, accent);
+    text(s->win_x + 16u, y + 8u, app_surface(s->app_id), th->title_fg, bg);
+    if (s->win_w > 320u) text(s->win_x + 120u, y + 8u, app_title(s->app_id), th->title_fg, bg);
+    if (s->win_w > 500u) text(s->win_x + 264u, y + 8u, app_hint(s->app_id), th->hint_fg, bg);
     if (s->win_w > 520u) text(s->win_x + s->win_w - 112u, y + 8u, LARDOS_VERSION, th->hint_fg, bg);
 }
 

@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #define LGUILIB_NAME_MAX    31u
-#define LGUILIB_WIDGET_MAX  12u
+#define LGUILIB_WIDGET_MAX  24u
 
 typedef struct {
     char name[LGUILIB_NAME_MAX + 1u];

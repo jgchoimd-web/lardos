@@ -149,6 +149,22 @@ static uint32_t parse_number_adv(const char** ps, uint32_t fallback)
     return any ? v : fallback;
 }
 
+static uint32_t read_token(const char** ps, char* out, uint32_t cap)
+{
+    const char* s;
+    uint32_t n = 0;
+    if (!ps || !*ps || !out || cap == 0) return 0;
+    s = skip_ws(*ps);
+    while (s[n] && s[n] != ' ' && s[n] != '\t' && s[n] != '|' && n + 1u < cap) {
+        out[n] = s[n];
+        n++;
+    }
+    out[n] = '\0';
+    while (s[n] && s[n] != ' ' && s[n] != '\t' && s[n] != '|') n++;
+    *ps = s + n;
+    return n;
+}
+
 static char lower_ascii(char c)
 {
     if (c >= 'A' && c <= 'Z') return (char)(c + ('a' - 'A'));
@@ -164,6 +180,116 @@ static int streq_ci(const char* a, const char* b)
         i++;
     }
     return a[i] == b[i];
+}
+
+static int ui_kind_from_name(const char* name)
+{
+    if (streq_ci(name, "PANEL")) return SYSRXE_UI_PANEL;
+    if (streq_ci(name, "LABEL")) return SYSRXE_UI_LABEL;
+    if (streq_ci(name, "TEXT")) return SYSRXE_UI_LABEL;
+    if (streq_ci(name, "BUTTON")) return SYSRXE_UI_BUTTON;
+    if (streq_ci(name, "INPUT")) return SYSRXE_UI_INPUT;
+    if (streq_ci(name, "OUTPUT")) return SYSRXE_UI_OUTPUT;
+    if (streq_ci(name, "VIEW")) return SYSRXE_UI_OUTPUT;
+    if (streq_ci(name, "STATUS")) return SYSRXE_UI_STATUS;
+    if (streq_ci(name, "LIST")) return SYSRXE_UI_LIST;
+    if (streq_ci(name, "TOGGLE")) return SYSRXE_UI_TOGGLE;
+    if (streq_ci(name, "CHECK")) return SYSRXE_UI_TOGGLE;
+    if (streq_ci(name, "SLIDER")) return SYSRXE_UI_SLIDER;
+    if (streq_ci(name, "PROGRESS")) return SYSRXE_UI_PROGRESS;
+    if (streq_ci(name, "SEP")) return SYSRXE_UI_SEPARATOR;
+    if (streq_ci(name, "SEPARATOR")) return SYSRXE_UI_SEPARATOR;
+    if (streq_ci(name, "BADGE")) return SYSRXE_UI_BADGE;
+    if (streq_ci(name, "ICON")) return SYSRXE_UI_ICON;
+    if (streq_ci(name, "TILE")) return SYSRXE_UI_TILE;
+    if (streq_ci(name, "CUSTOM")) return SYSRXE_UI_CUSTOM;
+    if (streq_ci(name, "USER")) return SYSRXE_UI_CUSTOM;
+    if (streq_ci(name, "DRAW")) return SYSRXE_UI_CUSTOM;
+    return 0;
+}
+
+static int token_starts_number(const char* s)
+{
+    s = skip_ws(s);
+    return *s >= '0' && *s <= '9';
+}
+
+static void split_text_action(const char* src, char* text, uint32_t text_cap,
+                              char* action, uint32_t action_cap)
+{
+    uint32_t i = 0;
+    uint32_t t = 0;
+    if (text && text_cap) text[0] = '\0';
+    if (action && action_cap) action[0] = '\0';
+    if (!src) return;
+    src = skip_ws(src);
+    while (src[i] && src[i] != '|') {
+        if (text && t + 1u < text_cap) text[t++] = src[i];
+        i++;
+    }
+    if (text && text_cap) {
+        text[t] = '\0';
+        strip_tail(text);
+    }
+    if (src[i] == '|') {
+        const char* a = skip_ws(src + i + 1u);
+        copy_text(action, action_cap, a);
+        strip_tail(action);
+    }
+}
+
+static void parse_ui_widget(sysrxe_app_t* app, const char* src)
+{
+    sysrxe_widget_t* w;
+    const char* p = src;
+    char kind_name[16];
+    char style_name[16];
+    int kind;
+    if (!app || !src || app->ui_count >= SYSRXE_UI_MAX_WIDGETS) return;
+    if (!read_token(&p, kind_name, sizeof(kind_name))) return;
+    kind = ui_kind_from_name(kind_name);
+    style_name[0] = '\0';
+    if (!kind) {
+        kind = SYSRXE_UI_CUSTOM;
+        copy_text(style_name, sizeof(style_name), kind_name);
+    } else if (kind == SYSRXE_UI_CUSTOM) {
+        if (!token_starts_number(p)) {
+            (void)read_token(&p, style_name, sizeof(style_name));
+        }
+    }
+    w = &app->ui[app->ui_count];
+    memset(w, 0, sizeof(*w));
+    w->used = 1;
+    w->kind = kind;
+    if (style_name[0]) copy_text(w->style, sizeof(w->style), style_name);
+    else if (kind == SYSRXE_UI_CUSTOM) copy_text(w->style, sizeof(w->style), "custom");
+    w->x = (int)parse_number_adv(&p, 0u);
+    w->y = (int)parse_number_adv(&p, 0u);
+    w->w = (int)parse_number_adv(&p, 0u);
+    w->h = (int)parse_number_adv(&p, 0u);
+    w->color = app->color;
+    if (kind == SYSRXE_UI_BUTTON && w->w == 0) w->w = 88;
+    if (kind == SYSRXE_UI_BUTTON && w->h == 0) w->h = 24;
+    if (kind == SYSRXE_UI_INPUT && w->w == 0) w->w = 260;
+    if (kind == SYSRXE_UI_INPUT && w->h == 0) w->h = 24;
+    if (kind == SYSRXE_UI_OUTPUT && w->w == 0) w->w = 0;
+    if (kind == SYSRXE_UI_OUTPUT && w->h == 0) w->h = 0;
+    if (kind == SYSRXE_UI_PANEL && w->h == 0) w->h = 32;
+    if ((kind == SYSRXE_UI_LABEL || kind == SYSRXE_UI_STATUS) && w->h == 0) w->h = 14;
+    if (kind == SYSRXE_UI_TOGGLE && w->w == 0) w->w = 110;
+    if (kind == SYSRXE_UI_TOGGLE && w->h == 0) w->h = 22;
+    if ((kind == SYSRXE_UI_SLIDER || kind == SYSRXE_UI_PROGRESS) && w->w == 0) w->w = 140;
+    if ((kind == SYSRXE_UI_SLIDER || kind == SYSRXE_UI_PROGRESS) && w->h == 0) w->h = 18;
+    if (kind == SYSRXE_UI_SEPARATOR && w->h == 0) w->h = 8;
+    if (kind == SYSRXE_UI_BADGE && w->h == 0) w->h = 18;
+    if (kind == SYSRXE_UI_ICON && w->w == 0) w->w = 44;
+    if (kind == SYSRXE_UI_ICON && w->h == 0) w->h = 44;
+    if (kind == SYSRXE_UI_TILE && w->w == 0) w->w = 88;
+    if (kind == SYSRXE_UI_TILE && w->h == 0) w->h = 56;
+    if (kind == SYSRXE_UI_CUSTOM && w->w == 0) w->w = 96;
+    if (kind == SYSRXE_UI_CUSTOM && w->h == 0) w->h = 36;
+    split_text_action(p, w->text, sizeof(w->text), w->action, sizeof(w->action));
+    app->ui_count++;
 }
 
 static int has_suffix_ci(const char* name, const char* suffix)
@@ -194,6 +320,7 @@ static void defaults_for(sysrxe_app_t* app, const char* file)
     copy_text(app->id, sizeof(app->id), file ? file : "sysrxe");
     copy_text(app->name, sizeof(app->name), "SYSRXE App");
     copy_text(app->icon, sizeof(app->icon), "X");
+    copy_text(app->layout, sizeof(app->layout), "auto");
     copy_text(app->input_label, sizeof(app->input_label), "Input:");
     copy_text(app->button_label, sizeof(app->button_label), "Run");
     app->color = 0xFF57B8A6u;
@@ -297,6 +424,9 @@ static int parse_line(sysrxe_app_t* app, const char* src)
     if ((v = value_after_key(src, "ID")) != NULL) { copy_text(app->id, sizeof(app->id), v); return 0; }
     if ((v = value_after_key(src, "NAME")) != NULL) { copy_text(app->name, sizeof(app->name), v); return 0; }
     if ((v = value_after_key(src, "ICON")) != NULL) { copy_text(app->icon, sizeof(app->icon), v); return 0; }
+    if ((v = value_after_key(src, "LAYOUT")) != NULL || (v = value_after_key(src, "SURFACE")) != NULL) { copy_text(app->layout, sizeof(app->layout), v); return 0; }
+    if ((v = value_after_key(src, "UI")) != NULL || (v = value_after_key(src, "WIDGET")) != NULL) { parse_ui_widget(app, v); return 0; }
+    if ((v = value_after_key(src, "USE")) != NULL || (v = value_after_key(src, "LIB")) != NULL) { return 0; }
     if ((v = value_after_key(src, "COLOR")) != NULL) { app->color = parse_number(v, app->color); return 0; }
     if ((v = value_after_key(src, "TYPE")) != NULL) { app->type = streq_ci(v, "GAME") ? SYSRXE_TYPE_GAME : SYSRXE_TYPE_TEXT; return 0; }
     if ((v = value_after_key(src, "GAME")) != NULL) { app->type = SYSRXE_TYPE_GAME; copy_text(app->game_kind, sizeof(app->game_kind), v); return 0; }
@@ -336,6 +466,89 @@ static int parse_line(sysrxe_app_t* app, const char* src)
     if ((v = value_after_key(src, "DESKTOP")) != NULL) { app->show_desktop = parse_number(v, 1u) ? 1 : 0; return 0; }
     if ((v = value_after_key(src, "DOCK")) != NULL) { app->show_dock = parse_number(v, 0u) ? 1 : 0; return 0; }
     return 0;
+}
+
+static void appkit_clear_widgets(sysrxe_app_t* app)
+{
+    if (!app) return;
+    memset(app->ui, 0, sizeof(app->ui));
+    app->ui_count = 0;
+}
+
+static int appkit_apply_line(sysrxe_app_t* app, const char* line)
+{
+    char work[192];
+    const char* src;
+    const char* p;
+    const char* v;
+    uint32_t i = 0;
+    uint32_t before;
+    if (!app || !line) return 0;
+    while (line[i] && line[i] != '\n' && line[i] != '\r' && i + 1u < sizeof(work)) {
+        work[i] = line[i];
+        i++;
+    }
+    work[i] = '\0';
+    strip_tail(work);
+    src = skip_ws(work);
+    if (!starts_key(src, "APPKIT")) return 0;
+    p = value_after_key(src, "APPKIT");
+    if (!p) return 1;
+    p = skip_ws(p);
+    if (!p[0] || p[0] == '#') return 1;
+    if (starts_key(p, "CLEAR") || starts_key(p, "RESET")) {
+        appkit_clear_widgets(app);
+        return 1;
+    }
+    if ((v = value_after_key(p, "COLOR")) != NULL) {
+        app->color = parse_number(v, app->color);
+        return 1;
+    }
+    if ((v = value_after_key(p, "LAYOUT")) != NULL || (v = value_after_key(p, "SURFACE")) != NULL) {
+        copy_text(app->layout, sizeof(app->layout), v);
+        return 1;
+    }
+    if ((v = value_after_key(p, "UI")) != NULL || (v = value_after_key(p, "WIDGET")) != NULL) {
+        parse_ui_widget(app, v);
+        return 1;
+    }
+    before = app->ui_count;
+    parse_ui_widget(app, p);
+    return app->ui_count != before;
+}
+
+static uint32_t appkit_apply_script(sysrxe_app_t* app, const char* script, char* visible, uint32_t visible_cap)
+{
+    char line[192];
+    uint32_t lp = 0;
+    uint32_t pos = 0;
+    uint32_t applied = 0;
+    int saw_text = 0;
+    if (visible && visible_cap) visible[0] = '\0';
+    if (!app || !script) return 0;
+    for (uint32_t i = 0;; i++) {
+        char c = script[i];
+        int end = (c == '\0' || c == '\n' || c == '\r' || lp + 1u >= sizeof(line));
+        if (end) {
+            line[lp] = '\0';
+            if (appkit_apply_line(app, line)) {
+                applied++;
+            } else if (visible && visible_cap && lp > 0) {
+                out_append_s(visible, visible_cap, &pos, line);
+                out_append_ch(visible, visible_cap, &pos, '\n');
+                saw_text = 1;
+            }
+            lp = 0;
+            if (c == '\0') break;
+            if (c == '\r' && script[i + 1u] == '\n') i++;
+        } else {
+            line[lp++] = c;
+        }
+    }
+    if (visible && visible_cap && applied && !saw_text) {
+        out_append_s(visible, visible_cap, &pos, "APPKIT: app updated its UI.\n");
+    }
+    return applied;
 }
 
 static int parse_rxe_text(sysrxe_app_t* app, const char* file, const char* data, uint32_t size, const char* magic)
@@ -647,8 +860,8 @@ int sysrxe_format_home(int app, char* out, uint32_t out_cap)
         return 0;
     }
     snprintf(out, out_cap,
-             "SYSRXE app: %s\nfile: %s\n\n%s%s%s",
-             a->name, a->file, a->body,
+             "SYSRXE app: %s\nfile: %s\nlayout: %s\nui widgets: %u\n\n%s%s%s",
+             a->name, a->file, a->layout, a->ui_count, a->body,
              a->command[0] ? "\nCommand: " : "",
              a->command[0] ? a->command : "");
     return 0;
@@ -663,8 +876,8 @@ int rxe_format_home(int app, char* out, uint32_t out_cap)
         return 0;
     }
     snprintf(out, out_cap,
-             "RXE executable: %s\nfile: %s\n\n%s%s%s",
-             a->name, a->file, a->body,
+             "RXE executable: %s\nfile: %s\nlayout: %s\nui widgets: %u\n\n%s%s%s",
+             a->name, a->file, a->layout, a->ui_count, a->body,
              a->command[0] ? "\nCommand: " : "",
              a->command[0] ? a->command : "");
     return 0;
@@ -687,7 +900,7 @@ int sysrxe_run(int app, const char* input, char* out, uint32_t out_cap)
         }
         cmd[n] = '\0';
         lsh_exec(cmd);
-        copy_text(out, out_cap, lsh_get_output());
+        appkit_apply_script(a, lsh_get_output(), out, out_cap);
         return 0;
     }
     snprintf(out, out_cap, "%s\nInput: %s\n\nNo COMMAND is set, so SYSRXE only rendered the app body.", a->body, input);
@@ -711,11 +924,25 @@ int rxe_run(int app, const char* input, char* out, uint32_t out_cap)
         }
         cmd[n] = '\0';
         lsh_exec(cmd);
-        copy_text(out, out_cap, lsh_get_output());
+        appkit_apply_script(a, lsh_get_output(), out, out_cap);
         return 0;
     }
     snprintf(out, out_cap, "%s\nInput: %s\n\nNo COMMAND is set, so RXE only rendered the executable body.", a->body, input);
     return 0;
+}
+
+int sysrxe_apply_appkit(int app, const char* script)
+{
+    sysrxe_app_t* a = sysrxe_get_mutable_by_app(app);
+    if (!a || !script) return -1;
+    return (int)appkit_apply_script(a, script, NULL, 0);
+}
+
+int rxe_apply_appkit(int app, const char* script)
+{
+    rxe_app_t* a = rxe_get_mutable_by_app(app);
+    if (!a || !script) return -1;
+    return (int)appkit_apply_script(a, script, NULL, 0);
 }
 
 int sysrxe_is_game(int app)
@@ -737,9 +964,17 @@ int sysrxe_selftest(void)
         "ID test\n"
         "NAME Test App\n"
         "ICON T\n"
+        "LAYOUT panel\n"
         "COLOR 0xFF123456\n"
         "INPUT Thing:\n"
         "BUTTON Do\n"
+        "UI PANEL 0 0 180 34 Test controls\n"
+        "UI BUTTON 8 8 72 20 Do | go\n"
+        "UI INPUT 0 44 180 22 Thing:\n"
+        "UI OUTPUT 0 76 0 0 Output\n"
+        "UI PROGRESS 0 104 160 18 Meter | 66\n"
+        "UI CUSTOM glass 4 126 120 24 Free | free\n"
+        "UI KNOB 8 154 80 24 Missing | twist\n"
         "TEXT hello\n"
         "COMMAND echo sysrxe\n";
     static const char game[] =
@@ -754,19 +989,31 @@ int sysrxe_selftest(void)
     sysrxe_app_t app;
     sysrxe_app_t game_app;
     char out[512];
+    char visible[256];
     if (parse_sysrxe(&app, "test.sysrxe", sample, sizeof(sample) - 1) != 0) return -1;
     if (strcmp(app.name, "Test App") != 0) return -2;
     if (strcmp(app.icon, "T") != 0) return -3;
     if (app.color != 0xFF123456u) return -4;
-    if (strcmp(app.button_label, "Do") != 0) return -5;
-    if (strcmp(app.command, "echo sysrxe") != 0) return -6;
-    if (parse_sysrxe(&game_app, "game.sysrxe", game, sizeof(game) - 1) != 0) return -7;
-    if (game_app.type != SYSRXE_TYPE_GAME) return -8;
-    if (game_app.game_w != 5u || game_app.game_h != 3u) return -9;
-    if (game_app.game_px != 1 || game_app.game_py != 1) return -10;
-    if (game_app.game_goal_x != 3 || game_app.game_goal_y != 1) return -11;
-    if (sysrxe_game_run(&game_app, "right", out, sizeof(out)) != 0) return -12;
-    if (game_app.game_px != 2 || game_app.game_py != 1 || game_app.game_moves != 1u) return -13;
+    if (strcmp(app.layout, "panel") != 0) return -5;
+    if (app.ui_count != 7u) return -6;
+    if (app.ui[1].kind != SYSRXE_UI_BUTTON || strcmp(app.ui[1].action, "go") != 0) return -7;
+    if (app.ui[4].kind != SYSRXE_UI_PROGRESS || strcmp(app.ui[4].action, "66") != 0) return -17;
+    if (app.ui[5].kind != SYSRXE_UI_CUSTOM || strcmp(app.ui[5].style, "glass") != 0 || strcmp(app.ui[5].action, "free") != 0) return -18;
+    if (app.ui[6].kind != SYSRXE_UI_CUSTOM || strcmp(app.ui[6].style, "KNOB") != 0 || strcmp(app.ui[6].action, "twist") != 0) return -19;
+    if (appkit_apply_script(&app, "hello\nAPPKIT UI CUSTOM meter 0 180 120 18 Live | 80\n", visible, sizeof(visible)) != 1u) return -20;
+    if (strcmp(visible, "hello\n") != 0) return -21;
+    if (app.ui_count != 8u || app.ui[7].kind != SYSRXE_UI_CUSTOM || strcmp(app.ui[7].style, "meter") != 0) return -22;
+    if (appkit_apply_script(&app, "APPKIT CLEAR\nAPPKIT UI KNOB 1 2 3 4 Runtime | run\n", visible, sizeof(visible)) != 2u) return -23;
+    if (app.ui_count != 1u || strcmp(app.ui[0].style, "KNOB") != 0 || strcmp(app.ui[0].action, "run") != 0) return -24;
+    if (strcmp(app.button_label, "Do") != 0) return -8;
+    if (strcmp(app.command, "echo sysrxe") != 0) return -9;
+    if (parse_sysrxe(&game_app, "game.sysrxe", game, sizeof(game) - 1) != 0) return -10;
+    if (game_app.type != SYSRXE_TYPE_GAME) return -11;
+    if (game_app.game_w != 5u || game_app.game_h != 3u) return -12;
+    if (game_app.game_px != 1 || game_app.game_py != 1) return -13;
+    if (game_app.game_goal_x != 3 || game_app.game_goal_y != 1) return -14;
+    if (sysrxe_game_run(&game_app, "right", out, sizeof(out)) != 0) return -15;
+    if (game_app.game_px != 2 || game_app.game_py != 1 || game_app.game_moves != 1u) return -16;
     return 0;
 }
 

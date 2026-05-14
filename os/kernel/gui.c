@@ -43,6 +43,20 @@
 #define GUI_DRAG_THRESHOLD 8
 #define GUI_TITLE_H 20
 #define GUI_CONTENT_TOP 24
+#define GUI_TITLE_BTN_INSET 2
+#define GUI_TITLE_BTN_SIZE 14
+#define GUI_TITLE_BTN_GAP 4
+#define GUI_TITLE_SET_W 36
+#define GUI_SURFACE_TOOL 0
+#define GUI_SURFACE_DOC 1
+#define GUI_SURFACE_TERMINAL 2
+#define GUI_SURFACE_NOTE 3
+#define GUI_SURFACE_GALLERY 4
+#define GUI_SURFACE_PACKAGE 5
+#define GUI_SURFACE_GAME 6
+#define GUI_SURFACE_EDITOR 7
+#define GUI_SURFACE_EXEC 8
+#define GUI_SURFACE_SYS 9
 
 typedef struct {
     int app;
@@ -171,6 +185,7 @@ static void gui_bring_window_front(int app);
 static void gui_sync_active_window(void);
 static void gui_save_app_view(int app);
 static void gui_run_sysrxe_current(void);
+static void gui_run_sysrxe_input(const char* input);
 
 #define SCREENRAM_MAX_BYTES 8192u
 #define SCREENRAM_DEFAULT_W 64u
@@ -584,6 +599,44 @@ static void fb_draw_char(const fb_t* f, uint16_t x, uint16_t y, char ch, uint32_
     }
 }
 
+static uint32_t fb_gray_argb(uint32_t gray)
+{
+    if (gray > 255u) gray = 255u;
+    return 0xFF000000u | (gray << 16) | (gray << 8) | gray;
+}
+
+static void fb_draw_unicode_failsafe(const fb_t* f, uint16_t x, uint16_t y, uint32_t cp, uint32_t bg)
+{
+    uint32_t code = cp & 0x00FFFFFFu;
+    for (uint16_t row = 0; row < 8; row++) {
+        for (uint16_t col = 0; col < 8; col++) {
+            uint32_t color = bg;
+            if (col == 0) {
+                color = 0xFF1A1A1Au;
+            } else if (col == 7) {
+                color = 0xFFE6E6E6u;
+            } else {
+                uint32_t shift = (uint32_t)(6u - col) * 4u;
+                uint32_t nibble = (code >> shift) & 0xFu;
+                color = fb_gray_argb(32u + nibble * 14u);
+                if (row == 0 || row == 7) {
+                    color = fb_gray_argb(18u + nibble * 8u);
+                }
+            }
+            fb_putpixel(f, (uint16_t)(x + col), (uint16_t)(y + row), color);
+        }
+    }
+}
+
+static void fb_draw_codepoint_cell(const fb_t* f, uint16_t x, uint16_t y, uint32_t cp, uint32_t fg, uint32_t bg)
+{
+    if (cp >= 32u && cp <= 126u) {
+        fb_draw_char(f, x, y, (char)cp, fg, bg);
+    } else {
+        fb_draw_unicode_failsafe(f, x, y, cp, bg);
+    }
+}
+
 static void fb_draw_text_cells(const fb_t* f, uint16_t x, uint16_t y, const char* s,
                                uint16_t max_cells, uint32_t fg, uint32_t bg)
 {
@@ -592,8 +645,7 @@ static void fb_draw_text_cells(const fb_t* f, uint16_t x, uint16_t y, const char
     while (*p && cell < max_cells) {
         uint32_t cp = utf8_next(&p);
         if (cp == 0) break;
-        if (cp < 32 || cp > 126) cp = '?';
-        fb_draw_char(f, (uint16_t)(x + cell * 8), y, (char)cp, fg, bg);
+        fb_draw_codepoint_cell(f, (uint16_t)(x + cell * 8), y, cp, fg, bg);
         cell++;
     }
 }
@@ -935,14 +987,14 @@ int gui_screenram_selftest(void)
 static void gui_draw_default_cursor(const fb_t* tgt, int x, int y, uint32_t color)
 {
     static const uint8_t shape[8][8] = {
-        {0,0,0,1,1,0,0,0},
-        {0,0,1,2,2,1,0,0},
-        {0,1,3,4,4,3,1,0},
-        {0,1,4,3,4,4,1,0},
-        {0,1,3,4,3,4,1,0},
-        {0,1,4,3,4,3,1,0},
-        {0,0,1,3,3,1,0,0},
-        {0,0,0,1,1,0,0,0}
+        {4,0,0,0,0,0,0,0},
+        {4,1,0,0,0,0,0,0},
+        {4,4,1,0,0,0,0,0},
+        {4,4,4,1,0,0,0,0},
+        {4,4,4,4,1,0,0,0},
+        {4,4,1,1,1,0,0,0},
+        {4,1,0,0,0,0,0,0},
+        {1,0,0,0,0,0,0,0}
     };
     uint32_t shell = color;
     uint32_t shade = 0xFFD7DFEAu;
@@ -1051,16 +1103,18 @@ static int in_rect(int x, int y, int rx, int ry, int rw, int rh)
 static void gui_title_control_rects(int* out_set_x, int* out_min_x, int* out_full_x,
                                     int* out_close_x, int* out_y, int* out_h)
 {
-    int close_x = g.win_x + g.win_w - 18;
-    int full_x = close_x - 18;
-    int min_x = full_x - 18;
-    int set_x = min_x - 42;
+    int close_x = g.win_x + g.win_w - GUI_TITLE_BTN_GAP - GUI_TITLE_BTN_SIZE;
+    int full_x = close_x - GUI_TITLE_BTN_GAP - GUI_TITLE_BTN_SIZE;
+    int min_x = full_x - GUI_TITLE_BTN_GAP - GUI_TITLE_BTN_SIZE;
+    int set_x = min_x - GUI_TITLE_BTN_GAP - GUI_TITLE_SET_W;
+    int min_set_x = g.win_x + GUI_TITLE_BTN_GAP;
+    if (set_x < min_set_x) set_x = min_set_x;
     if (out_set_x) *out_set_x = set_x;
     if (out_min_x) *out_min_x = min_x;
     if (out_full_x) *out_full_x = full_x;
     if (out_close_x) *out_close_x = close_x;
-    if (out_y) *out_y = g.win_y;
-    if (out_h) *out_h = GUI_TITLE_H;
+    if (out_y) *out_y = g.win_y + GUI_TITLE_BTN_INSET;
+    if (out_h) *out_h = GUI_TITLE_BTN_SIZE;
 }
 
 static const char* gui_app_name(int app)
@@ -1099,6 +1153,508 @@ static int gui_file_rxe_format_home(int app, char* out, uint32_t out_cap)
     if (sysrxe_is_app(app)) return sysrxe_format_home(app, out, out_cap);
     if (rxe_is_app(app)) return rxe_format_home(app, out, out_cap);
     return -1;
+}
+
+static char gui_meta_lower(char c)
+{
+    if (c >= 'A' && c <= 'Z') return (char)(c - 'A' + 'a');
+    return c;
+}
+
+static int gui_meta_eq_ci(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i]) {
+        if (gui_meta_lower(a[i]) != gui_meta_lower(b[i])) return 0;
+        i++;
+    }
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static const sysrxe_app_t* gui_file_app_meta(int app)
+{
+    const sysrxe_app_t* sx = sysrxe_get_by_app(app);
+    if (sx) return sx;
+    return rxe_get_by_app(app);
+}
+
+static int gui_surface_from_layout(const char* layout, int fallback)
+{
+    if (!layout || !layout[0] || gui_meta_eq_ci(layout, "auto")) return fallback;
+    if (gui_meta_eq_ci(layout, "document") || gui_meta_eq_ci(layout, "doc")) return GUI_SURFACE_DOC;
+    if (gui_meta_eq_ci(layout, "terminal") || gui_meta_eq_ci(layout, "shell")) return GUI_SURFACE_TERMINAL;
+    if (gui_meta_eq_ci(layout, "note") || gui_meta_eq_ci(layout, "notes")) return GUI_SURFACE_NOTE;
+    if (gui_meta_eq_ci(layout, "gallery") || gui_meta_eq_ci(layout, "image")) return GUI_SURFACE_GALLERY;
+    if (gui_meta_eq_ci(layout, "package") || gui_meta_eq_ci(layout, "pak")) return GUI_SURFACE_PACKAGE;
+    if (gui_meta_eq_ci(layout, "game")) return GUI_SURFACE_GAME;
+    if (gui_meta_eq_ci(layout, "editor") || gui_meta_eq_ci(layout, "edit")) return GUI_SURFACE_EDITOR;
+    if (gui_meta_eq_ci(layout, "system") || gui_meta_eq_ci(layout, "sys")) return GUI_SURFACE_SYS;
+    if (gui_meta_eq_ci(layout, "exec") || gui_meta_eq_ci(layout, "panel") || gui_meta_eq_ci(layout, "tool")) return GUI_SURFACE_EXEC;
+    return fallback;
+}
+
+static int gui_app_surface(int app)
+{
+    const sysrxe_app_t* sx = sysrxe_get_by_app(app);
+    const rxe_app_t* rx = rxe_get_by_app(app);
+    if (sx) {
+        int base = sx->type == SYSRXE_TYPE_GAME ? GUI_SURFACE_GAME : GUI_SURFACE_SYS;
+        return gui_surface_from_layout(sx->layout, base);
+    }
+    if (rx) {
+        int base = rx->type == SYSRXE_TYPE_GAME ? GUI_SURFACE_GAME : GUI_SURFACE_EXEC;
+        return gui_surface_from_layout(rx->layout, base);
+    }
+    switch (app) {
+    case 0: return GUI_SURFACE_DOC;
+    case 2: return GUI_SURFACE_NOTE;
+    case 3: return GUI_SURFACE_GALLERY;
+    case 4: return GUI_SURFACE_PACKAGE;
+    case 6: return GUI_SURFACE_SYS;
+    case 7: return GUI_SURFACE_TERMINAL;
+    case 8: return GUI_SURFACE_EXEC;
+    case 9: return GUI_SURFACE_EDITOR;
+    default: return GUI_SURFACE_TOOL;
+    }
+}
+
+static uint32_t gui_opaque(uint32_t c)
+{
+    return (c & 0x00FFFFFFu) | 0xFF000000u;
+}
+
+static uint32_t gui_app_accent(int app)
+{
+    const sysrxe_app_t* sx = sysrxe_get_by_app(app);
+    const rxe_app_t* rx = rxe_get_by_app(app);
+    if (sx) return gui_opaque(sx->color);
+    if (rx) return gui_opaque(rx->color);
+    switch (app) {
+    case 0: return 0xFF2E8FBAu;
+    case 1: return 0xFF48A9A6u;
+    case 2: return 0xFFE3A447u;
+    case 3: return 0xFFC86DD7u;
+    case 4: return 0xFF6F8BDCu;
+    case 5: return 0xFFB88746u;
+    case 6: return 0xFF7AC86Du;
+    case 7: return 0xFF3AA66Fu;
+    case 8: return 0xFF8BC34Au;
+    case 9: return 0xFFE06A6Au;
+    default: return 0xFF57B8A6u;
+    }
+}
+
+static uint32_t gui_dim_color(uint32_t c, uint32_t divisor)
+{
+    uint32_t r;
+    uint32_t g_;
+    uint32_t b;
+    if (divisor == 0) divisor = 1;
+    c = gui_opaque(c);
+    r = ((c >> 16) & 0xFFu) / divisor;
+    g_ = ((c >> 8) & 0xFFu) / divisor;
+    b = (c & 0xFFu) / divisor;
+    return 0xFF000000u | (r << 16) | (g_ << 8) | b;
+}
+
+static const char* gui_surface_badge(int surface)
+{
+    switch (surface) {
+    case GUI_SURFACE_DOC: return "DOCUMENT";
+    case GUI_SURFACE_TERMINAL: return "TERMINAL";
+    case GUI_SURFACE_NOTE: return "NOTES";
+    case GUI_SURFACE_GALLERY: return "GALLERY";
+    case GUI_SURFACE_PACKAGE: return "PACKAGE";
+    case GUI_SURFACE_GAME: return "GAME";
+    case GUI_SURFACE_EDITOR: return "EDITOR";
+    case GUI_SURFACE_EXEC: return "RXE EXEC";
+    case GUI_SURFACE_SYS: return "SYSRXE";
+    default: return "TOOL";
+    }
+}
+
+static uint32_t gui_surface_view_bg(int surface)
+{
+    switch (surface) {
+    case GUI_SURFACE_TERMINAL: return 0xFF0A1014u;
+    case GUI_SURFACE_NOTE: return 0xFF1E2320u;
+    case GUI_SURFACE_GALLERY: return 0xFF171724u;
+    case GUI_SURFACE_PACKAGE: return 0xFF1D202Au;
+    case GUI_SURFACE_GAME: return 0xFF111B16u;
+    case GUI_SURFACE_EDITOR: return 0xFF1B2026u;
+    default: return 0xFF20252Bu;
+    }
+}
+
+static void gui_draw_game_minimap(const fb_t* tgt, int x, int y, int max_w, int max_h, const sysrxe_app_t* a)
+{
+    int cell = 7;
+    if (!a || a->type != SYSRXE_TYPE_GAME || max_w < 32 || max_h < 24) return;
+    while ((int)a->game_w * cell > max_w && cell > 3) cell--;
+    while ((int)a->game_h * cell > max_h && cell > 3) cell--;
+    if (cell < 3) return;
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)((int)a->game_w * cell + 8), (uint16_t)((int)a->game_h * cell + 18), 0xFF0B1110u);
+    fb_draw_text(tgt, (uint16_t)(x + 4), (uint16_t)(y + 5), "BOARD", 0xFFCFEED8u, 0xFF0B1110u);
+    y += 14;
+    for (uint32_t row = 0; row < a->game_h; row++) {
+        for (uint32_t col = 0; col < a->game_w; col++) {
+            char tile = a->game_map[row][col] ? a->game_map[row][col] : '.';
+            uint32_t c = 0xFF26332Cu;
+            if (tile == '#') c = 0xFF5A6A76u;
+            if ((int)col == a->game_goal_x && (int)row == a->game_goal_y) c = 0xFFFFC857u;
+            if ((int)col == a->game_px && (int)row == a->game_py) c = 0xFF7BE0D6u;
+            fb_fill_rect(tgt, (uint16_t)(x + 4 + (int)col * cell), (uint16_t)(y + (int)row * cell),
+                         (uint16_t)(cell - 1), (uint16_t)(cell - 1), c);
+        }
+    }
+}
+
+static void gui_draw_app_surface(const fb_t* tgt, int surface, uint32_t accent, uint32_t view_bg,
+                                 int content_y, int view_x, int view_y, int view_w, int view_h)
+{
+    int header_x = g.win_x + 8;
+    int header_y = content_y + 4;
+    int header_w = g.win_w - 16;
+    uint32_t header_bg = gui_dim_color(accent, 5);
+    const sysrxe_app_t* meta = gui_file_app_meta(g.app_id);
+    if (header_w < 80) header_w = 80;
+
+    fb_fill_rect(tgt, (uint16_t)header_x, (uint16_t)header_y, (uint16_t)header_w, 22, header_bg);
+    fb_fill_rect(tgt, (uint16_t)header_x, (uint16_t)header_y, 5, 22, accent);
+    fb_draw_text(tgt, (uint16_t)(header_x + 12), (uint16_t)(header_y + 8), gui_surface_badge(surface), 0xFFFFFFFFu, header_bg);
+    if (meta && g.win_w > 420) {
+        fb_draw_text(tgt, (uint16_t)(header_x + 112), (uint16_t)(header_y + 8), meta->file, 0xFFCFE3FFu, header_bg);
+    }
+
+    fb_fill_rect(tgt, (uint16_t)view_x, (uint16_t)view_y, (uint16_t)view_w, (uint16_t)view_h, view_bg);
+    fb_fill_rect(tgt, (uint16_t)view_x, (uint16_t)view_y, (uint16_t)view_w, 1, accent);
+    fb_fill_rect(tgt, (uint16_t)view_x, (uint16_t)(view_y + view_h - 1), (uint16_t)view_w, 1, 0xFF0B0D10u);
+    fb_fill_rect(tgt, (uint16_t)view_x, (uint16_t)view_y, 1, (uint16_t)view_h, 0xFF60717Cu);
+    fb_fill_rect(tgt, (uint16_t)(view_x + view_w - 1), (uint16_t)view_y, 1, (uint16_t)view_h, 0xFF60717Cu);
+
+    if (surface == GUI_SURFACE_TERMINAL) {
+        fb_fill_rect(tgt, (uint16_t)(view_x + 8), (uint16_t)(view_y + 8), 4, (uint16_t)(view_h > 16 ? view_h - 16 : 1), accent);
+    } else if (surface == GUI_SURFACE_NOTE || surface == GUI_SURFACE_EDITOR) {
+        for (int y = view_y + 20; y < view_y + view_h - 4; y += 20) {
+            fb_fill_rect(tgt, (uint16_t)(view_x + 8), (uint16_t)y, (uint16_t)(view_w > 24 ? view_w - 24 : 1), 1, 0xFF303943u);
+        }
+    } else if (surface == GUI_SURFACE_PACKAGE) {
+        int card_x = g.win_x + g.win_w - 150;
+        int card_y = content_y + 36;
+        if (card_x > g.win_x + 220) {
+            for (int i = 0; i < 3; i++) {
+                fb_fill_rect(tgt, (uint16_t)card_x, (uint16_t)(card_y + i * 24), 120, 18, gui_dim_color(accent, (uint32_t)(4 + i)));
+                fb_fill_rect(tgt, (uint16_t)card_x, (uint16_t)(card_y + i * 24), 3, 18, accent);
+            }
+            fb_draw_text(tgt, (uint16_t)(card_x + 10), (uint16_t)(card_y + 6), "LAR", 0xFFFFFFFFu, gui_dim_color(accent, 4));
+            fb_draw_text(tgt, (uint16_t)(card_x + 10), (uint16_t)(card_y + 30), "LPACK", 0xFFFFFFFFu, gui_dim_color(accent, 5));
+            fb_draw_text(tgt, (uint16_t)(card_x + 10), (uint16_t)(card_y + 54), "ROLLBACK", 0xFFFFFFFFu, gui_dim_color(accent, 6));
+        }
+    } else if (surface == GUI_SURFACE_GAME) {
+        int map_x = g.win_x + g.win_w - 158;
+        if (map_x > g.win_x + 220) gui_draw_game_minimap(tgt, map_x, content_y + 34, 148, 100, meta);
+    } else if (surface == GUI_SURFACE_DOC || surface == GUI_SURFACE_GALLERY) {
+        int chip_x = g.win_x + g.win_w - 156;
+        if (chip_x > g.win_x + 260) {
+            uint32_t c0 = gui_dim_color(accent, 4);
+            uint32_t c1 = gui_dim_color(accent, 3);
+            const char* a = surface == GUI_SURFACE_DOC ? "LARS" : "BMP";
+            const char* b = surface == GUI_SURFACE_DOC ? "HTTP" : "LARSH";
+            fb_fill_rect(tgt, (uint16_t)chip_x, (uint16_t)(content_y + 36), 64, 18, c0);
+            fb_fill_rect(tgt, (uint16_t)(chip_x + 70), (uint16_t)(content_y + 36), 64, 18, c1);
+            fb_draw_text(tgt, (uint16_t)(chip_x + 8), (uint16_t)(content_y + 42), a, 0xFFFFFFFFu, c0);
+            fb_draw_text(tgt, (uint16_t)(chip_x + 78), (uint16_t)(content_y + 42), b, 0xFFFFFFFFu, c1);
+        }
+    }
+}
+
+static const sysrxe_app_t* gui_file_ui_app(int app)
+{
+    const sysrxe_app_t* sx = sysrxe_get_by_app(app);
+    if (sx) return sx;
+    return rxe_get_by_app(app);
+}
+
+static int gui_file_has_custom_ui(int app)
+{
+    const sysrxe_app_t* a = gui_file_ui_app(app);
+    return a && a->ui_count > 0;
+}
+
+static int gui_ui_widget_rect(const sysrxe_widget_t* w, int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    int content_y = g.win_y + GUI_CONTENT_TOP;
+    int base_x = g.win_x + 16;
+    int base_y = content_y + 36;
+    int x;
+    int y;
+    int ww;
+    int hh;
+    int max_right = g.win_x + g.win_w - 16;
+    int max_bottom = g.win_y + g.win_h - 12;
+    if (!w || !w->used) return 0;
+    x = base_x + w->x;
+    y = base_y + w->y;
+    ww = w->w > 0 ? w->w : max_right - x;
+    hh = w->h > 0 ? w->h : max_bottom - y;
+    if (x < base_x) x = base_x;
+    if (y < content_y + 28) y = content_y + 28;
+    if (x + ww > max_right) ww = max_right - x;
+    if (y + hh > max_bottom) hh = max_bottom - y;
+    if (ww < 8) ww = 8;
+    if (hh < 8) hh = 8;
+    if (out_x) *out_x = x;
+    if (out_y) *out_y = y;
+    if (out_w) *out_w = ww;
+    if (out_h) *out_h = hh;
+    return 1;
+}
+
+static const sysrxe_widget_t* gui_find_ui_widget(int app, int kind)
+{
+    const sysrxe_app_t* a = gui_file_ui_app(app);
+    if (!a) return NULL;
+    for (uint32_t i = 0; i < a->ui_count && i < SYSRXE_UI_MAX_WIDGETS; i++) {
+        if (a->ui[i].used && a->ui[i].kind == kind) return &a->ui[i];
+    }
+    return NULL;
+}
+
+static int gui_custom_input_rect(int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    return gui_ui_widget_rect(gui_find_ui_widget(g.app_id, SYSRXE_UI_INPUT), out_x, out_y, out_w, out_h);
+}
+
+static int gui_custom_output_rect(int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    const sysrxe_widget_t* w = gui_find_ui_widget(g.app_id, SYSRXE_UI_OUTPUT);
+    if (!w) w = gui_find_ui_widget(g.app_id, SYSRXE_UI_LIST);
+    return gui_ui_widget_rect(w, out_x, out_y, out_w, out_h);
+}
+
+static int gui_ui_action_kind(int kind)
+{
+    return kind == SYSRXE_UI_BUTTON || kind == SYSRXE_UI_TOGGLE ||
+           kind == SYSRXE_UI_ICON || kind == SYSRXE_UI_TILE ||
+           kind == SYSRXE_UI_CUSTOM;
+}
+
+static const sysrxe_widget_t* gui_ui_button_at(int x, int y)
+{
+    const sysrxe_app_t* a = gui_file_ui_app(g.app_id);
+    if (!a) return NULL;
+    for (uint32_t i = 0; i < a->ui_count && i < SYSRXE_UI_MAX_WIDGETS; i++) {
+        int wx;
+        int wy;
+        int ww;
+        int wh;
+        const sysrxe_widget_t* w = &a->ui[i];
+        if (!w->used || !gui_ui_action_kind(w->kind)) continue;
+        if (w->kind == SYSRXE_UI_CUSTOM && !w->action[0]) continue;
+        if (gui_ui_widget_rect(w, &wx, &wy, &ww, &wh) && in_rect(x, y, wx, wy, ww, wh)) return w;
+    }
+    return NULL;
+}
+
+static int gui_style_eq_ci(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i]) {
+        char ca = a[i];
+        char cb = b[i];
+        if (ca >= 'A' && ca <= 'Z') ca = (char)(ca - 'A' + 'a');
+        if (cb >= 'A' && cb <= 'Z') cb = (char)(cb - 'A' + 'a');
+        if (ca != cb) return 0;
+        i++;
+    }
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static uint32_t gui_style_hash(const char* s)
+{
+    uint32_t h = 2166136261u;
+    if (!s) return h;
+    while (*s) {
+        h ^= (uint8_t)*s;
+        h *= 16777619u;
+        s++;
+    }
+    return h;
+}
+
+static int gui_ui_percent(const char* s, int fallback)
+{
+    int v = 0;
+    int any = 0;
+    if (!s || !s[0]) return fallback;
+    while (*s == ' ' || *s == '\t') s++;
+    while (*s >= '0' && *s <= '9') {
+        any = 1;
+        v = v * 10 + (*s - '0');
+        s++;
+    }
+    if (!any) return fallback;
+    if (v < 0) v = 0;
+    if (v > 100) v = 100;
+    return v;
+}
+
+static void gui_draw_ui_text_clipped(const fb_t* tgt, int x, int y, int w, const char* text_s,
+                                     uint32_t fg, uint32_t bg)
+{
+    int cells = (w - 8) / 8;
+    if (cells < 1) return;
+    fb_draw_text_cells(tgt, (uint16_t)x, (uint16_t)y, text_s ? text_s : "", (uint16_t)cells, fg, bg);
+}
+
+static void gui_draw_custom_widget(const fb_t* tgt, const sysrxe_widget_t* w,
+                                   int x, int y, int ww, int hh, uint32_t c)
+{
+    const char* style = w->style[0] ? w->style : "custom";
+    int hover = in_rect(g.mx, g.my, x, y, ww, hh);
+    uint32_t h = gui_style_hash(style);
+    uint32_t style_color = gui_opaque(c ^ ((h & 0x003F3F3Fu) << 1));
+    uint32_t fill = hover ? gui_dim_color(style_color, 2) : gui_dim_color(style_color, 4);
+    if (gui_style_eq_ci(style, "hline") || gui_style_eq_ci(style, "line")) {
+        int yy = y + hh / 2;
+        fb_fill_rect(tgt, (uint16_t)x, (uint16_t)yy, (uint16_t)ww, 1, style_color);
+        if (w->text[0]) gui_draw_ui_text_clipped(tgt, x + 4, y, ww - 8, w->text, 0xFFFFFFFFu, 0xFF20252Bu);
+        return;
+    }
+    if (gui_style_eq_ci(style, "vline")) {
+        int xx = x + ww / 2;
+        fb_fill_rect(tgt, (uint16_t)xx, (uint16_t)y, 1, (uint16_t)hh, style_color);
+        return;
+    }
+    if (gui_style_eq_ci(style, "meter") || gui_style_eq_ci(style, "bar")) {
+        int pct = gui_ui_percent(w->action, 50);
+        int fill_w = (ww - 2) * pct / 100;
+        fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, 0xFF111619u);
+        fb_fill_rect(tgt, (uint16_t)(x + 1), (uint16_t)(y + 1), (uint16_t)fill_w, (uint16_t)(hh > 2 ? hh - 2 : 1), style_color);
+        if (w->text[0]) gui_draw_ui_text_clipped(tgt, x + 6, y + (hh > 16 ? 7 : 2), ww - 10, w->text, 0xFFFFFFFFu, 0xFF111619u);
+        return;
+    }
+    if (gui_style_eq_ci(style, "outline") || gui_style_eq_ci(style, "box")) {
+        fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, style_color);
+        fb_fill_rect(tgt, (uint16_t)x, (uint16_t)(y + hh - 1), (uint16_t)ww, 1, style_color);
+        fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 1, (uint16_t)hh, style_color);
+        fb_fill_rect(tgt, (uint16_t)(x + ww - 1), (uint16_t)y, 1, (uint16_t)hh, style_color);
+        if (w->text[0]) gui_draw_ui_text_clipped(tgt, x + 8, y + (hh > 16 ? 8 : 2), ww - 12, w->text, 0xFFFFFFFFu, 0xFF20252Bu);
+        return;
+    }
+    if (gui_style_eq_ci(style, "chip") || gui_style_eq_ci(style, "pill")) {
+        fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, fill);
+        fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 4, (uint16_t)hh, style_color);
+        fb_fill_rect(tgt, (uint16_t)(x + ww - 4), (uint16_t)y, 4, (uint16_t)hh, style_color);
+        gui_draw_ui_text_clipped(tgt, x + 8, y + (hh > 16 ? 7 : 2), ww - 12, w->text[0] ? w->text : style, 0xFFFFFFFFu, fill);
+        return;
+    }
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, fill);
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 4, (uint16_t)hh, style_color);
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, 0xFFBCEFE8u);
+    for (int px = x + 8; px < x + ww - 2; px += 12) {
+        fb_fill_rect(tgt, (uint16_t)px, (uint16_t)(y + 4), 1, (uint16_t)(hh > 8 ? hh - 8 : 1), gui_dim_color(style_color, 2));
+    }
+    gui_draw_ui_text_clipped(tgt, x + 10, y + (hh > 16 ? 8 : 2), ww - 12, w->text[0] ? w->text : style, 0xFFFFFFFFu, fill);
+}
+
+static void gui_draw_file_ui_widgets(const fb_t* tgt, uint32_t accent, uint32_t view_bg)
+{
+    const sysrxe_app_t* a = gui_file_ui_app(g.app_id);
+    if (!a) return;
+    for (uint32_t i = 0; i < a->ui_count && i < SYSRXE_UI_MAX_WIDGETS; i++) {
+        const sysrxe_widget_t* w = &a->ui[i];
+        int x;
+        int y;
+        int ww;
+        int hh;
+        uint32_t c;
+        uint32_t bg;
+        if (!gui_ui_widget_rect(w, &x, &y, &ww, &hh)) continue;
+        c = w->color ? gui_opaque(w->color) : accent;
+        bg = gui_dim_color(c, 5);
+        if (w->kind == SYSRXE_UI_PANEL) {
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, bg);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 4, (uint16_t)hh, c);
+            gui_draw_ui_text_clipped(tgt, x + 10, y + 8, ww - 12, w->text, 0xFFFFFFFFu, bg);
+        } else if (w->kind == SYSRXE_UI_LABEL) {
+            gui_draw_ui_text_clipped(tgt, x, y + 2, ww, w->text, 0xFFCFE3FFu, 0xFF20252Bu);
+        } else if (w->kind == SYSRXE_UI_STATUS) {
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, bg);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 3, (uint16_t)hh, c);
+            gui_draw_ui_text_clipped(tgt, x + 8, y + 7, ww - 10, w->text, 0xFFFFFFFFu, bg);
+        } else if (w->kind == SYSRXE_UI_BADGE) {
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, gui_dim_color(c, 3));
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, 0xFFBCEFE8u);
+            gui_draw_ui_text_clipped(tgt, x + 7, y + (hh > 14 ? 5 : 1), ww - 8, w->text, 0xFFFFFFFFu, gui_dim_color(c, 3));
+        } else if (w->kind == SYSRXE_UI_SEPARATOR) {
+            int yy = y + hh / 2;
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)yy, (uint16_t)ww, 1, gui_dim_color(c, 2));
+        } else if (w->kind == SYSRXE_UI_SLIDER || w->kind == SYSRXE_UI_PROGRESS) {
+            int pct = gui_ui_percent(w->action, w->kind == SYSRXE_UI_PROGRESS ? 50 : 60);
+            int fill = (ww - 2) * pct / 100;
+            if (fill < 0) fill = 0;
+            if (fill > ww - 2) fill = ww - 2;
+            if (w->text[0]) fb_draw_text(tgt, (uint16_t)x, (uint16_t)(y - 12), w->text, 0xFFFFFFFFu, 0xFF20252Bu);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, 0xFF111619u);
+            fb_fill_rect(tgt, (uint16_t)(x + 1), (uint16_t)(y + 1), (uint16_t)fill, (uint16_t)(hh > 2 ? hh - 2 : 1), c);
+            if (w->kind == SYSRXE_UI_SLIDER) {
+                int knob_x = x + 1 + fill;
+                if (knob_x > x + ww - 5) knob_x = x + ww - 5;
+                fb_fill_rect(tgt, (uint16_t)knob_x, (uint16_t)(y - 2), 5, (uint16_t)(hh + 4), 0xFFFFC857u);
+            }
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, 0xFF60717Cu);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)(y + hh - 1), (uint16_t)ww, 1, 0xFF60717Cu);
+        } else if (w->kind == SYSRXE_UI_TOGGLE) {
+            int hover = in_rect(g.mx, g.my, x, y, ww, hh);
+            uint32_t toggle_bg = hover ? gui_dim_color(c, 3) : 0xFF151B20u;
+            int pill_w = hh * 2;
+            if (pill_w > ww) pill_w = ww;
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)pill_w, (uint16_t)hh, toggle_bg);
+            fb_fill_rect(tgt, (uint16_t)(x + pill_w - hh + 3), (uint16_t)(y + 3), (uint16_t)(hh - 6), (uint16_t)(hh - 6), c);
+            gui_draw_ui_text_clipped(tgt, x + pill_w + 8, y + (hh > 16 ? 7 : 2), ww - pill_w - 8, w->text, 0xFFFFFFFFu, 0xFF20252Bu);
+        } else if (w->kind == SYSRXE_UI_ICON) {
+            int hover = in_rect(g.mx, g.my, x, y, ww, hh);
+            uint32_t icon_bg = hover ? gui_dim_color(c, 2) : gui_dim_color(c, 4);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, icon_bg);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, 0xFFBCEFE8u);
+            gui_draw_ui_text_clipped(tgt, x + 8, y + hh / 2 - 4, ww - 10, w->text, 0xFFFFFFFFu, icon_bg);
+        } else if (w->kind == SYSRXE_UI_TILE) {
+            int hover = in_rect(g.mx, g.my, x, y, ww, hh);
+            uint32_t tile_bg = hover ? gui_dim_color(c, 2) : gui_dim_color(c, 4);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, tile_bg);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 4, (uint16_t)hh, c);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, 0xFFBCEFE8u);
+            gui_draw_ui_text_clipped(tgt, x + 10, y + 8, ww - 12, w->text, 0xFFFFFFFFu, tile_bg);
+        } else if (w->kind == SYSRXE_UI_CUSTOM) {
+            gui_draw_custom_widget(tgt, w, x, y, ww, hh, c);
+        } else if (w->kind == SYSRXE_UI_BUTTON) {
+            int hover = in_rect(g.mx, g.my, x, y, ww, hh);
+            uint32_t btn = hover ? gui_dim_color(c, 2) : gui_dim_color(c, 3);
+            if (g.btn_pressed && hover) btn = 0xFFFFB84Du;
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, btn);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, 0xFFBCEFE8u);
+            gui_draw_ui_text_clipped(tgt, x + 8, y + (hh > 16 ? 8 : 2), ww - 10, w->text, 0xFFFFFFFFu, btn);
+        } else if (w->kind == SYSRXE_UI_INPUT) {
+            uint32_t bd = g.tb_focused ? 0xFFFFC857u : c;
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, 0xFF111619u);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, bd);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)(y + hh - 1), (uint16_t)ww, 1, bd);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 1, (uint16_t)hh, bd);
+            fb_fill_rect(tgt, (uint16_t)(x + ww - 1), (uint16_t)y, 1, (uint16_t)hh, bd);
+            if (w->text[0]) fb_draw_text(tgt, (uint16_t)x, (uint16_t)(y - 12), w->text, 0xFFFFFFFFu, 0xFF20252Bu);
+            gui_draw_ui_text_clipped(tgt, x + 6, y + 8, ww - 12, g.tb, 0xFFFFFFFFu, 0xFF111619u);
+        } else if (w->kind == SYSRXE_UI_OUTPUT || w->kind == SYSRXE_UI_LIST) {
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, (uint16_t)hh, view_bg);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, (uint16_t)ww, 1, c);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)(y + hh - 1), (uint16_t)ww, 1, 0xFF0B0D10u);
+            fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y, 1, (uint16_t)hh, 0xFF60717Cu);
+            fb_fill_rect(tgt, (uint16_t)(x + ww - 1), (uint16_t)y, 1, (uint16_t)hh, 0xFF60717Cu);
+            if (w->text[0]) fb_draw_text(tgt, (uint16_t)x, (uint16_t)(y - 12), w->text, 0xFFFFFFFFu, 0xFF20252Bu);
+        }
+    }
 }
 
 static void gui_copy_text(char* dst, uint32_t cap, const char* src)
@@ -2299,6 +2855,14 @@ static void gui_view_rect(int* out_x, int* out_y, int* out_w, int* out_h)
     if (out_h) *out_h = view_h;
 }
 
+static void gui_response_view_rect(int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    gui_view_rect(out_x, out_y, out_w, out_h);
+    if (gui_file_has_custom_ui(g.app_id)) {
+        (void)gui_custom_output_rect(out_x, out_y, out_w, out_h);
+    }
+}
+
 static int gui_rows_for_view_h(int view_h)
 {
     int rows = view_h / 10;
@@ -2728,7 +3292,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         int rows;
         if (wheel_win >= 0 && wheel_win != g.app_id) gui_select_app(wheel_win);
         if (g.win_visible) {
-            gui_view_rect(&view_x, &view_y, &view_w, &view_h);
+            gui_response_view_rect(&view_x, &view_y, &view_w, &view_h);
             rows = gui_rows_for_view_h(view_h);
             if (in_rect(g.mx, g.my, view_x, view_y - 18, view_w, view_h + 18)) {
                 g.resp_scroll -= wheel * 3;
@@ -2896,14 +3460,16 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int min_btn_x;
     int full_btn_x;
     int set_btn_x;
-    int set_btn_w = 40;
+    int title_btn_y;
+    int title_btn_h;
+    int set_btn_w = GUI_TITLE_SET_W;
     int settings_capture = 0;
     int settings_panel_x = 0;
     int settings_panel_y = 0;
     int settings_panel_w = 0;
     int settings_panel_h = 0;
-    gui_title_control_rects(&set_btn_x, &min_btn_x, &full_btn_x, &close_btn_x, 0, 0);
-    if (l_pressed && in_rect(g.mx, g.my, close_btn_x, g.win_y + 2, 14, 14)) {
+    gui_title_control_rects(&set_btn_x, &min_btn_x, &full_btn_x, &close_btn_x, &title_btn_y, &title_btn_h);
+    if (l_pressed && in_rect(g.mx, g.my, close_btn_x, title_btn_y, GUI_TITLE_BTN_SIZE, title_btn_h)) {
         g.win_visible = 0;
         g.settings_open = 0;
         g.tb_focused = 0;
@@ -2913,7 +3479,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         gui_activate_top_window_or_none();
         return;
     }
-    if (l_pressed && in_rect(g.mx, g.my, min_btn_x, g.win_y + 2, 14, 14)) {
+    if (l_pressed && in_rect(g.mx, g.my, min_btn_x, title_btn_y, GUI_TITLE_BTN_SIZE, title_btn_h)) {
         g.win_visible = 0;
         g.settings_open = 0;
         g.tb_focused = 0;
@@ -2923,12 +3489,12 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         gui_activate_top_window_or_none();
         return;
     }
-    if (l_pressed && in_rect(g.mx, g.my, full_btn_x, g.win_y + 2, 14, 14)) {
+    if (l_pressed && in_rect(g.mx, g.my, full_btn_x, title_btn_y, GUI_TITLE_BTN_SIZE, title_btn_h)) {
         gui_toggle_fullscreen();
         g.slider_drag = 0;
         return;
     }
-    if (l_pressed && in_rect(g.mx, g.my, set_btn_x, g.win_y, set_btn_w, title_h)) {
+    if (l_pressed && in_rect(g.mx, g.my, set_btn_x, title_btn_y, set_btn_w, title_btn_h)) {
         g.settings_open = 1 - g.settings_open;
         g.slider_drag = 0;
         return;
@@ -3003,6 +3569,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     }
 
     // Button inside window
+    int custom_ui_m = gui_file_has_custom_ui(g.app_id);
     int content_y_m = g.win_y + GUI_CONTENT_TOP;
     int btn_x = g.win_x + 16;
     int btn_y = content_y_m + 36;
@@ -3010,7 +3577,21 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int btn_h = 28;
     int lafillo_w[] = { 48, 64, 52, 56, 50 };
     int lafaelo_btn_w = 56;
-    if (l_pressed) {
+    if (custom_ui_m) {
+        if (l_pressed && gui_ui_button_at(g.mx, g.my)) {
+            g.btn_pressed = 1;
+            return;
+        }
+        if (l_released && g.btn_pressed) {
+            const sysrxe_widget_t* w = gui_ui_button_at(g.mx, g.my);
+            if (w) {
+                const char* action = w->action[0] ? w->action : g.tb;
+                gui_run_sysrxe_input(action);
+            }
+            g.btn_pressed = 0;
+            return;
+        }
+    } else if (l_pressed) {
         if (g.app_id == 0) {
             int x = btn_x;
             for (int d = 0; d < 5; d++) {
@@ -3027,7 +3608,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             g.btn_pressed = 1;
         }
     }
-    if (l_released) {
+    if (!custom_ui_m && l_released) {
         if (g.btn_pressed && g.app_id == 0) {
             int x = btn_x;
             int hit = -1;
@@ -3201,9 +3782,18 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int view_y_focus;
     int view_w_focus;
     int view_h_focus;
-    gui_view_rect(&view_x_focus, &view_y_focus, &view_w_focus, &view_h_focus);
+    int custom_ui_focus = gui_file_has_custom_ui(g.app_id);
+    if (custom_ui_focus) (void)gui_custom_input_rect(&tb_x, &tb_y, &tb_w, &tb_h);
+    gui_response_view_rect(&view_x_focus, &view_y_focus, &view_w_focus, &view_h_focus);
     if (l_pressed) {
-        if (g.app_id == 9) {
+        if (custom_ui_focus) {
+            if (in_rect(g.mx, g.my, tb_x, tb_y, tb_w, tb_h)) {
+                g.tb_focused = 1;
+            } else {
+                g.tb_focused = 0;
+            }
+            g.lafaelo_focus = 0;
+        } else if (g.app_id == 9) {
             if (in_rect(g.mx, g.my, tb_x, tb_y, tb_w, tb_h)) {
                 g.tb_focused = 1;
                 g.lafaelo_focus = 0;
@@ -3238,7 +3828,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         int max_scroll;
         int thumb_y;
         int thumb_h;
-        gui_view_rect(&view_x, &view_y, &view_w, &view_h);
+        gui_response_view_rect(&view_x, &view_y, &view_w, &view_h);
         sb_x = view_x + view_w - sb_w;
         sb_y = view_y;
         sb_h = view_h;
@@ -3748,7 +4338,9 @@ void gui_render(void)
     int min_btn_x;
     int full_btn_x;
     int set_btn_x;
-    gui_title_control_rects(&set_btn_x, &min_btn_x, &full_btn_x, &close_btn_x, 0, 0);
+    int title_btn_y;
+    int title_btn_h;
+    gui_title_control_rects(&set_btn_x, &min_btn_x, &full_btn_x, &close_btn_x, &title_btn_y, &title_btn_h);
     int app_title_x = g.win_x + 96;
     int app_title_cells = (set_btn_x - app_title_x - 4) / 8;
     fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(g.win_y + 7), gui_app_name(g.app_id), 0xFFFFFFFF, title_bg);
@@ -3756,15 +4348,15 @@ void gui_render(void)
         fb_draw_text_cells(tgt, (uint16_t)app_title_x, (uint16_t)(g.win_y + 7), LARDOS_VERSION,
                            (uint16_t)app_title_cells, 0xFF9DEAE4u, title_bg);
     }
-    uint32_t set_btn_bg = (g.settings_open || (g.mx >= set_btn_x && g.mx < set_btn_x + 40 && g.my >= g.win_y && g.my < g.win_y + 20)) ? 0xFF235D64 : 0xFF2A2F34;
-    uint32_t min_btn_bg = (g.mx >= min_btn_x && g.mx < min_btn_x + 14 && g.my >= g.win_y + 2 && g.my < g.win_y + 16) ? 0xFF42504A : 0xFF2A2F34;
-    uint32_t full_btn_bg = (g.mx >= full_btn_x && g.mx < full_btn_x + 14 && g.my >= g.win_y + 2 && g.my < g.win_y + 16) ? 0xFF42504A : 0xFF2A2F34;
-    uint32_t close_btn_bg = (g.mx >= close_btn_x && g.mx < close_btn_x + 14 && g.my >= g.win_y + 2 && g.my < g.win_y + 16) ? 0xFFB94747 : 0xFF803B45;
-    fb_fill_rect(tgt, (uint16_t)set_btn_x, (uint16_t)g.win_y, 40, 20, set_btn_bg);
-    fb_draw_text(tgt, (uint16_t)(set_btn_x + 8), (uint16_t)(g.win_y + 6), "Set", 0xFFFFFFFF, set_btn_bg);
-    fb_fill_rect(tgt, (uint16_t)min_btn_x, (uint16_t)(g.win_y + 2), 14, 14, min_btn_bg);
+    uint32_t set_btn_bg = (g.settings_open || in_rect(g.mx, g.my, set_btn_x, title_btn_y, GUI_TITLE_SET_W, title_btn_h)) ? 0xFF235D64 : 0xFF2A2F34;
+    uint32_t min_btn_bg = in_rect(g.mx, g.my, min_btn_x, title_btn_y, GUI_TITLE_BTN_SIZE, title_btn_h) ? 0xFF42504A : 0xFF2A2F34;
+    uint32_t full_btn_bg = in_rect(g.mx, g.my, full_btn_x, title_btn_y, GUI_TITLE_BTN_SIZE, title_btn_h) ? 0xFF42504A : 0xFF2A2F34;
+    uint32_t close_btn_bg = in_rect(g.mx, g.my, close_btn_x, title_btn_y, GUI_TITLE_BTN_SIZE, title_btn_h) ? 0xFFB94747 : 0xFF803B45;
+    fb_fill_rect(tgt, (uint16_t)set_btn_x, (uint16_t)title_btn_y, GUI_TITLE_SET_W, GUI_TITLE_BTN_SIZE, set_btn_bg);
+    fb_draw_text(tgt, (uint16_t)(set_btn_x + 6), (uint16_t)(g.win_y + 6), "Set", 0xFFFFFFFF, set_btn_bg);
+    fb_fill_rect(tgt, (uint16_t)min_btn_x, (uint16_t)title_btn_y, GUI_TITLE_BTN_SIZE, GUI_TITLE_BTN_SIZE, min_btn_bg);
     fb_fill_rect(tgt, (uint16_t)(min_btn_x + 3), (uint16_t)(g.win_y + 12), 8, 1, 0xFFFFFFFFu);
-    fb_fill_rect(tgt, (uint16_t)full_btn_x, (uint16_t)(g.win_y + 2), 14, 14, full_btn_bg);
+    fb_fill_rect(tgt, (uint16_t)full_btn_x, (uint16_t)title_btn_y, GUI_TITLE_BTN_SIZE, GUI_TITLE_BTN_SIZE, full_btn_bg);
     if (g.fullscreen) {
         fb_fill_rect(tgt, (uint16_t)(full_btn_x + 4), (uint16_t)(g.win_y + 5), 6, 1, 0xFFFFFFFFu);
         fb_fill_rect(tgt, (uint16_t)(full_btn_x + 4), (uint16_t)(g.win_y + 5), 1, 5, 0xFFFFFFFFu);
@@ -3777,7 +4369,7 @@ void gui_render(void)
         fb_fill_rect(tgt, (uint16_t)(full_btn_x + 10), (uint16_t)(g.win_y + 5), 1, 7, 0xFFFFFFFFu);
         fb_fill_rect(tgt, (uint16_t)(full_btn_x + 4), (uint16_t)(g.win_y + 11), 7, 1, 0xFFFFFFFFu);
     }
-    fb_fill_rect(tgt, (uint16_t)close_btn_x, (uint16_t)(g.win_y + 2), 14, 14, close_btn_bg);
+    fb_fill_rect(tgt, (uint16_t)close_btn_x, (uint16_t)title_btn_y, GUI_TITLE_BTN_SIZE, GUI_TITLE_BTN_SIZE, close_btn_bg);
     fb_draw_text(tgt, (uint16_t)(close_btn_x + 4), (uint16_t)(g.win_y + 6), "x", 0xFFFFFFFFu, close_btn_bg);
     // crude border
     fb_fill_rect(tgt, (uint16_t)g.win_x, (uint16_t)g.win_y, (uint16_t)g.win_w, 1, border);
@@ -3786,15 +4378,30 @@ void gui_render(void)
     fb_fill_rect(tgt, (uint16_t)(g.win_x + g.win_w - 1), (uint16_t)g.win_y, 1, (uint16_t)g.win_h, border);
 
     int content_y = g.win_y + GUI_CONTENT_TOP;
-
-    fb_draw_text(tgt, (uint16_t)(g.win_x + 8), (uint16_t)(content_y + 4), "LardOS", 0xFFFFC857, win_bg);
-
-    // Button
+    int surface = gui_app_surface(g.app_id);
+    uint32_t accent = gui_app_accent(g.app_id);
+    uint32_t view_bg = gui_surface_view_bg(surface);
     int btn_x = g.win_x + 16;
     int btn_y = content_y + 36;
     int btn_w = 120;
     int btn_h = 28;
-    if (g.app_id == 0) {
+    int tb_x = g.win_x + 16;
+    int tb_y = content_y + 118;
+    int tb_w = 260;
+    int tb_h = 24;
+    int view_x;
+    int view_y;
+    int view_w;
+    int view_h;
+    int custom_ui = gui_file_has_custom_ui(g.app_id);
+    gui_response_view_rect(&view_x, &view_y, &view_w, &view_h);
+    gui_draw_app_surface(tgt, surface, accent, view_bg, content_y, view_x, view_y, view_w, view_h);
+    if (custom_ui) gui_draw_file_ui_widgets(tgt, accent, view_bg);
+
+    // Button
+    if (custom_ui) {
+        /* File-defined apps draw their own UI widgets through APPKIT. */
+    } else if (g.app_id == 0) {
         static const char* lafillo_labels[] = { "Go", "Refresh", "", "Save", "Src" };
         int dx[] = { 0, 52, 120, 176, 236 };
         int dww[] = { 48, 64, 52, 56, 50 };
@@ -3827,17 +4434,16 @@ void gui_render(void)
         }
     }
 
-    int tb_x = g.win_x + 16;
-    int tb_y = content_y + 118;
-    int tb_w = 260;
-    int tb_h = 24;
     uint32_t tb_bg = 0xFF111619;
     uint32_t tb_bd = g.tb_focused ? 0xFFFFC857 : 0xFF60717C;
-    fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, (uint16_t)tb_w, (uint16_t)tb_h, tb_bg);
-    fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, (uint16_t)tb_w, 1, tb_bd);
-    fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)(tb_y + tb_h - 1), (uint16_t)tb_w, 1, tb_bd);
-    fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, 1, (uint16_t)tb_h, tb_bd);
-    fb_fill_rect(tgt, (uint16_t)(tb_x + tb_w - 1), (uint16_t)tb_y, 1, (uint16_t)tb_h, tb_bd);
+    if (custom_ui) (void)gui_custom_input_rect(&tb_x, &tb_y, &tb_w, &tb_h);
+    if (!custom_ui) {
+        fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, (uint16_t)tb_w, (uint16_t)tb_h, tb_bg);
+        fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, (uint16_t)tb_w, 1, tb_bd);
+        fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)(tb_y + tb_h - 1), (uint16_t)tb_w, 1, tb_bd);
+        fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, 1, (uint16_t)tb_h, tb_bd);
+        fb_fill_rect(tgt, (uint16_t)(tb_x + tb_w - 1), (uint16_t)tb_y, 1, (uint16_t)tb_h, tb_bd);
+    }
     const char* input_text = (g.app_id == 1) ? g.calc_display : g.tb;
     uint32_t input_cur = (g.app_id == 1) ? g.calc_cur : g.tb_cur;
     const char* input_label = "URL:";
@@ -3852,15 +4458,12 @@ void gui_render(void)
     else if (g.app_id == 7) input_label = lsh_in_sum_mode() ? "SUM:" : "Cmd:";
     else if (g.app_id == 8) input_label = "Code:";
     else if (g.app_id == 9) input_label = "Path:";
-    fb_draw_text_cells(tgt, (uint16_t)(tb_x + 6), (uint16_t)(tb_y + 8), input_text,
-                       (uint16_t)((tb_w - 12) / 8), 0xFFFFFFFF, tb_bg);
-    fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)(tb_y - 12), input_label, 0xFFFFFFFF, win_bg);
+    if (!custom_ui) {
+        fb_draw_text_cells(tgt, (uint16_t)(tb_x + 6), (uint16_t)(tb_y + 8), input_text,
+                           (uint16_t)((tb_w - 12) / 8), 0xFFFFFFFF, tb_bg);
+        fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)(tb_y - 12), input_label, 0xFFFFFFFF, win_bg);
+    }
 
-    int view_x;
-    int view_y;
-    int view_w;
-    int view_h;
-    gui_view_rect(&view_x, &view_y, &view_w, &view_h);
     int view_label_y = view_y - 14;
     if ((g.tb_focused || (g.app_id == 9 && g.lafaelo_focus && !g.lafaelo_show_run)) && g.caret_on) {
         uint16_t cx, cy;
@@ -3899,8 +4502,10 @@ void gui_render(void)
     else if (g.app_id == 7) view_label = lsh_in_sum_mode() ? "SUM:" : "LSH:";
     else if (g.app_id == 8) view_label = "Output:";
     else if (g.app_id == 9) view_label = "Editor:";
-    fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)view_label_y,
-                 g.loading ? "Response: Fetching..." : view_label, 0xFFFFFFFF, win_bg);
+    if (!custom_ui) {
+        fb_draw_text(tgt, (uint16_t)(g.win_x + 16), (uint16_t)view_label_y,
+                     g.loading ? "Response: Fetching..." : view_label, 0xFFFFFFFF, win_bg);
+    }
     int cols = (view_w - 12) / 8; // leave scrollbar space
     int rows = gui_rows_for_view_h(view_h);
     if (cols < 10) cols = 10;
@@ -3951,7 +4556,7 @@ void gui_render(void)
                     }
                 }
                 int cap_y = view_y + (int)br.h * scale + 6;
-                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)cap_y, "glyph U+E000 = ", 0xFFFFFFFF, win_bg);
+                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)cap_y, "glyph U+E000 = ", 0xFFFFFFFF, view_bg);
                 uint16_t gw, gh;
                 int gx = view_x + 16 * 8;
                 int gy = cap_y;
@@ -3960,7 +4565,7 @@ void gui_render(void)
                     fb_draw_image(tgt, (uint16_t)gx, (uint16_t)gy, g.glyph_render_pixels, gw, gh);
                     gui_glyph_register_hit(gx, gy, gw, gh, 0xE000u);
                 }
-                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)(cap_y + 12), "Click glyph. LSH: glyph live U+E000 on | glyph list", 0xFFCFE3FFu, win_bg);
+                fb_draw_text(tgt, (uint16_t)view_x, (uint16_t)(cap_y + 12), "Click glyph. LSH: glyph live U+E000 on | glyph list", 0xFFCFE3FFu, view_bg);
             }
         }
     }
@@ -3997,9 +4602,8 @@ void gui_render(void)
                 }
             }
 
-            if (cp < 32 || cp > 127) cp = '?';
             if (on_screen) {
-                fb_draw_char(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), (char)cp, 0xFFFFFFFF, win_bg);
+                fb_draw_codepoint_cell(tgt, (uint16_t)(rx + col * 8), (uint16_t)(ry + row * 10), cp, 0xFFFFFFFF, view_bg);
             }
             col++;
         }

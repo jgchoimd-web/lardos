@@ -79,8 +79,8 @@ static uint32_t glyph_pattern_pixel(uint32_t cp, const char* name, uint16_t x, u
             "WWWK....",
             "WWWWK...",
             "WWKKK...",
-            "WK..KK..",
-            "K....KK."
+            "WK......",
+            "K......."
         };
         char p = pointer[y][x];
         if (p == 'K') return ink;

@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.69.0a
+ITEM Official release adding app-side language runners for RXE/SYSRXE without feature loss or philosophy changes.
+ITEM App files can select LANG LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, or LML and carry their own CODE lines inside the .rxe/.sysrxe file.
+ITEM LANG C uses an in-kernel C-style app runner with int variables, expressions, print/println, appkit("UI ..."), lsh("command"), return, and input as a user-provided numeric value.
+ITEM Added langdemo.rxe as a normal RXE file-defined app proving app code is loaded from the file rather than hard-coded into the desktop.
+ITEM Keeps APPKIT file-defined/runtime UI, RXE/SYSRXE split, KMO, KModTalk, OSLink, hardware-profiled IMG/ISO artifacts, raw IMG, HDD/SSD installer, and user-owned control values intact.
+
 SECTION v1.68.0a
 ITEM Official release adding APPKIT file-defined and runtime app UI without feature loss or philosophy changes.
 ITEM RXE/SYSRXE apps can declare APPKIT widgets in files and create UI at runtime with APPKIT UI, APPKIT CLEAR, APPKIT COLOR, and APPKIT LAYOUT/SURFACE output lines.

@@ -339,6 +339,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use lpack verify sample.lpack before install, and lpack undo last to roll back the last install.\n"
     "li Use sysrxe list, sysrxe reload, sysrxe show userapp.sysrxe, and sysrxe run 0 text for file-defined system executables.\n"
     "li Use rxe list, rxe show demo_game.rxe, and rxe run 0 right to play the normal RXE demo game.\n"
+    "li Use rxe show langdemo.rxe and rxe run 1 7 after rxe reload to try app-side C/LardOS language code.\n"
     "li Use kmod history to read kmodtalk.lardd after direct kernel-module messages.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
     "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
@@ -396,6 +397,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.67.2p hotpatches VirtualBox optical-drive booting with ISO-specific CHS fallback and register-safe stage2 progress output.\n"
     "li v1.67.2a officially promotes the VirtualBox boot hotpatch without feature loss or value changes.\n"
     "li v1.68.0a officially adds APPKIT file-defined/runtime app UI, custom widgets, barcode Unicode fallback, and tail-less cursors without feature loss.\n"
+    "li v1.69.0a officially lets RXE/SYSRXE apps carry LANG/CODE for LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, and LML.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -745,9 +747,12 @@ static const uint8_t file_sysrxe_guide[] =
     "ITEM COLOR 0xAARRGGBB\n"
     "ITEM INPUT label\n"
     "ITEM BUTTON label\n"
+    "ITEM LANG LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, or LML selects the app code runner.\n"
+    "ITEM CODE source-line appends code for the selected language.\n"
+    "ITEM LANG C uses the in-kernel C-style app runner: int vars, expressions, print/println, appkit(\"UI ...\"), lsh(\"command\"), and return.\n"
     "ITEM DESKTOP 1 and DOCK 1 decide launcher placement.\n"
     "ITEM TEXT app body line\n"
-    "ITEM COMMAND lsh-command optionally receives textbox input.\n"
+    "ITEM COMMAND lsh-command optionally receives textbox input when LANG is LSH.\n"
     "SECTION Commands\n"
     "ITEM sysrxe list\n"
     "ITEM sysrxe reload\n"
@@ -788,17 +793,22 @@ static const uint8_t file_rxe_guide[] =
     "ITEM COLOR 0xAARRGGBB\n"
     "ITEM INPUT label\n"
     "ITEM BUTTON label\n"
+    "ITEM LANG LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, or LML selects the executable code runner.\n"
+    "ITEM CODE source-line appends code for the selected language.\n"
+    "ITEM LANG C uses the in-kernel C-style app runner: int vars, expressions, print/println, appkit(\"UI ...\"), lsh(\"command\"), and return.\n"
     "ITEM DESKTOP 1 and DOCK 1 decide launcher placement.\n"
     "ITEM TYPE GAME turns the executable into a native RXE game.\n"
     "ITEM BOARD width height declares the game map size, up to 24x12.\n"
     "ITEM ROW map-line adds # walls, . floor, @ start, and G goal.\n"
     "ITEM TEXT executable body line\n"
-    "ITEM COMMAND lsh-command optionally receives textbox input for text executables.\n"
+    "ITEM COMMAND lsh-command optionally receives textbox input for LANG LSH text executables.\n"
     "SECTION Commands\n"
     "ITEM rxe list\n"
     "ITEM rxe reload\n"
     "ITEM rxe show demo_game.rxe\n"
     "ITEM rxe run 0 right\n"
+    "ITEM rxe show langdemo.rxe\n"
+    "ITEM rxe run 1 7\n"
     "ITEM rxe run 0 reset\n"
     "END\n";
 
@@ -894,8 +904,34 @@ static const uint8_t file_hello_sysrxe[] =
     "DESKTOP 1\n"
     "DOCK 1\n"
     "TEXT This app was registered from hello.sysrxe, not hand-coded in gui.c.\n"
-    "TEXT Future simple apps can be new SYSRXE files.\n"
-    "COMMAND echo hello-from-sysrxe\n";
+    "TEXT Future simple apps can be new SYSRXE files with their own language runner.\n"
+    "LANG C\n"
+    "CODE println(\"hello-from-sysrxe-c\");\n"
+    "CODE appkit(\"UI BADGE 342 9 70 18 C RUN\");\n";
+
+static const uint8_t file_langdemo_rxe[] =
+    "RXE 1\n"
+    "ID lang-demo\n"
+    "NAME RXE Lang Demo\n"
+    "ICON L\n"
+    "LAYOUT terminal\n"
+    "COLOR 0xFF7BC86C\n"
+    "INPUT Number:\n"
+    "BUTTON Run\n"
+    "USE APPKIT\n"
+    "UI PANEL 0 0 220 36 App languages\n"
+    "UI BUTTON 8 8 72 20 Run | 7\n"
+    "UI BADGE 118 9 80 18 C/LIL/etc\n"
+    "UI INPUT 0 46 220 24 Number:\n"
+    "UI OUTPUT 0 84 0 0 Language output\n"
+    "DESKTOP 1\n"
+    "DOCK 1\n"
+    "TEXT RXE can run native LardOS languages or the in-kernel C-style app runner from file code.\n"
+    "LANG C\n"
+    "CODE int bonus = 35;\n"
+    "CODE println(input + bonus);\n"
+    "CODE appkit(\"UI CUSTOM meter 230 46 110 18 live-code | 42\");\n"
+    "CODE lsh(\"echo lsh-from-c-app\");\n";
 
 static const uint8_t file_demo_game_rxe[] =
     "RXE 1\n"
@@ -978,6 +1014,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file kmodtalk_guide.lardd\n"
     "CHECK file kmo_guide.lardd\n"
     "CHECK file hello.sysrxe\n"
+    "CHECK file langdemo.rxe\n"
     "CHECK file demo_game.rxe\n"
     "CHECK file gui_status.kmo\n"
     "CHECK file raw_control.kmo\n"
@@ -1079,6 +1116,7 @@ static const FsFile FS_FILES[] = {
     { "kmo_guide.lardd", file_kmo_guide, sizeof(file_kmo_guide) - 1 },
     { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) - 1 },
     { "demo_game.rxe", file_demo_game_rxe, sizeof(file_demo_game_rxe) - 1 },
+    { "langdemo.rxe", file_langdemo_rxe, sizeof(file_langdemo_rxe) - 1 },
     { "gui_status.kmo", file_gui_status_kmo, sizeof(file_gui_status_kmo) - 1 },
     { "raw_control.kmo", file_raw_control_kmo, sizeof(file_raw_control_kmo) - 1 },
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },

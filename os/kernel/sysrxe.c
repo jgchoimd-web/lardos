@@ -1,7 +1,13 @@
 #include "sysrxe.h"
 
+#include "bosl_vm.h"
 #include "fs.h"
+#include "gasm_vm.h"
+#include "lafillo_vm.h"
+#include "lil.h"
+#include "lml.h"
 #include "lsh.h"
+#include "os_vm.h"
 #include "rxe.h"
 #include "string.h"
 
@@ -26,6 +32,17 @@ static void copy_text(char* dst, uint32_t cap, const char* src)
 }
 
 static void append_text(char* dst, uint32_t cap, const char* src)
+{
+    uint32_t n = 0;
+    uint32_t i = 0;
+    if (!dst || cap == 0 || !src) return;
+    while (dst[n] && n + 1u < cap) n++;
+    while (src[i] && n + 1u < cap) dst[n++] = src[i++];
+    if (n + 1u < cap) dst[n++] = '\n';
+    dst[n] = '\0';
+}
+
+static void append_code(char* dst, uint32_t cap, const char* src)
 {
     uint32_t n = 0;
     uint32_t i = 0;
@@ -61,6 +78,28 @@ static void out_append_u32(char* dst, uint32_t cap, uint32_t* pos, uint32_t v)
     while (v && n < sizeof(tmp)) {
         tmp[n++] = (char)('0' + (v % 10u));
         v /= 10u;
+    }
+    while (n > 0) out_append_ch(dst, cap, pos, tmp[--n]);
+}
+
+static void out_append_i64(char* dst, uint32_t cap, uint32_t* pos, int64_t v)
+{
+    char tmp[24];
+    uint32_t n = 0;
+    uint64_t mag;
+    if (v < 0) {
+        out_append_ch(dst, cap, pos, '-');
+        mag = (uint64_t)(-(v + 1)) + 1u;
+    } else {
+        mag = (uint64_t)v;
+    }
+    if (mag == 0) {
+        out_append_ch(dst, cap, pos, '0');
+        return;
+    }
+    while (mag && n < sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (mag % 10u));
+        mag /= 10u;
     }
     while (n > 0) out_append_ch(dst, cap, pos, tmp[--n]);
 }
@@ -180,6 +219,43 @@ static int streq_ci(const char* a, const char* b)
         i++;
     }
     return a[i] == b[i];
+}
+
+static int starts_ci_word(const char* s, const char* word)
+{
+    uint32_t i = 0;
+    if (!s || !word) return 0;
+    while (word[i]) {
+        if (lower_ascii(s[i]) != lower_ascii(word[i])) return 0;
+        i++;
+    }
+    return s[i] == '\0' || s[i] == ' ' || s[i] == '\t' ||
+           s[i] == '(' || s[i] == '=' || s[i] == ';';
+}
+
+static int lang_from_name(const char* name)
+{
+    if (streq_ci(name, "LSH") || streq_ci(name, "SHELL") || streq_ci(name, "COMMAND")) return SYSRXE_LANG_LSH;
+    if (streq_ci(name, "LIL")) return SYSRXE_LANG_LIL;
+    if (streq_ci(name, "GASM")) return SYSRXE_LANG_GASM;
+    if (streq_ci(name, "BOSL") || streq_ci(name, "BOSLASM")) return SYSRXE_LANG_BOSL;
+    if (streq_ci(name, "LAFILLO") || streq_ci(name, "LAFVM") || streq_ci(name, "DVM")) return SYSRXE_LANG_LAFILLO;
+    if (streq_ci(name, "OSVM") || streq_ci(name, "OVM")) return SYSRXE_LANG_OSVM;
+    if (streq_ci(name, "C") || streq_ci(name, "LC") || streq_ci(name, "LARDC")) return SYSRXE_LANG_C;
+    if (streq_ci(name, "LML")) return SYSRXE_LANG_LML;
+    return SYSRXE_LANG_LSH;
+}
+
+static const char* lang_name(int lang)
+{
+    if (lang == SYSRXE_LANG_LIL) return "LIL";
+    if (lang == SYSRXE_LANG_GASM) return "GASM";
+    if (lang == SYSRXE_LANG_BOSL) return "BOSL";
+    if (lang == SYSRXE_LANG_LAFILLO) return "LAFILLO";
+    if (lang == SYSRXE_LANG_OSVM) return "OSVM";
+    if (lang == SYSRXE_LANG_C) return "C";
+    if (lang == SYSRXE_LANG_LML) return "LML";
+    return "LSH";
 }
 
 static int ui_kind_from_name(const char* name)
@@ -324,6 +400,7 @@ static void defaults_for(sysrxe_app_t* app, const char* file)
     copy_text(app->input_label, sizeof(app->input_label), "Input:");
     copy_text(app->button_label, sizeof(app->button_label), "Run");
     app->color = 0xFF57B8A6u;
+    app->lang = SYSRXE_LANG_LSH;
     app->show_desktop = 1;
     app->show_dock = 0;
     copy_text(app->game_kind, sizeof(app->game_kind), "maze");
@@ -459,8 +536,10 @@ static int parse_line(sysrxe_app_t* app, const char* src)
     }
     if ((v = value_after_key(src, "INPUT")) != NULL) { copy_text(app->input_label, sizeof(app->input_label), v); return 0; }
     if ((v = value_after_key(src, "BUTTON")) != NULL) { copy_text(app->button_label, sizeof(app->button_label), v); return 0; }
+    if ((v = value_after_key(src, "LANG")) != NULL || (v = value_after_key(src, "LANGUAGE")) != NULL) { app->lang = lang_from_name(v); return 0; }
     if ((v = value_after_key(src, "COMMAND")) != NULL) { copy_text(app->command, sizeof(app->command), v); return 0; }
     if ((v = value_after_key(src, "CMD")) != NULL) { copy_text(app->command, sizeof(app->command), v); return 0; }
+    if ((v = value_after_key(src, "CODE")) != NULL || (v = value_after_key(src, "SCRIPT")) != NULL || (v = value_after_key(src, "SRC")) != NULL) { append_code(app->code, sizeof(app->code), v); return 0; }
     if ((v = value_after_key(src, "TEXT")) != NULL) { append_text(app->body, sizeof(app->body), v); return 0; }
     if ((v = value_after_key(src, "BODY")) != NULL) { append_text(app->body, sizeof(app->body), v); return 0; }
     if ((v = value_after_key(src, "DESKTOP")) != NULL) { app->show_desktop = parse_number(v, 1u) ? 1 : 0; return 0; }
@@ -851,6 +930,395 @@ static int sysrxe_game_run(sysrxe_app_t* a, const char* input, char* out, uint32
     return 0;
 }
 
+typedef struct app_out {
+    char* data;
+    uint32_t cap;
+    uint32_t pos;
+} app_out_t;
+
+static void app_out_init(app_out_t* b, char* data, uint32_t cap)
+{
+    if (!b) return;
+    b->data = data;
+    b->cap = cap;
+    b->pos = 0;
+    if (data && cap) data[0] = '\0';
+}
+
+static void app_putc(char c, void* user)
+{
+    app_out_t* b = (app_out_t*)user;
+    if (!b || !b->data || b->cap == 0) return;
+    out_append_ch(b->data, b->cap, &b->pos, c);
+}
+
+static void app_out_append(app_out_t* b, const char* s)
+{
+    if (!b || !b->data || b->cap == 0) return;
+    out_append_s(b->data, b->cap, &b->pos, s);
+}
+
+static void app_out_append_i64(app_out_t* b, int64_t v)
+{
+    if (!b || !b->data || b->cap == 0) return;
+    out_append_i64(b->data, b->cap, &b->pos, v);
+}
+
+typedef struct c_var {
+    char name[16];
+    int64_t value;
+} c_var_t;
+
+typedef struct c_ctx {
+    const char* p;
+    const char* input;
+    c_var_t vars[12];
+    uint32_t nvars;
+} c_ctx_t;
+
+static int c_ident_start(char c)
+{
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+}
+
+static int c_ident_char(char c)
+{
+    return c_ident_start(c) || (c >= '0' && c <= '9');
+}
+
+static int64_t c_input_number(const char* s)
+{
+    int neg = 0;
+    int64_t v = 0;
+    s = skip_ws(s);
+    if (*s == '-') { neg = 1; s++; }
+    while (*s >= '0' && *s <= '9') {
+        v = v * 10 + (int64_t)(*s - '0');
+        s++;
+    }
+    return neg ? -v : v;
+}
+
+static int64_t c_get_var(c_ctx_t* c, const char* name)
+{
+    if (streq_ci(name, "input")) return c_input_number(c ? c->input : "");
+    if (!c || !name) return 0;
+    for (uint32_t i = 0; i < c->nvars; i++) {
+        if (strcmp(c->vars[i].name, name) == 0) return c->vars[i].value;
+    }
+    return 0;
+}
+
+static void c_set_var(c_ctx_t* c, const char* name, int64_t value)
+{
+    if (!c || !name || !name[0]) return;
+    for (uint32_t i = 0; i < c->nvars; i++) {
+        if (strcmp(c->vars[i].name, name) == 0) {
+            c->vars[i].value = value;
+            return;
+        }
+    }
+    if (c->nvars < sizeof(c->vars) / sizeof(c->vars[0])) {
+        copy_text(c->vars[c->nvars].name, sizeof(c->vars[c->nvars].name), name);
+        c->vars[c->nvars].value = value;
+        c->nvars++;
+    }
+}
+
+static int c_read_ident(c_ctx_t* c, char* out, uint32_t cap)
+{
+    uint32_t n = 0;
+    const char* p;
+    if (!c || !out || cap == 0) return 0;
+    p = skip_ws(c->p);
+    if (!c_ident_start(*p)) return 0;
+    while (c_ident_char(*p)) {
+        if (n + 1u < cap) out[n++] = *p;
+        p++;
+    }
+    out[n] = '\0';
+    c->p = p;
+    return 1;
+}
+
+static int64_t c_expr(c_ctx_t* c);
+
+static int64_t c_factor(c_ctx_t* c)
+{
+    const char* p;
+    int neg = 0;
+    int64_t v = 0;
+    char name[16];
+    if (!c) return 0;
+    p = skip_ws(c->p);
+    if (*p == '-') { neg = 1; p++; }
+    if (*p == '(') {
+        c->p = p + 1;
+        v = c_expr(c);
+        p = skip_ws(c->p);
+        if (*p == ')') p++;
+        c->p = p;
+        return neg ? -v : v;
+    }
+    if (c_ident_start(*p)) {
+        c->p = p;
+        if (c_read_ident(c, name, sizeof(name))) v = c_get_var(c, name);
+        return neg ? -v : v;
+    }
+    if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+        p += 2;
+        while (*p) {
+            uint32_t d;
+            if (*p >= '0' && *p <= '9') d = (uint32_t)(*p - '0');
+            else if (*p >= 'a' && *p <= 'f') d = (uint32_t)(*p - 'a' + 10);
+            else if (*p >= 'A' && *p <= 'F') d = (uint32_t)(*p - 'A' + 10);
+            else break;
+            v = (v << 4) | (int64_t)d;
+            p++;
+        }
+    } else {
+        while (*p >= '0' && *p <= '9') {
+            v = v * 10 + (int64_t)(*p - '0');
+            p++;
+        }
+    }
+    c->p = p;
+    return neg ? -v : v;
+}
+
+static int64_t c_term(c_ctx_t* c)
+{
+    int64_t v = c_factor(c);
+    for (;;) {
+        const char* p = skip_ws(c->p);
+        char op = *p;
+        int64_t r;
+        if (op != '*' && op != '/' && op != '%') break;
+        c->p = p + 1;
+        r = c_factor(c);
+        if (op == '*') v *= r;
+        else if (op == '/' && r) v /= r;
+        else if (op == '%' && r) v %= r;
+    }
+    return v;
+}
+
+static int64_t c_expr(c_ctx_t* c)
+{
+    int64_t v = c_term(c);
+    for (;;) {
+        const char* p = skip_ws(c->p);
+        char op = *p;
+        int64_t r;
+        if (op != '+' && op != '-') break;
+        c->p = p + 1;
+        r = c_term(c);
+        if (op == '+') v += r;
+        else v -= r;
+    }
+    return v;
+}
+
+static void c_skip_statement(c_ctx_t* c)
+{
+    if (!c) return;
+    while (*c->p && *c->p != ';' && *c->p != '\n' && *c->p != '\r') c->p++;
+    if (*c->p == ';' || *c->p == '\n' || *c->p == '\r') c->p++;
+}
+
+static int c_read_string_arg(c_ctx_t* c, char* out, uint32_t cap)
+{
+    uint32_t n = 0;
+    const char* p;
+    if (!c || !out || cap == 0) return 0;
+    out[0] = '\0';
+    p = skip_ws(c->p);
+    if (*p != '(') return 0;
+    p = skip_ws(p + 1);
+    if (*p != '"') return 0;
+    p++;
+    while (*p && *p != '"' && n + 1u < cap) {
+        if (*p == '\\' && p[1]) {
+            p++;
+            if (*p == 'n') out[n++] = '\n';
+            else if (*p == 't') out[n++] = '\t';
+            else out[n++] = *p;
+            p++;
+        } else {
+            out[n++] = *p++;
+        }
+    }
+    out[n] = '\0';
+    if (*p == '"') p++;
+    p = skip_ws(p);
+    if (*p == ')') p++;
+    c->p = p;
+    return 1;
+}
+
+static void c_print_call(c_ctx_t* c, app_out_t* out, int newline)
+{
+    const char* p;
+    char text[160];
+    if (c_read_string_arg(c, text, sizeof(text))) {
+        app_out_append(out, text);
+    } else {
+        p = skip_ws(c->p);
+        if (*p == '(') {
+            c->p = p + 1;
+            app_out_append_i64(out, c_expr(c));
+            p = skip_ws(c->p);
+            if (*p == ')') c->p = p + 1;
+        }
+    }
+    if (newline) app_putc('\n', out);
+    c_skip_statement(c);
+}
+
+static int capp_run(sysrxe_app_t* app, const char* src, const char* input, app_out_t* out)
+{
+    c_ctx_t c;
+    (void)app;
+    memset(&c, 0, sizeof(c));
+    c.p = src ? src : "";
+    c.input = input ? input : "";
+    c_set_var(&c, "input", c_input_number(c.input));
+    while (*c.p) {
+        char name[16];
+        const char* p = skip_ws(c.p);
+        if (!*p) break;
+        c.p = p;
+        if (*p == ';' || *p == '\n' || *p == '\r') { c.p++; continue; }
+        if (starts_ci_word(p, "int")) {
+            c.p = skip_ws(p + 3);
+            if (c_read_ident(&c, name, sizeof(name))) {
+                int64_t value = 0;
+                p = skip_ws(c.p);
+                if (*p == '=') {
+                    c.p = p + 1;
+                    value = c_expr(&c);
+                }
+                c_set_var(&c, name, value);
+            }
+            c_skip_statement(&c);
+        } else if (starts_ci_word(p, "println")) {
+            c.p = p + 7;
+            c_print_call(&c, out, 1);
+        } else if (starts_ci_word(p, "print") || starts_ci_word(p, "printf")) {
+            c.p = p + (starts_ci_word(p, "printf") ? 6 : 5);
+            c_print_call(&c, out, 0);
+        } else if (starts_ci_word(p, "appkit")) {
+            char text[160];
+            c.p = p + 6;
+            if (c_read_string_arg(&c, text, sizeof(text))) {
+                const char* t = skip_ws(text);
+                if (!starts_key(t, "APPKIT")) app_out_append(out, "APPKIT ");
+                app_out_append(out, t);
+                app_putc('\n', out);
+            }
+            c_skip_statement(&c);
+        } else if (starts_ci_word(p, "lsh")) {
+            char text[160];
+            c.p = p + 3;
+            if (c_read_string_arg(&c, text, sizeof(text))) {
+                lsh_clear_output();
+                lsh_exec(text);
+                app_out_append(out, lsh_get_output());
+            }
+            c_skip_statement(&c);
+        } else if (starts_ci_word(p, "return")) {
+            c.p = p + 6;
+            app_out_append(out, "return ");
+            app_out_append_i64(out, c_expr(&c));
+            app_putc('\n', out);
+            break;
+        } else if (c_read_ident(&c, name, sizeof(name))) {
+            p = skip_ws(c.p);
+            if (*p == '=') {
+                c.p = p + 1;
+                c_set_var(&c, name, c_expr(&c));
+            }
+            c_skip_statement(&c);
+        } else {
+            app_out_append(out, "CAPP: skipped statement\n");
+            c_skip_statement(&c);
+        }
+    }
+    return 0;
+}
+
+static int lml_emit_cb(lml_event_t ev, const char* name, const char* value, void* user)
+{
+    app_out_t* out = (app_out_t*)user;
+    if (ev == LML_OPEN_TAG) {
+        app_out_append(out, "<");
+        app_out_append(out, name ? name : "tag");
+        app_out_append(out, ">\n");
+    } else if (ev == LML_CLOSE_TAG) {
+        app_out_append(out, "</");
+        app_out_append(out, name ? name : "tag");
+        app_out_append(out, ">\n");
+    } else if (ev == LML_ATTR) {
+        app_out_append(out, "@");
+        app_out_append(out, name ? name : "attr");
+        app_out_append(out, "=");
+        app_out_append(out, value ? value : "");
+        app_putc('\n', out);
+    } else if (ev == LML_TEXT && value && value[0]) {
+        app_out_append(out, value);
+        app_putc('\n', out);
+    }
+    return 0;
+}
+
+static int app_run_language(sysrxe_app_t* a, const char* input, char* out, uint32_t out_cap)
+{
+    static char raw[2048];
+    app_out_t buf;
+    const char* src;
+    int r = 0;
+    if (!a || !out || out_cap == 0) return -1;
+    src = a->code[0] ? a->code : a->command;
+    app_out_init(&buf, raw, sizeof(raw));
+    if (a->lang == SYSRXE_LANG_LSH) {
+        char cmd[256];
+        uint32_t n = 0;
+        uint32_t i = 0;
+        const char* base = src ? src : "";
+        while (base[n] && n + 1u < sizeof(cmd)) { cmd[n] = base[n]; n++; }
+        if (!a->code[0] && input && input[0] && n + 2u < sizeof(cmd)) {
+            cmd[n++] = ' ';
+            while (input[i] && n + 1u < sizeof(cmd)) cmd[n++] = input[i++];
+        }
+        cmd[n] = '\0';
+        lsh_clear_output();
+        lsh_exec(cmd);
+        app_out_append(&buf, lsh_get_output());
+    } else if (a->lang == SYSRXE_LANG_LIL) {
+        r = lil_run(src, app_putc, &buf);
+    } else if (a->lang == SYSRXE_LANG_GASM) {
+        r = gasm_asm_eval(src, app_putc, &buf);
+    } else if (a->lang == SYSRXE_LANG_BOSL) {
+        r = bosl_asm_eval(src, app_putc, &buf);
+    } else if (a->lang == SYSRXE_LANG_LAFILLO) {
+        r = lafillo_vm_asm_eval(src, app_putc, &buf);
+    } else if (a->lang == SYSRXE_LANG_OSVM) {
+        r = os_vm_asm_eval(src, app_putc, &buf);
+    } else if (a->lang == SYSRXE_LANG_C) {
+        r = capp_run(a, src, input, &buf);
+    } else if (a->lang == SYSRXE_LANG_LML) {
+        r = lml_parse(src, lml_emit_cb, &buf);
+    }
+    if (r != 0) {
+        app_out_append(&buf, lang_name(a->lang));
+        app_out_append(&buf, " execution failed: ");
+        app_out_append_i64(&buf, r);
+        app_putc('\n', &buf);
+    }
+    appkit_apply_script(a, raw, out, out_cap);
+    return 0;
+}
+
 int sysrxe_format_home(int app, char* out, uint32_t out_cap)
 {
     const sysrxe_app_t* a = sysrxe_get_by_app(app);
@@ -860,8 +1328,8 @@ int sysrxe_format_home(int app, char* out, uint32_t out_cap)
         return 0;
     }
     snprintf(out, out_cap,
-             "SYSRXE app: %s\nfile: %s\nlayout: %s\nui widgets: %u\n\n%s%s%s",
-             a->name, a->file, a->layout, a->ui_count, a->body,
+             "SYSRXE app: %s\nfile: %s\nlayout: %s\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
+             a->name, a->file, a->layout, lang_name(a->lang), a->ui_count, a->body,
              a->command[0] ? "\nCommand: " : "",
              a->command[0] ? a->command : "");
     return 0;
@@ -876,8 +1344,8 @@ int rxe_format_home(int app, char* out, uint32_t out_cap)
         return 0;
     }
     snprintf(out, out_cap,
-             "RXE executable: %s\nfile: %s\nlayout: %s\nui widgets: %u\n\n%s%s%s",
-             a->name, a->file, a->layout, a->ui_count, a->body,
+             "RXE executable: %s\nfile: %s\nlayout: %s\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
+             a->name, a->file, a->layout, lang_name(a->lang), a->ui_count, a->body,
              a->command[0] ? "\nCommand: " : "",
              a->command[0] ? a->command : "");
     return 0;
@@ -889,20 +1357,7 @@ int sysrxe_run(int app, const char* input, char* out, uint32_t out_cap)
     if (!a || !out || out_cap == 0) return -1;
     if (!input) input = "";
     if (a->type == SYSRXE_TYPE_GAME) return sysrxe_game_run(a, input, out, out_cap);
-    if (a->command[0]) {
-        char cmd[256];
-        uint32_t n = 0;
-        uint32_t i = 0;
-        while (a->command[n] && n + 1u < sizeof(cmd)) { cmd[n] = a->command[n]; n++; }
-        if (input[0] && n + 2u < sizeof(cmd)) {
-            cmd[n++] = ' ';
-            while (input[i] && n + 1u < sizeof(cmd)) cmd[n++] = input[i++];
-        }
-        cmd[n] = '\0';
-        lsh_exec(cmd);
-        appkit_apply_script(a, lsh_get_output(), out, out_cap);
-        return 0;
-    }
+    if (a->command[0] || a->code[0]) return app_run_language(a, input, out, out_cap);
     snprintf(out, out_cap, "%s\nInput: %s\n\nNo COMMAND is set, so SYSRXE only rendered the app body.", a->body, input);
     return 0;
 }
@@ -913,20 +1368,7 @@ int rxe_run(int app, const char* input, char* out, uint32_t out_cap)
     if (!a || !out || out_cap == 0) return -1;
     if (!input) input = "";
     if (a->type == SYSRXE_TYPE_GAME) return sysrxe_game_run(a, input, out, out_cap);
-    if (a->command[0]) {
-        char cmd[256];
-        uint32_t n = 0;
-        uint32_t i = 0;
-        while (a->command[n] && n + 1u < sizeof(cmd)) { cmd[n] = a->command[n]; n++; }
-        if (input[0] && n + 2u < sizeof(cmd)) {
-            cmd[n++] = ' ';
-            while (input[i] && n + 1u < sizeof(cmd)) cmd[n++] = input[i++];
-        }
-        cmd[n] = '\0';
-        lsh_exec(cmd);
-        appkit_apply_script(a, lsh_get_output(), out, out_cap);
-        return 0;
-    }
+    if (a->command[0] || a->code[0]) return app_run_language(a, input, out, out_cap);
     snprintf(out, out_cap, "%s\nInput: %s\n\nNo COMMAND is set, so RXE only rendered the executable body.", a->body, input);
     return 0;
 }
@@ -986,8 +1428,24 @@ int sysrxe_selftest(void)
         "ROW #####\n"
         "ROW #@.G#\n"
         "ROW #####\n";
+    static const char capp[] =
+        "SYSRXE 1\n"
+        "ID c-app\n"
+        "NAME C App\n"
+        "LANG C\n"
+        "CODE int bonus = 35;\n"
+        "CODE println(input + bonus);\n"
+        "CODE appkit(\"UI BADGE 0 0 64 18 CAPP\");\n";
+    static const char lilapp[] =
+        "SYSRXE 1\n"
+        "ID lil-app\n"
+        "NAME LIL App\n"
+        "LANG LIL\n"
+        "CODE (print (+ 40 2))\n";
     sysrxe_app_t app;
     sysrxe_app_t game_app;
+    sysrxe_app_t c_app;
+    sysrxe_app_t lil_app;
     char out[512];
     char visible[256];
     if (parse_sysrxe(&app, "test.sysrxe", sample, sizeof(sample) - 1) != 0) return -1;
@@ -1014,6 +1472,14 @@ int sysrxe_selftest(void)
     if (game_app.game_goal_x != 3 || game_app.game_goal_y != 1) return -14;
     if (sysrxe_game_run(&game_app, "right", out, sizeof(out)) != 0) return -15;
     if (game_app.game_px != 2 || game_app.game_py != 1 || game_app.game_moves != 1u) return -16;
+    if (parse_sysrxe(&c_app, "c.sysrxe", capp, sizeof(capp) - 1) != 0) return -25;
+    if (c_app.lang != SYSRXE_LANG_C || !c_app.code[0]) return -26;
+    if (app_run_language(&c_app, "7", out, sizeof(out)) != 0) return -27;
+    if (strcmp(out, "42\n") != 0 || c_app.ui_count != 1u || c_app.ui[0].kind != SYSRXE_UI_BADGE) return -28;
+    if (parse_sysrxe(&lil_app, "lil.sysrxe", lilapp, sizeof(lilapp) - 1) != 0) return -29;
+    if (lil_app.lang != SYSRXE_LANG_LIL || !lil_app.code[0]) return -30;
+    if (app_run_language(&lil_app, "", out, sizeof(out)) != 0) return -31;
+    if (strcmp(out, "42\n") != 0) return -32;
     return 0;
 }
 

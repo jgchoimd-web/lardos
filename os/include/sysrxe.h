@@ -26,6 +26,15 @@
 #define SYSRXE_UI_ICON 13
 #define SYSRXE_UI_TILE 14
 #define SYSRXE_UI_CUSTOM 15
+#define SYSRXE_CODE_MAX 1536
+#define SYSRXE_LANG_LSH 0
+#define SYSRXE_LANG_LIL 1
+#define SYSRXE_LANG_GASM 2
+#define SYSRXE_LANG_BOSL 3
+#define SYSRXE_LANG_LAFILLO 4
+#define SYSRXE_LANG_OSVM 5
+#define SYSRXE_LANG_C 6
+#define SYSRXE_LANG_LML 7
 
 typedef struct sysrxe_widget {
     int used;
@@ -53,6 +62,8 @@ typedef struct sysrxe_app {
     char button_label[24];
     char body[1024];
     char command[128];
+    int lang;
+    char code[SYSRXE_CODE_MAX];
     int show_desktop;
     int show_dock;
     uint32_t ui_count;

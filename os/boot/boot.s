@@ -55,7 +55,7 @@ start:
     call vbe_try_enable
 
     ; Load LARDX executable (kernel) below VGA/EBDA into KERNEL_LOAD_SEG:0000.
-    ; v1.72.0a builds the kernel with -Os, keeping the complete native feature
+    ; v1.73.0b builds the kernel with -Os, keeping the complete native feature
     ; set small enough for this safer BIOS-loading path.
     mov ax, KERNEL_LOAD_SEG
     mov es, ax

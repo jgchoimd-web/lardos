@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.72.0a-ami/lardos-v1.72.0a-ami.iso`. To publish the whole hardware
+`release/v1.73.0b-ami/lardos-v1.73.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.73.0b` expands the native web stack without switching to external HTML,
+Markdown, or a browser engine: HTTP/HTTPS can choose GET, POST, or HEAD, LARS
+can carry `link` and `fetch` records, and `webstack status|guide|demo` exposes
+the stack from inside the OS.
 
 `v1.72.0a` officially promotes the file-defined shell-command path from
 `v1.72.0b`. `.kmo` files can carry `COMMAND name`, `SHELL name`, or `BIND name`,
@@ -93,9 +98,10 @@ These formats are record-based, readable without a renderer, and parsed by frees
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
 does not use HTML or Markdown for its own built-in documents.
 
-The Doc tab can choose GET or POST for HTTP/HTTPS requests. In POST mode, type
-`URL|body` in the address field; the in-kernel request builder sends the body
-with `Content-Length` and `application/x-www-form-urlencoded`.
+The Doc tab can choose GET, POST, or HEAD for HTTP/HTTPS requests. In POST mode,
+type `URL|body` in the address field; the in-kernel request builder sends the
+body with `Content-Length` and `application/x-www-form-urlencoded`. In HEAD
+mode, the same transport asks for headers without a body.
 
 The classic GUI stays as the main surface. A separate GUI overlay chrome layer
 is drawn above it to show the active app, repaint compact-safe tabs when space
@@ -159,6 +165,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.73.0b` expands the native web stack with HEAD, LARS `link`/`fetch`
+  records, `webstack` commands, and POST/LUNIT coverage.
 - `v1.72.0a` officially promotes KMO shell-command binding without feature loss
   or philosophy changes.
 - `v1.72.0b` adds KMO shell-command binding: `.kmo` can carry `COMMAND`,
@@ -358,7 +366,7 @@ commands:
   overlay theme without leaving LardOS.
 - `cfgsh`, `cfg`, and `settings` provide a settings-focused shell. Enter
   `cfgsh` to get a `CFG#` prompt, then use `mode value` commands such as
-  `awake on`, `ltheme night`, `http 2`, `boot 4`,
+  `awake on`, `ltheme night`, `http 3`, `boot 4`,
   `priority 10`, `sandbox off`, or `sum on`. Outside the mode, `cfg ltheme night`
   runs one setting change directly.
 - `buddy on|off|status|joke|next` controls Lard Buddy, an optional roaming
@@ -373,7 +381,9 @@ commands:
 - `lardtrace on|off|show|module name` and the shorter `trace` alias turn on
   LardTrace, a small event ring for kernel modules, shell commands, OSLink,
   TaskPrio, networking, and LPack.
-- `netwatch on|off|show` records readable UDP, OSLink, and HTTP/HTTPS GET/POST
+- `webstack status|guide|demo|selftest` exposes the native web stack: LARS
+  links/fetch records and HTTP/HTTPS GET/POST/HEAD request building.
+- `netwatch on|off|show` records readable UDP, OSLink, and HTTP/HTTPS GET/POST/HEAD
   activity into `netwatch.lardd`.
 - `journal show|add|clear` opens the automatic `journal.lardd` event log.
 - `rollback snap|last|apply` snapshots and restores user-visible settings such as
@@ -516,7 +526,7 @@ profile rules.
 
 The kernel networking stack owns DHCP, DNS, IPv4, UDP, a small TCP path, and
 plain HTTP. HTTP requests are no longer GET-only: the shared request builder can
-send GET or POST, and the Doc tab exposes that as a method option. OSLink uses
+send GET, POST, or HEAD, and the Doc tab exposes that as a method option. OSLink uses
 UDP port 39010 for hello, ping, text, acknowledgement, safe exec, and
 peer-discovery packets between LardOS nodes. Local OSLink messages never leave
 the kernel; they use the same inbox shape with a lightweight channel label.

@@ -596,7 +596,7 @@ int lardkit_snapshot(const char* label)
     scopy(s_lardkit.rollback.label, sizeof(s_lardkit.rollback.label),
           label && label[0] ? label : "manual");
     s_lardkit.rollback.buddy_enabled = bi.enabled;
-    s_lardkit.rollback.http_post = (uint32_t)gui_http_post_mode();
+    s_lardkit.rollback.http_post = (uint32_t)gui_http_method();
     s_lardkit.rollback.task_default = taskprio_default_priority();
     scopy(s_lardkit.rollback.boot_profile, sizeof(s_lardkit.rollback.boot_profile), bp.name);
     s_lardkit.rollback.awake_enabled = aw.enabled;
@@ -609,7 +609,7 @@ int lardkit_rollback_apply(void)
 {
     if (!s_lardkit.rollback.valid) return -1;
     lassist_enable((int)s_lardkit.rollback.buddy_enabled);
-    gui_http_set_post_mode((int)s_lardkit.rollback.http_post);
+    gui_http_set_method((int)s_lardkit.rollback.http_post);
     taskprio_set_default(s_lardkit.rollback.task_default);
     (void)bootprof_set(s_lardkit.rollback.boot_profile);
     if (s_lardkit.rollback.awake_enabled) awake_enable(1, 3u);
@@ -1252,7 +1252,7 @@ static void cfg_profile_from_current(lardkit_cfg_profile_t* p, const char* name)
     p->valid = 1u;
     scopy(p->name, sizeof(p->name), name && name[0] ? name : "profile");
     p->buddy_enabled = bi.enabled;
-    p->http_post = (uint32_t)gui_http_post_mode();
+    p->http_post = (uint32_t)gui_http_method();
     p->task_default = taskprio_default_priority();
     scopy(p->boot_profile, sizeof(p->boot_profile), bp.name);
     p->awake_enabled = aw.enabled;
@@ -1263,7 +1263,7 @@ static int cfg_profile_apply(const lardkit_cfg_profile_t* p)
 {
     if (!p || !p->valid) return -1;
     lassist_enable((int)p->buddy_enabled);
-    gui_http_set_post_mode((int)p->http_post);
+    gui_http_set_method((int)p->http_post);
     taskprio_set_default(p->task_default);
     (void)bootprof_set(p->boot_profile);
     if (p->awake_enabled) awake_enable(1, 3u);
@@ -1337,6 +1337,9 @@ int lardkit_cfgprof_write(void)
         report_append(w, s_lardkit.cfgprof[i].name);
         report_append(w, " boot ");
         report_append(w, s_lardkit.cfgprof[i].boot_profile);
+        report_append(w, " http ");
+        report_append(w, s_lardkit.cfgprof[i].http_post == 1u ? "POST" :
+                         s_lardkit.cfgprof[i].http_post == 2u ? "HEAD" : "GET");
         report_append(w, " priority ");
         report_append_i32(w, s_lardkit.cfgprof[i].task_default);
         report_append(w, "\n");

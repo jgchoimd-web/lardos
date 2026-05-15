@@ -41,6 +41,7 @@
 #include "vmmon.h"
 #include "rxe.h"
 #include "sysrxe.h"
+#include "net.h"
 #include "kmodtalk.h"
 #include "kmo.h"
 #include "io.h"
@@ -226,6 +227,14 @@ static void out_append_i64(int64_t v)
     }
 }
 
+static const char* lsh_http_method_name(void)
+{
+    int method = gui_http_method();
+    if (method == 1) return "POST";
+    if (method == 2) return "HEAD";
+    return "GET";
+}
+
 static void out_append_hex16(uint16_t v)
 {
     static const char hex[] = "0123456789abcdef";
@@ -307,6 +316,17 @@ static int ascii_streq_ci(const char* a, const char* b)
     return a[i] == '\0' && b[i] == '\0';
 }
 
+static int ascii_prefix_ci(const char* s, const char* pfx)
+{
+    uint32_t i = 0;
+    if (!s || !pfx) return 0;
+    while (pfx[i]) {
+        if (ascii_lower_char(s[i]) != ascii_lower_char(pfx[i])) return 0;
+        i++;
+    }
+    return 1;
+}
+
 typedef struct {
     const char* name;
     uint8_t magic_safe;
@@ -316,7 +336,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
@@ -1688,7 +1708,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr undo last\n");
@@ -1708,6 +1728,7 @@ static void cmd_help(const char* args)
     out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
     out_append("  post baseline, bootreplay show, bootmap, oldcheck, devmap boot/POST/device views\n");
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
+    out_append("  webstack status|guide|demo|selftest for native LARS/HTTP method support\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
@@ -2751,7 +2772,59 @@ static void cmd_larsact(const char* args)
     out_append(" -> ");
     out_append(a.command);
     out_append("\n");
+    if (strcmp(a.kind, "link") == 0) {
+        const char* target = a.command;
+        if (ascii_prefix_ci(target, "file://")) target += 7;
+        if (ascii_prefix_ci(target, "http://") || ascii_prefix_ci(target, "https://")) {
+            out_append("larsact: network link; open it in the Doc tab or use cfgsh http 1|2|3 first.\n");
+            return;
+        }
+        if (lardkit_larsview_open(target) == 0) {
+            cmd_larddoc(target, "Usage: larsact file.lars index");
+        } else {
+            out_append("larsact: link target is not a local native document.\n");
+        }
+        return;
+    }
+    if (strcmp(a.kind, "fetch") == 0) {
+        out_append("larsact: fetch target is ready for the Doc tab: ");
+        out_append(a.command);
+        out_append("\n");
+        return;
+    }
     lsh_exec(a.command);
+}
+
+static void cmd_webstack(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        out_append("WebStack native\n");
+        out_append("  transport: HTTP/HTTPS in kernel, no external web library\n");
+        out_append("  method: ");
+        out_append(lsh_http_method_name());
+        out_append(" (cfgsh http 1=GET 2=POST 3=HEAD)\n");
+        out_append("  documents: LARS link/fetch/button/input, LARDD guides\n");
+        out_append("  builder selftest: ");
+        out_append(net_http_selftest() == 0 ? "OK" : "FAIL");
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "guide") == 0 || strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
+        cmd_larddoc("webstack_guide.lardd", "Usage: webstack guide");
+        return;
+    }
+    if (strcmp(sub, "demo") == 0 || strcmp(sub, "lars") == 0) {
+        cmd_larddoc("webdemo.lars", "Usage: webstack demo");
+        return;
+    }
+    if (strcmp(sub, "selftest") == 0 || strcmp(sub, "test") == 0) {
+        out_append(net_http_selftest() == 0 ? "webstack: selftest OK\n" : "webstack: selftest failed\n");
+        return;
+    }
+    out_append("Usage: webstack status|guide|demo|selftest\n");
 }
 
 static void cmd_lpack_show(const char* file_arg, const uint8_t* data, uint32_t size, int verbose)
@@ -3356,7 +3429,7 @@ static void cmd_rollback_status(void)
         out_append("buddy=");
         out_append_u32(info.buddy_enabled);
         out_append(" http=");
-        out_append(info.http_post ? "POST" : "GET");
+        out_append(info.http_post == 1u ? "POST" : info.http_post == 2u ? "HEAD" : "GET");
         out_append(" boot=");
         out_append(info.boot_profile);
         out_append(" prio=");
@@ -3912,6 +3985,8 @@ static void cmd_cfgprof(const char* args)
             out_append(p.name);
             out_append(" boot=");
             out_append(p.boot_profile);
+            out_append(" http=");
+            out_append(p.http_post == 1u ? "POST" : p.http_post == 2u ? "HEAD" : "GET");
             out_append(" prio=");
             out_append_i32(p.task_default);
             out_append("\n");
@@ -7867,7 +7942,7 @@ static void cfgsh_help(void)
     out_append("CFGSH settings shell\n");
     out_append("  cfgsh              enter settings shell (CFG# prompt)\n");
     out_append("  exitcfg            leave settings shell\n");
-    out_append("  setting value      e.g. awake on, ltheme night, http 2, boot 4\n");
+    out_append("  setting value      e.g. awake on, ltheme night, http 3, boot 4\n");
     out_append("Settings:\n");
     out_append("  awake on|off       next boot fast-surface mode\n");
     out_append("  buddy on|off|mood  roaming easygoing assistant\n");
@@ -7875,7 +7950,7 @@ static void cfgsh_help(void)
     out_append("  ltheme name        classic|contrast|night|amber\n");
     out_append("  rollback snap|apply settings snapshot restore\n");
     out_append("  sram on|off        screen scratch RAM\n");
-    out_append("  http 1|2           GET|POST mode\n");
+    out_append("  http 1|2|3         GET|POST|HEAD mode\n");
     out_append("  boot 1..5          normal|safe|netoff|dev|awakening\n");
     out_append("  priority 0..10     default background task priority\n");
     out_append("  sandbox on|off     default LARDX sandbox run mode\n");
@@ -7917,7 +7992,7 @@ static void cfgsh_status(void)
     out_append("\n  sram=");
     out_append(sr.enabled ? "on" : "off");
     out_append(" http=");
-    out_append(gui_http_post_mode() ? "POST" : "GET");
+    out_append(lsh_http_method_name());
     out_append(" priority=");
     out_append_i32(tp.default_priority);
     out_append("\n  sandbox=");
@@ -8031,17 +8106,21 @@ static int cfgsh_apply(const char* setting, const char* args)
     if (strcmp(setting, "http") == 0 || strcmp(setting, "method") == 0) {
         if (!have_value || cfgsh_is_status_word(value)) {
             out_append("cfgsh: http=");
-            out_append(gui_http_post_mode() ? "POST\n" : "GET\n");
+            out_append(lsh_http_method_name());
+            out_append("\n");
             return 1;
         }
         if (strcmp(value, "get") == 0 || strcmp(value, "1") == 0 || strcmp(value, "off") == 0) {
-            gui_http_set_post_mode(0);
+            gui_http_set_method(0);
             out_append("cfgsh: http=GET\n");
         } else if (strcmp(value, "post") == 0 || strcmp(value, "2") == 0 || strcmp(value, "on") == 0) {
-            gui_http_set_post_mode(1);
+            gui_http_set_method(1);
             out_append("cfgsh: http=POST\n");
+        } else if (strcmp(value, "head") == 0 || strcmp(value, "3") == 0) {
+            gui_http_set_method(2);
+            out_append("cfgsh: http=HEAD\n");
         } else {
-            out_append("Usage: http get|post or 1|2\n");
+            out_append("Usage: http get|post|head or 1|2|3\n");
         }
         return 1;
     }
@@ -8278,6 +8357,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lss") == 0 || strcmp(cmd, "shrine") == 0 || strcmp(cmd, "srine") == 0) { cmd_lss(args); return; }
     if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
     if (strcmp(cmd, "netwatch") == 0) { cmd_netwatch(args); return; }
+    if (strcmp(cmd, "webstack") == 0) { cmd_webstack(args); return; }
     if (strcmp(cmd, "journal") == 0) { cmd_journal(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "oschat") == 0) { cmd_oschat(args); return; }

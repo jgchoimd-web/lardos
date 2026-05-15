@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.73.0b
+ITEM Beta release expanding the native web stack without switching to HTML, Markdown, or an external browser/library.
+ITEM HTTP/HTTPS request construction now supports HEAD beside GET and POST; cfgsh http 1|2|3 selects GET, POST, or HEAD.
+ITEM NetWatch and LardTrace now record HEAD as its own readable HTTP/HTTPS method event.
+ITEM LARS documents now support link and fetch records in addition to button and input records, and larsform/larsact expose those actions.
+ITEM Added webstack status, webstack guide, webstack demo, webstack_guide.lardd, and webdemo.lars so users can inspect the web layer from inside LardOS.
+ITEM Added POST and LUNIT coverage for the request builder, LARS web demo, and embedded webstack guide while preserving KMO, DRFL, RXR/RXE/SYSRXE, OSLink, and user-owned control paths.
+
 SECTION v1.72.0a
 ITEM Official release promoting KMO shell-command bindings from v1.72.0b without feature loss or philosophy changes.
 ITEM Keeps COMMAND, SHELL, and BIND fields in .kmo files so users can expose module files as direct shell command names.

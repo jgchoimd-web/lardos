@@ -19,7 +19,7 @@ static const char* const s_app_titles[] = {
 };
 
 static const char* const s_app_hints[] = {
-    "local LARS, HTTP GET/POST", "integer scratchpad", "RAM notes",
+    "local LARS, HTTP GET/POST/HEAD", "integer scratchpad", "RAM notes",
     "images and scenes", "native archive tools", "sandboxable user task",
     "LSS programs", "system commands", "KR BASIC", "Lafaelo text",
 };

@@ -29,6 +29,8 @@ void gui_set_response(const char* text);
 void gui_set_loading(int on);
 void gui_http_set_post_mode(int on);
 int gui_http_post_mode(void);
+void gui_http_set_method(int method);
+int gui_http_method(void); /* 0=GET, 1=POST, 2=HEAD */
 void gui_reload_sysrxe_apps(void);
 
 #define GUI_RENAME_ANY 0

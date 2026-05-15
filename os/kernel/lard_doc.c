@@ -139,6 +139,26 @@ static void render_lars_line(char* out, uint32_t cap, uint32_t* pos,
             out_n(out, cap, pos, bar + 1, (uint32_t)(end - bar - 1));
         }
         out_ch(out, cap, pos, '\n');
+    } else if (line_has_prefix(p, end, "link", &v) || line_has_prefix(p, end, "a", &v)) {
+        const char* bar = v;
+        while (bar < end && *bar != '|') bar++;
+        out_s(out, cap, pos, " [link] ");
+        out_n(out, cap, pos, v, (uint32_t)(bar - v));
+        if (bar < end) {
+            out_s(out, cap, pos, " -> ");
+            out_n(out, cap, pos, bar + 1, (uint32_t)(end - bar - 1));
+        }
+        out_ch(out, cap, pos, '\n');
+    } else if (line_has_prefix(p, end, "fetch", &v)) {
+        const char* bar = v;
+        while (bar < end && *bar != '|') bar++;
+        out_s(out, cap, pos, " [fetch] ");
+        out_n(out, cap, pos, v, (uint32_t)(bar - v));
+        if (bar < end) {
+            out_s(out, cap, pos, " -> ");
+            out_n(out, cap, pos, bar + 1, (uint32_t)(end - bar - 1));
+        }
+        out_ch(out, cap, pos, '\n');
     } else if (line_has_prefix(p, end, "input", &v)) {
         out_s(out, cap, pos, " [input] ");
         out_n(out, cap, pos, v, (uint32_t)(end - v));
@@ -205,6 +225,22 @@ static int lars_action_from_line(const char* p, const char* end, lard_doc_action
         while (bar < end && *bar != '|') bar++;
         if (!out) return 1;
         copy_range(out->kind, sizeof(out->kind), "button", "button" + 6);
+        if (bar < end) {
+            copy_range(out->label, sizeof(out->label), v, bar);
+            copy_range(out->command, sizeof(out->command), bar + 1, end);
+        } else {
+            copy_range(out->label, sizeof(out->label), v, end);
+            out->command[0] = '\0';
+        }
+        return 1;
+    }
+    if (line_has_prefix(p, end, "link", &v) || line_has_prefix(p, end, "a", &v) ||
+        line_has_prefix(p, end, "fetch", &v)) {
+        const char* bar = v;
+        const char* kind = (p[0] == 'f') ? "fetch" : "link";
+        while (bar < end && *bar != '|') bar++;
+        if (!out) return 1;
+        copy_range(out->kind, sizeof(out->kind), kind, kind + (kind[0] == 'f' ? 5 : 4));
         if (bar < end) {
             copy_range(out->label, sizeof(out->label), v, bar);
             copy_range(out->command, sizeof(out->command), bar + 1, end);
@@ -315,13 +351,19 @@ int lard_doc_selftest(void)
         "LARS 1\n"
         "title Demo\n"
         "button Status | status\n"
+        "link Guide | lardd_guide.lardd\n"
+        "fetch Example | https://example.com/\n"
         "input name default\n"
         "end\n";
     char text[256];
     lard_doc_action_t a;
     if (lard_doc_to_text(doc, sizeof(doc) - 1, text, sizeof(text)) != 0) return -1;
-    if (lard_doc_action_count(doc, sizeof(doc) - 1) != 2) return -2;
+    if (lard_doc_action_count(doc, sizeof(doc) - 1) != 4) return -2;
     if (lard_doc_action_at(doc, sizeof(doc) - 1, 0, &a) != 0) return -3;
     if (a.kind[0] != 'b' || a.command[0] != 's') return -4;
+    if (lard_doc_action_at(doc, sizeof(doc) - 1, 1, &a) != 0) return -5;
+    if (a.kind[0] != 'l' || a.command[0] != 'l') return -6;
+    if (lard_doc_action_at(doc, sizeof(doc) - 1, 2, &a) != 0) return -7;
+    if (a.kind[0] != 'f' || a.command[0] != 'h') return -8;
     return 0;
 }

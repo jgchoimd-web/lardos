@@ -35,7 +35,8 @@
 - `bugeye on|off|scan` - visual bug monitor for framebuffer/layout checks; writes `bugreport.lardd`.
 - `bugreplay status|last|show|draw|clear` - replay BugEye scan frames from `bugreplay.lardd`.
 - `lardtrace on|off|show|module name` / `trace ...` - LardTrace event timeline for shell/modules.
-- `netwatch on|off|show|clear` - readable network, OSLink, and HTTP GET/POST watcher.
+- `netwatch on|off|show|clear` - readable network, OSLink, and HTTP GET/POST/HEAD watcher.
+- `webstack status|guide|demo|selftest` - inspect the native LARS/HTTP stack, including LARS `link`/`fetch` records and the request-builder selftest.
 - `journal show|add|clear` - automatic `.lardd` OS journal.
 - `rollback snap|last|apply` - settings snapshot and restore.
 - `trust list|allow|deny|history` - user-owned permission policy map and audit log.
@@ -58,7 +59,7 @@
 - `nice priority command` - queue a command at a chosen priority.
 - `bootprof status|set` - inspect or select normal, safe, netoff, dev, or awakening boot profiles.
 - `crashlog show|clear|test` - inspect or write diagnostic crash history.
-- `larsform file` / `larsact file index` - list or run LARS form buttons.
+- `larsform file` / `larsact file index` - list or run LARS button/link/fetch/input actions.
 - `lpack info|list|verify|install|undo file.lpack` - inspect, validate, install, or roll back a native LardPack package.
 - `rxr info|list|verify|install|undo file.rxr` - inspect, validate, install, or roll back a native app bundle containing one RXE/SYSRXE app plus required files.
 - `drivers status|reload|load file.drfl|show name` - inspect loaded DRFL files, rescan installed `.drfl` files, load one driver file directly, or show the code carried inside a DRFL 2 file.
@@ -103,7 +104,7 @@
 ## Settings Shell
 
 - `cfgsh` enters the settings-focused `CFG#` prompt; `exitcfg` leaves it
-- Inside `CFG#`, use `setting value`: `awake on`, `ltheme night`, `http 2`, `boot 4`, `priority 10`
+- Inside `CFG#`, use `setting value`: `awake on`, `ltheme night`, `http 3`, `boot 4`, `priority 10`
 - `buddy on` / `buddy off`, `bugeye on`, `ltheme night`, and `rollback snap|apply` can also be changed from `CFG#`
 - Outside `CFG#`, use `cfg setting value` for one-shot changes
-- Number maps: http 1=GET 2=POST; boot 1=normal 2=safe 3=netoff 4=dev 5=awakening
+- Number maps: http 1=GET 2=POST 3=HEAD; boot 1=normal 2=safe 3=netoff 4=dev 5=awakening

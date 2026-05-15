@@ -57,6 +57,9 @@
 #define GUI_SURFACE_EDITOR 7
 #define GUI_SURFACE_EXEC 8
 #define GUI_SURFACE_SYS 9
+#define GUI_HTTP_GET 0
+#define GUI_HTTP_POST 1
+#define GUI_HTTP_HEAD 2
 
 typedef struct {
     int app;
@@ -321,6 +324,13 @@ typedef struct {
 #define SS_IDLE_LOOP_DIVIDER 500000u
 
 static gui_state_t g;
+
+static const char* gui_http_method_label(void)
+{
+    if (g.http_post_mode == GUI_HTTP_POST) return "POST";
+    if (g.http_post_mode == GUI_HTTP_HEAD) return "HEAD";
+    return "GET";
+}
 
 static int fb_from_bootinfo(fb_t* out)
 {
@@ -751,7 +761,7 @@ int gui_init(void)
     g.resp_total_lines = 0;
     g.scroll_drag = 0;
     g.scroll_drag_off_y = 0;
-    g.http_post_mode = 0;
+    g.http_post_mode = GUI_HTTP_GET;
     g.app_id = 0;
     g.calc_display[0] = '0';
     g.calc_display[1] = '\0';
@@ -3624,7 +3634,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             } else if (hit == 1) {
                 g.submit_pending = 1;
             } else if (hit == 2) {
-                g.http_post_mode = 1 - g.http_post_mode;
+                g.http_post_mode = (g.http_post_mode + 1) % 3;
             } else if (hit == 3) {
                 FsWritableFile* w = fs_open_writable("lafillo_saved.txt");
                 if (w) {
@@ -4128,17 +4138,18 @@ int gui_take_submit(gui_http_request_t* out)
     g.submit_pending = 0;
     if (!out) return 1;
 
-    out->method[0] = g.http_post_mode ? 'P' : 'G';
-    out->method[1] = g.http_post_mode ? 'O' : 'E';
-    out->method[2] = g.http_post_mode ? 'S' : 'T';
-    out->method[3] = g.http_post_mode ? 'T' : '\0';
+    const char* method = gui_http_method_label();
+    out->method[0] = method[0];
+    out->method[1] = method[1];
+    out->method[2] = method[2];
+    out->method[3] = method[3];
     out->method[4] = '\0';
     out->body[0] = '\0';
     out->body_len = 0;
 
     uint32_t split = g.tb_len;
     int have_split = 0;
-    if (g.http_post_mode) {
+    if (g.http_post_mode == GUI_HTTP_POST) {
         for (uint32_t i = 0; i < g.tb_len; i++) {
             if (g.tb[i] == '|') {
                 split = i;
@@ -4158,7 +4169,7 @@ int gui_take_submit(gui_http_request_t* out)
     }
 
     gui_copy_trim(out->url, GUI_HTTP_URL_MAX, g.tb, 0, split);
-    if (g.http_post_mode && have_split && split + 1u < g.tb_len) {
+    if (g.http_post_mode == GUI_HTTP_POST && have_split && split + 1u < g.tb_len) {
         out->body_len = gui_copy_trim(out->body, GUI_HTTP_BODY_MAX, g.tb, split + 1u, g.tb_len);
     }
     return 1;
@@ -4166,12 +4177,24 @@ int gui_take_submit(gui_http_request_t* out)
 
 void gui_http_set_post_mode(int on)
 {
-    g.http_post_mode = on ? 1 : 0;
+    g.http_post_mode = on ? GUI_HTTP_POST : GUI_HTTP_GET;
 }
 
 int gui_http_post_mode(void)
 {
-    return g.http_post_mode ? 1 : 0;
+    return g.http_post_mode == GUI_HTTP_POST ? 1 : 0;
+}
+
+void gui_http_set_method(int method)
+{
+    if (method < GUI_HTTP_GET || method > GUI_HTTP_HEAD) method = GUI_HTTP_GET;
+    g.http_post_mode = method;
+}
+
+int gui_http_method(void)
+{
+    if (g.http_post_mode < GUI_HTTP_GET || g.http_post_mode > GUI_HTTP_HEAD) return GUI_HTTP_GET;
+    return g.http_post_mode;
 }
 
 int gui_post_check(gui_post_info_t* out)
@@ -4406,7 +4429,7 @@ void gui_render(void)
         int dx[] = { 0, 52, 120, 176, 236 };
         int dww[] = { 48, 64, 52, 56, 50 };
         for (int d = 0; d < 5; d++) {
-            const char* label = (d == 2) ? (g.http_post_mode ? "POST" : "GET") : lafillo_labels[d];
+            const char* label = (d == 2) ? gui_http_method_label() : lafillo_labels[d];
             uint32_t dbg = g.btn_pressed ? 0xFFFFB84D : 0xFF2B7A78;
             fb_fill_rect(tgt, (uint16_t)(btn_x + dx[d]), (uint16_t)btn_y, (uint16_t)dww[d], (uint16_t)btn_h, dbg);
             fb_draw_text(tgt, (uint16_t)(btn_x + dx[d] + 4), (uint16_t)(btn_y + 10), label, 0xFFFFFFFF, dbg);
@@ -4451,7 +4474,7 @@ void gui_render(void)
     const rxe_app_t* input_rx = rxe_get_by_app(g.app_id);
     if (input_sx) input_label = input_sx->input_label;
     if (input_rx) input_label = input_rx->input_label;
-    if (g.app_id == 0 && g.http_post_mode) input_label = "URL|Body:";
+    if (g.app_id == 0 && g.http_post_mode == GUI_HTTP_POST) input_label = "URL|Body:";
     if (g.app_id == 1) input_label = "Expr:";
     else if (g.app_id == 2) input_label = "Add line:";
     else if (g.app_id == 4) input_label = "File:";

@@ -972,10 +972,32 @@ static uint32_t str_len(const char* s)
     return n;
 }
 
+static int http_method_eq(const char* method, const char* expect)
+{
+    uint32_t i = 0;
+    if (!method || !expect) return 0;
+    while (method[i] && expect[i]) {
+        if (method[i] != expect[i]) return 0;
+        i++;
+    }
+    return method[i] == '\0' && expect[i] == '\0';
+}
+
 static int http_method_is_post(const char* method)
 {
-    return method && method[0] == 'P' && method[1] == 'O' && method[2] == 'S' &&
-           method[3] == 'T' && method[4] == '\0';
+    return http_method_eq(method, "POST");
+}
+
+static int http_method_is_head(const char* method)
+{
+    return http_method_eq(method, "HEAD");
+}
+
+static const char* http_method_verb(const char* method)
+{
+    if (http_method_is_post(method)) return "POST";
+    if (http_method_is_head(method)) return "HEAD";
+    return "GET";
 }
 
 static int req_puts(char* out, uint32_t cap, uint32_t* pos, const char* s)
@@ -1028,7 +1050,7 @@ static int build_http_request(char* req,
     if (!req || cap < 64 || !host || !path || !out_len) return -1;
     uint32_t p = 0;
     int is_post = http_method_is_post(method);
-    const char* verb = is_post ? "POST" : "GET";
+    const char* verb = http_method_verb(method);
     if (!is_post) {
         body = NULL;
         body_len = 0;
@@ -1336,7 +1358,7 @@ static int net_https_request_once(net_stack_t* n,
                         content_len = parse_u32_dec(out + vo, vl);
                     if (header_find_value(out, header_end, "Transfer-Encoding", &vo, &vl) == 0) {
                         const char* k = "chunked";
-                        for (uint32_t i = 0; i + 6 <= vl; i++) {
+                        for (uint32_t i = 0; i + 7 <= vl; i++) {
                             int ok = 1;
                             for (int j = 0; j < 7; j++) {
                                 if (out[vo + i + (uint32_t)j] != k[j]) { ok = 0; break; }
@@ -1476,7 +1498,7 @@ static int net_http_request_once(net_stack_t* n,
                     if (header_find_value(out, header_end, "Transfer-Encoding", &vo, &vl) == 0) {
                         // look for "chunked"
                         const char* k = "chunked";
-                        for (uint32_t i = 0; i + 6 <= vl; i++) {
+                        for (uint32_t i = 0; i + 7 <= vl; i++) {
                             int ok = 1;
                             for (int j = 0; j < 7; j++) {
                                 if (out[vo + i + (uint32_t)j] != k[j]) {
@@ -1578,8 +1600,10 @@ int net_http_request(net_stack_t* n,
     // Follow up to 1 redirect.
     net_cfg_t cfg;
     int is_post = http_method_is_post(method);
-    lardkit_netwatch_record("http", is_post ? "POST" : "GET", (int32_t)body_len);
-    lardkit_trace_event("net", is_post ? "http POST" : "http GET", (int32_t)port);
+    const char* verb = http_method_verb(method);
+    lardkit_netwatch_record("http", verb, (int32_t)body_len);
+    lardkit_trace_event("net", http_method_is_post(method) ? "http POST" :
+                               http_method_is_head(method) ? "http HEAD" : "http GET", (int32_t)port);
     if (net_get_cfg(n, &cfg) != 0) {
         cfg.dns = (ip4_t){{10, 0, 2, 3}};
     }
@@ -1642,8 +1666,10 @@ int net_https_request(net_stack_t* n,
 {
     net_cfg_t cfg;
     int is_post = http_method_is_post(method);
-    lardkit_netwatch_record("https", is_post ? "POST" : "GET", (int32_t)body_len);
-    lardkit_trace_event("net", is_post ? "https POST" : "https GET", (int32_t)port);
+    const char* verb = http_method_verb(method);
+    lardkit_netwatch_record("https", verb, (int32_t)body_len);
+    lardkit_trace_event("net", http_method_is_post(method) ? "https POST" :
+                               http_method_is_head(method) ? "https HEAD" : "https GET", (int32_t)port);
     if (net_get_cfg(n, &cfg) != 0) cfg.dns = (ip4_t){{10, 0, 2, 3}};
     if (out && out_cap) out[0] = '\0';
 
@@ -1687,4 +1713,44 @@ int net_https_request(net_stack_t* n,
 int net_https_get(net_stack_t* n, ip4_t dst, uint16_t port, const char* host, const char* path, char* out, uint32_t out_cap)
 {
     return net_https_request(n, dst, port, host, path, "GET", NULL, 0, out, out_cap);
+}
+
+static int has_prefix_exact(const char* s, const char* pfx)
+{
+    uint32_t i = 0;
+    if (!s || !pfx) return 0;
+    while (pfx[i]) {
+        if (s[i] != pfx[i]) return 0;
+        i++;
+    }
+    return 1;
+}
+
+static int has_substr(const char* s, const char* needle)
+{
+    uint32_t nlen = str_len(needle);
+    if (!s || !needle || nlen == 0) return 0;
+    for (uint32_t i = 0; s[i]; i++) {
+        uint32_t j = 0;
+        while (j < nlen && s[i + j] && s[i + j] == needle[j]) j++;
+        if (j == nlen) return 1;
+    }
+    return 0;
+}
+
+int net_http_selftest(void)
+{
+    char req[512];
+    uint32_t len = 0;
+    if (build_http_request(req, sizeof(req), "GET", "example.com", "/", "ignored", 7u, &len) != 0) return -1;
+    if (!has_prefix_exact(req, "GET / HTTP/1.0\r\n")) return -2;
+    if (has_substr(req, "Content-Length")) return -3;
+    if (build_http_request(req, sizeof(req), "POST", "example.com", "/form", "a=1", 0u, &len) != 0) return -4;
+    if (!has_prefix_exact(req, "POST /form HTTP/1.0\r\n")) return -5;
+    if (!has_substr(req, "Content-Length: 3\r\n\r\na=1")) return -6;
+    if (build_http_request(req, sizeof(req), "HEAD", "example.com", "/status", "ignored", 7u, &len) != 0) return -7;
+    if (!has_prefix_exact(req, "HEAD /status HTTP/1.0\r\n")) return -8;
+    if (has_substr(req, "Content-Length")) return -9;
+    if (!http_method_is_head("HEAD") || http_method_is_post("HEAD")) return -10;
+    return 0;
 }

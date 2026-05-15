@@ -174,8 +174,8 @@ flowchart TB
     RTL["rtl8139"]
     Net["net.c"]
     TCP["small TCP path"]
-    HTTP["net_http_request GET/POST"]
-    HTTPS["net_https_request GET/POST"]
+    HTTP["net_http_request GET/POST/HEAD"]
+    HTTPS["net_https_request GET/POST/HEAD"]
     OSLink["oslink UDP 39010"]
     TLS["lard_tls"]
 
@@ -203,10 +203,11 @@ generated from Windows Root stores; the verifier walks the presented chain and
 requires the final signature to validate against that native table.
 
 HTTP request construction is shared by HTTP and HTTPS. `net_http_request` and
-`net_https_request` support GET and POST, while `net_http_get` and
+`net_https_request` support GET, POST, and HEAD, while `net_http_get` and
 `net_https_get` remain wrappers for older callers. POST sends
 `Content-Length` and `application/x-www-form-urlencoded`; redirects preserve
-POST only for 307/308.
+POST only for 307/308. HEAD uses the same native TCP/TLS transport while asking
+for headers without a response body.
 
 `oslink.c` is the small OS-to-OS communication layer. It uses public
 `net_udp_send` and `net_udp_recv` helpers, frames packets with an `OSLK`
@@ -370,7 +371,7 @@ off by default; LSH exposes it through `awake on`, `awake off`, `awake status`,
 
 `cfgsh` is the settings-oriented face of LSH. `cfgsh` enters a `CFG#` prompt
 where each command is parsed as `setting value`: `awake on`, `style 2`,
-`layout 3`, `pane 1`, `http 2`, `boot 4`, `priority 10`, `sandbox off`, and
+`layout 3`, `pane 1`, `http 3`, `boot 4`, `priority 10`, `sandbox off`, and
 `sum on`. The same parser is available outside the mode through `cfg` or
 `settings`, and POST checks the non-mutating grammar map so numeric setting
 aliases stay covered.
@@ -404,10 +405,11 @@ ticks since `00000-01-01 00:00:00`. The shell prints years with at least five
 digits, adds Dangun year as CE+2333, and derives a native lunar view for LardOS
 calendar surfaces.
 
-`lard_doc.c` also parses LARS form records. `button label | command` is rendered
-as an actionable control and can be listed with `larsform` or executed with
-`larsact`; `input name value` gives LARS a native field record without falling
-back to HTML.
+`lard_doc.c` also parses LARS web/app records. `button label | command` is
+rendered as an actionable control and can be listed with `larsform` or executed
+with `larsact`; `link label | target` and `fetch label | target` give LARS a
+native link/fetch surface for local documents and network targets; `input name
+value` gives LARS a native field record without falling back to HTML.
 
 The GUI cursor can also be owned through the picture Unicode registry. LSH's
 `cursor set U+E000` stores a PUA codepoint in GUI state; the final cursor pass

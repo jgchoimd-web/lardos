@@ -326,7 +326,10 @@ static const uint8_t file_lardos_lars[] =
     "p Core value: the user owns the machine, and the OS must keep power visible, editable, explainable, and recoverable.\n"
     "p A GUI overlay chrome layer now draws clearer titles, safer tabs, button feedback, and output frames above the classic GUI.\n"
     "p LGUILIB files are native GUI library records that theme the overlay without external libraries.\n"
-    "p The Doc tab can switch HTTP requests between GET and POST; POST reads the address as URL|body.\n"
+    "p The Doc tab can switch HTTP requests between GET, POST, and HEAD; POST reads the address as URL|body.\n"
+    "link Web Stack Guide | webstack_guide.lardd\n"
+    "link Web Demo LARS | webdemo.lars\n"
+    "fetch Example HEAD target | https://example.com/\n"
     "section Full-control starts\n"
     "li Run control in LSH for the system control map.\n"
     "li Run status to inspect version, storage, drivers, and containers.\n"
@@ -348,7 +351,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use kmo raw rawdoor.kmo sum or set RAW 1 / TARGET raw in a .kmo when you explicitly want dangerous raw-control behavior.\n"
     "li Use ren old.txt new.txt, rename selected NewName, or the desktop Rename button to rename files, apps, and folders.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
-    "li Use cfgsh for the settings shell: awake on, ltheme night, http 2, boot 4.\n"
+    "li Use cfgsh for the settings shell: awake on, ltheme night, http 3, boot 4.\n"
     "li Use dos on for L-DOS mode: a native DOS-style shell layer with C:/A:/Z:/U:/R: drive mapping, DIR/TYPE/COPY/DEL/REN/MD/RD/CD, and dosmode.lardd history.\n"
     "li In L-DOS, DEL -F file hard-deletes read-only built-in files from the active filesystem through fsdelete.lardd, even if that breaks the OS.\n"
     "li RESTORE only removes soft TOMB HIDE records; use TOMB DROP file or TOMB CLEAR if you choose to delete hard-delete records too.\n"
@@ -378,7 +381,8 @@ static const uint8_t file_lardos_lars[] =
     "li Use bugreplay show to review the last BugEye screen-health frames.\n"
     "li Use bugreplay draw to draw the replay frames as a GUI panel.\n"
     "li Use trace on and trace show to inspect LardTrace module and shell events.\n"
-    "li Use netwatch on and netwatch show to inspect readable UDP, OSLink, and HTTP GET/POST events.\n"
+    "li Use webstack status, webstack guide, and webstack demo to inspect the native LARS/HTTP stack.\n"
+    "li Use netwatch on and netwatch show to inspect readable UDP, OSLink, and HTTP GET/POST/HEAD events.\n"
     "li Use journal show to read the automatic LARDD system journal.\n"
     "li Use rollback snap and rollback last to save and restore user-visible settings.\n"
     "li Use priority history to audit who granted priority lev.10.\n"
@@ -467,7 +471,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd oslink emit shell hello-from-lardos\n"
     "cmd cfgsh status\n"
     "cmd cfg ltheme night\n"
-    "cmd cfg http 2\n"
+    "cmd cfg http 3\n"
     "cmd buddy joke\n"
     "cmd lguilib show default.lguilib\n"
     "cmd time\n"
@@ -756,6 +760,44 @@ static const uint8_t file_media_guide[] =
     "ITEM This is not yet a full FAT/USB-MSC/FDC driver stack. It is a LardOS-native device-store layer on detected block storage.\n"
     "ITEM If no backing sectors exist, the store remains usable as RAM fallback and says so openly.\n"
     "END\n";
+
+static const uint8_t file_webstack_guide[] =
+    "LARDD 1\n"
+    "TITLE LardOS WebStack\n"
+    "TEXT The web stack is native LardOS code: HTTP request building, HTTPS transport, LARS documents, and NetWatch all live inside the tree.\n"
+    "TEXT No external browser engine or package manager is required.\n"
+    "SECTION Methods\n"
+    "ITEM cfgsh http 1 -> GET mode.\n"
+    "ITEM cfgsh http 2 -> POST mode. The Doc URL field accepts URL|body and sends application/x-www-form-urlencoded.\n"
+    "ITEM cfgsh http 3 -> HEAD mode. It asks for headers without a body and is useful for checking status, redirects, and server metadata.\n"
+    "SECTION LARS Records\n"
+    "ITEM link Label | file.lars opens a local native document through larsact.\n"
+    "ITEM link Label | https://host/path records a network target for the Doc tab.\n"
+    "ITEM fetch Label | https://host/path marks a network fetch target without hiding the URL from the user.\n"
+    "ITEM button Label | command still runs explicit shell commands.\n"
+    "ITEM input name value keeps local app fields native to LARS.\n"
+    "SECTION Commands\n"
+    "ITEM webstack status -> show method, document records, and the request-builder selftest.\n"
+    "ITEM webstack guide -> open this LARDD guide.\n"
+    "ITEM webstack demo -> open webdemo.lars.\n"
+    "ITEM larsform webdemo.lars -> list link/fetch/button/input actions.\n"
+    "ITEM larsact webdemo.lars 0 -> open the local linked guide.\n"
+    "ITEM netwatch on and netwatch show -> inspect readable HTTP/HTTPS GET/POST/HEAD events.\n"
+    "SECTION Values\n"
+    "ITEM The user can see and change the method, target, local document records, and raw command surface.\n"
+    "ITEM HEAD does not replace GET or POST; it expands the surface without feature loss.\n"
+    "END\n";
+
+static const uint8_t file_webdemo_lars[] =
+    "LARS 1\n"
+    "title WebStack Demo\n"
+    "p LARS now carries local links, network fetch targets, buttons, and inputs as native records.\n"
+    "link Open guide | webstack_guide.lardd\n"
+    "link Local control room | lardos.lars\n"
+    "fetch Example headers | https://example.com/\n"
+    "button Show status | webstack status\n"
+    "input query lardos\n"
+    "end\n";
 
 static const uint8_t file_features_lil[] =
     "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
@@ -1118,6 +1160,9 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command install\n"
     "CHECK command media\n"
     "CHECK file media_guide.lardd\n"
+    "CHECK command webstack\n"
+    "CHECK file webstack_guide.lardd\n"
+    "CHECK file webdemo.lars\n"
     "CHECK command restore\n"
     "CHECK command tomb\n"
     "CHECK command tombstone\n"
@@ -1243,6 +1288,8 @@ static const FsFile FS_FILES[] = {
     { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
     { "installer_guide.lardd", file_installer_guide, sizeof(file_installer_guide) - 1 },
     { "media_guide.lardd", file_media_guide, sizeof(file_media_guide) - 1 },
+    { "webstack_guide.lardd", file_webstack_guide, sizeof(file_webstack_guide) - 1 },
+    { "webdemo.lars", file_webdemo_lars, sizeof(file_webdemo_lars) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },

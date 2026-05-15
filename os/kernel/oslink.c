@@ -127,6 +127,7 @@ static int safe_exec_command(const char* command)
     if (streq(cmd, "bootprof")) return rest_empty_or_word(rest, "status", "info", "list");
     if (streq(cmd, "awake") || streq(cmd, "awakening")) return rest_empty_or_word(rest, "status", "info", "test");
     if (streq(cmd, "crashlog")) return rest_empty_or_word(rest, "show", "status", NULL);
+    if (streq(cmd, "webstack")) return rest_empty_or_word(rest, "status", "guide", "demo");
     if (streq(cmd, "lpack")) return rest_word_allows_tail(rest, "info", "list", "test");
     return 0;
 }

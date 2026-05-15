@@ -1,0 +1,7 @@
+LARDD 1
+TITLE Input Driver Catalog
+TEXT Reserved for keyboard, mouse, pointer, and tablet descriptors.
+SECTION Status
+ITEM No installable input driver bundle yet.
+ITEM Future mouse descriptors must preserve user-editable cursor/glyph ownership.
+END

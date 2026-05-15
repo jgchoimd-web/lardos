@@ -1,0 +1,24 @@
+LARDD 1
+TITLE LardOS Driver Catalog Manifest
+TEXT Branch: drivers
+TEXT Purpose: keep optional drivers in categorized folders so users can install what they need.
+SECTION Bundles
+ITEM bundles/core-drivers/core-drivers.rxr -> installs drv-rtl8139.drfl, drv-piix3ide.drfl, and driverctl.rxe.
+SECTION Network
+ITEM network/rtl8139/rtl8139.rxr -> Realtek RTL8139 PCI NIC descriptor bundle.
+ITEM network/rtl8139/drv-rtl8139.drfl -> raw DRFL descriptor for PCI 10EC:8139, driver rtl8139.
+SECTION Storage
+ITEM storage/piix3ide/piix3ide.rxr -> Intel PIIX3 IDE/ATA-PIO descriptor bundle.
+ITEM storage/piix3ide/drv-piix3ide.drfl -> raw DRFL descriptor for PCI 8086:7010, driver ata-pio.
+SECTION Empty Categories
+ITEM display -> reserved for framebuffer and graphics descriptors.
+ITEM input -> reserved for keyboard, mouse, and pointer descriptors.
+ITEM usb -> reserved for USB controller and device descriptors.
+ITEM vm -> reserved for virtual-machine helper descriptors.
+SECTION Commands
+ITEM rxr verify file.rxr
+ITEM rxr install file.rxr
+ITEM drivers reload
+ITEM drivers load file.drfl
+ITEM drivers
+END

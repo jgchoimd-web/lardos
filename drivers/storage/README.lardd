@@ -1,0 +1,8 @@
+LARDD 1
+TITLE Storage Driver Catalog
+TEXT Storage controller descriptors and RXR install bundles.
+SECTION Current
+ITEM piix3ide -> Intel PIIX3 IDE descriptor that selects the ata-pio storage path.
+SECTION Rule
+ITEM Storage descriptors must be explicit because bad storage probing can corrupt user data.
+END

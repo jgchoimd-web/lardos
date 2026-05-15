@@ -112,6 +112,8 @@ commands:
 - `help` lists the built-in shell commands by area.
 - `control` prints the system control map and the full-control entry points.
 - `status` prints version, drive, LPST persistence, driver, and container state.
+- `drivers status|reload|load file.drfl` inspects loaded DRFL descriptors and
+  can rescan user-installed driver files from RXR driver bundles.
 - `install status` / `install preview` shows the in-OS HDD/SSD installer layout;
   `install hdd yes` and `install ssd yes` write the current LardOS boot image
   to the ATA target with an explicit user confirmation. The boot options screen

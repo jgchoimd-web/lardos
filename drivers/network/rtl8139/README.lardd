@@ -1,0 +1,12 @@
+LARDD 1
+TITLE RTL8139 Driver Descriptor
+TEXT Realtek RTL8139 PCI network adapter descriptor.
+SECTION Files
+ITEM drv-rtl8139.drfl -> raw DRFL descriptor for PCI 10EC:8139.
+ITEM rtl8139.rxr -> install bundle containing drv-rtl8139.drfl and driverctl.rxe.
+SECTION Install
+ITEM rxr verify A:rtl8139.rxr
+ITEM rxr install A:rtl8139.rxr
+ITEM drivers reload
+ITEM drivers
+END

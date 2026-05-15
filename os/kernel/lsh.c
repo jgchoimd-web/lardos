@@ -1319,7 +1319,33 @@ static void cmd_drivers(const char* args)
     int last;
     const char* driver;
     uint32_t count;
-    (void)args;
+    char sub[32];
+    const char* p = args ? args : "";
+    while (*p == ' ' || *p == '\t') p++;
+
+    if (vcs_read_word(&p, sub, sizeof(sub)) == 0) {
+        if (strcmp(sub, "reload") == 0 || strcmp(sub, "scan") == 0) {
+            drfl_load_all();
+            out_append("drivers: reloaded DRFL descriptors.\n");
+        } else if (strcmp(sub, "load") == 0 || strcmp(sub, "add") == 0) {
+            char file_arg[64];
+            if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
+                out_append("Usage: drivers load file.drfl\n");
+                return;
+            }
+            if (drfl_load(file_arg) == 0) {
+                out_append("drivers: loaded ");
+                out_append(file_arg);
+                out_append("\n");
+            } else {
+                out_append("drivers: load failed; file must be a DRFL descriptor visible in LardOS FS.\n");
+                return;
+            }
+        } else if (strcmp(sub, "status") != 0 && strcmp(sub, "list") != 0) {
+            out_append("Usage: drivers [status|list|reload|load file.drfl]\n");
+            return;
+        }
+    }
 
     fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
     out_append("Storage: ");
@@ -1333,6 +1359,7 @@ static void cmd_drivers(const char* args)
     out_append("DRFL:\n");
     count = drfl_list(drivers_lsh_cb, NULL);
     if (count == 0) out_append("  none\n");
+    out_append("  Use RXR driver bundles, then drivers reload, to add user-installed descriptors.\n");
     out_append("MediaFS:\n");
     for (uint32_t i = 0; i < mediafs_count(); i++) media_print_info(i);
 }
@@ -1617,7 +1644,7 @@ static void cmd_help(const char* args)
     out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
-    out_append("  drivers fsstat fsload fssave sync mediafs devstore sram screencheck sandbox exitsandbox\n");
+    out_append("  drivers [status|reload|load file.drfl] fsstat fsload fssave sync mediafs devstore sram screencheck sandbox exitsandbox\n");
     out_append("  tasktop  task list|set|urgent|history|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");

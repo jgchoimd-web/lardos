@@ -1,0 +1,8 @@
+LARDD 1
+TITLE Network Driver Catalog
+TEXT Network driver descriptors and RXR install bundles.
+SECTION Current
+ITEM rtl8139 -> Realtek RTL8139 PCI NIC descriptor, driver name rtl8139.
+SECTION Rule
+ITEM Do not add a working RXR bundle unless the running LardOS kernel has the matching in-tree driver implementation.
+END

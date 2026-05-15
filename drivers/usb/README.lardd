@@ -1,0 +1,7 @@
+LARDD 1
+TITLE USB Driver Catalog
+TEXT Reserved for UHCI/OHCI/EHCI/XHCI and USB device descriptors.
+SECTION Status
+ITEM No installable USB driver bundle yet.
+ITEM Do not ship a fake USB bundle before the matching in-kernel controller code exists.
+END

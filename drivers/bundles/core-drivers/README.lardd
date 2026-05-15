@@ -1,0 +1,12 @@
+LARDD 1
+TITLE Core Driver Bundle
+TEXT Combined RXR bundle for the current in-kernel driver implementations.
+SECTION Files
+ITEM core-drivers.rxr -> installs drv-rtl8139.drfl, drv-piix3ide.drfl, and driverctl.rxe.
+SECTION Install
+ITEM rxr verify A:core-drivers.rxr
+ITEM rxr install A:core-drivers.rxr
+ITEM drivers reload
+ITEM drivers
+ITEM sync
+END

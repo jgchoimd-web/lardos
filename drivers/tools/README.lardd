@@ -1,0 +1,10 @@
+LARDD 1
+TITLE Driver Tools
+TEXT Small helper tools for driver catalog maintainers.
+SECTION Tools
+ITEM mkdrfl.c -> freestanding-friendly host C tool that writes DRFL 1 descriptor files.
+SECTION Example
+ITEM cc mkdrfl.c -o mkdrfl
+ITEM mkdrfl drv-rtl8139.drfl 10ec 8139 net rtl8139
+ITEM mkdrfl drv-piix3ide.drfl 8086 7010 block ata-pio
+END

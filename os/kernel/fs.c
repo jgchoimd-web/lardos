@@ -435,6 +435,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.1p hotpatches drive policy: X: main, Y:/F: floppy, Z:/S: auxiliary, A:/U: first extra media, and R: RAM.\n"
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
+    "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

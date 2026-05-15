@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.72.0a
+ITEM Official release promoting KMO shell-command bindings from v1.72.0b without feature loss or philosophy changes.
+ITEM Keeps COMMAND, SHELL, and BIND fields in .kmo files so users can expose module files as direct shell command names.
+ITEM Keeps kmo command file.kmo shell-command target default-message for creating command surfaces from writable KMO files.
+ITEM Keeps normal command KMO routing through KModTalk and explicit RAW 1 / TARGET raw for user-chosen risky LSH/raw-control execution.
+ITEM Keeps guistat, rawdemo, and userkmo sample command-bound modules, existing kmo run/create/raw/set/delete behavior, DRFL 2 driver-code files, RXR/RXE/SYSRXE, OSLink, hardware-profiled IMG/ISO artifacts, and the user-owned control philosophy.
+
 SECTION v1.72.0b
 ITEM Beta release making KMO files able to define shell commands without adding a new hard-coded LSH branch.
 ITEM .kmo files now accept COMMAND, SHELL, or BIND to expose a module as a direct shell command name.

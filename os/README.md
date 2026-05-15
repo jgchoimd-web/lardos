@@ -45,19 +45,19 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.72.0b-ami/lardos-v1.72.0b-ami.iso`. To publish the whole hardware
+`release/v1.72.0a-ami/lardos-v1.72.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
 
-`v1.72.0b` starts the file-defined shell-command path for KMO. `.kmo` files can
-now carry `COMMAND name`, `SHELL name`, or `BIND name`, and LSH will run that
-module when the user types the command. `kmo command file.kmo name target
-default` creates one without editing the shell dispatcher. Normal command KMO
-routes through KModTalk; `RAW 1` or `TARGET raw` still gives the user the risky
-direct LSH/raw-control path by choice.
+`v1.72.0a` officially promotes the file-defined shell-command path from
+`v1.72.0b`. `.kmo` files can carry `COMMAND name`, `SHELL name`, or `BIND name`,
+and LSH will run that module when the user types the command. `kmo command
+file.kmo name target default` creates one without editing the shell dispatcher.
+Normal command KMO routes through KModTalk; `RAW 1` or `TARGET raw` still gives
+the user the risky direct LSH/raw-control path by choice.
 
 ### Run in QEMU
 
@@ -159,6 +159,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.72.0a` officially promotes KMO shell-command binding without feature loss
+  or philosophy changes.
 - `v1.72.0b` adds KMO shell-command binding: `.kmo` can carry `COMMAND`,
   `SHELL`, or `BIND`, and unknown LSH commands are resolved against the KMO
   registry before being rejected.

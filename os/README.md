@@ -45,20 +45,19 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.70.0a-ami/lardos-v1.70.0a-ami.iso`. To publish the whole hardware
+`release/v1.71.0b-ami/lardos-v1.71.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
 
-`v1.70.0a` officially adds RXR app bundles without feature loss or value
-changes. `RXR 1` files collect one `.rxe` or `.sysrxe` app plus the files it
-needs, using visible `APP`, `FILE`, `ENDFILE`, and `END` records. `rxr install`
-writes normal user-owned files, reloads RXE/SYSRXE launchers, and can be undone
-with `rxr undo last`. It keeps app-side `LANG`/`CODE`, APPKIT/custom widgets,
-hardware-profiled boot media, raw IMG, HDD/SSD installer, hybrid USB,
-RXE/SYSRXE, KMO, KModTalk, OSLink, and user-owned control paths intact.
+`v1.71.0b` adds MediaFS/MDFS device stores for SSD/HDD, USB-style, and
+floppy-style open/save paths. `S:`, `U:`, and `Y:`/`F:` are visible drive
+stores usable from `dir`, `type`, `write`, `append`, `copy`, LARS/LARDD tools,
+RXR/LPACK readers, and L-DOS file commands. Stores sync to ATA sectors after
+the boot image/LPST when the backing disk is large enough; floppy-sized boot
+images honestly report RAM fallback instead of pretending persistence.
 
 ### Run in QEMU
 
@@ -87,6 +86,8 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
 - `LTHEME` (`.ltheme`) stores compact native shell theme presets.
 - `RXR` (`.rxr`) stores an app bundle: one RXE/SYSRXE executable plus required
   files.
+- `MDFS` stores files for the MediaFS device stores behind `S:`, `U:`, and
+  `Y:`/`F:`.
 
 These formats are record-based, readable without a renderer, and parsed by freestanding C
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
@@ -114,6 +115,11 @@ commands:
   `install hdd yes` and `install ssd yes` write the current LardOS boot image
   to the ATA target with an explicit user confirmation. The boot options screen
   also has `I` for the same installer preview.
+- `media list|format S|sync all|read S file|write S file text|append S file text`
+  manages native device stores. `S:` is SSD/HDD, `U:` is USB-style, and
+  `Y:`/`F:` is floppy-style. Normal file commands also work, for example
+  `write S:note.txt hello`, `dir U:`, `type Y:boot.txt`, and
+  `copy Z:notes.txt S:notes.txt`.
 - `post` / `selftest` reruns the same Power-On Self-Test diagnostics available
   from the boot option. `post baseline` opens the saved POST baseline report.
 - `magic command [args]` predicts a mistyped safe built-in command and executes
@@ -125,8 +131,8 @@ commands:
   without running it.
 - `dos on|off|status|help|map|log|test` enters L-DOS mode, a native DOS-style
   compatibility shell. It uses an `L-DOS C:\>` prompt, case-insensitive
-  commands, visible `C:`/`A:`/`R:` mapping to LardOS drives, and logs state in
-  `dosmode.lardd`.
+  commands, visible `C:`/`A:`/`U:`/`S:`/`R:` mapping to LardOS drives, and logs
+  state in `dosmode.lardd`.
 - `DEL -F file` in L-DOS hard-deletes a read-only built-in/LFS file from the
   active filesystem view through a user-owned `fsdelete.lardd` DELETE record.
   `RESTORE file` / `UNDELETE file` only restores soft `TOMB HIDE` records.
@@ -150,6 +156,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.71.0b` adds MediaFS/MDFS device stores for SSD/HDD, USB-style, and
+  floppy-style file open/save commands.
 - `v1.70.0a` officially adds RXR app bundles: `.rxr` files carry one RXE/SYSRXE
   app plus required files, with `rxr verify`, `rxr install`, and `rxr undo last`.
 - `v1.67.1a` officially promotes the corrected RXE/SYSRXE split without

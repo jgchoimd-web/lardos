@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.71.0b
+ITEM Beta release adding native media file stores for SSD/HDD, USB-style, and floppy-style device access.
+ITEM Added MediaFS/MDFS plus S:, U:, and Y:/F: drives so DIR, TYPE, WRITE, APPEND, COPY, LARS/LARDD, RXR/LPACK, and DOS-mode file commands can open or save files on device stores.
+ITEM MDFS uses visible in-tree records and syncs to ATA sectors after the boot image/LPST when backing storage is large enough; boot-floppy-sized images report RAM fallback honestly instead of pretending persistence.
+ITEM Added media/mediafs/devstore commands: list, format, sync, read, write, append, and delete.
+ITEM Preserves RXR, RXE/SYSRXE, KMO raw-control, OSLink, LPST, HDD/SSD installer, hardware-profiled IMG/ISO artifacts, and the user-owned control philosophy without feature loss.
+
 SECTION v1.70.0a
 ITEM Official release adding RXR app bundle files without feature loss or philosophy changes.
 ITEM RXR 1 bundles an RXE/SYSRXE app and its required files through APP, FILE, ENDFILE, and END records.

@@ -79,7 +79,7 @@ flowchart TB
     SMP["smp + ap_trampoline"]
     Syscall["syscall"]
     Drivers["pci / rtl8139 / ps2 / rtc"]
-    Storage["fs / lfs / ldll / lpack"]
+    Storage["fs / lfs / mediafs / ldll / lpack"]
     POST["post diagnostics"]
     Net["net DHCP DNS TCP HTTP"]
     OSLink["oslink OS-to-OS UDP"]
@@ -235,6 +235,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
 | RXR app bundles | `os/kernel/rxr.c`, `os/include/rxr.h` |
 | HDD/SSD installer | `os/kernel/installer.c`, `os/include/installer.h` |
+| Media device stores | `os/kernel/mediafs.c`, `os/include/mediafs.h` |
 | Shrine subsystem | `os/kernel/lss.c`, `os/include/lss.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
 | LardOS GUI library format | `os/kernel/lguilib.c`, `os/include/lguilib.h` |
@@ -259,6 +260,15 @@ visible and explicit: `install status` only previews the target layout, while
 `install hdd yes` and `install ssd yes` perform the write. Magic treats
 `install` as raw-control so autocorrect cannot silently install, but the direct
 command remains user-owned.
+
+`mediafs.c` owns the native MDFS device-store layer. It exposes `S:` for
+SSD/HDD media, `U:` for USB-style media, and `Y:`/`F:` for floppy-style media.
+When the boot target has spare sectors after the boot image and LPST, MDFS
+stores sync through the native ATA PIO block driver; on a floppy-sized image
+the same stores remain usable as visible RAM fallback and report that honestly.
+LSH and L-DOS route `dir`, `type`, `write`, `append`, `copy`, and delete-style
+file commands through the same path, so device files are not hard-coded app
+branches.
 
 LardKit also owns the local recovery/audit reports. `bugreplay.lardd` stores
 recent BugEye frame summaries and `bugreplay draw` renders a small replay

@@ -317,6 +317,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use bye or byebye to sync RAM files and request a firmware/VM poweroff.\n"
     "li Use restart or reboot to sync RAM files and request a firmware/VM restart.\n"
     "li Use install status for the HDD/SSD installer preview, or install hdd yes / install ssd yes to write LardOS to the ATA target disk.\n"
+    "li Use media list, media format S, media write S note.txt hello, dir S:, type S:note.txt, and copy Z:notes.txt S:notes.txt for SSD/HDD, USB-style, and floppy-style media stores.\n"
     "li Run mode probe to enter a controlled real16 window and return to long64.\n"
     "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
@@ -410,6 +411,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.68.0a officially adds APPKIT file-defined/runtime app UI, custom widgets, barcode Unicode fallback, and tail-less cursors without feature loss.\n"
     "li v1.69.0a officially lets RXE/SYSRXE apps carry LANG/CODE for LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, and LML.\n"
     "li v1.70.0a officially adds RXR app bundles for RXE/SYSRXE apps and required files.\n"
+    "li v1.71.0b adds MediaFS/MDFS device stores: S: SSD/HDD, U: USB-style, and Y:/F: floppy-style open/save paths.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -426,6 +428,8 @@ static const uint8_t file_lardos_lars[] =
     "li Use sum, peek, poke, and asm_ when you want raw ring-0 control.\n"
     "cmd release\n"
     "cmd install status\n"
+    "cmd media list\n"
+    "cmd dir S:\n"
     "cmd dos status\n"
     "cmd dos map\n"
     "cmd dos test\n"
@@ -669,11 +673,13 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM TOMB DROP file or DEL -T file -> delete one soft/hard record and make that read-only file visible.\n"
     "ITEM TOMB CLEAR -> delete every soft/hard record because the user can own even the deletion overlay.\n"
     "ITEM LSH command -> run one native LardOS command while staying in DOS mode.\n"
-    "ITEM dos map -> show C:/A:/R: drive mappings.\n"
+    "ITEM dos map -> show C:/A:/U:/S:/R: drive mappings.\n"
     "ITEM dos log -> read dosmode.lardd history.\n"
     "SECTION Drive Map\n"
     "ITEM C: maps to LardOS X: built-in and LFS files.\n"
-    "ITEM A: maps to LardOS Y: boot or floppy-style view.\n"
+    "ITEM A: maps to LardOS Y: floppy-style MDFS media store.\n"
+    "ITEM U: maps to LardOS U: USB-style MDFS media store.\n"
+    "ITEM S: maps to LardOS S: SSD/HDD MDFS media store.\n"
     "ITEM R: maps to LardOS Z: writable RAM files.\n"
     "SECTION Philosophy\n"
     "ITEM Directories are virtual navigation labels because LardOS currently keeps the core filesystem flat and visible.\n"
@@ -701,6 +707,29 @@ static const uint8_t file_installer_guide[] =
     "ITEM LBA1..4 contain stage2.\n"
     "ITEM LBA5.. contain the current loaded LARDX/BOSX kernel image from memory.\n"
     "ITEM LPST writable storage remains reserved at LBA2752 and beyond.\n"
+    "END\n";
+
+static const uint8_t file_media_guide[] =
+    "LARDD 1\n"
+    "TITLE MediaFS Device Stores\n"
+    "TEXT MediaFS gives LardOS native open/save paths for SSD/HDD, USB-style, and floppy-style media without external libraries.\n"
+    "TEXT The on-device format is MDFS: a tiny visible record table plus fixed file slots written by in-tree C.\n"
+    "SECTION Drives\n"
+    "ITEM S: SSD/HDD native media store, backed by ATA sectors after the boot image when available.\n"
+    "ITEM U: USB-style removable media store, exposed through the same block path until a full USB controller stack exists.\n"
+    "ITEM Y: and F: floppy-style media store. On a 1.44M boot image it reports RAM fallback because there are no spare sectors.\n"
+    "SECTION Commands\n"
+    "ITEM media list -> show each store, persistence, backing driver, LBA range, files, bytes, and dirty state.\n"
+    "ITEM media format S -> create an empty MDFS store.\n"
+    "ITEM media write S note.txt hello -> save a file into the SSD/HDD media store.\n"
+    "ITEM media append S note.txt more -> append text.\n"
+    "ITEM media sync all -> write persistent stores to backing sectors.\n"
+    "ITEM dir S: and type S:note.txt -> open media files from normal LSH.\n"
+    "ITEM copy Z:notes.txt U:notes.txt -> copy RAM data to a device store.\n"
+    "ITEM In L-DOS mode, A:, U:, and S: map to the same media stores.\n"
+    "SECTION Honesty\n"
+    "ITEM This is not yet a full FAT/USB-MSC/FDC driver stack. It is a LardOS-native device-store layer on detected block storage.\n"
+    "ITEM If no backing sectors exist, the store remains usable as RAM fallback and says so openly.\n"
     "END\n";
 
 static const uint8_t file_features_lil[] =
@@ -1055,6 +1084,8 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file shrine_guide.lardd\n"
     "CHECK command dos\n"
     "CHECK command install\n"
+    "CHECK command media\n"
+    "CHECK file media_guide.lardd\n"
     "CHECK command restore\n"
     "CHECK command tomb\n"
     "CHECK command tombstone\n"
@@ -1179,6 +1210,7 @@ static const FsFile FS_FILES[] = {
     { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
     { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
     { "installer_guide.lardd", file_installer_guide, sizeof(file_installer_guide) - 1 },
+    { "media_guide.lardd", file_media_guide, sizeof(file_media_guide) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },

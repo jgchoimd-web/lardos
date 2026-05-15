@@ -37,6 +37,7 @@
 #include "string.h"
 #include "fs.h"
 #include "installer.h"
+#include "mediafs.h"
 #include "version.h"
 
 static volatile uint16_t* const VGA = (volatile uint16_t*)0xB8000;
@@ -583,6 +584,7 @@ void kmain(void)
     /* Custom language demos: BOSL (bytecode) + LIL (s-expr interpreter). */
     mem_init();
     fs_init();
+    mediafs_init();
     gui_reload_sysrxe_apps();
     crashlog_init();
     bootprof_load();

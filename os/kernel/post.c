@@ -23,6 +23,7 @@
 #include "lsh.h"
 #include "lss.h"
 #include "lvcs.h"
+#include "mediafs.h"
 #include "mem.h"
 #include "oslink.h"
 #include "pci.h"
@@ -131,6 +132,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: raw control kmo", fs_open("raw_control.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode guide", fs_open("dosmode_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: installer guide", fs_open("installer_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: media guide", fs_open("media_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreport writable", fs_open_writable("bugreport.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreplay writable", fs_open_writable("bugreplay.lardd") != NULL, emit, user, &pass, &fail);
@@ -152,6 +154,10 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: hard delete overlay ownership", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable directory index", fs_writable_count() >= 31u, emit, user, &pass, &fail);
+    post_check("mediafs: native device stores", mediafs_selftest() == 0, emit, user, &pass, &fail);
+    post_check("mediafs: ssd drive", mediafs_drive_supported('S'), emit, user, &pass, &fail);
+    post_check("mediafs: usb drive", mediafs_drive_supported('U'), emit, user, &pass, &fail);
+    post_check("mediafs: floppy drive", mediafs_drive_supported('Y'), emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
     post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);
 

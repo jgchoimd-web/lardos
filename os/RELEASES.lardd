@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.71.2a
+ITEM Official release promoting the driver-catalog track without feature loss or philosophy changes.
+ITEM DRFL 2 makes .drfl a driver-code file: it names hardware, declares the driver type, and carries editable CODE lines as the driver source/control body.
+ITEM The kernel keeps DRFL 1 binary compatibility for older metadata files, but new DRFL 2 files must carry CODE so driver behavior is visible and user-owned.
+ITEM Added drivers show index|name so users can inspect loaded DRFL code, format, language, code length, and source hash from inside LardOS.
+ITEM The drivers branch now ships RTL8139 and PIIX3 IDE DRFL 2 files plus RXR bundles, so installable drivers live outside the monolithic OS tree until the user chooses them.
+ITEM Preserves MediaFS/MDFS drive letters from v1.71.1p, RXR, RXE/SYSRXE, KMO raw-control, KModTalk, OSLink, hardware-profiled IMG/ISO artifacts, and the user-owned control philosophy.
+
 SECTION v1.71.1p
 ITEM Hotpatch correcting the MediaFS drive-letter policy to match the LardOS memory rule: X: is main, Y:/F: is floppy, Z:/S: is auxiliary SSD/HDD, A:/U: is the first extra USB-style drive, and R: is writable RAM.
 ITEM Moves RAM-file workflows from Z: to R: so Z: can stay the user-rememberable auxiliary drive without losing writable RAM files.

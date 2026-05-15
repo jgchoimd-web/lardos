@@ -437,7 +437,7 @@ reversible instead of being hidden inside hand-coded GUI branches.
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
 exposes the same checks through `post` and `selftest`. POST covers CPU mode, the
 real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
-archives, DRFL descriptors, expected PCI devices, GUI framebuffer/layout state,
+archives, DRFL code files, expected PCI devices, GUI framebuffer/layout state,
 ScreenRAM scratch storage, OSLink packet framing, local bus, and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
 LardKit user-control tools, LardPack/RXR package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS

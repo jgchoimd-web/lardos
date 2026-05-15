@@ -45,20 +45,20 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.71.1p-ami/lardos-v1.71.1p-ami.iso`. To publish the whole hardware
+`release/v1.71.2a-ami/lardos-v1.71.2a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
 
-`v1.71.1p` hotpatches the MediaFS/MDFS drive-letter policy to match the LardOS
-memory rule: `X:` is main, `Y:`/`F:` is floppy, `Z:`/`S:` is auxiliary SSD/HDD,
-`A:`/`U:` is the first extra USB-style store, and `R:` is writable RAM. Stores
-remain usable from `dir`, `type`, `write`, `append`, `copy`, LARS/LARDD tools,
-RXR/LPACK readers, and L-DOS file commands. Stores sync to ATA sectors after
-the boot image/LPST when the backing disk is large enough; floppy-sized boot
-images honestly report RAM fallback instead of pretending persistence.
+`v1.71.2a` officially promotes the driver-catalog track. `.drfl` files are
+DRFL 2 code-carrying driver files, not hidden descriptors: each driver names
+hardware, declares its type, and carries editable `CODE` lines that can be
+loaded with `drivers load` and inspected with `drivers show name`. The release
+keeps the `v1.71.1p` MediaFS/MDFS drive-letter policy: `X:` is main,
+`Y:`/`F:` is floppy, `Z:`/`S:` is auxiliary SSD/HDD, `A:`/`U:` is the first
+extra USB-style store, and `R:` is writable RAM.
 
 ### Run in QEMU
 
@@ -160,6 +160,10 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.71.2a` officially promotes DRFL 2 driver-code files: `.drfl` carries
+  editable driver `CODE`, `drivers show name` exposes the source/control body,
+  and the external `drivers` branch ships DRFL/RXR catalogs without hiding
+  driver behavior inside the monolithic kernel.
 - `v1.71.1p` hotpatches MediaFS drive letters to `X:` main, `Y:` floppy,
   `Z:` auxiliary, `A:` first extra media, and `R:` RAM while preserving
   `F:`/`S:`/`U:` compatibility aliases.

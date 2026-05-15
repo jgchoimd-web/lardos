@@ -432,6 +432,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.70.0a officially adds RXR app bundles for RXE/SYSRXE apps and required files.\n"
     "li v1.71.0b adds MediaFS/MDFS device stores for SSD/HDD, USB-style, and Y:/F: floppy-style open/save paths.\n"
     "li v1.71.1p hotpatches drive policy: X: main, Y:/F: floppy, Z:/S: auxiliary, A:/U: first extra media, and R: RAM.\n"
+    "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"

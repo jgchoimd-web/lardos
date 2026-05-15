@@ -15,7 +15,8 @@ LardOS is guided by a simple rule: the user owns the machine.
   behavior.
 - Powerful actions should be visible and explainable.
 - Risky changes should have history, rollback, or recovery paths.
-- Native formats such as LARS, LARDD, LGUILIB, LTHEME, LPACK, RXR, MDFS, SYSRXE, KMO, and LFS
+- Native formats such as LARS, LARDD, LGUILIB, LTHEME, LPACK, RXR, DRFL,
+  MDFS, SYSRXE, KMO, and LFS
   are part of the system identity.
 - Kernel modules should be reachable through visible user-owned channels such
   as KModTalk and KMO instead of hidden control paths; if the user explicitly

@@ -20,23 +20,42 @@ static const uint8_t lfs_volume[73] = {
     ' ','-',' ','c','u','s','t','o','m',' ','f','o','r','m','a','t','.','\n'
 };
 
-/* rtl8139.drfl - DRFL entry for RTL8139 (vendor 0x10EC, device 0x8139) */
-static const uint8_t file_rtl8139_drfl[23] = {
-    'D', 'R', 'F', 'L', 1, 0, 0, 0,   /* magic, version, reserved */
-    1, 0,                              /* entry_count = 1 */
-    0xEC, 0x10, 0x39, 0x81,            /* vendor 0x10EC, device 0x8139 */
-    0, 7,                              /* type=net, name_len=7 */
-    'r', 't', 'l', '8', '1', '3', '9'
-};
+/* rtl8139.drfl - DRFL 2 source-carrying driver for RTL8139. */
+static const uint8_t file_rtl8139_drfl[] =
+    "DRFL 2\n"
+    "ID rtl8139\n"
+    "TYPE net\n"
+    "PCI 10EC 8139\n"
+    "LANG DRFL-C\n"
+    "CODE int drfl_init(void* ctx) {\n"
+    "CODE   rtl8139_t* n = (rtl8139_t*)ctx;\n"
+    "CODE   pci_find(0x10EC, 0x8139); pci_enable_io_and_busmaster();\n"
+    "CODE   n->io_base = pci_bar0_io(); n->irq_line = pci_irq();\n"
+    "CODE   outb(n->io_base + 0x52, 0x00); outb(n->io_base + 0x37, 0x10);\n"
+    "CODE   wait_until((inb(n->io_base + 0x37) & 0x10) == 0);\n"
+    "CODE   read_mac(n->io_base + 0x00, n->mac); set_rx_ring(); set_tx_rings();\n"
+    "CODE   outl(n->io_base + 0x44, RCR_APM | RCR_AB | RCR_WRAP);\n"
+    "CODE   outb(n->io_base + 0x37, CMD_RX_EN | CMD_TX_EN); mask_interrupts_polling();\n"
+    "CODE   return 0;\n"
+    "CODE }\n"
+    "END\n";
 
-/* piix3ide.drfl - DRFL entry for Intel PIIX3 IDE (vendor 0x8086, device 0x7010) */
-static const uint8_t file_piix3ide_drfl[23] = {
-    'D', 'R', 'F', 'L', 1, 0, 0, 0,    /* magic, version, reserved */
-    1, 0,                              /* entry_count = 1 */
-    0x86, 0x80, 0x10, 0x70,            /* vendor 0x8086, device 0x7010 */
-    1, 7,                              /* type=block, name_len=7 */
-    'a', 't', 'a', '-', 'p', 'i', 'o'
-};
+/* piix3ide.drfl - DRFL 2 source-carrying driver for Intel PIIX3 IDE. */
+static const uint8_t file_piix3ide_drfl[] =
+    "DRFL 2\n"
+    "ID ata-pio\n"
+    "TYPE block\n"
+    "PCI 8086 7010\n"
+    "LANG DRFL-C\n"
+    "CODE int drfl_init(void* ctx) {\n"
+    "CODE   (void)ctx; select_primary_ata_ports(0x1F0, 0x3F6);\n"
+    "CODE   outb(0x3F6, 0x02); outb(0x1F6, 0xA0); ata_delay_400ns();\n"
+    "CODE   outb(0x1F2, 0); outb(0x1F3, 0); outb(0x1F4, 0); outb(0x1F5, 0);\n"
+    "CODE   outb(0x1F7, 0xEC); wait_not_busy(); require_drq();\n"
+    "CODE   read_identify_words(0x1F0, 256); publish_sector_count(words[60..61]);\n"
+    "CODE   return 0;\n"
+    "CODE }\n"
+    "END\n";
 
 #define RAM_FILE_CAP 8192u
 /* Initial Notes: "Image: " + U+E000 (UTF-8 EE 80 80) - view Gallery sample.bmp first to assign */
@@ -1230,8 +1249,8 @@ static const FsFile FS_FILES[] = {
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
-    { "rtl8139.drfl",  file_rtl8139_drfl,  sizeof(file_rtl8139_drfl) },
-    { "piix3ide.drfl", file_piix3ide_drfl, sizeof(file_piix3ide_drfl) },
+    { "rtl8139.drfl",  file_rtl8139_drfl,  sizeof(file_rtl8139_drfl) - 1 },
+    { "piix3ide.drfl", file_piix3ide_drfl, sizeof(file_piix3ide_drfl) - 1 },
 #include "fs_ldll_entries.inc"
     { "lafillo_demo.bosx", file_lafillo_demo_bosx, sizeof(file_lafillo_demo_bosx) },
     { "demo.larsh",      file_demo_larsh,      sizeof(file_demo_larsh) - 1 },

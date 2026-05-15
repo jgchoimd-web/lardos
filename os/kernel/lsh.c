@@ -1310,6 +1310,79 @@ static void drivers_lsh_cb(uint16_t vendor_id, uint16_t device_id, uint8_t type,
     out_append("\n");
 }
 
+static int drivers_word_index(const char* s, uint32_t* out)
+{
+    uint32_t v = 0;
+    uint32_t i = 0;
+    if (!s || !s[0]) return 0;
+    while (s[i]) {
+        if (s[i] < '0' || s[i] > '9') return 0;
+        v = v * 10u + (uint32_t)(s[i] - '0');
+        i++;
+    }
+    if (out) *out = v;
+    return 1;
+}
+
+static int drivers_name_eq(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && a[i] == b[i]) i++;
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static void cmd_drivers_show(const char* key)
+{
+    drfl_info_t info;
+    uint32_t idx = 0xFFFFFFFFu;
+    uint32_t count = drfl_list(NULL, NULL);
+    if (drivers_word_index(key, &idx)) {
+        if (drfl_info(idx, &info) != 0) {
+            out_append("drivers show: index not found.\n");
+            return;
+        }
+    } else {
+        for (uint32_t i = 0; i < count; i++) {
+            if (drfl_info(i, &info) == 0 && drivers_name_eq(info.name, key)) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx == 0xFFFFFFFFu) {
+            out_append("drivers show: driver not found.\n");
+            return;
+        }
+    }
+    out_append("DRFL[");
+    out_append_u32(idx);
+    out_append("] ");
+    out_append(info.name);
+    out_append(info.type == DRFL_TYPE_NET ? " net " : (info.type == DRFL_TYPE_BLOCK ? " block " : " type "));
+    if (info.type != DRFL_TYPE_NET && info.type != DRFL_TYPE_BLOCK) out_append_u32(info.type);
+    out_append("pci ");
+    out_append_hex16(info.vendor_id);
+    out_append(":");
+    out_append_hex16(info.device_id);
+    out_append(" format=");
+    out_append_u32(info.format_version);
+    out_append(" lang=");
+    out_append(info.lang[0] ? info.lang : "none");
+    out_append(" code-bytes=");
+    out_append_u32(info.code_len);
+    out_append(" hash=");
+    out_append_hex32(info.code_hash);
+    out_append("\n");
+    if (info.code && info.code_len) {
+        uint32_t cap = info.code_len > 900u ? 900u : info.code_len;
+        out_append("CODE:\n");
+        for (uint32_t i = 0; i < cap; i++) out_append_char(info.code[i]);
+        if (cap < info.code_len) out_append("...\n");
+    } else {
+        out_append("CODE: none (DRFL 1 compatibility metadata only)\n");
+    }
+}
+
 static void cmd_drivers(const char* args)
 {
     uint32_t available;
@@ -1326,7 +1399,7 @@ static void cmd_drivers(const char* args)
     if (vcs_read_word(&p, sub, sizeof(sub)) == 0) {
         if (strcmp(sub, "reload") == 0 || strcmp(sub, "scan") == 0) {
             drfl_load_all();
-            out_append("drivers: reloaded DRFL descriptors.\n");
+            out_append("drivers: reloaded DRFL driver files.\n");
         } else if (strcmp(sub, "load") == 0 || strcmp(sub, "add") == 0) {
             char file_arg[64];
             if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
@@ -1338,11 +1411,19 @@ static void cmd_drivers(const char* args)
                 out_append(file_arg);
                 out_append("\n");
             } else {
-                out_append("drivers: load failed; file must be a DRFL descriptor visible in LardOS FS.\n");
+                out_append("drivers: load failed; file must be a DRFL driver file visible in LardOS FS.\n");
                 return;
             }
+        } else if (strcmp(sub, "show") == 0 || strcmp(sub, "code") == 0) {
+            char key[64];
+            if (vcs_read_word(&p, key, sizeof(key)) != 0) {
+                out_append("Usage: drivers show index|name\n");
+                return;
+            }
+            cmd_drivers_show(key);
+            return;
         } else if (strcmp(sub, "status") != 0 && strcmp(sub, "list") != 0) {
-            out_append("Usage: drivers [status|list|reload|load file.drfl]\n");
+            out_append("Usage: drivers [status|list|reload|load file.drfl|show index|name]\n");
             return;
         }
     }
@@ -1359,7 +1440,8 @@ static void cmd_drivers(const char* args)
     out_append("DRFL:\n");
     count = drfl_list(drivers_lsh_cb, NULL);
     if (count == 0) out_append("  none\n");
-    out_append("  Use RXR driver bundles, then drivers reload, to add user-installed descriptors.\n");
+    out_append("  Use RXR driver bundles, then drivers reload, to add user-installed DRFL 2 code files.\n");
+    out_append("  Use drivers show name to inspect the code carried by a .drfl file.\n");
     out_append("MediaFS:\n");
     for (uint32_t i = 0; i < mediafs_count(); i++) media_print_info(i);
 }
@@ -1644,7 +1726,7 @@ static void cmd_help(const char* args)
     out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
-    out_append("  drivers [status|reload|load file.drfl] fsstat fsload fssave sync mediafs devstore sram screencheck sandbox exitsandbox\n");
+    out_append("  drivers [status|reload|load file.drfl|show name] fsstat fsload fssave sync mediafs devstore sram screencheck sandbox exitsandbox\n");
     out_append("  tasktop  task list|set|urgent|history|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");

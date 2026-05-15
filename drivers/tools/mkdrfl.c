@@ -1,8 +1,10 @@
 /*
- * mkdrfl - write a DRFL 1 descriptor.
+ * mkdrfl - write a DRFL 2 source-carrying driver file.
  *
  * Usage:
  *   mkdrfl out.drfl vendor_hex device_hex net|block driver-name
+ *
+ * The generated file is text so the user can edit the driver body directly.
  */
 #include <stdio.h>
 #include <stdint.h>
@@ -20,18 +22,12 @@ static unsigned parse_hex16(const char* s)
     return (unsigned)v;
 }
 
-static unsigned parse_type(const char* s)
+static const char* parse_type(const char* s)
 {
-    if (strcmp(s, "net") == 0) return 0;
-    if (strcmp(s, "block") == 0) return 1;
+    if (strcmp(s, "net") == 0) return "net";
+    if (strcmp(s, "block") == 0) return "block";
     fprintf(stderr, "mkdrfl: type must be net or block\n");
     exit(2);
-}
-
-static void put16(FILE* f, unsigned v)
-{
-    fputc((int)(v & 0xFFu), f);
-    fputc((int)((v >> 8) & 0xFFu), f);
 }
 
 int main(int argc, char** argv)
@@ -39,7 +35,7 @@ int main(int argc, char** argv)
     FILE* f;
     unsigned vendor;
     unsigned device;
-    unsigned type;
+    const char* type;
     size_t name_len;
 
     if (argc != 6) {
@@ -62,20 +58,17 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    fputc('D', f);
-    fputc('R', f);
-    fputc('F', f);
-    fputc('L', f);
-    fputc(1, f);
-    fputc(0, f);
-    fputc(0, f);
-    fputc(0, f);
-    put16(f, 1);
-    put16(f, vendor);
-    put16(f, device);
-    fputc((int)type, f);
-    fputc((int)name_len, f);
-    fwrite(argv[5], 1, name_len, f);
+    fprintf(f, "DRFL 2\n");
+    fprintf(f, "ID %s\n", argv[5]);
+    fprintf(f, "TYPE %s\n", type);
+    fprintf(f, "PCI %04X %04X\n", vendor, device);
+    fprintf(f, "LANG DRFL-C\n");
+    fprintf(f, "CODE int drfl_init(void* ctx) {\n");
+    fprintf(f, "CODE   /* user-owned driver body goes here */\n");
+    fprintf(f, "CODE   (void)ctx;\n");
+    fprintf(f, "CODE   return 0;\n");
+    fprintf(f, "CODE }\n");
+    fprintf(f, "END\n");
     fclose(f);
     return 0;
 }

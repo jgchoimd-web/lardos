@@ -7,6 +7,8 @@ SECTION Install
 ITEM rxr verify A:core-drivers.rxr
 ITEM rxr install A:core-drivers.rxr
 ITEM drivers reload
+ITEM drivers show rtl8139
+ITEM drivers show ata-pio
 ITEM drivers
 ITEM sync
 END

@@ -241,7 +241,7 @@ int net_init(net_stack_t* n)
     s->ip_id = 0x1234;
     s->tcp_iss = 0x10000;
     s->cfg_valid = 0;
-    if (drfl_probe_net(&s->nic, (drfl_net_init_fn)rtl8139_init) != 0) return -1;
+    if (drfl_probe_net(&s->nic, "rtl8139", (drfl_net_init_fn)rtl8139_init) != 0) return -1;
     return 0;
 }
 

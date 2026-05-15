@@ -14,7 +14,9 @@ UI INPUT 0 46 220 24 Command:
 UI OUTPUT 0 84 0 0 Driver output
 DESKTOP 1
 DOCK 1
-TEXT Installed from the drivers branch. Use drivers reload after rxr install.
+TEXT Installed from the drivers branch. Use drivers reload, then drivers show name to inspect DRFL code.
 LANG C
 CODE lsh("drivers reload");
 CODE lsh("drivers");
+CODE lsh("drivers show rtl8139");
+CODE lsh("drivers show ata-pio");

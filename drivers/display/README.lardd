@@ -1,6 +1,6 @@
 LARDD 1
 TITLE Display Driver Catalog
-TEXT Reserved for framebuffer, VBE, and future graphics descriptors.
+TEXT Reserved for framebuffer, VBE, and future graphics driver files.
 SECTION Status
 ITEM No installable display driver bundle yet.
 ITEM Add only in-tree C-backed drivers or clearly mark source-only plans.

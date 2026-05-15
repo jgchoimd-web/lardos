@@ -1,7 +1,7 @@
 LARDD 1
 TITLE VM Driver Catalog
-TEXT Reserved for VirtualBox, QEMU, VMware, and hardware-profile helper descriptors.
+TEXT Reserved for VirtualBox, QEMU, VMware, and hardware-profile helper driver files.
 SECTION Status
 ITEM No separate VM helper bundle yet.
-ITEM Current common VM support can use the core network/storage descriptors.
+ITEM Current common VM support can use the core network/storage driver files.
 END

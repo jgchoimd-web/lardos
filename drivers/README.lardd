@@ -2,16 +2,16 @@ LARDD 1
 TITLE LardOS Driver Branch
 TEXT User-installable driver catalog for LardOS.
 SECTION Formats
-ITEM DRFL is the native driver descriptor format.
-ITEM RXR bundles a DRFL descriptor with a small RXE helper app so users can install drivers with rxr install.
+ITEM DRFL 2 is the native driver-file format. It carries editable CODE lines inside the .drfl file.
+ITEM RXR bundles a DRFL driver file with a small RXE helper app so users can install drivers with rxr install.
 ITEM LARDD documents drivers in a LardOS-native readable form.
 SECTION Folders
 ITEM network -> network adapters.
-ITEM storage -> disk and controller descriptors.
-ITEM display -> display and framebuffer descriptors.
-ITEM input -> keyboard, mouse, and pointer descriptors.
-ITEM usb -> USB controller and device descriptors.
-ITEM vm -> virtual-machine helper descriptors.
+ITEM storage -> disk and controller driver files.
+ITEM display -> display and framebuffer driver files.
+ITEM input -> keyboard, mouse, and pointer driver files.
+ITEM usb -> USB controller and device driver files.
+ITEM vm -> virtual-machine helper driver files.
 ITEM bundles -> combined packs for common setups.
 ITEM tools -> small in-tree helper tools.
 SECTION Install
@@ -20,9 +20,10 @@ ITEM rxr verify A:core-drivers.rxr
 ITEM rxr install A:core-drivers.rxr
 ITEM drivers reload
 ITEM drivers
+ITEM drivers show rtl8139
 ITEM sync
-ITEM Restart if the descriptor must be present during early boot probing.
+ITEM Restart if the driver file must be present during early boot probing.
 SECTION Honesty
-ITEM DRFL describes hardware and selects an in-kernel driver name. It is not a hidden external blob.
-ITEM If the running kernel does not include the actual driver code, the descriptor stays planned or source-only.
+ITEM DRFL is the driver source/control body, not only a hardware descriptor.
+ITEM The code body stays visible through drivers show and remains user-editable.
 END

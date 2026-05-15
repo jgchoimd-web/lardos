@@ -61,7 +61,7 @@
 - `larsform file` / `larsact file index` - list or run LARS form buttons.
 - `lpack info|list|verify|install|undo file.lpack` - inspect, validate, install, or roll back a native LardPack package.
 - `rxr info|list|verify|install|undo file.rxr` - inspect, validate, install, or roll back a native app bundle containing one RXE/SYSRXE app plus required files.
-- `drivers status|reload|load file.drfl` - inspect loaded DRFL descriptors, rescan installed `.drfl` files, or load one descriptor directly.
+- `drivers status|reload|load file.drfl|show name` - inspect loaded DRFL files, rescan installed `.drfl` files, load one driver file directly, or show the code carried inside a DRFL 2 file.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
 

@@ -1,12 +1,13 @@
 LARDD 1
-TITLE PIIX3 IDE Driver Descriptor
-TEXT Intel PIIX3 IDE / ATA-PIO descriptor.
+TITLE PIIX3 IDE Driver File
+TEXT Intel PIIX3 IDE / ATA-PIO DRFL 2 code file.
 SECTION Files
-ITEM drv-piix3ide.drfl -> raw DRFL descriptor for PCI 8086:7010.
+ITEM drv-piix3ide.drfl -> DRFL 2 code file for PCI 8086:7010.
 ITEM piix3ide.rxr -> install bundle containing drv-piix3ide.drfl and driverctl.rxe.
 SECTION Install
 ITEM rxr verify A:piix3ide.rxr
 ITEM rxr install A:piix3ide.rxr
 ITEM drivers reload
+ITEM drivers show ata-pio
 ITEM drivers
 END

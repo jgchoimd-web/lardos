@@ -155,9 +155,11 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable directory index", fs_writable_count() >= 31u, emit, user, &pass, &fail);
     post_check("mediafs: native device stores", mediafs_selftest() == 0, emit, user, &pass, &fail);
-    post_check("mediafs: ssd drive", mediafs_drive_supported('S'), emit, user, &pass, &fail);
-    post_check("mediafs: usb drive", mediafs_drive_supported('U'), emit, user, &pass, &fail);
     post_check("mediafs: floppy drive", mediafs_drive_supported('Y'), emit, user, &pass, &fail);
+    post_check("mediafs: auxiliary drive", mediafs_drive_supported('Z'), emit, user, &pass, &fail);
+    post_check("mediafs: first extra drive", mediafs_drive_supported('A'), emit, user, &pass, &fail);
+    post_check("mediafs: compatibility aliases", mediafs_drive_supported('F') &&
+               mediafs_drive_supported('S') && mediafs_drive_supported('U'), emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
     post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);
 

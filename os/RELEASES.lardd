@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.71.1p
+ITEM Hotpatch correcting the MediaFS drive-letter policy to match the LardOS memory rule: X: is main, Y:/F: is floppy, Z:/S: is auxiliary SSD/HDD, A:/U: is the first extra USB-style drive, and R: is writable RAM.
+ITEM Moves RAM-file workflows from Z: to R: so Z: can stay the user-rememberable auxiliary drive without losing writable RAM files.
+ITEM Keeps S:, U:, and F: as visible compatibility aliases so v1.71.0b users do not lose access to existing MediaFS commands.
+ITEM Updates LSH, L-DOS, POST, built-in LARS/LARDD guides, and architecture docs so help text and diagnostics all report the same drive policy.
+ITEM Preserves MediaFS/MDFS, RXR, RXE/SYSRXE, KMO raw-control, OSLink, LPST, HDD/SSD installer, hardware-profiled IMG/ISO artifacts, and the user-owned control philosophy without feature loss.
+
 SECTION v1.71.0b
 ITEM Beta release adding native media file stores for SSD/HDD, USB-style, and floppy-style device access.
 ITEM Added MediaFS/MDFS plus S:, U:, and Y:/F: drives so DIR, TYPE, WRITE, APPEND, COPY, LARS/LARDD, RXR/LPACK, and DOS-mode file commands can open or save files on device stores.

@@ -3,11 +3,12 @@
  *
  * Drive letters:
  *   X: = default (main FS: built-in + LFS)
- *   S: = SSD/HDD native MediaFS store
- *   U: = USB-style native MediaFS store
  *   Y:/F: = floppy-style native MediaFS store
- *   Z: = RAM (writable: notes.txt etc.)
- *   A~W except S/U/Y: = additional visible aliases (map to X for now)
+ *   Z:/S: = auxiliary SSD/HDD native MediaFS store
+ *   A:/U: = first extra USB-style native MediaFS store
+ *   R: = RAM (writable: notes.txt etc.)
+ *   B~W except F/R/S/U/Y/Z: = future visible extra-drive letters;
+ *       until backed, they remain visible main-FS aliases to avoid feature loss
  *
  * Custom commands: .lsh files (LSH\0 + name + type 0=BOSL + payload)
  */

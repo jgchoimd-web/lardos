@@ -261,8 +261,9 @@ visible and explicit: `install status` only previews the target layout, while
 `install` as raw-control so autocorrect cannot silently install, but the direct
 command remains user-owned.
 
-`mediafs.c` owns the native MDFS device-store layer. It exposes `S:` for
-SSD/HDD media, `U:` for USB-style media, and `Y:`/`F:` for floppy-style media.
+`mediafs.c` owns the native MDFS device-store layer. It exposes `Y:`/`F:` for
+floppy-style media, `Z:`/`S:` for auxiliary SSD/HDD media, and `A:`/`U:` for
+the first extra USB-style media store.
 When the boot target has spare sectors after the boot image and LPST, MDFS
 stores sync through the native ATA PIO block driver; on a floppy-sized image
 the same stores remain usable as visible RAM fallback and report that honestly.
@@ -329,8 +330,9 @@ new per-app GUI branches.
 
 `v1.60.0a` adds L-DOS mode as a compatibility layer inside LSH rather than a
 foreign DOS runtime. `dos on` switches the prompt to `L-DOS C:\>`, DOS command
-aliases are case-insensitive, `C:`/`A:`/`R:` map visibly onto LardOS
-`X:`/`Y:`/`Z:`, and `dosmode.lardd` records user-visible state/history.
+aliases are case-insensitive, `C:` maps to `X:`, `A:` maps to `Y:`, `Z:` maps
+to auxiliary `Z:`, `U:` maps to extra media `A:`, `R:` maps to RAM `R:`, and
+`dosmode.lardd` records user-visible state/history.
 `v1.60.1p` adds the `DEL -F` tombstone overlay: read-only built-in/LFS files
 can be hidden from open/list operations by user-owned `fsdelete.lardd` records,
 and `RESTORE`/`UNDELETE` removes the tombstone.

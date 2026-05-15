@@ -18,8 +18,8 @@
 #define MEDIAFS_ENTRY_SIZE 48u
 #define MEDIAFS_DATA_OFF   MEDIAFS_HEADER_LEN
 
-#define MEDIAFS_SSD_LBA     LARD_INSTALL_IMAGE_SECTORS
-#define MEDIAFS_USB_LBA     (MEDIAFS_SSD_LBA + MEDIAFS_SECTORS)
+#define MEDIAFS_AUX_LBA     LARD_INSTALL_IMAGE_SECTORS
+#define MEDIAFS_USB_LBA     (MEDIAFS_AUX_LBA + MEDIAFS_SECTORS)
 #define MEDIAFS_FLOPPY_LBA  (MEDIAFS_USB_LBA + MEDIAFS_SECTORS)
 
 typedef struct {
@@ -47,9 +47,9 @@ typedef struct {
 } media_dev_t;
 
 static media_dev_t s_media[] = {
-    { .drive = 'S', .name = "ssd", .label = "SSD/HDD native media store", .base_lba = MEDIAFS_SSD_LBA, .sectors = MEDIAFS_SECTORS },
-    { .drive = 'U', .name = "usb", .label = "USB-style removable store", .base_lba = MEDIAFS_USB_LBA, .sectors = MEDIAFS_SECTORS },
     { .drive = 'Y', .name = "floppy", .label = "Floppy-style media store", .base_lba = MEDIAFS_FLOPPY_LBA, .sectors = MEDIAFS_SECTORS },
+    { .drive = 'Z', .name = "aux", .label = "Auxiliary SSD/HDD media store", .base_lba = MEDIAFS_AUX_LBA, .sectors = MEDIAFS_SECTORS },
+    { .drive = 'A', .name = "usb", .label = "USB-style removable store", .base_lba = MEDIAFS_USB_LBA, .sectors = MEDIAFS_SECTORS },
 };
 
 static uint32_t rd32(const uint8_t* p)
@@ -86,6 +86,8 @@ static media_dev_t* media_by_drive(char drive)
 {
     drive = upper_drive(drive);
     if (drive == 'F') drive = 'Y';
+    if (drive == 'S') drive = 'Z';
+    if (drive == 'U') drive = 'A';
     for (uint32_t i = 0; i < mediafs_count(); i++) {
         if (s_media[i].drive == drive) return &s_media[i];
     }
@@ -395,10 +397,11 @@ int mediafs_format(char drive)
 int mediafs_selftest(void)
 {
     if (mediafs_count() != 3u) return -1;
-    if (!mediafs_drive_supported('S') || !mediafs_drive_supported('U') ||
-        !mediafs_drive_supported('Y') || !mediafs_drive_supported('F')) return -2;
+    if (!mediafs_drive_supported('Y') || !mediafs_drive_supported('Z') ||
+        !mediafs_drive_supported('A') || !mediafs_drive_supported('F') ||
+        !mediafs_drive_supported('S') || !mediafs_drive_supported('U')) return -2;
     if (MEDIAFS_FILE_CAP < 512u || MEDIAFS_MAX_FILES < 3u) return -3;
     if (MEDIAFS_DATA_OFF + MEDIAFS_MAX_FILES * MEDIAFS_FILE_CAP > MEDIAFS_BYTES) return -4;
-    if (MEDIAFS_SSD_LBA != LARD_INSTALL_IMAGE_SECTORS) return -5;
+    if (MEDIAFS_AUX_LBA != LARD_INSTALL_IMAGE_SECTORS) return -5;
     return 0;
 }

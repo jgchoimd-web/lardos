@@ -1,6 +1,7 @@
 /*
  * LSH - Lard Shell
- * Drive X=default, Y=floppy, Z=RAM, A~W=extra.
+ * Drive X=main, Y=floppy, Z=auxiliary media, A=first extra media, R=RAM.
+ * Unbacked B-W letters remain visible main-FS aliases to avoid feature loss.
  */
 #include "lsh.h"
 #include "fs.h"
@@ -601,9 +602,9 @@ static void dir_cb(const char* nm, uint32_t sz, void* u)
 static int drive_to_fs(char d)
 {
     d = (char)((d >= 'a' && d <= 'z') ? d - 32 : d);
-    if (d == 'S' || d == 'U' || d == 'Y' || d == 'F') return 2; /* media device stores */
-    if (d == 'X' || (d >= 'A' && d <= 'W')) return 0; /* main FS aliases */
-    if (d == 'Z') return 1; /* RAM */
+    if (d == 'Y' || d == 'Z' || d == 'A' || d == 'F' || d == 'S' || d == 'U') return 2; /* media device stores */
+    if (d == 'R') return 1; /* RAM */
+    if (d == 'X' || (d >= 'B' && d <= 'W')) return 0; /* main FS and unbacked legacy aliases */
     return -1;
 }
 
@@ -629,7 +630,7 @@ static const FsFile* lsh_open_read(char drive, const char* name)
     if (drive_to_fs(drive) == 1) {
         if (name[0] == 'n' && name[1] == 'o' && name[2] == 't' && name[3] == 'e' &&
             name[4] == 's' && name[5] == '.' && name[6] == 't' && name[7] == 'x' && name[8] == 't' && name[9] == '\0') {
-            return NULL; /* Z: - we need fs_open for ram, but fs_open handles notes.txt */
+            return NULL; /* R: uses fs_open for RAM; fs_open handles notes.txt */
         }
     }
     return fs_open(name);
@@ -1138,9 +1139,19 @@ static char media_drive_from_word(const char* word)
     d = ascii_upper_char(word[0]);
     if (word[1] == ':' && word[2] == '\0') return d;
     if (word[1] == '\0') return d;
-    if (ascii_streq_ci(word, "ssd") || ascii_streq_ci(word, "hdd") || ascii_streq_ci(word, "disk")) return 'S';
-    if (ascii_streq_ci(word, "usb") || ascii_streq_ci(word, "stick")) return 'U';
+    if (ascii_streq_ci(word, "ssd") || ascii_streq_ci(word, "hdd") || ascii_streq_ci(word, "disk") ||
+        ascii_streq_ci(word, "aux")) return 'Z';
+    if (ascii_streq_ci(word, "usb") || ascii_streq_ci(word, "stick")) return 'A';
     if (ascii_streq_ci(word, "floppy") || ascii_streq_ci(word, "fd")) return 'Y';
+    return d;
+}
+
+static char media_display_drive(char d)
+{
+    d = ascii_upper_char(d);
+    if (d == 'F') return 'Y';
+    if (d == 'S') return 'Z';
+    if (d == 'U') return 'A';
     return d;
 }
 
@@ -1184,12 +1195,12 @@ static void cmd_media(const char* args)
         strcmp(sub, "info") == 0 || strcmp(sub, "ls") == 0) {
         out_append("LardOS media stores (MDFS)\n");
         for (uint32_t i = 0; i < mediafs_count(); i++) media_print_info(i);
-        out_append("  Drives: S:=SSD/HDD, U:=USB-style, Y:/F:=floppy-style. Use dir S: and type S:file.\n");
+        out_append("  Drives: X:=main, Y:/F:=floppy, Z:/S:=aux SSD/HDD, A:/U:=USB-style, R:=RAM.\n");
         return;
     }
     if (strcmp(sub, "format") == 0 || strcmp(sub, "mkfs") == 0) {
         if (vcs_read_word(&args, drive_word, sizeof(drive_word)) != 0) {
-            out_append("Usage: media format S|U|Y\n");
+            out_append("Usage: media format Y|Z|A\n");
             return;
         }
         drive = media_drive_from_word(drive_word);
@@ -1198,7 +1209,7 @@ static void cmd_media(const char* args)
             return;
         }
         out_append("Formatted ");
-        out_append_char(drive == 'F' ? 'Y' : drive);
+        out_append_char(media_display_drive(drive));
         out_append(": as MDFS.\n");
         return;
     }
@@ -1225,7 +1236,7 @@ static void cmd_media(const char* args)
         uint32_t size = 0;
         if (vcs_read_word(&args, drive_word, sizeof(drive_word)) != 0 ||
             vcs_read_word(&args, name, sizeof(name)) != 0) {
-            out_append("Usage: media read S file\n");
+            out_append("Usage: media read Z file\n");
             return;
         }
         drive = media_drive_from_word(drive_word);
@@ -1242,7 +1253,7 @@ static void cmd_media(const char* args)
         uint32_t len = 0;
         if (vcs_read_word(&args, drive_word, sizeof(drive_word)) != 0 ||
             vcs_read_word(&args, name, sizeof(name)) != 0) {
-            out_append(append ? "Usage: media append S file text\n" : "Usage: media write S file text\n");
+            out_append(append ? "Usage: media append Z file text\n" : "Usage: media write Z file text\n");
             return;
         }
         drive = media_drive_from_word(drive_word);
@@ -1252,7 +1263,7 @@ static void cmd_media(const char* args)
             return;
         }
         out_append(append ? "media append: " : "media write: ");
-        out_append_char(drive == 'F' ? 'Y' : drive);
+        out_append_char(media_display_drive(drive));
         out_append(":");
         out_append(name);
         out_append("\n");
@@ -1261,7 +1272,7 @@ static void cmd_media(const char* args)
     if (strcmp(sub, "delete") == 0 || strcmp(sub, "del") == 0 || strcmp(sub, "rm") == 0) {
         if (vcs_read_word(&args, drive_word, sizeof(drive_word)) != 0 ||
             vcs_read_word(&args, name, sizeof(name)) != 0) {
-            out_append("Usage: media delete S file\n");
+            out_append("Usage: media delete Z file\n");
             return;
         }
         drive = media_drive_from_word(drive_word);
@@ -1270,13 +1281,13 @@ static void cmd_media(const char* args)
             return;
         }
         out_append("media delete: removed ");
-        out_append_char(drive == 'F' ? 'Y' : drive);
+        out_append_char(media_display_drive(drive));
         out_append(":");
         out_append(name);
         out_append("\n");
         return;
     }
-    out_append("Usage: media list|format S|sync [S|all]|read S file|write S file text|append S file text|delete S file\n");
+    out_append("Usage: media list|format Y|Z|A|sync [Z|all]|read Z file|write Z file text|append Z file text|delete Z file\n");
 }
 
 static void drivers_lsh_cb(uint16_t vendor_id, uint16_t device_id, uint8_t type,
@@ -1574,7 +1585,7 @@ static void cmd_help(const char* args)
     out_append("  rxr info|list|verify|install file.rxr; rxr undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
-    out_append("  media list|format S|sync all|write S file text  S:/U:/Y: device stores\n");
+    out_append("  media list|format Z|sync all|write Z file text  X/Y/Z/A/R drive rules\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
@@ -1599,7 +1610,7 @@ static void cmd_help(const char* args)
     out_append("  lguilib status|show|use|test [file.lguilib]\n");
     out_append("  awake on|off|status|test\n");
     out_append("  write file text  append file text  copy src dst  ren src dst\n");
-    out_append("  set NAME=value  echo text  cd drive:  X: S: U: Y: Z:\n");
+    out_append("  set NAME=value  echo text  cd drive:  X: Y: Z: A: R:\n");
     out_append("  shrine status|list|info|verify|run|test [file.shrine]\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
     out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM\n");
@@ -1615,7 +1626,7 @@ static void cmd_help(const char* args)
     out_append("  bye|byebye          sync RAM files, then request firmware/VM poweroff\n");
     out_append("  restart|reboot      sync RAM files, then request firmware/VM restart\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
-    out_append("Tips: open file://lardos.lars in Doc, use Z: for RAM files, S:/U:/Y: for media stores.\n");
+    out_append("Tips: X: main, Y: floppy, Z: auxiliary media, A: first extra media, R: RAM files.\n");
 }
 
 static void cmd_control(const char* args)
@@ -1624,10 +1635,10 @@ static void cmd_control(const char* args)
     out_append("LardOS control surface\n");
     out_append("  Kernel and host tools are C. Runtime features stay in-tree.\n");
     out_append("  Files live in LFS, RAM files, LPST persistence, and embedded FS tables.\n");
-    out_append("  Device media uses visible MDFS stores on S:/U:/Y: with RAM fallback when no backing sectors exist.\n");
+    out_append("  Device media uses visible MDFS stores on Y:/Z:/A: with RAM fallback when no backing sectors exist.\n");
     out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
     out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
-    out_append("  DOS mode is a native compatibility shell layer; it maps C:/A:/R: visibly onto LardOS drives.\n");
+    out_append("  DOS mode is a native compatibility shell layer; it maps C:/A:/Z:/U:/R: visibly onto LardOS drives.\n");
     out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
     out_append("  Values: visible power, editable state, local formats, explainable automation, repair over halt.\n");
     out_append("  Release suffix: a=official, b=beta-experimental, p=hotpatch.\n");
@@ -1639,8 +1650,8 @@ static void cmd_control(const char* args)
     out_append("  status              inspect version, drivers, storage, containers\n");
     out_append("  install status      preview the HDD/SSD installer layout and target\n");
     out_append("  install hdd yes     write the current LardOS boot image to the target disk\n");
-    out_append("  media list          inspect SSD/HDD, USB-style, and floppy-style file stores\n");
-    out_append("  media write S note.txt hello  save data to the SSD/HDD media store\n");
+    out_append("  media list          inspect floppy, auxiliary, and extra media stores\n");
+    out_append("  media write Z note.txt hello  save data to the auxiliary media store\n");
     out_append("  values              reread the LardOS user-law values\n");
     out_append("  tomb list           inspect active user-owned read-only deletion records\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
@@ -6102,7 +6113,9 @@ static char dos_drive_to_lard(char d)
     d = ascii_upper_char(d);
     if (d == 'C') return 'X';
     if (d == 'A') return 'Y';
-    if (d == 'R') return 'Z';
+    if (d == 'R') return 'R';
+    if (d == 'S') return 'Z';
+    if (d == 'U') return 'A';
     return d;
 }
 
@@ -6111,7 +6124,8 @@ static char dos_drive_from_lard(char d)
     d = ascii_upper_char(d);
     if (d == 'X') return 'C';
     if (d == 'Y') return 'A';
-    if (d == 'Z') return 'R';
+    if (d == 'A') return 'U';
+    if (d == 'R') return 'R';
     return d;
 }
 
@@ -6167,7 +6181,7 @@ static void dos_help(void)
     out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL [-F|-T] file  RESTORE file  TOMB LIST|SHOW|HIDE|DROP|CLEAR\n");
     out_append("  MD name  RD name  CD [dir|\\|..]  CLS  VER  SET  ECHO text  MEM\n");
     out_append("  EXIT leaves DOS mode; LSH command runs one native LardOS command.\n");
-    out_append("  Drive map: C: -> X: built-in, A: -> Y: floppy media, U: -> USB, S: -> SSD/HDD, R: -> Z: RAM.\n");
+    out_append("  Drive map: C: -> X: main, A: -> Y: floppy, Z: -> Z: aux, U: -> A: extra USB-style, R: -> R: RAM.\n");
     out_append("  DEL -F hard-deletes read-only files from the active FS; TOMB owns the records.\n");
     out_append("  Directories are visible virtual labels; LardOS files remain flat and user-owned.\n");
 }
@@ -6193,9 +6207,9 @@ static void dos_map(void)
     out_append("L-DOS drive map\n");
     out_append("  C: -> X: built-in/LFS main files\n");
     out_append("  A: -> Y: floppy-style MDFS media store\n");
-    out_append("  U: -> U: USB-style MDFS media store\n");
-    out_append("  S: -> S: SSD/HDD MDFS media store\n");
-    out_append("  R: -> Z: writable RAM files\n");
+    out_append("  Z: -> Z: auxiliary SSD/HDD MDFS media store\n");
+    out_append("  U: -> A: first extra USB-style MDFS media store\n");
+    out_append("  R: -> R: writable RAM files\n");
     out_append("  Other letters remain visible aliases; no hidden mount translation is used.\n");
 }
 
@@ -6832,12 +6846,15 @@ int lsh_dosmode_selftest(void)
     char drv = 0;
     char name[64];
     if (!ascii_streq_ci("DIR", "dir")) return -1;
-    if (dos_drive_to_lard('C') != 'X' || dos_drive_to_lard('A') != 'Y' || dos_drive_to_lard('R') != 'Z' ||
-        dos_drive_to_lard('U') != 'U' || dos_drive_to_lard('S') != 'S') return -2;
+    if (dos_drive_to_lard('C') != 'X' || dos_drive_to_lard('A') != 'Y' || dos_drive_to_lard('R') != 'R' ||
+        dos_drive_to_lard('Z') != 'Z' || dos_drive_to_lard('U') != 'A' || dos_drive_to_lard('S') != 'Z') return -2;
+    if (dos_drive_from_lard('X') != 'C' || dos_drive_from_lard('Y') != 'A' ||
+        dos_drive_from_lard('Z') != 'Z' || dos_drive_from_lard('A') != 'U' ||
+        dos_drive_from_lard('R') != 'R') return -6;
     dos_resolve_path("C:\\DOCS\\HELLO.TXT", &drv, name, sizeof(name));
     if (drv != 'X' || strcmp(name, "hello.txt") != 0) return -3;
     dos_resolve_path("R:\\NOTES.TXT", &drv, name, sizeof(name));
-    if (drv != 'Z' || strcmp(name, "notes.txt") != 0) return -4;
+    if (drv != 'R' || strcmp(name, "notes.txt") != 0) return -4;
     if (fs_delete_overlay_selftest() != 0) return -5;
     return 0;
 }

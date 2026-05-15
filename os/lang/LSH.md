@@ -1,10 +1,10 @@
 # LSH (Lard Shell)
 
-**LSH** is the LardOS shell, available in the GUI LSH tab. Drive letters: X (default built-in), S (SSD/HDD media), U (USB-style media), Y/F (floppy-style media), Z (RAM).
+**LSH** is the LardOS shell, available in the GUI LSH tab. Drive letters: X (main built-in/LFS), Y/F (floppy-style media), Z/S (auxiliary SSD/HDD media), A/U (first extra USB-style media), R (RAM).
 
 ## Commands
 
-- `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc. `dir X:` lists read-only system files; `dir Z:` lists every writable RAM file; `dir S:`/`dir U:`/`dir Y:` list MediaFS device stores.
+- `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc. `dir X:` lists read-only system files; `dir R:` lists every writable RAM file; `dir Y:`/`dir Z:`/`dir A:` list MediaFS device stores.
 - `release policy` - show when to use `a`, `b`, or `p` release suffixes.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `post baseline` / `postbaseline show` - show the saved POST baseline report.
@@ -15,7 +15,7 @@
 - `install status|preview|hdd yes|ssd yes|guide` - preview or write the current
   LardOS boot image to an ATA HDD/SSD from inside the OS. `install` is
   raw-control for Magic, so automatic execution requires `magic -f`.
-- `media list|format S|sync all|read S file|write S file text|append S file text|delete S file` - manage native MDFS device stores for SSD/HDD (`S:`), USB-style (`U:`), and floppy-style (`Y:`/`F:`) files. Normal `dir`, `type`, `write`, `append`, and `copy` commands can also use those drives.
+- `media list|format Z|sync all|read Z file|write Z file text|append Z file text|delete Z file` - manage native MDFS device stores for auxiliary SSD/HDD (`Z:`/`S:`), first extra USB-style (`A:`/`U:`), and floppy-style (`Y:`/`F:`) files. Normal `dir`, `type`, `write`, `append`, and `copy` commands can also use those drives.
 - `dos on|off|status|help|map|log|test` - enter L-DOS mode, a native DOS-style shell layer with case-insensitive `DIR`, `TYPE`, `COPY`, `DEL`, `DEL -F`, `DEL -T`, `RESTORE`, `UNDELETE`, `TOMB`, `REN`, `MD`, `RD`, `CD`, `CLS`, `VER`, `SET`, `ECHO`, `MEM`, and `EXIT`.
 - `tomb list|show|hide file|drop file|clear` - inspect, create soft hides, or delete user-owned `DEL -F` hard-delete records from `fsdelete.lardd`.
 - `mode [status|probe|real|guard]` - inspect or run the controlled real16/long64 bridge.

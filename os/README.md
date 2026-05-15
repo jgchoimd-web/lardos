@@ -45,16 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.71.0b-ami/lardos-v1.71.0b-ami.iso`. To publish the whole hardware
+`release/v1.71.1p-ami/lardos-v1.71.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
 
-`v1.71.0b` adds MediaFS/MDFS device stores for SSD/HDD, USB-style, and
-floppy-style open/save paths. `S:`, `U:`, and `Y:`/`F:` are visible drive
-stores usable from `dir`, `type`, `write`, `append`, `copy`, LARS/LARDD tools,
+`v1.71.1p` hotpatches the MediaFS/MDFS drive-letter policy to match the LardOS
+memory rule: `X:` is main, `Y:`/`F:` is floppy, `Z:`/`S:` is auxiliary SSD/HDD,
+`A:`/`U:` is the first extra USB-style store, and `R:` is writable RAM. Stores
+remain usable from `dir`, `type`, `write`, `append`, `copy`, LARS/LARDD tools,
 RXR/LPACK readers, and L-DOS file commands. Stores sync to ATA sectors after
 the boot image/LPST when the backing disk is large enough; floppy-sized boot
 images honestly report RAM fallback instead of pretending persistence.
@@ -86,8 +87,8 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
 - `LTHEME` (`.ltheme`) stores compact native shell theme presets.
 - `RXR` (`.rxr`) stores an app bundle: one RXE/SYSRXE executable plus required
   files.
-- `MDFS` stores files for the MediaFS device stores behind `S:`, `U:`, and
-  `Y:`/`F:`.
+- `MDFS` stores files for the MediaFS device stores behind `Y:`/`F:`,
+  `Z:`/`S:`, and `A:`/`U:`.
 
 These formats are record-based, readable without a renderer, and parsed by freestanding C
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
@@ -115,11 +116,11 @@ commands:
   `install hdd yes` and `install ssd yes` write the current LardOS boot image
   to the ATA target with an explicit user confirmation. The boot options screen
   also has `I` for the same installer preview.
-- `media list|format S|sync all|read S file|write S file text|append S file text`
-  manages native device stores. `S:` is SSD/HDD, `U:` is USB-style, and
-  `Y:`/`F:` is floppy-style. Normal file commands also work, for example
-  `write S:note.txt hello`, `dir U:`, `type Y:boot.txt`, and
-  `copy Z:notes.txt S:notes.txt`.
+- `media list|format Z|sync all|read Z file|write Z file text|append Z file text`
+  manages native device stores. `Y:`/`F:` is floppy-style, `Z:`/`S:` is
+  auxiliary SSD/HDD, `A:`/`U:` is the first extra USB-style store, and `R:` is
+  RAM. Normal file commands also work, for example `write Z:note.txt hello`,
+  `dir A:`, `type Y:boot.txt`, and `copy R:notes.txt Z:notes.txt`.
 - `post` / `selftest` reruns the same Power-On Self-Test diagnostics available
   from the boot option. `post baseline` opens the saved POST baseline report.
 - `magic command [args]` predicts a mistyped safe built-in command and executes
@@ -131,7 +132,7 @@ commands:
   without running it.
 - `dos on|off|status|help|map|log|test` enters L-DOS mode, a native DOS-style
   compatibility shell. It uses an `L-DOS C:\>` prompt, case-insensitive
-  commands, visible `C:`/`A:`/`U:`/`S:`/`R:` mapping to LardOS drives, and logs
+  commands, visible `C:`/`A:`/`Z:`/`U:`/`R:` mapping to LardOS drives, and logs
   state in `dosmode.lardd`.
 - `DEL -F file` in L-DOS hard-deletes a read-only built-in/LFS file from the
   active filesystem view through a user-owned `fsdelete.lardd` DELETE record.
@@ -156,8 +157,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
-- `v1.71.0b` adds MediaFS/MDFS device stores for SSD/HDD, USB-style, and
-  floppy-style file open/save commands.
+- `v1.71.1p` hotpatches MediaFS drive letters to `X:` main, `Y:` floppy,
+  `Z:` auxiliary, `A:` first extra media, and `R:` RAM while preserving
+  `F:`/`S:`/`U:` compatibility aliases.
 - `v1.70.0a` officially adds RXR app bundles: `.rxr` files carry one RXE/SYSRXE
   app plus required files, with `rxr verify`, `rxr install`, and `rxr undo last`.
 - `v1.67.1a` officially promotes the corrected RXE/SYSRXE split without
@@ -232,7 +234,7 @@ commands:
   keep GUI hitboxes, accept mouse clicks, record click counts in
   `glyphmap.lardd`, and use realtime hover/click/live rendering.
 - `v1.39.0b` starts a rough-edge repair pass for older almost-there features:
-  `dir X:`/`dir Z:` now show the right filesystem surfaces, `notes add` syncs
+  `dir X:`/`dir R:` now show the right filesystem surfaces, `notes add` syncs
   both the LARDD notes file and GUI notes file, and `larsview` gains reload,
   back, and actions commands.
 - `v1.40.0a` promotes the beta GUI/glyph/repair track to the official channel

@@ -39,6 +39,7 @@
 #include "installer.h"
 #include "mediafs.h"
 #include "version.h"
+#include "ytview.h"
 
 static volatile uint16_t* const VGA = (volatile uint16_t*)0xB8000;
 
@@ -661,11 +662,11 @@ void kmain(void)
             gui_set_loading(1);
             gui_set_response("");
             gui_render();
-            int is_file = 0;
+            int handled = 0;
             if (http_req.url[0] == 'f' && http_req.url[1] == 'i' && http_req.url[2] == 'l' && http_req.url[3] == 'e') {
                 const char* path = (http_req.url[4] == ':' && http_req.url[5] == '/' && http_req.url[6] == '/') ? http_req.url + 7 : (http_req.url[4] == ':') ? http_req.url + 5 : NULL;
                 if (path && path[0]) {
-                    is_file = 1;
+                    handled = 1;
                     const FsFile* f = fs_open(path);
                     FsWritableFile* w = fs_open_writable(path);
                     const uint8_t* d = f ? f->data : (w ? w->data : NULL);
@@ -686,10 +687,26 @@ void kmain(void)
                         gui_set_response("File not found");
                     }
                 } else {
+                    handled = 1;
                     gui_set_response("Bad file URL");
                 }
             }
-            if (!is_file) {
+            if (!handled) {
+                ytview_info_t ytinfo;
+                if (ytview_parse_url(http_req.url, &ytinfo) == 0) {
+                    static char doc_out[4096];
+                    if (ytview_format_lars(&ytinfo, resp, sizeof(s_http_resp)) == 0 &&
+                        lard_doc_to_text(resp, (uint32_t)strlen(resp), doc_out, sizeof(doc_out)) == 0) {
+                        gui_lafillo_set_content(doc_out, resp);
+                    } else if (ytview_format_card(&ytinfo, resp, sizeof(s_http_resp)) == 0) {
+                        gui_set_response(resp);
+                    } else {
+                        gui_set_response("YouTube URL recognized, but native card generation failed");
+                    }
+                    handled = 1;
+                }
+            }
+            if (!handled) {
                 if (!s_net_ready) {
                     gui_set_response("Network disabled by boot profile");
                 } else {

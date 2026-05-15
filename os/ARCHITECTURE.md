@@ -209,6 +209,16 @@ HTTP request construction is shared by HTTP and HTTPS. `net_http_request` and
 POST only for 307/308. HEAD uses the same native TCP/TLS transport while asking
 for headers without a response body.
 
+`ytview.c` is the first YouTube-specific web surface. It parses YouTube watch,
+shorts, embed, youtu.be, youtube-nocookie, and raw 11-character video IDs in
+freestanding C, then emits either a shell card or a LARS watch card with
+visible watch/embed/thumbnail fetch targets. `kernel64.c` checks GUI Doc-tab
+submissions with `ytview_parse_url` before generic network fetching so a
+YouTube URL opens as a native LardOS document instead of disappearing into an
+unsupported JavaScript page. Full playback remains an explicit native roadmap:
+stream selection, DASH/HLS fetching, demux, decode, audio, and sync are future
+LardOS-owned layers rather than hidden browser imports.
+
 `oslink.c` is the small OS-to-OS communication layer. It uses public
 `net_udp_send` and `net_udp_recv` helpers, frames packets with an `OSLK`
 signature, remembers peers by IPv4/node name, queues inbound hello/ping/text
@@ -410,6 +420,9 @@ rendered as an actionable control and can be listed with `larsform` or executed
 with `larsact`; `link label | target` and `fetch label | target` give LARS a
 native link/fetch surface for local documents and network targets; `input name
 value` gives LARS a native field record without falling back to HTML.
+`youtube_demo.lars` uses those same records, so YouTube viewing remains inside
+the ordinary document/action system instead of becoming a special external
+runtime.
 
 The GUI cursor can also be owned through the picture Unicode registry. LSH's
 `cursor set U+E000` stores a PUA codepoint in GUI state; the final cursor pass

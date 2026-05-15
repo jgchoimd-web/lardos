@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.73.0b-ami/lardos-v1.73.0b-ami.iso`. To publish the whole hardware
+`release/v1.74.0b-ami/lardos-v1.74.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.74.0b` adds native YouTube URL recognition on top of the web stack:
+`ytview`, `youtube`, and the GUI Doc tab can turn watch/shorts/embed/youtu.be
+targets into LARS watch cards with visible watch/embed/thumbnail fetch records.
+It does not import an external browser engine or hide JavaScript playback.
 
 `v1.73.0b` expands the native web stack without switching to external HTML,
 Markdown, or a browser engine: HTTP/HTTPS can choose GET, POST, or HEAD, LARS
@@ -165,6 +170,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.74.0b` adds native YouTube URL recognition, `ytview`, a GUI Doc-tab
+  watch card, `youtube_guide.lardd`, and `youtube_demo.lars` while keeping the
+  playback roadmap honest and LardOS-owned.
 - `v1.73.0b` expands the native web stack with HEAD, LARS `link`/`fetch`
   records, `webstack` commands, and POST/LUNIT coverage.
 - `v1.72.0a` officially promotes KMO shell-command binding without feature loss
@@ -383,6 +391,9 @@ commands:
   TaskPrio, networking, and LPack.
 - `webstack status|guide|demo|selftest` exposes the native web stack: LARS
   links/fetch records and HTTP/HTTPS GET/POST/HEAD request building.
+- `ytview URL_OR_ID`, `youtube ...`, and `yt ...` recognize YouTube watch,
+  shorts, embed, youtu.be, or raw video IDs and expose a native LARS watch card;
+  pasting the URL into the Doc tab opens the same card.
 - `netwatch on|off|show` records readable UDP, OSLink, and HTTP/HTTPS GET/POST/HEAD
   activity into `netwatch.lardd`.
 - `journal show|add|clear` opens the automatic `journal.lardd` event log.

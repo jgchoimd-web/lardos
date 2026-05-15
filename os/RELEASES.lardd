@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.74.0b
+ITEM Beta release adding a native YouTube view surface without importing an external browser engine, JavaScript bridge, or outside media library.
+ITEM Added ytview, youtube, and yt aliases that parse watch, shorts, embed, youtu.be, youtube-nocookie, and raw 11-character video IDs.
+ITEM The GUI Doc tab now recognizes YouTube URLs before generic fetch and opens a LARS watch card with visible watch, embed, and thumbnail fetch targets.
+ITEM Added youtube_guide.lardd and youtube_demo.lars so users can inspect the feature from inside LardOS.
+ITEM Added POST and LUNIT coverage for the YouTube URL parser, demo document, and guide while preserving WebStack GET/POST/HEAD, KMO, DRFL, RXR/RXE/SYSRXE, OSLink, and user-owned control paths.
+ITEM Full video playback remains an honest native roadmap: stream selection, DASH/HLS fetching, demux, codec decode, audio, and sync must be LardOS-owned layers.
+
 SECTION v1.73.0b
 ITEM Beta release expanding the native web stack without switching to HTML, Markdown, or an external browser/library.
 ITEM HTTP/HTTPS request construction now supports HEAD beside GET and POST; cfgsh http 1|2|3 selects GET, POST, or HEAD.

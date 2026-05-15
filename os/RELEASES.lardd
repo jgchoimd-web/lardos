@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.72.0b
+ITEM Beta release making KMO files able to define shell commands without adding a new hard-coded LSH branch.
+ITEM .kmo files now accept COMMAND, SHELL, or BIND to expose a module as a direct shell command name.
+ITEM Added kmo command file.kmo shell-command target default-message so users can create new command surfaces from writable KMO files.
+ITEM Normal KMO commands route through KModTalk targets; RAW 1 or TARGET raw still gives explicit user-owned raw-control execution when the user chooses it.
+ITEM Built-in gui_status.kmo, raw_control.kmo, and writable user0.kmo now demonstrate command-bound modules through guistat, rawdemo, and userkmo.
+ITEM Preserves existing kmo run/create/raw/set/delete behavior, DRFL 2 driver-code files, RXR/RXE/SYSRXE, KModTalk, OSLink, hardware-profiled IMG/ISO artifacts, and the user-owned control philosophy.
+
 SECTION v1.71.2a
 ITEM Official release promoting the driver-catalog track without feature loss or philosophy changes.
 ITEM DRFL 2 makes .drfl a driver-code file: it names hardware, declares the driver type, and carries editable CODE lines as the driver source/control body.

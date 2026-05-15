@@ -11,6 +11,7 @@
 
 static kmo_module_t s_kmos[KMO_MAX_MODULES];
 static uint32_t s_kmo_count;
+static uint32_t s_command_depth;
 
 static uint32_t slen(const char* s)
 {
@@ -57,6 +58,21 @@ static int is_raw_target(const char* target)
 {
     return streq_ci(target, "raw") || streq_ci(target, "lsh") ||
            streq_ci(target, "shell") || streq_ci(target, "sum");
+}
+
+static int valid_command_name(const char* s)
+{
+    uint32_t i = 0;
+    if (!s || !s[0]) return 0;
+    while (s[i]) {
+        char c = s[i];
+        int ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                 (c >= '0' && c <= '9') || c == '_' || c == '-';
+        if (!ok) return 0;
+        i++;
+        if (i >= KMO_COMMAND_MAX) return 0;
+    }
+    return 1;
 }
 
 static int has_suffix_ci(const char* name, const char* suffix)
@@ -135,6 +151,7 @@ static void defaults_for(kmo_module_t* m, const char* file)
     scopy(m->file, sizeof(m->file), file ? file : "module.kmo");
     scopy(m->id, sizeof(m->id), file ? file : "module");
     scopy(m->name, sizeof(m->name), "KMO Module");
+    m->command[0] = '\0';
     scopy(m->target, sizeof(m->target), "boot");
     scopy(m->help, sizeof(m->help), "File-defined kernel module route");
     scopy(m->default_msg, sizeof(m->default_msg), "status");
@@ -157,6 +174,9 @@ static int parse_line(kmo_module_t* m, const char* src)
     if (strncmp(src, "KMO", 3) == 0) return 0;
     if ((v = value_after_key(src, "ID")) != NULL) { scopy(m->id, sizeof(m->id), v); return 0; }
     if ((v = value_after_key(src, "NAME")) != NULL) { scopy(m->name, sizeof(m->name), v); return 0; }
+    if ((v = value_after_key(src, "COMMAND")) != NULL) { scopy(m->command, sizeof(m->command), v); return 0; }
+    if ((v = value_after_key(src, "SHELL")) != NULL) { scopy(m->command, sizeof(m->command), v); return 0; }
+    if ((v = value_after_key(src, "BIND")) != NULL) { scopy(m->command, sizeof(m->command), v); return 0; }
     if ((v = value_after_key(src, "TARGET")) != NULL) { scopy(m->target, sizeof(m->target), v); return 0; }
     if ((v = value_after_key(src, "MODULE")) != NULL) { scopy(m->target, sizeof(m->target), v); return 0; }
     if ((v = value_after_key(src, "RAW")) != NULL) { m->raw_control = truthy_value(v) ? 1 : 0; return 0; }
@@ -206,6 +226,7 @@ static int parse_kmo(kmo_module_t* m, const char* file, const char* data, uint32
     }
     if (!saw_magic) return -2;
     if (!m->target[0]) return -3;
+    if (m->command[0] && !valid_command_name(m->command)) return -4;
     if (is_raw_target(m->target)) m->raw_control = 1;
     if (!m->default_msg[0]) scopy(m->default_msg, sizeof(m->default_msg), "status");
     if (!m->body[0]) append_body_line(m->body, sizeof(m->body), "This KMO routes a file-defined module request through KModTalk.");
@@ -302,6 +323,19 @@ const kmo_module_t* kmo_find(const char* key, uint32_t* index_out)
     return NULL;
 }
 
+const kmo_module_t* kmo_find_command(const char* command, uint32_t* index_out)
+{
+    if (s_kmo_count == 0) (void)kmo_reload();
+    if (!valid_command_name(command)) return NULL;
+    for (uint32_t i = 0; i < s_kmo_count; i++) {
+        if (s_kmos[i].command[0] && streq_ci(s_kmos[i].command, command)) {
+            if (index_out) *index_out = i;
+            return &s_kmos[i];
+        }
+    }
+    return NULL;
+}
+
 int kmo_format(const char* key, char* out, uint32_t out_cap)
 {
     const kmo_module_t* m = kmo_find(key, NULL);
@@ -311,11 +345,58 @@ int kmo_format(const char* key, char* out, uint32_t out_cap)
         return -2;
     }
     snprintf(out, out_cap,
-             "KMO %s\nfile: %s\nid: %s\ntarget: %s\nmode: %s\ndefault: %s\nwritable: %s\nhelp: %s\n\n%s",
-             m->name, m->file, m->id, m->target,
+             "KMO %s\nfile: %s\nid: %s\ncommand: %s\ntarget: %s\nmode: %s\ndefault: %s\nwritable: %s\nhelp: %s\n\n%s",
+             m->name, m->file, m->id, m->command[0] ? m->command : "(none)", m->target,
              m->raw_control ? "raw-control" : "kmodtalk", m->default_msg,
              m->writable ? "yes" : "no", m->help, m->body);
     return 0;
+}
+
+static void build_command_message(const kmo_module_t* m, const char* args, char* msg, uint32_t cap)
+{
+    const char* a = skip_ws(args);
+    if (!msg || cap == 0 || !m) return;
+    msg[0] = '\0';
+    if (m->raw_control || is_raw_target(m->target)) {
+        scopy(msg, cap, m->default_msg);
+        if (a && a[0]) {
+            if (msg[0]) sappend(msg, cap, " ");
+            sappend(msg, cap, a);
+        }
+    } else {
+        scopy(msg, cap, (a && a[0]) ? a : m->default_msg);
+    }
+}
+
+int kmo_run_command(const char* command, const char* args, char* out, uint32_t out_cap)
+{
+    const kmo_module_t* m = kmo_find_command(command, NULL);
+    char msg[160];
+    int r;
+    if (!out || out_cap == 0) return -1;
+    out[0] = '\0';
+    if (!m) return -2;
+    if (s_command_depth > 4u) {
+        scopy(out, out_cap, "kmo command: recursion guard stopped module command");
+        return -3;
+    }
+    build_command_message(m, args, msg, sizeof(msg));
+    if (!msg[0]) {
+        scopy(out, out_cap, "kmo command: empty module message");
+        return -4;
+    }
+    s_command_depth++;
+    if (m->raw_control || is_raw_target(m->target)) {
+        lsh_exec(msg);
+        snprintf(out, out_cap, "kmo command %s executed: %s", m->command, msg);
+        r = 0;
+    } else {
+        r = kmodtalk_send(m->target, msg, out, out_cap);
+    }
+    s_command_depth--;
+    lardkit_trace_event("kmo", m->command, r);
+    lardkit_journal_event("kmo", m->file);
+    return r;
 }
 
 int kmo_run(const char* key, const char* message, char* out, uint32_t out_cap)
@@ -437,6 +518,10 @@ static int write_kmo_file(FsWritableFile* w, const kmo_module_t* m)
     sappend(data, sizeof(data), m->id);
     sappend(data, sizeof(data), "\nNAME ");
     sappend(data, sizeof(data), m->name);
+    if (m->command[0]) {
+        sappend(data, sizeof(data), "\nCOMMAND ");
+        sappend(data, sizeof(data), m->command);
+    }
     sappend(data, sizeof(data), "\nTARGET ");
     sappend(data, sizeof(data), m->target);
     if (m->raw_control) sappend(data, sizeof(data), "\nRAW 1");
@@ -494,6 +579,38 @@ int kmo_create(const char* name, const char* target, const char* default_msg)
     return 0;
 }
 
+int kmo_create_command(const char* name, const char* command, const char* target, const char* default_msg)
+{
+    char file[32];
+    char slot[32];
+    FsWritableFile* w;
+    kmo_module_t m;
+    if (!valid_command_name(command)) return -1;
+    if (normalize_kmo_name(name, file, sizeof(file)) != 0) return -2;
+    w = fs_open_writable(file);
+    if ((w && w->size != 0) || fs_open_readonly(file)) return -3;
+    if (!w) {
+        if (find_free_slot(slot, sizeof(slot)) != 0) return -4;
+        if (fs_rename_writable(slot, file) != 0) return -5;
+        w = fs_open_writable(file);
+    }
+    if (!w) return -6;
+    defaults_for(&m, file);
+    make_id_from_name(file, m.id, sizeof(m.id));
+    scopy(m.name, sizeof(m.name), m.id);
+    scopy(m.command, sizeof(m.command), command);
+    scopy(m.target, sizeof(m.target), target && target[0] ? target : "boot");
+    if (is_raw_target(m.target)) m.raw_control = 1;
+    scopy(m.default_msg, sizeof(m.default_msg), default_msg && default_msg[0] ? default_msg : "status");
+    scopy(m.help, sizeof(m.help), m.raw_control ? "User-created KMO shell command; raw-control path." : "User-created KMO shell command.");
+    scopy(m.body, sizeof(m.body), "This .kmo binds COMMAND to the shell, so adding this command did not require editing LSH dispatch code.\n");
+    if (write_kmo_file(w, &m) != 0) return -7;
+    (void)kmo_reload();
+    lardkit_trace_event("kmo", "command", 0);
+    lardkit_journal_event("kmo", "created KMO shell command");
+    return 0;
+}
+
 int kmo_set_field(const char* name, const char* field, const char* value)
 {
     char file[32];
@@ -507,6 +624,10 @@ int kmo_set_field(const char* name, const char* field, const char* value)
     if (parse_kmo(&m, file, (const char*)f->data, f->size) != 0) return -4;
     if (streq_ci(field, "id")) scopy(m.id, sizeof(m.id), value);
     else if (streq_ci(field, "name")) scopy(m.name, sizeof(m.name), value);
+    else if (streq_ci(field, "command") || streq_ci(field, "shell") || streq_ci(field, "bind")) {
+        if (!valid_command_name(value)) return -5;
+        scopy(m.command, sizeof(m.command), value);
+    }
     else if (streq_ci(field, "target") || streq_ci(field, "module")) scopy(m.target, sizeof(m.target), value);
     else if (streq_ci(field, "raw") || streq_ci(field, "danger") ||
              streq_ci(field, "unsafe") || streq_ci(field, "mode") ||
@@ -559,6 +680,7 @@ int kmo_selftest(void)
         "KMO 1\n"
         "ID test-kmo\n"
         "NAME Test KMO\n"
+        "COMMAND kmotest\n"
         "TARGET boot\n"
         "HELP status route\n"
         "DEFAULT status\n"
@@ -574,12 +696,13 @@ int kmo_selftest(void)
     char out[256];
     if (parse_kmo(&m, "test.kmo", sample, sizeof(sample) - 1) != 0) return -1;
     if (strcmp(m.id, "test-kmo") != 0) return -2;
-    if (strcmp(m.target, "boot") != 0) return -3;
-    if (strcmp(m.default_msg, "status") != 0) return -4;
-    if (kmodtalk_send("boot", "status", out, sizeof(out)) != 0) return -5;
-    if (!out[0]) return -6;
-    if (parse_kmo(&raw, "raw.kmo", raw_sample, sizeof(raw_sample) - 1) != 0) return -7;
-    if (!raw.raw_control) return -8;
-    if (strcmp(raw.target, "raw") != 0) return -9;
+    if (strcmp(m.command, "kmotest") != 0) return -3;
+    if (strcmp(m.target, "boot") != 0) return -4;
+    if (strcmp(m.default_msg, "status") != 0) return -5;
+    if (kmodtalk_send("boot", "status", out, sizeof(out)) != 0) return -6;
+    if (!out[0]) return -7;
+    if (parse_kmo(&raw, "raw.kmo", raw_sample, sizeof(raw_sample) - 1) != 0) return -8;
+    if (!raw.raw_control) return -9;
+    if (strcmp(raw.target, "raw") != 0) return -10;
     return 0;
 }

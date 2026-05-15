@@ -45,20 +45,19 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.71.2a-ami/lardos-v1.71.2a-ami.iso`. To publish the whole hardware
+`release/v1.72.0b-ami/lardos-v1.72.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
 
-`v1.71.2a` officially promotes the driver-catalog track. `.drfl` files are
-DRFL 2 code-carrying driver files, not hidden descriptors: each driver names
-hardware, declares its type, and carries editable `CODE` lines that can be
-loaded with `drivers load` and inspected with `drivers show name`. The release
-keeps the `v1.71.1p` MediaFS/MDFS drive-letter policy: `X:` is main,
-`Y:`/`F:` is floppy, `Z:`/`S:` is auxiliary SSD/HDD, `A:`/`U:` is the first
-extra USB-style store, and `R:` is writable RAM.
+`v1.72.0b` starts the file-defined shell-command path for KMO. `.kmo` files can
+now carry `COMMAND name`, `SHELL name`, or `BIND name`, and LSH will run that
+module when the user types the command. `kmo command file.kmo name target
+default` creates one without editing the shell dispatcher. Normal command KMO
+routes through KModTalk; `RAW 1` or `TARGET raw` still gives the user the risky
+direct LSH/raw-control path by choice.
 
 ### Run in QEMU
 
@@ -160,6 +159,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.72.0b` adds KMO shell-command binding: `.kmo` can carry `COMMAND`,
+  `SHELL`, or `BIND`, and unknown LSH commands are resolved against the KMO
+  registry before being rejected.
 - `v1.71.2a` officially promotes DRFL 2 driver-code files: `.drfl` carries
   editable driver `CODE`, `drivers show name` exposes the source/control body,
   and the external `drivers` branch ships DRFL/RXR catalogs without hiding
@@ -416,10 +418,13 @@ commands:
   text`, and `kmod history` provide a direct user-to-kernel-module message
   surface. Replies are shown immediately and logged in writable
   `kmodtalk.lardd`.
-- `kmo list|reload|show|run|create|set|delete` manages `.kmo` kernel module
+- `kmo list|reload|show|run|create|command|set|delete` manages `.kmo` kernel module
   files. Built-in `gui_status.kmo` demonstrates a file-defined GUI module
   route, while writable `user0.kmo` through `user3.kmo` let the user create,
   change, run, and remove KMO modules without adding a new hard-coded C branch.
+  `COMMAND name` binds a KMO to the shell, so typing `guistat`, `rawdemo`, or
+  `userkmo` can run a file-defined module directly. Use `kmo command
+  mystat.kmo mystat gui status` to create a new one.
   `kmo raw rawdoor.kmo sum` or `kmo set file.kmo raw 1` intentionally switches
   a module to direct raw-control LSH execution for user-owned risky workflows.
 - `ren old.txt new.txt`, `rename selected NewName`, `rename app old new`, and

@@ -172,7 +172,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("sysrxe: file app parser", sysrxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxe: normal executable parser", rxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("kmodtalk: direct module channel", kmodtalk_selftest() == 0, emit, user, &pass, &fail);
-    post_check("kmo: file and raw-control modules", kmo_selftest() == 0, emit, user, &pass, &fail);
+    post_check("kmo: file commands and raw-control modules", kmo_selftest() == 0, emit, user, &pass, &fail);
     post_check("imgglyph: user-editable Unicode slots", img_glyph_selftest() == 0, emit, user, &pass, &fail);
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);

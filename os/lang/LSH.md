@@ -47,7 +47,7 @@
 - `cfgprof save|load name` / `cfg profile` in the feature map / `userlaw show` - settings profiles and user-right policy.
 - `oschat say|send|read` - local OSLink chat-style messages.
 - `larsview open|reload|back|actions file` / `larsapp open|form|run` / `notes show|add|clear` - native document/app browser state and notes synced between `notes.lardd` and GUI `notes.txt`.
-- `kmo list|reload|show|run|create|raw|set|delete` - manage native `.kmo` kernel module files; normal KMO routes through visible KModTalk targets, while `kmo raw file.kmo command`, `RAW 1`, or `TARGET raw` explicitly enables direct risky LSH/raw-control execution.
+- `kmo list|reload|show|run|create|command|raw|set|delete` - manage native `.kmo` kernel module files; `COMMAND name`, `SHELL name`, or `BIND name` turns a KMO into a direct shell command without editing LSH, normal KMO routes through visible KModTalk targets, while `kmo raw file.kmo command`, `RAW 1`, or `TARGET raw` explicitly enables direct risky LSH/raw-control execution.
 - `lunit run tests.lunit` - run small native feature tests.
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
 - `awake on|off|status|test` - control the default-off Awakening fast-boot mode.

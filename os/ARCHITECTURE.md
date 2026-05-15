@@ -455,7 +455,8 @@ rendering and form actions (`lars`, `lardd`, `doc`, `larsform`, `larsact`),
 LardPack package inspection and install (`lpack`), native LIL script execution
 (`lil file`), writable RAM file editing (`write`, `append`, `copy`), LPST
 persistence (`sync`/`fssave`), LVCS, Lard containers, the language/runtime
-launchers, and SUM-only raw machine controls (`peek`, `poke`, `asm_`).
+launchers, KMO command bindings (`COMMAND name` inside `.kmo` files), and
+SUM-only raw machine controls (`peek`, `poke`, `asm_`).
 
 `magic` is deliberately a prefix command rather than a global autocorrect mode.
 It uses a small edit-distance predictor over known built-ins and runs the

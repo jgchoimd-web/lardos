@@ -1699,7 +1699,7 @@ static void cmd_help(const char* args)
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
-    out_append("  kmo list|create|raw|set|delete|show|run  user-owned .kmo kernel module files, including explicit raw-control\n");
+    out_append("  kmo list|create|command|raw|set|delete|show|run  .kmo kernel modules and file-defined shell commands\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
@@ -1814,6 +1814,7 @@ static void cmd_control(const char* args)
     out_append("  rxr install sample.rxr install app plus required files and reload launchers\n");
     out_append("  rxr undo last       restore the last RXR app-bundle install\n");
     out_append("  kmo create mine.kmo gui status create a user-owned kernel module file\n");
+    out_append("  kmo command mystat.kmo mystat gui status creates a shell command without editing LSH\n");
     out_append("  kmo raw rawdoor.kmo sum create an explicit risky raw-control KMO\n");
     out_append("  kmo run mine.kmo    route that .kmo through KModTalk\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
@@ -4386,6 +4387,10 @@ static void cmd_kmo(const char* args)
             out_append(m->name);
             out_append(" file=");
             out_append(m->file);
+            if (m->command[0]) {
+                out_append(" command=");
+                out_append(m->command);
+            }
             out_append(" target=");
             out_append(m->target);
             out_append(m->raw_control ? " raw-control" : " kmodtalk");
@@ -4458,6 +4463,31 @@ static void cmd_kmo(const char* args)
         }
         return;
     }
+    if (ascii_streq_ci(sub, "command") || ascii_streq_ci(sub, "cmd")) {
+        char file_arg[64];
+        char command[32];
+        char target[32];
+        int r;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+            vcs_read_word(&args, command, sizeof(command)) != 0 ||
+            vcs_read_word(&args, target, sizeof(target)) != 0) {
+            out_append("Usage: kmo command file.kmo shell-command target [default-message]\n");
+            return;
+        }
+        r = kmo_create_command(file_arg, command, target, args);
+        if (r == 0) {
+            out_append("KMO shell command created. Type ");
+            out_append(command);
+            out_append(" directly, or inspect with kmo show ");
+            out_append(file_arg);
+            out_append(".\n");
+        } else {
+            out_append("kmo command failed ");
+            out_append_i32(r);
+            out_append("\n");
+        }
+        return;
+    }
     if (ascii_streq_ci(sub, "raw") || ascii_streq_ci(sub, "danger")) {
         char file_arg[64];
         int r;
@@ -4483,7 +4513,7 @@ static void cmd_kmo(const char* args)
         int r;
         if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
             vcs_read_word(&args, field, sizeof(field)) != 0 || !args[0]) {
-            out_append("Usage: kmo set file.kmo id|name|target|raw|help|default|text value\n");
+            out_append("Usage: kmo set file.kmo id|name|command|target|raw|help|default|text value\n");
             return;
         }
         r = kmo_set_field(file_arg, field, args);
@@ -4516,7 +4546,7 @@ static void cmd_kmo(const char* args)
         out_append(kmo_selftest() == 0 ? "KMO selftest PASS.\n" : "KMO selftest FAIL.\n");
         return;
     }
-    out_append("Usage: kmo list|reload|show key|run key [message]|create file.kmo target [default]|raw file.kmo command|set file.kmo field value|delete file.kmo\n");
+    out_append("Usage: kmo list|reload|show key|run key [message]|create file.kmo target [default]|command file.kmo shell-command target [default]|raw file.kmo command|set file.kmo field value|delete file.kmo\n");
 }
 
 static void cmd_ltheme_status(void)
@@ -8378,6 +8408,17 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] >= 'a' && cmd[0] <= 'z' && cmd[1] == ':' && cmd[2] == '\0') { s_drive = (char)(cmd[0] - 32); return; }
 
     if (run_lsh_cmd(cmd, args)) return;
+    {
+        char reply[KMODTALK_REPLY_MAX];
+        int r = kmo_run_command(cmd, args, reply, sizeof(reply));
+        if (r != -2) {
+            if (reply[0]) {
+                out_append(reply);
+                out_append("\n");
+            }
+            return;
+        }
+    }
     out_append("Unknown command: ");
     out_append(cmd);
     out_append("\n");

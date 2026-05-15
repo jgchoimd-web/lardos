@@ -1,0 +1,36 @@
+RXR 1
+NAME appkit-sampler
+APP appkit_sampler.rxe
+FILE appkit_sampler.rxe
+RXE 1
+ID app-appkit-sampler
+NAME APPKIT Sampler
+ICON A
+LAYOUT panel
+COLOR 0xFF6CC0A8
+INPUT Value:
+BUTTON Build
+USE APPKIT
+UI PANEL 0 0 250 36 APPKIT Sampler
+UI BUTTON 8 8 78 20 Build | 4
+UI TOGGLE 0 46 118 22 Toggle | on
+UI SLIDER 130 46 140 18 Slider | 62
+UI PROGRESS 0 76 220 18 Progress | 44
+UI CUSTOM knob 230 76 92 24 Custom | twist
+UI OUTPUT 0 112 0 0 Sampler output
+DESKTOP 1
+DOCK 0
+TEXT Demonstrates several APPKIT widgets from an RXR bundle.
+LANG C
+CODE appkit("UI BADGE 330 9 80 18 runtime");
+CODE println(input + 44);
+CODE lsh("type appkit_sampler_notes.lardd");
+ENDFILE
+FILE appkit_sampler_notes.lardd
+LARDD 1
+TITLE APPKIT Sampler Notes
+TEXT This RXR bundle demonstrates file-defined widgets and runtime appkit output.
+TEXT It is meant for app authors on the app branch.
+END
+ENDFILE
+END

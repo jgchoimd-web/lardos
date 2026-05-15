@@ -1,0 +1,21 @@
+RXE 1
+ID app-c-math-lab
+NAME C Math Lab
+ICON C
+LAYOUT terminal
+COLOR 0xFF6E8EDB
+INPUT Number:
+BUTTON Run
+USE APPKIT
+UI PANEL 0 0 230 36 C Math Lab
+UI BUTTON 8 8 70 20 Run | 5
+UI BADGE 124 9 84 18 code
+UI INPUT 0 46 230 24 Number:
+UI OUTPUT 0 84 0 0 Math output
+DESKTOP 1
+DOCK 0
+TEXT Demonstrates app-side C-style code inside an RXE file.
+LANG C
+CODE int base = input + 10;
+CODE println(base * base);
+CODE appkit("UI BADGE 240 46 92 18 computed");

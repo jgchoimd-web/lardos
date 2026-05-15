@@ -1,0 +1,32 @@
+RXE 1
+ID app-maze-runner
+NAME Maze Runner
+ICON M
+LAYOUT game
+COLOR 0xFF62C370
+TYPE GAME
+GAME maze
+BOARD 18 9
+INPUT Move:
+BUTTON Step
+USE APPKIT
+UI PANEL 0 0 210 36 Maze Runner
+UI BUTTON 8 8 64 20 Step | right
+UI INPUT 0 46 220 24 Move:
+UI STATUS 230 46 170 24 Type W/A/S/D or arrows
+UI PROGRESS 0 76 220 18 Maze | 25
+UI BADGE 230 76 100 18 app-branch
+UI OUTPUT 0 108 0 0 Game log
+DESKTOP 1
+DOCK 1
+TEXT A small file-defined RXE maze. It is an app file, not a GUI branch.
+TEXT @ is you, G is the exit, # is wall.
+ROW ##################
+ROW #@......#.......G#
+ROW #.####..#.#####..#
+ROW #....#..#.....#..#
+ROW ####.#.#####..#..#
+ROW #....#.....#..#..#
+ROW #.########.#..#..#
+ROW #..........#.....#
+ROW ##################

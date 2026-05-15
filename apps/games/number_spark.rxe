@@ -1,0 +1,21 @@
+RXE 1
+ID app-number-spark
+NAME Number Spark
+ICON N
+LAYOUT terminal
+COLOR 0xFFF2B84B
+INPUT Number:
+BUTTON Spark
+USE APPKIT
+UI PANEL 0 0 230 36 Number Spark
+UI BUTTON 8 8 74 20 Spark | 9
+UI BADGE 126 9 86 18 C app
+UI INPUT 0 46 230 24 Number:
+UI OUTPUT 0 84 0 0 Result
+DESKTOP 1
+DOCK 1
+TEXT Type a number. The app runs C-style code stored inside this RXE file.
+LANG C
+CODE int doubled = input * 2;
+CODE println(doubled + 7);
+CODE appkit("UI PROGRESS 238 46 150 18 spark | 70");

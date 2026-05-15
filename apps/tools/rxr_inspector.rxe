@@ -1,0 +1,18 @@
+RXE 1
+ID app-rxr-inspector
+NAME RXR Inspector
+ICON R
+LAYOUT terminal
+COLOR 0xFF9AD16F
+INPUT Bundle:
+BUTTON Verify
+USE APPKIT
+UI PANEL 0 0 250 36 RXR Inspector
+UI BUTTON 8 8 78 20 Verify | sample.rxr
+UI BADGE 132 9 82 18 bundle
+UI INPUT 0 46 250 24 Bundle:
+UI OUTPUT 0 84 0 0 Inspector output
+DESKTOP 1
+DOCK 1
+TEXT Verifies the built-in sample.rxr by default. Edit COMMAND for another bundle.
+COMMAND rxr verify sample.rxr

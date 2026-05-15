@@ -1,0 +1,34 @@
+RXR 1
+NAME notes-plus
+APP notes_plus.rxe
+FILE notes_plus.rxe
+RXE 1
+ID app-notes-plus
+NAME Notes Plus
+ICON +
+LAYOUT editor
+COLOR 0xFFE4A54F
+INPUT Note:
+BUTTON Add
+USE APPKIT
+UI PANEL 0 0 230 36 Notes Plus
+UI BUTTON 8 8 72 20 Add | note
+UI BADGE 124 9 82 18 RXR
+UI INPUT 0 46 260 24 Note:
+UI OUTPUT 0 84 0 0 Notes output
+DESKTOP 1
+DOCK 1
+TEXT A bundled helper app. It ships with notes_plus_help.lardd.
+COMMAND append notes.txt
+ENDFILE
+FILE notes_plus_help.lardd
+LARDD 1
+TITLE Notes Plus
+TEXT Notes Plus is a small RXR-bundled helper app.
+TEXT The app and this help file are normal user-owned files after install.
+SECTION Commands
+ITEM type notes_plus_help.lardd
+ITEM rxr undo last
+END
+ENDFILE
+END

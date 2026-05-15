@@ -1,0 +1,30 @@
+RXR 1
+NAME treasure-trail
+APP treasure_trail.rxe
+FILE treasure_trail.rxe
+RXE 1
+ID app-treasure-trail
+NAME Treasure Trail
+ICON T
+LAYOUT terminal
+COLOR 0xFF67B7DC
+INPUT Step:
+BUTTON Search
+USE APPKIT
+UI PANEL 0 0 230 36 Treasure Trail
+UI BUTTON 8 8 80 20 Search | 1
+UI BADGE 126 9 82 18 RXR
+UI INPUT 0 46 230 24 Step:
+UI OUTPUT 0 84 0 0 Trail output
+DESKTOP 1
+DOCK 1
+TEXT This game is bundled as RXR with treasure_hint.txt.
+LANG C
+CODE println(input + 100);
+CODE lsh("type treasure_hint.txt");
+ENDFILE
+FILE treasure_hint.txt
+Treasure hint: the exit is usually behind the quiet wall.
+Because this file came from RXR, the user can edit or delete it.
+ENDFILE
+END

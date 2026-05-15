@@ -1,0 +1,18 @@
+RXE 1
+ID app-theme-card
+NAME Theme Card
+ICON C
+LAYOUT panel
+COLOR 0xFF4FB7B0
+INPUT Theme:
+BUTTON Preview
+USE APPKIT
+UI PANEL 0 0 240 36 Theme Card
+UI BUTTON 8 8 84 20 Preview | default
+UI BADGE 132 9 84 18 theme
+UI INPUT 0 46 240 24 Theme:
+UI OUTPUT 0 84 0 0 Theme output
+DESKTOP 1
+DOCK 1
+TEXT Preview the built-in default theme file.
+COMMAND ltheme preview default.ltheme

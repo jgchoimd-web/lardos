@@ -1,0 +1,20 @@
+RXE 1
+ID app-system-pulse
+NAME System Pulse
+ICON P
+LAYOUT terminal
+COLOR 0xFF5DB7A6
+INPUT Command:
+BUTTON Pulse
+USE APPKIT
+UI PANEL 0 0 240 36 System Pulse
+UI BUTTON 8 8 76 20 Pulse | status
+UI BADGE 130 9 82 18 tool
+UI OUTPUT 0 46 0 0 Pulse output
+DESKTOP 1
+DOCK 1
+TEXT Runs useful built-in status commands from an app file.
+LANG C
+CODE lsh("status");
+CODE lsh("time");
+CODE lsh("fsstat");

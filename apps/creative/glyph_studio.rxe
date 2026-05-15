@@ -1,0 +1,18 @@
+RXE 1
+ID app-glyph-studio
+NAME Glyph Studio
+ICON G
+LAYOUT panel
+COLOR 0xFFB86AD8
+INPUT Slot:
+BUTTON Show
+USE APPKIT
+UI PANEL 0 0 240 36 Glyph Studio
+UI BUTTON 8 8 70 20 Show | U+E000
+UI BADGE 126 9 96 18 picture
+UI INPUT 0 46 240 24 Slot:
+UI OUTPUT 0 84 0 0 Glyph output
+DESKTOP 1
+DOCK 1
+TEXT A small launcher for user-editable picture Unicode workflows.
+COMMAND glyph show U+E000

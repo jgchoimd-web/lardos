@@ -165,7 +165,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Reversibility: settings, packages, and risky changes should have rollback, history, or capsule trails.\n"
     "ITEM Repair over halt: panic room, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
-    "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, SYSRXE, RXE, KMO, LFS, and picture Unicode keep the system's surface its own.\n"
+    "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
     "SECTION Commands\n"
@@ -256,6 +256,16 @@ static FsWritableFile ram_user1_kmo = { "user1.kmo", ram_user1_kmo_buf, 0, USER_
 static FsWritableFile ram_user2_kmo = { "user2.kmo", ram_user2_kmo_buf, 0, USER_KMO_CAP };
 static FsWritableFile ram_user3_kmo = { "user3.kmo", ram_user3_kmo_buf, 0, USER_KMO_CAP };
 
+#define RXR_SLOT_CAP 4096u
+static uint8_t ram_rxrslot0_buf[RXR_SLOT_CAP];
+static uint8_t ram_rxrslot1_buf[RXR_SLOT_CAP];
+static uint8_t ram_rxrslot2_buf[RXR_SLOT_CAP];
+static uint8_t ram_rxrslot3_buf[RXR_SLOT_CAP];
+static FsWritableFile ram_rxrslot0 = { "rxrslot0.dat", ram_rxrslot0_buf, 0, RXR_SLOT_CAP };
+static FsWritableFile ram_rxrslot1 = { "rxrslot1.dat", ram_rxrslot1_buf, 0, RXR_SLOT_CAP };
+static FsWritableFile ram_rxrslot2 = { "rxrslot2.dat", ram_rxrslot2_buf, 0, RXR_SLOT_CAP };
+static FsWritableFile ram_rxrslot3 = { "rxrslot3.dat", ram_rxrslot3_buf, 0, RXR_SLOT_CAP };
+
 #define FS_HIDDEN_READONLY_MAX 32u
 static char s_hidden_readonly[FS_HIDDEN_READONLY_MAX][32];
 static uint32_t s_hidden_readonly_count;
@@ -337,6 +347,7 @@ static const uint8_t file_lardos_lars[] =
     "li Awakening mode is off by default; use awake on or awake off to choose the next boot path.\n"
     "li Use crashlog show to inspect panic and diagnostic history.\n"
     "li Use lpack verify sample.lpack before install, and lpack undo last to roll back the last install.\n"
+    "li Use rxr verify sample.rxr, rxr list sample.rxr, and rxr install sample.rxr to install an app bundle with its files.\n"
     "li Use sysrxe list, sysrxe reload, sysrxe show userapp.sysrxe, and sysrxe run 0 text for file-defined system executables.\n"
     "li Use rxe list, rxe show demo_game.rxe, and rxe run 0 right to play the normal RXE demo game.\n"
     "li Use rxe show langdemo.rxe and rxe run 1 7 after rxe reload to try app-side C/LardOS language code.\n"
@@ -398,6 +409,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.67.2a officially promotes the VirtualBox boot hotpatch without feature loss or value changes.\n"
     "li v1.68.0a officially adds APPKIT file-defined/runtime app UI, custom widgets, barcode Unicode fallback, and tail-less cursors without feature loss.\n"
     "li v1.69.0a officially lets RXE/SYSRXE apps carry LANG/CODE for LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, and LML.\n"
+    "li v1.70.0a officially adds RXR app bundles for RXE/SYSRXE apps and required files.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -457,6 +469,8 @@ static const uint8_t file_lardos_lars[] =
     "cmd crashlog show\n"
     "cmd lpack verify sample.lpack\n"
     "cmd lpack list sample.lpack\n"
+    "cmd rxr verify sample.rxr\n"
+    "cmd rxr list sample.rxr\n"
     "cmd screencheck retro\n"
     "cmd bugeye scan\n"
     "cmd bugreplay show\n"
@@ -711,6 +725,61 @@ static const uint8_t file_sample_lpack[] =
     "FILE notes.txt\n"
     "Installed by LardPack.\n"
     "Use type notes.txt after install.\n"
+    "ENDFILE\n"
+    "END\n";
+
+static const uint8_t file_rxr_guide[] =
+    "LARDD 1\n"
+    "TITLE RXR App Bundle Format\n"
+    "TEXT RXR bundles one RXE/SYSRXE app with the files it needs, without an external package manager.\n"
+    "TEXT It is for apps and app dependencies; LPACK remains the broader package/install format.\n"
+    "SECTION Syntax\n"
+    "ITEM RXR 1\n"
+    "ITEM NAME bundle-name\n"
+    "ITEM APP primary.rxe or primary.sysrxe\n"
+    "ITEM FILE name starts a bundled file body.\n"
+    "ITEM ENDFILE ends the file body.\n"
+    "ITEM END ends the bundle.\n"
+    "SECTION Commands\n"
+    "ITEM rxr info sample.rxr\n"
+    "ITEM rxr list sample.rxr\n"
+    "ITEM rxr verify sample.rxr\n"
+    "ITEM rxr install sample.rxr\n"
+    "ITEM rxr undo last\n"
+    "SECTION Values\n"
+    "ITEM RXR install writes normal user-owned files, then reloads RXE/SYSRXE apps.\n"
+    "ITEM The app code stays inside the .rxe/.sysrxe file and can use LardOS languages or C-style app code.\n"
+    "ITEM Undo restores the last RXR snapshot and releases newly created RXR slots when possible.\n"
+    "END\n";
+
+static const uint8_t file_sample_rxr[] =
+    "RXR 1\n"
+    "NAME language-demo-bundle\n"
+    "APP rxr_app.rxe\n"
+    "FILE rxr_app.rxe\n"
+    "RXE 1\n"
+    "ID rxr-app\n"
+    "NAME RXR App\n"
+    "ICON R\n"
+    "LAYOUT terminal\n"
+    "COLOR 0xFF74C7A2\n"
+    "INPUT Number:\n"
+    "BUTTON Run\n"
+    "USE APPKIT\n"
+    "UI PANEL 0 0 220 36 RXR bundled app\n"
+    "UI BUTTON 8 8 72 20 Run | 7\n"
+    "UI BADGE 118 9 70 18 RXR\n"
+    "UI INPUT 0 46 220 24 Number:\n"
+    "UI OUTPUT 0 84 0 0 Bundle output\n"
+    "DESKTOP 1\n"
+    "DOCK 1\n"
+    "TEXT This app was installed from sample.rxr with rxr_data.txt beside it.\n"
+    "LANG C\n"
+    "CODE println(input + 70);\n"
+    "CODE lsh(\"type rxr_data.txt\");\n"
+    "ENDFILE\n"
+    "FILE rxr_data.txt\n"
+    "RXR dependency file installed with the app.\n"
     "ENDFILE\n"
     "END\n";
 
@@ -1007,10 +1076,13 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command paniccapsule\n"
     "CHECK command sysrxe\n"
     "CHECK command rxe\n"
+    "CHECK command rxr\n"
     "CHECK command kmod\n"
     "CHECK command kmo\n"
     "CHECK file sysrxe_guide.lardd\n"
     "CHECK file rxe_guide.lardd\n"
+    "CHECK file rxr_guide.lardd\n"
+    "CHECK file sample.rxr\n"
     "CHECK file kmodtalk_guide.lardd\n"
     "CHECK file kmo_guide.lardd\n"
     "CHECK file hello.sysrxe\n"
@@ -1110,6 +1182,8 @@ static const FsFile FS_FILES[] = {
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
+    { "rxr_guide.lardd", file_rxr_guide, sizeof(file_rxr_guide) - 1 },
+    { "sample.rxr",    file_sample_rxr,    sizeof(file_sample_rxr) - 1 },
     { "sysrxe_guide.lardd", file_sysrxe_guide, sizeof(file_sysrxe_guide) - 1 },
     { "rxe_guide.lardd", file_rxe_guide, sizeof(file_rxe_guide) - 1 },
     { "kmodtalk_guide.lardd", file_kmodtalk_guide, sizeof(file_kmodtalk_guide) - 1 },
@@ -1538,7 +1612,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 27u;
+    return 31u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -1570,6 +1644,10 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 24) return &ram_user1_kmo;
     if (idx == 25) return &ram_user2_kmo;
     if (idx == 26) return &ram_user3_kmo;
+    if (idx == 27) return &ram_rxrslot0;
+    if (idx == 28) return &ram_rxrslot1;
+    if (idx == 29) return &ram_rxrslot2;
+    if (idx == 30) return &ram_rxrslot3;
     return NULL;
 }
 
@@ -1960,6 +2038,67 @@ FsWritableFile* fs_open_writable(const char* name)
         if (*a == '\0' && *b == '\0') return w;
     }
     return NULL;
+}
+
+static int fs_is_empty_rxr_slot(const FsWritableFile* w)
+{
+    static const char prefix[] = "rxrslot";
+    uint32_t i = 0;
+    if (!w || w->size != 0) return 0;
+    while (prefix[i]) {
+        if (w->name[i] != prefix[i]) return 0;
+        i++;
+    }
+    return 1;
+}
+
+static FsWritableFile* fs_find_empty_rxr_slot(void)
+{
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        if (fs_is_empty_rxr_slot(w)) return w;
+    }
+    return NULL;
+}
+
+uint32_t fs_creatable_writable_slots(void)
+{
+    uint32_t count = 0;
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        if (fs_is_empty_rxr_slot(w)) count++;
+    }
+    return count;
+}
+
+int fs_can_create_writable(const char* name)
+{
+    if (!fs_valid_user_name(name)) return 0;
+    if (fs_open_writable(name)) return 1;
+    if (fs_open_readonly(name)) return 0;
+    return fs_find_empty_rxr_slot() ? 1 : 0;
+}
+
+uint32_t fs_writable_capacity_for(const char* name)
+{
+    FsWritableFile* w = fs_open_writable(name);
+    if (w) return w->cap;
+    if (!fs_valid_user_name(name) || fs_open_readonly(name)) return 0;
+    w = fs_find_empty_rxr_slot();
+    return w ? w->cap : 0;
+}
+
+FsWritableFile* fs_open_or_create_writable(const char* name)
+{
+    FsWritableFile* w = fs_open_writable(name);
+    if (w) return w;
+    if (!fs_valid_user_name(name) || fs_open_readonly(name)) return NULL;
+    w = fs_find_empty_rxr_slot();
+    if (!w) return NULL;
+    fs_copy_name(w->name, sizeof(w->name), name);
+    w->size = 0;
+    s_fs_dirty = 1;
+    return w;
 }
 
 int fs_rename_writable(const char* old_name, const char* new_name)

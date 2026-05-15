@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.70.0a
+ITEM Official release adding RXR app bundle files without feature loss or philosophy changes.
+ITEM RXR 1 bundles an RXE/SYSRXE app and its required files through APP, FILE, ENDFILE, and END records.
+ITEM Added rxr info/list/verify/install/undo/test plus sample.rxr and rxr_guide.lardd.
+ITEM RXR install can create user-owned writable targets from RXR slots, then reload RXE/SYSRXE apps so installed apps appear without hard-coded desktop branches.
+ITEM Keeps app-side LANG/CODE, APPKIT, RXE/SYSRXE split, KMO, KModTalk, OSLink, hardware-profiled IMG/ISO artifacts, raw IMG, HDD/SSD installer, and user-owned control values intact.
+
 SECTION v1.69.0a
 ITEM Official release adding app-side language runners for RXE/SYSRXE without feature loss or philosophy changes.
 ITEM App files can select LANG LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, or LML and carry their own CODE lines inside the .rxe/.sysrxe file.

@@ -45,17 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.69.0a-ami/lardos-v1.69.0a-ami.iso`. To publish the whole hardware
+`release/v1.70.0a-ami/lardos-v1.70.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
 
-`v1.69.0a` officially adds app-side language runners for RXE/SYSRXE without
-feature loss or value changes. App files can select `LANG LSH`, `LIL`, `GASM`,
-`BOSL`, `LAFILLO`, `OSVM`, `C`, or `LML` and carry their own `CODE` lines inside
-the `.rxe`/`.sysrxe` file. It keeps the `v1.68.0a` APPKIT/custom-widget GUI work,
+`v1.70.0a` officially adds RXR app bundles without feature loss or value
+changes. `RXR 1` files collect one `.rxe` or `.sysrxe` app plus the files it
+needs, using visible `APP`, `FILE`, `ENDFILE`, and `END` records. `rxr install`
+writes normal user-owned files, reloads RXE/SYSRXE launchers, and can be undone
+with `rxr undo last`. It keeps app-side `LANG`/`CODE`, APPKIT/custom widgets,
 hardware-profiled boot media, raw IMG, HDD/SSD installer, hybrid USB,
 RXE/SYSRXE, KMO, KModTalk, OSLink, and user-owned control paths intact.
 
@@ -84,8 +85,10 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
 - `LGUILIB` (`.lguilib`) stores native GUI library/theme records for the
   overlay chrome.
 - `LTHEME` (`.ltheme`) stores compact native shell theme presets.
+- `RXR` (`.rxr`) stores an app bundle: one RXE/SYSRXE executable plus required
+  files.
 
-Both are record-based, readable without a renderer, and parsed by freestanding C
+These formats are record-based, readable without a renderer, and parsed by freestanding C
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
 does not use HTML or Markdown for its own built-in documents.
 
@@ -147,6 +150,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.70.0a` officially adds RXR app bundles: `.rxr` files carry one RXE/SYSRXE
+  app plus required files, with `rxr verify`, `rxr install`, and `rxr undo last`.
 - `v1.67.1a` officially promotes the corrected RXE/SYSRXE split without
   feature loss or philosophy changes.
 - `v1.67.1p` hotpatches the RXE naming model: `sysrxe` is reserved for system
@@ -439,6 +444,9 @@ commands:
   and rolls back native LardPack packages. Verification reports package hash,
   warning/error counts, installable targets, and payload size before install.
   The built-in `sample.lpack` writes a starter note into `notes.txt`.
+- `rxr info|list|verify|install|undo file.rxr` inspects, validates, installs,
+  and rolls back native app bundles. The built-in `sample.rxr` installs a normal
+  `.rxe` app and its required `rxr_data.txt` dependency as editable user files.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has

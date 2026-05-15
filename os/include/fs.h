@@ -30,6 +30,10 @@ const char* fs_readonly_deleted_name(uint32_t index);
 
 /* Writable RAM files (notes, temp). Returns NULL if not found. */
 FsWritableFile* fs_open_writable(const char* name);
+FsWritableFile* fs_open_or_create_writable(const char* name);
+int fs_can_create_writable(const char* name);
+uint32_t fs_creatable_writable_slots(void);
+uint32_t fs_writable_capacity_for(const char* name);
 int fs_rename_writable(const char* old_name, const char* new_name);
 uint32_t fs_write(FsWritableFile* f, uint32_t offset, const uint8_t* buf, uint32_t len);
 uint32_t fs_append(FsWritableFile* f, const uint8_t* buf, uint32_t len);

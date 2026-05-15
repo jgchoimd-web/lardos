@@ -20,6 +20,7 @@
 #include "drfl.h"
 #include "lcontainer.h"
 #include "lpack.h"
+#include "rxr.h"
 #include "lardkit.h"
 #include "gui.h"
 #include "post.h"
@@ -317,6 +318,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
+    { "rxr", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
     { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
@@ -1394,6 +1396,7 @@ static void cmd_help(const char* args)
     out_append("  help control values status install dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
+    out_append("  rxr info|list|verify|install file.rxr; rxr undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
@@ -1508,6 +1511,9 @@ static void cmd_control(const char* args)
     out_append("  crashlog show       inspect panic and diagnostic history\n");
     out_append("  lpack verify sample.lpack inspect package integrity before install\n");
     out_append("  lpack undo last     restore files changed by the last install\n");
+    out_append("  rxr verify sample.rxr inspect an app bundle before install\n");
+    out_append("  rxr install sample.rxr install app plus required files and reload launchers\n");
+    out_append("  rxr undo last       restore the last RXR app-bundle install\n");
     out_append("  kmo create mine.kmo gui status create a user-owned kernel module file\n");
     out_append("  kmo raw rawdoor.kmo sum create an explicit risky raw-control KMO\n");
     out_append("  kmo run mine.kmo    route that .kmo through KModTalk\n");
@@ -2554,6 +2560,144 @@ static void cmd_lpack(const char* args)
         return;
     }
     cmd_lpack_op(sub, args);
+}
+
+static void cmd_rxr_reload_apps(void)
+{
+    (void)sysrxe_reload();
+    (void)rxe_reload();
+    gui_reload_sysrxe_apps();
+}
+
+static void cmd_rxr_show(const char* file_arg, const uint8_t* data, uint32_t size, int verbose)
+{
+    int count = rxr_file_count(data, size);
+    rxr_verify_info_t verify;
+    int vr = rxr_verify(data, size, &verify);
+    if (count < 0 || !verify.valid) {
+        out_append("rxr: invalid app bundle.\n");
+        return;
+    }
+    out_append("RXR ");
+    out_append(file_arg);
+    out_append(": files=");
+    out_append_u32((uint32_t)count);
+    out_append(" app-files=");
+    out_append_u32(verify.app_files);
+    out_append(" primary=");
+    out_append(verify.primary_app[0] ? verify.primary_app : "(none)");
+    out_append(" bytes=");
+    out_append_u32(verify.total_bytes);
+    out_append(" hash=");
+    out_append_hex32(verify.hash);
+    out_append(vr == 0 ? " status=OK" : " status=CHECK");
+    out_append("\n");
+    if (verbose) {
+        for (uint32_t i = 0; i < (uint32_t)count; i++) {
+            rxr_file_info_t info;
+            if (rxr_file_at(data, size, i, &info) != 0) continue;
+            out_append("  ");
+            out_append_u32(i);
+            out_append(" ");
+            out_append(info.name);
+            out_append(info.is_app ? " app " : " file ");
+            out_append_u32(info.size);
+            out_append(" bytes\n");
+        }
+    }
+}
+
+static void cmd_rxr_op(const char* op, const char* args)
+{
+    char file_arg[64];
+    const uint8_t* data;
+    uint32_t size;
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+        lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
+        out_append("Usage: rxr info|list|verify|checksum|install [drive:]file.rxr\n");
+        return;
+    }
+    if (strcmp(op, "info") == 0) {
+        cmd_rxr_show(file_arg, data, size, 0);
+        return;
+    }
+    if (strcmp(op, "list") == 0 || strcmp(op, "ls") == 0) {
+        cmd_rxr_show(file_arg, data, size, 1);
+        return;
+    }
+    if (strcmp(op, "verify") == 0 || strcmp(op, "check") == 0 || strcmp(op, "checksum") == 0) {
+        rxr_verify_info_t info;
+        int r = rxr_verify(data, size, &info);
+        out_append("rxr verify ");
+        out_append(file_arg);
+        out_append(r == 0 ? ": OK\n" : ": CHECK\n");
+        out_append("files=");
+        out_append_u32(info.files);
+        out_append(" apps=");
+        out_append_u32(info.app_files);
+        out_append(" installable=");
+        out_append_u32(info.installable);
+        out_append(" bytes=");
+        out_append_u32(info.total_bytes);
+        out_append(" hash=");
+        out_append_hex32(info.hash);
+        out_append(" warnings=");
+        out_append_u32(info.warnings);
+        out_append(" errors=");
+        out_append_u32(info.errors);
+        out_append(" primary=");
+        out_append(info.primary_app[0] ? info.primary_app : "(none)");
+        out_append("\n");
+        return;
+    }
+    if (strcmp(op, "install") == 0 || strcmp(op, "add") == 0) {
+        int installed = rxr_install(data, size);
+        if (installed < 0) {
+            out_append("rxr: install failed; invalid app bundle or no writable RXR slot.\n");
+            return;
+        }
+        cmd_rxr_reload_apps();
+        out_append("rxr: installed ");
+        out_append_u32((uint32_t)installed);
+        out_append(installed == 1 ? " file and reloaded launchers.\n" : " files and reloaded launchers.\n");
+        return;
+    }
+    out_append("Usage: rxr info|list|verify|install [drive:]file.rxr\n");
+}
+
+static void cmd_rxr(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
+        rxr_undo_info_t undo;
+        rxr_undo_info(&undo);
+        out_append("Usage: rxr info|list|verify|checksum|install file.rxr | rxr undo last | rxr test\n");
+        out_append("undo=");
+        out_append(undo.ready ? "ready" : "empty");
+        out_append(" files=");
+        out_append_u32(undo.files);
+        out_append(" bytes=");
+        out_append_u32(undo.bytes);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "undo") == 0 || strcmp(sub, "rollback") == 0) {
+        int r = rxr_undo_last();
+        if (r < 0) out_append("rxr: no install snapshot to undo.\n");
+        else {
+            cmd_rxr_reload_apps();
+            out_append("rxr: restored ");
+            out_append_u32((uint32_t)r);
+            out_append(r == 1 ? " file and reloaded launchers.\n" : " files and reloaded launchers.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(rxr_selftest() == 0 ? "rxr: selftest OK\n" : "rxr: selftest failed\n");
+        return;
+    }
+    cmd_rxr_op(sub, args);
 }
 
 static const char* oslink_type_name(uint8_t type)
@@ -7642,6 +7786,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) lardkit_trace_event("kmodtalk", cmd, 0);
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
+    if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
     if (strcmp(cmd, "ltheme") == 0 ||
@@ -7773,6 +7918,12 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lpackverify") == 0) { cmd_lpack_op("verify", args); return; }
     if (strcmp(cmd, "lpackchecksum") == 0) { cmd_lpack_op("checksum", args); return; }
     if (strcmp(cmd, "lpackundo") == 0) { cmd_lpack("undo"); return; }
+    if (strcmp(cmd, "rxr") == 0) { cmd_rxr(args); return; }
+    if (strcmp(cmd, "rxrls") == 0) { cmd_rxr_op("list", args); return; }
+    if (strcmp(cmd, "rxrinstall") == 0) { cmd_rxr_op("install", args); return; }
+    if (strcmp(cmd, "rxrverify") == 0) { cmd_rxr_op("verify", args); return; }
+    if (strcmp(cmd, "rxrchecksum") == 0) { cmd_rxr_op("checksum", args); return; }
+    if (strcmp(cmd, "rxrundo") == 0) { cmd_rxr("undo"); return; }
     if (strcmp(cmd, "ren") == 0 || strcmp(cmd, "rename") == 0) { cmd_rename(args); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }

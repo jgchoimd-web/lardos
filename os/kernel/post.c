@@ -27,6 +27,7 @@
 #include "oslink.h"
 #include "pci.h"
 #include "rxe.h"
+#include "rxr.h"
 #include "screencheck.h"
 #include "string.h"
 #include "syscall.h"
@@ -120,6 +121,8 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: default.ltheme", fs_open("default.ltheme") != NULL, emit, user, &pass, &fail);
     post_check("fs: sysrxe guide", fs_open("sysrxe_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: rxe guide", fs_open("rxe_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: rxr guide", fs_open("rxr_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: sample rxr", fs_open("sample.rxr") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk guide", fs_open("kmodtalk_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmo guide", fs_open("kmo_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: hello sysrxe", fs_open("hello.sysrxe") != NULL, emit, user, &pass, &fail);
@@ -148,7 +151,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: user kmo writable", fs_open_writable("user0.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: hard delete overlay ownership", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
-    post_check("fs: writable directory index", fs_writable_count() >= 27u, emit, user, &pass, &fail);
+    post_check("fs: writable directory index", fs_writable_count() >= 31u, emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
     post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);
 
@@ -156,6 +159,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("doc: LARDD renderer", post_doc_parse("lardd_guide.lardd"), emit, user, &pass, &fail);
     post_check("doc: LARS form actions", lard_doc_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
+    post_check("rxr: app bundle parser", rxr_selftest() == 0, emit, user, &pass, &fail);
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);
     post_check("sysrxe: file app parser", sysrxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxe: normal executable parser", rxe_selftest() == 0, emit, user, &pass, &fail);

@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.76.0a
+ITEM Official release promoting the v1.76.0b OS virtual path namespace without feature loss or philosophy changes.
+ITEM Keeps folder/inside/path resolution in the kernel filesystem layer for read-only files, writable files, app syscalls, LARDX, LDLL, and Y:/Z:/A: MediaFS stores.
+ITEM Keeps RXR alias priority for rxr/name so app-bundle dependency files remain install-path independent.
+ITEM Keeps quoted path words plus vpath/pathmap so users can inspect and control the visible mapping before using it.
+ITEM Ships the full hardware-profiled IMG/ISO set for universal, seabios, ami, vbox, usb, and realpc.
+
 SECTION v1.76.0b
 ITEM Beta release generalizing OS virtual file paths beyond RXR bundles.
 ITEM Any path shaped folder/inside/path is resolved by the kernel filesystem layer to a safe flat LardOS filename, and MediaFS applies the same rule for Y:/Z:/A: device stores.

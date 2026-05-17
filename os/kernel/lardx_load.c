@@ -5,6 +5,7 @@
 #include "lardx_load.h"
 #include "fs.h"
 #include "mmu.h"
+#include "rxr.h"
 #include "usermode.h"
 #include "syscall.h"
 #include <stdint.h>
@@ -22,7 +23,10 @@ static uint32_t rd_u32(const uint8_t* p)
 
 int lardx_run(const char* path, int argc, const char** argv)
 {
-    const FsFile* f = fs_open(path);
+    char resolved[64];
+    const char* load_path = path;
+    if (rxr_resolve_path(path, resolved, sizeof(resolved)) >= 0) load_path = resolved;
+    const FsFile* f = fs_open(load_path);
     if (!f || f->size < 32) return -1;
 
     const uint8_t* d = f->data;

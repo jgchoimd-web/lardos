@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.75.0b
+ITEM Beta release adding RXR bundle-internal paths for RXE/SYSRXE apps and their dependency files.
+ITEM Apps installed from .rxr can open rxr/name through LSH commands, C-style app code that calls lsh("..."), user-mode SYS_OPEN, LARDX loading, and LDLL loading.
+ITEM Added rxr path rxr/file plus rxr aliases/map so users can inspect the visible alias from bundle path to installed file target.
+ITEM Updated sample.rxr so the demo app reads rxr/rxr_data.txt instead of hard-coding the installed dependency name.
+ITEM POST now checks the RXR path resolver, preserving RXR/RXE/SYSRXE, KMO, DRFL, MediaFS, WebStack, and user-owned control behavior without feature loss.
+
 SECTION v1.74.1p
 ITEM Hotpatch rollback removing the site-specific video-view beta surface from the current branch and boot media.
 ITEM Removed the service-specific parser module, shell aliases, built-in guide/demo documents, POST/LUNIT checks, OSLink allowlist entry, and GUI Doc-tab special case.

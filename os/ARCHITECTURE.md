@@ -79,7 +79,7 @@ flowchart TB
     SMP["smp + ap_trampoline"]
     Syscall["syscall"]
     Drivers["pci / rtl8139 / ps2 / rtc"]
-    Storage["fs / lfs / mediafs / ldll / lpack"]
+    Storage["fs / lfs / mediafs / ldll / lpack / rxr"]
     POST["post diagnostics"]
     Net["net DHCP DNS TCP HTTP"]
     OSLink["oslink OS-to-OS UDP"]
@@ -433,7 +433,11 @@ without depending on an external package manager.
 `FILE`, `ENDFILE`, and `END` records to carry one `.rxe` or `.sysrxe` app plus
 the files it needs. RXR installs create normal user-owned writable files from
 RXR slots, reload RXE/SYSRXE launchers, and keep undo state so app bundles stay
-reversible instead of being hidden inside hand-coded GUI branches.
+reversible instead of being hidden inside hand-coded GUI branches. Installed
+apps can refer to their bundled files as `rxr/name`; the resolver maps that
+bundle-internal path to the current installed target for shell reads, app
+syscalls, LARDX, and LDLL without exposing a drive-letter dependency in app
+source.
 
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
@@ -442,8 +446,9 @@ real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL code files, expected PCI devices, GUI framebuffer/layout state,
 ScreenRAM scratch storage, OSLink packet framing, local bus, and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
-LardKit user-control tools, LardPack/RXR package parsing, ScreenCheck visual diagnostics, LPST metadata, LVCS
-hashing, containers, the installer boot-stage selftest, and LIL feature forms.
+LardKit user-control tools, LardPack/RXR package parsing and RXR internal path
+resolution, ScreenCheck visual diagnostics, LPST metadata, LVCS hashing,
+containers, the installer boot-stage selftest, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),

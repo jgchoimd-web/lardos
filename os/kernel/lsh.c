@@ -340,7 +340,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
-    { "rxr", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrundo", 1 },
+    { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
     { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
@@ -632,6 +632,7 @@ static void resolve_path(const char* path, char* out_drive, char* out_name, uint
 {
     char drv = s_drive;
     const char* p = path;
+    char raw[64];
     while (*p == ' ' || *p == '\t') p++;
     if (p[0] && p[1] == ':') {
         drv = (char)((p[0] >= 'a' && p[0] <= 'z') ? p[0] - 32 : p[0]);
@@ -640,7 +641,14 @@ static void resolve_path(const char* path, char* out_drive, char* out_name, uint
     }
     *out_drive = drv;
     uint32_t i = 0;
-    while (*p && *p != ' ' && *p != '\t' && i + 1 < name_cap) out_name[i++] = *p++;
+    while (*p && *p != ' ' && *p != '\t' && i + 1 < sizeof(raw)) raw[i++] = *p++;
+    raw[i] = '\0';
+    if (rxr_resolve_path(raw, out_name, name_cap) >= 0) return;
+    i = 0;
+    while (raw[i] && i + 1 < name_cap) {
+        out_name[i] = raw[i];
+        i++;
+    }
     out_name[i] = '\0';
 }
 
@@ -1711,7 +1719,7 @@ static void cmd_help(const char* args)
     out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
-    out_append("  rxr info|list|verify|install file.rxr; rxr undo last\n");
+    out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  media list|format Z|sync all|write Z file text  X/Y/Z/A/R drive rules\n");
@@ -2986,6 +2994,45 @@ static void cmd_rxr_show(const char* file_arg, const uint8_t* data, uint32_t siz
     }
 }
 
+static void cmd_rxr_resolve(const char* args)
+{
+    char path[64];
+    char target[RXR_NAME_MAX + 1u];
+    int r;
+    if (vcs_read_word(&args, path, sizeof(path)) != 0) {
+        out_append("Usage: rxr path rxr/file\n");
+        return;
+    }
+    r = rxr_resolve_path(path, target, sizeof(target));
+    if (r < 0) {
+        out_append("rxr: path must use rxr/file.\n");
+        return;
+    }
+    out_append(path);
+    out_append(" -> ");
+    out_append(target);
+    if (r > 0) out_append(" (not installed yet)");
+    out_append("\n");
+}
+
+static void cmd_rxr_aliases(void)
+{
+    uint32_t count = rxr_alias_count();
+    out_append("RXR path aliases: ");
+    out_append_u32(count);
+    out_append("\n");
+    for (uint32_t i = 0; i < count; i++) {
+        char alias[RXR_NAME_MAX + 1u];
+        char target[RXR_NAME_MAX + 1u];
+        if (rxr_alias_at(i, alias, sizeof(alias), target, sizeof(target)) != 0) continue;
+        out_append("  rxr/");
+        out_append(alias);
+        out_append(" -> ");
+        out_append(target);
+        out_append("\n");
+    }
+}
+
 static void cmd_rxr_op(const char* op, const char* args)
 {
     char file_arg[64];
@@ -2993,7 +3040,7 @@ static void cmd_rxr_op(const char* op, const char* args)
     uint32_t size;
     if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
         lsh_doc_data_from_arg(file_arg, &data, &size) != 0) {
-        out_append("Usage: rxr info|list|verify|checksum|install [drive:]file.rxr\n");
+        out_append("Usage: rxr info|list|verify|checksum|install [drive:]file.rxr | rxr path rxr/file\n");
         return;
     }
     if (strcmp(op, "info") == 0) {
@@ -3041,7 +3088,7 @@ static void cmd_rxr_op(const char* op, const char* args)
         out_append(installed == 1 ? " file and reloaded launchers.\n" : " files and reloaded launchers.\n");
         return;
     }
-    out_append("Usage: rxr info|list|verify|install [drive:]file.rxr\n");
+    out_append("Usage: rxr info|list|verify|install [drive:]file.rxr | rxr path rxr/file\n");
 }
 
 static void cmd_rxr(const char* args)
@@ -3051,7 +3098,7 @@ static void cmd_rxr(const char* args)
     if (vcs_read_word(&args, sub, sizeof(sub)) != 0) {
         rxr_undo_info_t undo;
         rxr_undo_info(&undo);
-        out_append("Usage: rxr info|list|verify|checksum|install file.rxr | rxr undo last | rxr test\n");
+        out_append("Usage: rxr info|list|verify|checksum|install file.rxr | rxr path rxr/file | rxr undo last | rxr test\n");
         out_append("undo=");
         out_append(undo.ready ? "ready" : "empty");
         out_append(" files=");
@@ -3059,6 +3106,14 @@ static void cmd_rxr(const char* args)
         out_append(" bytes=");
         out_append_u32(undo.bytes);
         out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "path") == 0 || strcmp(sub, "resolve") == 0) {
+        cmd_rxr_resolve(args);
+        return;
+    }
+    if (strcmp(sub, "aliases") == 0 || strcmp(sub, "map") == 0) {
+        cmd_rxr_aliases();
         return;
     }
     if (strcmp(sub, "undo") == 0 || strcmp(sub, "rollback") == 0) {
@@ -3073,7 +3128,7 @@ static void cmd_rxr(const char* args)
         return;
     }
     if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
-        out_append(rxr_selftest() == 0 ? "rxr: selftest OK\n" : "rxr: selftest failed\n");
+        out_append((rxr_selftest() == 0 && rxr_path_selftest() == 0) ? "rxr: selftest OK\n" : "rxr: selftest failed\n");
         return;
     }
     cmd_rxr_op(sub, args);
@@ -8410,6 +8465,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lpackchecksum") == 0) { cmd_lpack_op("checksum", args); return; }
     if (strcmp(cmd, "lpackundo") == 0) { cmd_lpack("undo"); return; }
     if (strcmp(cmd, "rxr") == 0) { cmd_rxr(args); return; }
+    if (strcmp(cmd, "rxrpath") == 0) { cmd_rxr_resolve(args); return; }
+    if (strcmp(cmd, "rxrmap") == 0) { cmd_rxr_aliases(); return; }
     if (strcmp(cmd, "rxrls") == 0) { cmd_rxr_op("list", args); return; }
     if (strcmp(cmd, "rxrinstall") == 0) { cmd_rxr_op("install", args); return; }
     if (strcmp(cmd, "rxrverify") == 0) { cmd_rxr_op("verify", args); return; }

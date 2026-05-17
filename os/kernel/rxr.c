@@ -9,6 +9,12 @@
 #define RXR_UNDO_BYTES_MAX 8192u
 
 typedef struct {
+    char alias[RXR_NAME_MAX + 1u];
+    char target[RXR_NAME_MAX + 1u];
+    uint32_t valid;
+} rxr_alias_t;
+
+typedef struct {
     char name[RXR_NAME_MAX + 1u];
     uint32_t offset;
     uint32_t size;
@@ -24,6 +30,8 @@ typedef struct {
 } rxr_undo_state_t;
 
 static rxr_undo_state_t s_rxr_undo;
+static rxr_alias_t s_rxr_alias[RXR_UNDO_MAX_FILES];
+static uint32_t s_rxr_alias_count;
 
 static int line_eq(const char* p, const char* end, const char* s)
 {
@@ -93,6 +101,21 @@ static int cstr_eq(const char* a, const char* b)
     return a[i] == '\0' && b[i] == '\0';
 }
 
+static int cstr_eq_ci(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i]) {
+        char ca = a[i];
+        char cb = b[i];
+        if (ca >= 'A' && ca <= 'Z') ca = (char)(ca + ('a' - 'A'));
+        if (cb >= 'A' && cb <= 'Z') cb = (char)(cb + ('a' - 'A'));
+        if (ca != cb) return 0;
+        i++;
+    }
+    return a[i] == '\0' && b[i] == '\0';
+}
+
 static char lower(char c)
 {
     if (c >= 'A' && c <= 'Z') return (char)(c + ('a' - 'A'));
@@ -142,6 +165,89 @@ static int valid_rxr(const uint8_t* data, uint32_t len)
 static void undo_reset(void)
 {
     for (uint32_t i = 0; i < sizeof(s_rxr_undo); i++) ((uint8_t*)&s_rxr_undo)[i] = 0;
+}
+
+static int rxr_prefix(const char* path, const char** inner)
+{
+    const char* p = path ? path : "";
+    while (*p == ' ' || *p == '\t') p++;
+    if (lower(p[0]) != 'r' || lower(p[1]) != 'x' || lower(p[2]) != 'r') return 0;
+    p += 3;
+    if (*p != '/' && *p != '\\' && *p != ':') return 0;
+    if (*p == ':') {
+        p++;
+        while (*p == '/' || *p == '\\') p++;
+    } else {
+        p++;
+    }
+    if (!*p) return 0;
+    if (inner) *inner = p;
+    return 1;
+}
+
+static void rxr_copy_inner_name(char* out, uint32_t cap, const char* src)
+{
+    uint32_t i = 0;
+    if (!out || cap == 0) return;
+    if (!src) src = "";
+    while (src[i] && src[i] != ' ' && src[i] != '\t' && src[i] != '\r' &&
+           src[i] != '\n' && i + 1u < cap) {
+        out[i] = src[i];
+        i++;
+    }
+    out[i] = '\0';
+}
+
+static void rxr_alias_reset(void)
+{
+    for (uint32_t i = 0; i < RXR_UNDO_MAX_FILES; i++) {
+        s_rxr_alias[i].valid = 0;
+        s_rxr_alias[i].alias[0] = '\0';
+        s_rxr_alias[i].target[0] = '\0';
+    }
+    s_rxr_alias_count = 0;
+}
+
+static int rxr_alias_add(const char* alias, const char* target)
+{
+    if (!alias || !target || !alias[0] || !target[0]) return -1;
+    for (uint32_t i = 0; i < s_rxr_alias_count; i++) {
+        if (s_rxr_alias[i].valid && cstr_eq_ci(s_rxr_alias[i].alias, alias)) {
+            copy_cstr(s_rxr_alias[i].target, sizeof(s_rxr_alias[i].target), target);
+            return 0;
+        }
+    }
+    if (s_rxr_alias_count >= RXR_UNDO_MAX_FILES) return -2;
+    copy_cstr(s_rxr_alias[s_rxr_alias_count].alias, sizeof(s_rxr_alias[s_rxr_alias_count].alias), alias);
+    copy_cstr(s_rxr_alias[s_rxr_alias_count].target, sizeof(s_rxr_alias[s_rxr_alias_count].target), target);
+    s_rxr_alias[s_rxr_alias_count].valid = 1u;
+    s_rxr_alias_count++;
+    return 0;
+}
+
+static void rxr_aliases_from_bundle(const uint8_t* data, uint32_t len)
+{
+    const char* p = (const char*)data;
+    const char* end = p + len;
+    const char* ls;
+    const char* le;
+    rxr_alias_reset();
+    if (!valid_rxr(data, len)) return;
+    while (next_line(&p, end, &ls, &le)) {
+        const char* v;
+        if (line_prefix(ls, le, "FILE", &v)) {
+            char name[RXR_NAME_MAX + 1u];
+            const char* q = p;
+            const char* fs = end;
+            const char* fe = end;
+            copy_name(name, sizeof(name), v, le);
+            if (name[0]) (void)rxr_alias_add(name, name);
+            while (next_line(&q, end, &fs, &fe)) {
+                if (line_eq(fs, fe, "ENDFILE")) break;
+            }
+            p = q;
+        }
+    }
 }
 
 static int undo_index(const char* name)
@@ -364,7 +470,41 @@ int rxr_install(const uint8_t* data, uint32_t len)
         }
     }
     if (installed > 0) lardkit_journal_event("rxr", "installed app bundle");
+    if (installed > 0) rxr_aliases_from_bundle(data, len);
     return installed;
+}
+
+int rxr_resolve_path(const char* path, char* out, uint32_t cap)
+{
+    const char* inner;
+    char name[RXR_NAME_MAX + 1u];
+    if (!out || cap == 0) return -1;
+    out[0] = '\0';
+    if (!rxr_prefix(path, &inner)) return -1;
+    rxr_copy_inner_name(name, sizeof(name), inner);
+    if (!name[0]) return -2;
+    for (uint32_t i = 0; i < s_rxr_alias_count; i++) {
+        if (s_rxr_alias[i].valid && cstr_eq_ci(s_rxr_alias[i].alias, name)) {
+            copy_cstr(out, cap, s_rxr_alias[i].target);
+            return 0;
+        }
+    }
+    copy_cstr(out, cap, name);
+    if (fs_open(name) || fs_open_writable(name)) return 0;
+    return 1;
+}
+
+uint32_t rxr_alias_count(void)
+{
+    return s_rxr_alias_count;
+}
+
+int rxr_alias_at(uint32_t index, char* alias, uint32_t alias_cap, char* target, uint32_t target_cap)
+{
+    if (index >= s_rxr_alias_count || !s_rxr_alias[index].valid) return -1;
+    copy_cstr(alias, alias_cap, s_rxr_alias[index].alias);
+    copy_cstr(target, target_cap, s_rxr_alias[index].target);
+    return 0;
 }
 
 static const char* rxr_slot_name(uint32_t idx)
@@ -401,6 +541,7 @@ int rxr_undo_last(void)
         restored++;
     }
     undo_reset();
+    rxr_alias_reset();
     if (restored) lardkit_journal_event("rxr", "undo restored bundle files");
     return (int)restored;
 }
@@ -438,5 +579,19 @@ int rxr_selftest(void)
     if (rxr_verify(pack, sizeof(pack) - 1, &vi) != 0) return -4;
     if (!vi.valid || vi.files != 2u || vi.app_files != 1u || vi.installable != 2u || vi.hash == 0u) return -5;
     if (!cstr_eq(vi.primary_app, "userapp.sysrxe")) return -6;
+    return 0;
+}
+
+int rxr_path_selftest(void)
+{
+    char out[RXR_NAME_MAX + 1u];
+    int r;
+    r = rxr_resolve_path("rxr/notes.txt", out, sizeof(out));
+    if (r < 0 || !cstr_eq(out, "notes.txt")) return -1;
+    r = rxr_resolve_path("RXR\\notes.txt", out, sizeof(out));
+    if (r < 0 || !cstr_eq(out, "notes.txt")) return -2;
+    r = rxr_resolve_path("rxr:not_installed.dat", out, sizeof(out));
+    if (r < 0 || !cstr_eq(out, "not_installed.dat")) return -3;
+    if (rxr_resolve_path("notes.txt", out, sizeof(out)) >= 0) return -4;
     return 0;
 }

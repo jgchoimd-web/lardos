@@ -5,6 +5,7 @@
 #include "ldll.h"
 #include "fs.h"
 #include "mmu.h"
+#include "rxr.h"
 #include "usermode.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -49,6 +50,16 @@ int ldll_load(const char* name)
     if (!is_user_ptr((uintptr_t)name, LDLL_MAX_NAME)) return -1;
     char kern_name[LDLL_MAX_NAME];
     if (copy_user_string(name, kern_name, LDLL_MAX_NAME) < 0) return -1;
+    {
+        char resolved[LDLL_MAX_NAME];
+        if (rxr_resolve_path(kern_name, resolved, sizeof(resolved)) >= 0) {
+            for (uint32_t i = 0; i < sizeof(kern_name); i++) {
+                kern_name[i] = resolved[i];
+                if (resolved[i] == '\0') break;
+            }
+            kern_name[sizeof(kern_name) - 1u] = '\0';
+        }
+    }
 
     const FsFile* f = fs_open(kern_name);
     if (!f || f->size < 16) return -1;

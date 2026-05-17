@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.74.1p-ami/lardos-v1.74.1p-ami.iso`. To publish the whole hardware
+`release/v1.75.0b-ami/lardos-v1.75.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.75.0b` adds RXR bundle-internal paths. An RXE/SYSRXE installed from an
+`.rxr` can now open files with `rxr/name` from shell code, C-style app code,
+and user-mode file syscalls, so bundled data is not tied to a drive letter or
+install path.
 
 `v1.74.1p` hotpatches the web track by removing the site-specific video-view
 beta surface. The OS keeps generic LARS link/fetch records and HTTP/HTTPS
@@ -95,7 +100,7 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
   overlay chrome.
 - `LTHEME` (`.ltheme`) stores compact native shell theme presets.
 - `RXR` (`.rxr`) stores an app bundle: one RXE/SYSRXE executable plus required
-  files.
+  files. Apps can open installed bundle files through `rxr/name`.
 - `MDFS` stores files for the MediaFS device stores behind `Y:`/`F:`,
   `Z:`/`S:`, and `A:`/`U:`.
 
@@ -170,6 +175,9 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.75.0b` adds RXR bundle-internal paths: app code can use `rxr/file` for
+  files carried inside the same `.rxr`, and `rxr path rxr/file` shows the
+  installed target.
 - `v1.74.1p` removes the site-specific video-view beta surface and returns the
   web stack to general LARS link/fetch plus HTTP/HTTPS GET/POST/HEAD behavior.
 - `v1.73.0b` expands the native web stack with HEAD, LARS `link`/`fetch`
@@ -485,9 +493,11 @@ commands:
   and rolls back native LardPack packages. Verification reports package hash,
   warning/error counts, installable targets, and payload size before install.
   The built-in `sample.lpack` writes a starter note into `notes.txt`.
-- `rxr info|list|verify|install|undo file.rxr` inspects, validates, installs,
-  and rolls back native app bundles. The built-in `sample.rxr` installs a normal
-  `.rxe` app and its required `rxr_data.txt` dependency as editable user files.
+- `rxr info|list|verify|install|undo file.rxr` / `rxr path rxr/file`
+  inspects, validates, installs, rolls back, or resolves native app bundles.
+  The built-in `sample.rxr` installs a normal `.rxe` app and reads its required
+  `rxr_data.txt` dependency through `rxr/rxr_data.txt`, keeping app source
+  independent from the installed drive/path.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has

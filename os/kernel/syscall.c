@@ -15,6 +15,7 @@
 #include "lafillo.h"
 #include "hash.h"
 #include "base64.h"
+#include "rxr.h"
 #include "usermode.h"
 #include <stdint.h>
 
@@ -246,6 +247,16 @@ void syscall_handler(void* frame)
         if (copy_user_string((const char*)(uintptr_t)a1, path, SYS_PATH_MAX) < 0) {
             f->rax = (uint64_t)(int64_t)-1;
             return;
+        }
+        {
+            char resolved[SYS_PATH_MAX];
+            if (rxr_resolve_path(path, resolved, sizeof(resolved)) >= 0) {
+                for (uint32_t pi = 0; pi < sizeof(path); pi++) {
+                    path[pi] = resolved[pi];
+                    if (resolved[pi] == '\0') break;
+                }
+                path[sizeof(path) - 1u] = '\0';
+            }
         }
         for (int i = 0; i < FD_MAX; i++) {
             if (s_fds[i].f || s_fds[i].w) continue;

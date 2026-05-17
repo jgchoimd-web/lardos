@@ -5,13 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
-SECTION v1.74.0b
-ITEM Beta release adding a native YouTube view surface without importing an external browser engine, JavaScript bridge, or outside media library.
-ITEM Added ytview, youtube, and yt aliases that parse watch, shorts, embed, youtu.be, youtube-nocookie, and raw 11-character video IDs.
-ITEM The GUI Doc tab now recognizes YouTube URLs before generic fetch and opens a LARS watch card with visible watch, embed, and thumbnail fetch targets.
-ITEM Added youtube_guide.lardd and youtube_demo.lars so users can inspect the feature from inside LardOS.
-ITEM Added POST and LUNIT coverage for the YouTube URL parser, demo document, and guide while preserving WebStack GET/POST/HEAD, KMO, DRFL, RXR/RXE/SYSRXE, OSLink, and user-owned control paths.
-ITEM Full video playback remains an honest native roadmap: stream selection, DASH/HLS fetching, demux, codec decode, audio, and sync must be LardOS-owned layers.
+SECTION v1.74.1p
+ITEM Hotpatch rollback removing the site-specific video-view beta surface from the current branch and boot media.
+ITEM Removed the service-specific parser module, shell aliases, built-in guide/demo documents, POST/LUNIT checks, OSLink allowlist entry, and GUI Doc-tab special case.
+ITEM The web stack returns to generic LARS link/fetch records and HTTP/HTTPS GET, POST, and HEAD handling without hard-coded third-party platform logic.
+ITEM Preserves WebStack v1.73.0b, KMO, DRFL, RXR/RXE/SYSRXE, OSLink, MediaFS, GUI, and user-owned control paths without feature loss outside the withdrawn beta surface.
+ITEM This release keeps the LardOS value rule: the OS should expose general user-controlled primitives, not embed a named outside service as a privileged built-in.
 
 SECTION v1.73.0b
 ITEM Beta release expanding the native web stack without switching to HTML, Markdown, or an external browser/library.

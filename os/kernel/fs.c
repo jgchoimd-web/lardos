@@ -329,8 +329,6 @@ static const uint8_t file_lardos_lars[] =
     "p The Doc tab can switch HTTP requests between GET, POST, and HEAD; POST reads the address as URL|body.\n"
     "link Web Stack Guide | webstack_guide.lardd\n"
     "link Web Demo LARS | webdemo.lars\n"
-    "link YouTube Native View Guide | youtube_guide.lardd\n"
-    "link YouTube Demo LARS | youtube_demo.lars\n"
     "fetch Example HEAD target | https://example.com/\n"
     "section Full-control starts\n"
     "li Run control in LSH for the system control map.\n"
@@ -354,7 +352,6 @@ static const uint8_t file_lardos_lars[] =
     "li Use ren old.txt new.txt, rename selected NewName, or the desktop Rename button to rename files, apps, and folders.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 3, boot 4.\n"
-    "li Use ytview https://www.youtube.com/watch?v=jNQXAC9IVRw or paste a YouTube URL into the Doc tab to open a native watch card.\n"
     "li Use dos on for L-DOS mode: a native DOS-style shell layer with C:/A:/Z:/U:/R: drive mapping, DIR/TYPE/COPY/DEL/REN/MD/RD/CD, and dosmode.lardd history.\n"
     "li In L-DOS, DEL -F file hard-deletes read-only built-in files from the active filesystem through fsdelete.lardd, even if that breaks the OS.\n"
     "li RESTORE only removes soft TOMB HIDE records; use TOMB DROP file or TOMB CLEAR if you choose to delete hard-delete records too.\n"
@@ -443,8 +440,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
-    "li v1.73.0b expands WebStack with GET/POST/HEAD plus LARS link/fetch records.\n"
-    "li v1.74.0b adds native YouTube URL recognition, ytview commands, and LARS watch cards as the next web-stack layer.\n"
+    "li v1.74.1p removes the site-specific video-view beta surface and keeps WebStack generic: LARS link/fetch plus HTTP/HTTPS GET/POST/HEAD.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
     "li Use larsview open lardos.lars, larsapp form lardos.lars, and notes add text for native document/app browsing and notes.lardd.\n"
@@ -477,9 +473,6 @@ static const uint8_t file_lardos_lars[] =
     "cmd cfgsh status\n"
     "cmd cfg ltheme night\n"
     "cmd cfg http 3\n"
-    "cmd webstack status\n"
-    "cmd ytview https://www.youtube.com/watch?v=jNQXAC9IVRw\n"
-    "cmd ytview demo\n"
     "cmd buddy joke\n"
     "cmd lguilib show default.lguilib\n"
     "cmd time\n"
@@ -788,7 +781,6 @@ static const uint8_t file_webstack_guide[] =
     "ITEM webstack status -> show method, document records, and the request-builder selftest.\n"
     "ITEM webstack guide -> open this LARDD guide.\n"
     "ITEM webstack demo -> open webdemo.lars.\n"
-    "ITEM ytview URL_OR_ID -> open a native YouTube watch card built on LARS records.\n"
     "ITEM larsform webdemo.lars -> list link/fetch/button/input actions.\n"
     "ITEM larsact webdemo.lars 0 -> open the local linked guide.\n"
     "ITEM netwatch on and netwatch show -> inspect readable HTTP/HTTPS GET/POST/HEAD events.\n"
@@ -806,43 +798,6 @@ static const uint8_t file_webdemo_lars[] =
     "fetch Example headers | https://example.com/\n"
     "button Show status | webstack status\n"
     "input query lardos\n"
-    "end\n";
-
-static const uint8_t file_youtube_guide[] =
-    "LARDD 1\n"
-    "TITLE YouTube Native View\n"
-    "TEXT LardOS should be able to face real web targets without importing an outside browser engine.\n"
-    "TEXT ytview recognizes YouTube watch, shorts, embed, youtu.be, and raw 11-character video IDs in in-tree C.\n"
-    "TEXT The Doc tab also recognizes YouTube URLs and opens a native LARS watch card instead of pretending HTML/JavaScript playback already exists.\n"
-    "SECTION Commands\n"
-    "ITEM ytview URL_OR_ID -> show the native YouTube watch card in shell text.\n"
-    "ITEM ytview lars URL_OR_ID -> print the LARS watch-card source.\n"
-    "ITEM ytview demo -> open youtube_demo.lars.\n"
-    "ITEM ytview guide -> open this guide.\n"
-    "ITEM ytview selftest -> test URL parsing, card generation, and rejection of non-YouTube URLs.\n"
-    "SECTION Native Card\n"
-    "ITEM The card exposes the video id, watch URL, embed URL, and thumbnail URL as visible records.\n"
-    "ITEM LARS fetch records keep targets inspectable through larsform/larsact and Doc tab workflows.\n"
-    "ITEM NetWatch can be enabled before fetching so network activity remains readable.\n"
-    "SECTION Playback Roadmap\n"
-    "ITEM Full YouTube playback still needs native stream selection, DASH/HLS range fetching, MP4/WebM demux, codec decode, audio output, and sync.\n"
-    "ITEM Those layers must be LardOS-owned code or LardOS-owned files, not a hidden hosted browser bridge.\n"
-    "ITEM This release adds the visible YouTube viewing surface first so later playback work does not change the web-stack direction.\n"
-    "END\n";
-
-static const uint8_t file_youtube_demo_lars[] =
-    "LARS 1\n"
-    "title YouTube Demo\n"
-    "p Native YouTube watch-card demo using a stable public video id.\n"
-    "p Use ytview jNQXAC9IVRw or paste the watch URL into the Doc tab.\n"
-    "fetch Watch page | https://www.youtube.com/watch?v=jNQXAC9IVRw\n"
-    "fetch Embed page | https://www.youtube.com/embed/jNQXAC9IVRw\n"
-    "fetch Thumbnail | https://i.ytimg.com/vi/jNQXAC9IVRw/hqdefault.jpg\n"
-    "link YouTube guide | youtube_guide.lardd\n"
-    "button Show watch card | ytview jNQXAC9IVRw\n"
-    "button Use HEAD | cfgsh http 3\n"
-    "button NetWatch | netwatch on\n"
-    "input video jNQXAC9IVRw\n"
     "end\n";
 
 static const uint8_t file_features_lil[] =
@@ -1209,10 +1164,6 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command webstack\n"
     "CHECK file webstack_guide.lardd\n"
     "CHECK file webdemo.lars\n"
-    "CHECK command ytview\n"
-    "CHECK command youtube\n"
-    "CHECK file youtube_guide.lardd\n"
-    "CHECK file youtube_demo.lars\n"
     "CHECK command restore\n"
     "CHECK command tomb\n"
     "CHECK command tombstone\n"
@@ -1340,8 +1291,6 @@ static const FsFile FS_FILES[] = {
     { "media_guide.lardd", file_media_guide, sizeof(file_media_guide) - 1 },
     { "webstack_guide.lardd", file_webstack_guide, sizeof(file_webstack_guide) - 1 },
     { "webdemo.lars", file_webdemo_lars, sizeof(file_webdemo_lars) - 1 },
-    { "youtube_guide.lardd", file_youtube_guide, sizeof(file_youtube_guide) - 1 },
-    { "youtube_demo.lars", file_youtube_demo_lars, sizeof(file_youtube_demo_lars) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },

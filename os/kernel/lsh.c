@@ -42,7 +42,6 @@
 #include "rxe.h"
 #include "sysrxe.h"
 #include "net.h"
-#include "ytview.h"
 #include "kmodtalk.h"
 #include "kmo.h"
 #include "io.h"
@@ -337,7 +336,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "ytview", 1 }, { "youtube", 1 }, { "yt", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
@@ -1709,7 +1708,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack ytview oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr undo last\n");
@@ -1730,7 +1729,6 @@ static void cmd_help(const char* args)
     out_append("  post baseline, bootreplay show, bootmap, oldcheck, devmap boot/POST/device views\n");
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
     out_append("  webstack status|guide|demo|selftest for native LARS/HTTP method support\n");
-    out_append("  ytview URL_OR_ID|guide|demo|selftest for native YouTube watch cards\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
@@ -1799,7 +1797,6 @@ static void cmd_control(const char* args)
     out_append("  shrine run hello.shrine run a Shrine subsystem wrapper through LSS\n");
     out_append("  trace on            record shell/module/oslink/taskprio events in order\n");
     out_append("  netwatch on         watch readable packet/oslink/HTTP activity\n");
-    out_append("  ytview jNQXAC9IVRw open a native YouTube watch card\n");
     out_append("  journal show        view automatic LARDD system journal\n");
     out_append("  bugeye scan         scan for visible bugs and write bugreport.lardd\n");
     out_append("  bugreplay draw      draw the last BugEye replay frames as a panel\n");
@@ -2828,58 +2825,6 @@ static void cmd_webstack(const char* args)
         return;
     }
     out_append("Usage: webstack status|guide|demo|selftest\n");
-}
-
-static void cmd_ytview(const char* args)
-{
-    char sub[24];
-    const char* p = args ? args : "";
-    const char* original = p;
-    int lars_mode = 0;
-    ytview_info_t info;
-    char card[1400];
-
-    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
-        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
-        out_append("YouTube Native View\n");
-        out_append("  command: ytview URL_OR_ID | ytview lars URL_OR_ID | ytview guide|demo|selftest\n");
-        out_append("  GUI: paste a YouTube URL into the Doc tab and press Go.\n");
-        out_append("  state: URL parser, native LARS watch card, visible watch/embed/thumbnail fetch targets.\n");
-        out_append("  next: native stream selection, demux, codec, audio, and sync for real playback.\n");
-        return;
-    }
-    if (strcmp(sub, "guide") == 0 || strcmp(sub, "doc") == 0 || strcmp(sub, "show") == 0) {
-        cmd_larddoc("youtube_guide.lardd", "Usage: ytview guide");
-        return;
-    }
-    if (strcmp(sub, "demo") == 0 || strcmp(sub, "lars") == 0) {
-        if (strcmp(sub, "demo") == 0) {
-            cmd_larddoc("youtube_demo.lars", "Usage: ytview demo");
-            return;
-        }
-        lars_mode = 1;
-        while (*p == ' ' || *p == '\t') p++;
-        original = p;
-    }
-    if (strcmp(sub, "selftest") == 0 || strcmp(sub, "test") == 0) {
-        out_append(ytview_selftest() == 0 ? "ytview: selftest OK\n" : "ytview: selftest failed\n");
-        return;
-    }
-    if (!lars_mode) original = args ? args : "";
-    if (ytview_parse_url(original, &info) != 0) {
-        out_append("ytview: not a supported YouTube URL or 11-character video id.\n");
-        out_append("Usage: ytview https://www.youtube.com/watch?v=jNQXAC9IVRw\n");
-        return;
-    }
-    if (lars_mode) {
-        if (ytview_format_lars(&info, card, sizeof(card)) == 0) out_append(card);
-        else out_append("ytview: LARS card generation failed.\n");
-    } else {
-        if (ytview_format_card(&info, card, sizeof(card)) == 0) out_append(card);
-        else out_append("ytview: card generation failed.\n");
-    }
-    lardkit_trace_event("web", "ytview", 1);
-    lardkit_netwatch_record("youtube", info.id, (int32_t)info.shorts);
 }
 
 static void cmd_lpack_show(const char* file_arg, const uint8_t* data, uint32_t size, int verbose)
@@ -8413,7 +8358,6 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
     if (strcmp(cmd, "netwatch") == 0) { cmd_netwatch(args); return; }
     if (strcmp(cmd, "webstack") == 0) { cmd_webstack(args); return; }
-    if (strcmp(cmd, "ytview") == 0 || strcmp(cmd, "youtube") == 0 || strcmp(cmd, "yt") == 0) { cmd_ytview(args); return; }
     if (strcmp(cmd, "journal") == 0) { cmd_journal(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "oschat") == 0) { cmd_oschat(args); return; }

@@ -37,7 +37,6 @@
 #include "taskprio.h"
 #include "version.h"
 #include "vmmon.h"
-#include "ytview.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -137,8 +136,6 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: media guide", fs_open("media_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: webstack guide", fs_open("webstack_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: webdemo lars", fs_open("webdemo.lars") != NULL, emit, user, &pass, &fail);
-    post_check("fs: youtube guide", fs_open("youtube_guide.lardd") != NULL, emit, user, &pass, &fail);
-    post_check("fs: youtube demo lars", fs_open("youtube_demo.lars") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreport writable", fs_open_writable("bugreport.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreplay writable", fs_open_writable("bugreplay.lardd") != NULL, emit, user, &pass, &fail);
@@ -171,11 +168,9 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
     post_check("doc: LARS web demo", post_doc_parse("webdemo.lars"), emit, user, &pass, &fail);
-    post_check("doc: LARS youtube demo", post_doc_parse("youtube_demo.lars"), emit, user, &pass, &fail);
     post_check("doc: LARDD renderer", post_doc_parse("lardd_guide.lardd"), emit, user, &pass, &fail);
     post_check("doc: LARS form actions", lard_doc_selftest() == 0, emit, user, &pass, &fail);
     post_check("web: HTTP method builder", net_http_selftest() == 0, emit, user, &pass, &fail);
-    post_check("web: YouTube native view", ytview_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: app bundle parser", rxr_selftest() == 0, emit, user, &pass, &fail);
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);

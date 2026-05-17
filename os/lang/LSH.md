@@ -37,7 +37,6 @@
 - `lardtrace on|off|show|module name` / `trace ...` - LardTrace event timeline for shell/modules.
 - `netwatch on|off|show|clear` - readable network, OSLink, and HTTP GET/POST/HEAD watcher.
 - `webstack status|guide|demo|selftest` - inspect the native LARS/HTTP stack, including LARS `link`/`fetch` records and the request-builder selftest.
-- `ytview URL_OR_ID` / `youtube ...` / `yt ...` - recognize YouTube watch, shorts, embed, youtu.be, or raw video IDs and show a native LARS watch card with visible watch/embed/thumbnail fetch targets. Paste a YouTube URL into the GUI Doc tab for the same native card.
 - `journal show|add|clear` - automatic `.lardd` OS journal.
 - `rollback snap|last|apply` - settings snapshot and restore.
 - `trust list|allow|deny|history` - user-owned permission policy map and audit log.

@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.75.1b
+ITEM Beta release correcting RXR paths to be OS-centered instead of app-runtime centered.
+ITEM The kernel filesystem layer now resolves rxr/name before read-only open, writable open, writable create, capacity checks, and rename operations.
+ITEM LSH and apps no longer need a special path rewrite to use bundle dependency files; they pass rxr/name to the OS namespace and FS owns the mapping.
+ITEM POST now checks both the RXR path parser and fs_open("rxr/notes.txt") so the namespace behavior is tested where it belongs.
+ITEM Preserves RXR/RXE/SYSRXE app bundles, user-owned file editing, undo behavior, KMO, DRFL, MediaFS, WebStack, and the no-hidden-control value rule.
+
 SECTION v1.75.0b
 ITEM Beta release adding RXR bundle-internal paths for RXE/SYSRXE apps and their dependency files.
 ITEM Apps installed from .rxr can open rxr/name through LSH commands, C-style app code that calls lsh("..."), user-mode SYS_OPEN, LARDX loading, and LDLL loading.

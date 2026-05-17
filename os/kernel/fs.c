@@ -1,5 +1,6 @@
 #include "fs.h"
 #include "lfs.h"
+#include "rxr.h"
 #include "storage.h"
 #include "fs_ldll.inc"
 #include "lafillo_demo_data.inc"
@@ -440,7 +441,8 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
-    "li v1.75.0b adds RXR bundle-internal paths: apps can open rxr/file inside their own bundle without caring where the bundle was installed.\n"
+    "li v1.75.1b makes rxr/file an OS filesystem namespace path, so the kernel FS layer owns RXR path resolution.\n"
+    "li v1.75.0b adds RXR bundle-internal paths for app bundle dependency files.\n"
     "li v1.74.1p removes the site-specific video-view beta surface and keeps WebStack generic: LARS link/fetch plus HTTP/HTTPS GET/POST/HEAD.\n"
     "li Use lunit run tests.lunit for small native feature tests.\n"
     "li Use oschat say text for local OSLink chat-style module messages.\n"
@@ -848,8 +850,8 @@ static const uint8_t file_rxr_guide[] =
     "ITEM rxr undo last\n"
     "SECTION Values\n"
     "ITEM RXR install writes normal user-owned files, then reloads RXE/SYSRXE apps.\n"
-    "ITEM Apps may open bundle files with rxr/name, for example type rxr/data.txt or open(\"rxr/data.txt\").\n"
-    "ITEM The rxr/name path resolves to the installed target, so app code avoids drive letters and install locations.\n"
+    "ITEM LardOS treats rxr/name as an OS filesystem namespace path, for example type rxr/data.txt or open(\"rxr/data.txt\").\n"
+    "ITEM The kernel FS layer resolves rxr/name to the installed target before readonly, writable, create, and rename operations.\n"
     "ITEM The app code stays inside the .rxe/.sysrxe file and can use LardOS languages or C-style app code.\n"
     "ITEM Undo restores the last RXR snapshot and releases newly created RXR slots when possible.\n"
     "END\n";
@@ -1382,6 +1384,13 @@ static void fs_copy_name(char* dst, uint32_t cap, const char* src)
     dst[i] = '\0';
 }
 
+static const char* fs_os_name(const char* name, char* buf, uint32_t cap)
+{
+    if (!name) return "";
+    if (rxr_resolve_path(name, buf, cap) == 0) return buf;
+    return name;
+}
+
 static int fs_valid_user_name(const char* name)
 {
     uint32_t i = 0;
@@ -1867,12 +1876,14 @@ void fs_init(void)
 
 const FsFile* fs_open(const char* name)
 {
-    const FsFile* f = fs_open_readonly(name);
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
+    const FsFile* f = fs_open_readonly(q);
     if (f) return f;
     for (uint32_t wi = 0; wi < writable_count(); wi++) {
         FsWritableFile* w = writable_at(wi);
         const char* a = w ? w->name : "";
-        const char* b = name;
+        const char* b = q;
         while (*a && *b && *a == *b) { a++; b++; }
         if (*a == '\0' && *b == '\0') {
             g_ram_result.name = w->name;
@@ -1886,18 +1897,20 @@ const FsFile* fs_open(const char* name)
 
 const FsFile* fs_open_readonly(const char* name)
 {
-    if (fs_readonly_hidden(name)) return 0;
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
+    if (fs_readonly_hidden(q)) return 0;
     for (uint32_t i = 0; i < FS_FILE_COUNT; i++) {
-        if (fs_name_eq(FS_FILES[i].name, name)) {
+        if (fs_name_eq(FS_FILES[i].name, q)) {
             return &FS_FILES[i];
         }
     }
     {
         const uint8_t* data;
         uint32_t sz;
-        if (lfs_lookup(name, &data, &sz)) {
+        if (lfs_lookup(q, &data, &sz)) {
             uint32_t j = 0;
-            while (name[j] && j < LFS_MAX_NAME - 1) { g_lfs_name[j] = name[j]; j++; }
+            while (q[j] && j < LFS_MAX_NAME - 1) { g_lfs_name[j] = q[j]; j++; }
             g_lfs_name[j] = '\0';
             g_lfs_result.name = g_lfs_name;
             g_lfs_result.data = data;
@@ -2149,10 +2162,12 @@ void fs_persist_detail(uint32_t* active_bank, uint32_t* generation, uint32_t* ba
 
 FsWritableFile* fs_open_writable(const char* name)
 {
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
     for (uint32_t wi = 0; wi < writable_count(); wi++) {
         FsWritableFile* w = writable_at(wi);
         const char* a = w ? w->name : "";
-        const char* b = name ? name : "";
+        const char* b = q;
         while (*a && *b && *a == *b) { a++; b++; }
         if (*a == '\0' && *b == '\0') return w;
     }
@@ -2192,29 +2207,35 @@ uint32_t fs_creatable_writable_slots(void)
 
 int fs_can_create_writable(const char* name)
 {
-    if (!fs_valid_user_name(name)) return 0;
-    if (fs_open_writable(name)) return 1;
-    if (fs_open_readonly(name)) return 0;
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
+    if (!fs_valid_user_name(q)) return 0;
+    if (fs_open_writable(q)) return 1;
+    if (fs_open_readonly(q)) return 0;
     return fs_find_empty_rxr_slot() ? 1 : 0;
 }
 
 uint32_t fs_writable_capacity_for(const char* name)
 {
-    FsWritableFile* w = fs_open_writable(name);
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
+    FsWritableFile* w = fs_open_writable(q);
     if (w) return w->cap;
-    if (!fs_valid_user_name(name) || fs_open_readonly(name)) return 0;
+    if (!fs_valid_user_name(q) || fs_open_readonly(q)) return 0;
     w = fs_find_empty_rxr_slot();
     return w ? w->cap : 0;
 }
 
 FsWritableFile* fs_open_or_create_writable(const char* name)
 {
-    FsWritableFile* w = fs_open_writable(name);
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
+    FsWritableFile* w = fs_open_writable(q);
     if (w) return w;
-    if (!fs_valid_user_name(name) || fs_open_readonly(name)) return NULL;
+    if (!fs_valid_user_name(q) || fs_open_readonly(q)) return NULL;
     w = fs_find_empty_rxr_slot();
     if (!w) return NULL;
-    fs_copy_name(w->name, sizeof(w->name), name);
+    fs_copy_name(w->name, sizeof(w->name), q);
     w->size = 0;
     s_fs_dirty = 1;
     return w;
@@ -2223,12 +2244,16 @@ FsWritableFile* fs_open_or_create_writable(const char* name)
 int fs_rename_writable(const char* old_name, const char* new_name)
 {
     FsWritableFile* w;
-    if (!fs_valid_user_name(old_name) || !fs_valid_user_name(new_name)) return -2;
-    w = fs_open_writable(old_name);
+    char old_resolved[32];
+    char new_resolved[32];
+    const char* old_q = fs_os_name(old_name, old_resolved, sizeof(old_resolved));
+    const char* new_q = fs_os_name(new_name, new_resolved, sizeof(new_resolved));
+    if (!fs_valid_user_name(old_q) || !fs_valid_user_name(new_q)) return -2;
+    w = fs_open_writable(old_q);
     if (!w) return -1;
-    if (fs_name_eq(old_name, new_name)) return 0;
-    if (fs_open_writable(new_name) || fs_open_readonly(new_name)) return -3;
-    fs_copy_name(w->name, sizeof(w->name), new_name);
+    if (fs_name_eq(old_q, new_q)) return 0;
+    if (fs_open_writable(new_q) || fs_open_readonly(new_q)) return -3;
+    fs_copy_name(w->name, sizeof(w->name), new_q);
     s_fs_dirty = 1;
     return 0;
 }

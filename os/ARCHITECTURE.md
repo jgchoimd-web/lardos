@@ -433,11 +433,12 @@ without depending on an external package manager.
 `FILE`, `ENDFILE`, and `END` records to carry one `.rxe` or `.sysrxe` app plus
 the files it needs. RXR installs create normal user-owned writable files from
 RXR slots, reload RXE/SYSRXE launchers, and keep undo state so app bundles stay
-reversible instead of being hidden inside hand-coded GUI branches. Installed
-apps can refer to their bundled files as `rxr/name`; the resolver maps that
-bundle-internal path to the current installed target for shell reads, app
-syscalls, LARDX, and LDLL without exposing a drive-letter dependency in app
-source.
+reversible instead of being hidden inside hand-coded GUI branches. `rxr/name`
+is an OS filesystem namespace path, not an app-runtime trick: `fs_open`,
+`fs_open_writable`, writable creation, capacity checks, and rename operations
+resolve it to the current installed target before the caller sees storage
+details. Shell reads, app syscalls, LARDX, and LDLL therefore inherit the same
+OS-centered path rule without exposing a drive-letter dependency in app source.
 
 `post.c` owns the shared Power-On Self-Test engine. `kernel64.c` exposes it as a
 boot-time `P` option, while `M` runs the focused CPU Mode Bridge Test. LSH
@@ -446,8 +447,8 @@ real/long bridge, heap allocation, native FS files, LARS/LARDD rendering, LAR
 archives, DRFL code files, expected PCI devices, GUI framebuffer/layout state,
 ScreenRAM scratch storage, OSLink packet framing, local bus, and safe exec filtering,
 TaskPrio scheduling, BootProf profile flags, CrashLog writes, LARS form parsing,
-LardKit user-control tools, LardPack/RXR package parsing and RXR internal path
-resolution, ScreenCheck visual diagnostics, LPST metadata, LVCS hashing,
+LardKit user-control tools, LardPack/RXR package parsing and the RXR OS
+namespace path in the filesystem layer, ScreenCheck visual diagnostics, LPST metadata, LVCS hashing,
 containers, the installer boot-stage selftest, and LIL feature forms.
 
 `LSH` provides command discovery (`help`), a system control map (`control`), a

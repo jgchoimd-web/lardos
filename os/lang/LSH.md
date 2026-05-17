@@ -61,7 +61,7 @@
 - `crashlog show|clear|test` - inspect or write diagnostic crash history.
 - `larsform file` / `larsact file index` - list or run LARS button/link/fetch/input actions.
 - `lpack info|list|verify|install|undo file.lpack` - inspect, validate, install, or roll back a native LardPack package.
-- `rxr info|list|verify|install|undo file.rxr` / `rxr path rxr/file` - inspect, validate, install, roll back, or resolve a native app bundle containing one RXE/SYSRXE app plus required files. Apps installed from RXR can read bundled files through `rxr/name`.
+- `rxr info|list|verify|install|undo file.rxr` / `rxr path rxr/file` - inspect, validate, install, roll back, or resolve a native app bundle containing one RXE/SYSRXE app plus required files. LardOS exposes bundled files through the OS filesystem namespace `rxr/name`.
 - `drivers status|reload|load file.drfl|show name` - inspect loaded DRFL files, rescan installed `.drfl` files, load one driver file directly, or show the code carried inside a DRFL 2 file.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)
@@ -97,7 +97,7 @@
 - `lpack undo` restores the last writable-file snapshot captured before a package install
 - `rxr verify file.rxr` checks app bundle structure, primary app, payload hash, installable files, and RXR writable slots before install
 - `rxr undo` restores the last app-bundle snapshot and reloads RXE/SYSRXE launchers
-- `rxr/name` resolves to the installed target for files carried inside the app bundle, so RXE/SYSRXE source does not hard-code the install drive/path
+- `rxr/name` is resolved by the OS filesystem layer to the installed target for files carried inside the app bundle, so RXE/SYSRXE source does not hard-code the install drive/path
 - `paniccapsule show` builds a compact LARDD recovery bundle from panic room, crashlog, BugEye, replay, trust, priority, LFSDoctor, and BootMap state
 - On runtime-ready `panic` or `panic_u64`, PanicRoom first draws the real16 default texture, auto-writes the capsule, and offers crashlog view, capsule rebuild, rollback apply, queued-task drop, and halt keys
 - `lfsdoctor repair` runs the native LPST repair path and rewrites `lfsdoctor.lardd`

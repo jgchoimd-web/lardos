@@ -632,7 +632,6 @@ static void resolve_path(const char* path, char* out_drive, char* out_name, uint
 {
     char drv = s_drive;
     const char* p = path;
-    char raw[64];
     while (*p == ' ' || *p == '\t') p++;
     if (p[0] && p[1] == ':') {
         drv = (char)((p[0] >= 'a' && p[0] <= 'z') ? p[0] - 32 : p[0]);
@@ -641,14 +640,7 @@ static void resolve_path(const char* path, char* out_drive, char* out_name, uint
     }
     *out_drive = drv;
     uint32_t i = 0;
-    while (*p && *p != ' ' && *p != '\t' && i + 1 < sizeof(raw)) raw[i++] = *p++;
-    raw[i] = '\0';
-    if (rxr_resolve_path(raw, out_name, name_cap) >= 0) return;
-    i = 0;
-    while (raw[i] && i + 1 < name_cap) {
-        out_name[i] = raw[i];
-        i++;
-    }
+    while (*p && *p != ' ' && *p != '\t' && i + 1 < name_cap) out_name[i++] = *p++;
     out_name[i] = '\0';
 }
 
@@ -3011,7 +3003,7 @@ static void cmd_rxr_resolve(const char* args)
     out_append(path);
     out_append(" -> ");
     out_append(target);
-    if (r > 0) out_append(" (not installed yet)");
+    if (!fs_open(target) && !fs_open_writable(target)) out_append(" (not installed yet)");
     out_append("\n");
 }
 

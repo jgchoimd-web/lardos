@@ -45,17 +45,21 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.75.0b-ami/lardos-v1.75.0b-ami.iso`. To publish the whole hardware
+`release/v1.75.1b-ami/lardos-v1.75.1b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
 
-`v1.75.0b` adds RXR bundle-internal paths. An RXE/SYSRXE installed from an
-`.rxr` can now open files with `rxr/name` from shell code, C-style app code,
-and user-mode file syscalls, so bundled data is not tied to a drive letter or
-install path.
+`v1.75.1b` makes RXR paths OS-centered. `rxr/name` is resolved by the kernel
+filesystem layer before read-only open, writable open, create, capacity, and
+rename operations, so apps and shell commands use an OS namespace rather than a
+private app-runtime rewrite.
+
+`v1.75.0b` added RXR bundle-internal paths. An RXE/SYSRXE installed from an
+`.rxr` can open files with `rxr/name`, so bundled data is not tied to a drive
+letter or install path.
 
 `v1.74.1p` hotpatches the web track by removing the site-specific video-view
 beta surface. The OS keeps generic LARS link/fetch records and HTTP/HTTPS
@@ -100,7 +104,8 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
   overlay chrome.
 - `LTHEME` (`.ltheme`) stores compact native shell theme presets.
 - `RXR` (`.rxr`) stores an app bundle: one RXE/SYSRXE executable plus required
-  files. Apps can open installed bundle files through `rxr/name`.
+  files. LardOS exposes installed bundle files through the OS path namespace
+  `rxr/name`.
 - `MDFS` stores files for the MediaFS device stores behind `Y:`/`F:`,
   `Z:`/`S:`, and `A:`/`U:`.
 
@@ -175,6 +180,8 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `v1.75.1b` makes `rxr/file` an OS filesystem namespace path resolved by the
+  kernel FS layer, including writable create and rename operations.
 - `v1.75.0b` adds RXR bundle-internal paths: app code can use `rxr/file` for
   files carried inside the same `.rxr`, and `rxr path rxr/file` shows the
   installed target.
@@ -496,8 +503,8 @@ commands:
 - `rxr info|list|verify|install|undo file.rxr` / `rxr path rxr/file`
   inspects, validates, installs, rolls back, or resolves native app bundles.
   The built-in `sample.rxr` installs a normal `.rxe` app and reads its required
-  `rxr_data.txt` dependency through `rxr/rxr_data.txt`, keeping app source
-  independent from the installed drive/path.
+  `rxr_data.txt` dependency through the OS-owned `rxr/rxr_data.txt` namespace,
+  keeping app source independent from the installed drive/path.
 - `release` renders the current release log from `releases.lardd`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has

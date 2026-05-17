@@ -490,8 +490,7 @@ int rxr_resolve_path(const char* path, char* out, uint32_t cap)
         }
     }
     copy_cstr(out, cap, name);
-    if (fs_open(name) || fs_open_writable(name)) return 0;
-    return 1;
+    return 0;
 }
 
 uint32_t rxr_alias_count(void)

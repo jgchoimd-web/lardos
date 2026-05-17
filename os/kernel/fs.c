@@ -441,6 +441,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.76.0b generalizes OS virtual paths: folder/inside/address resolves through the kernel FS layer.\n"
     "li v1.75.1b makes rxr/file an OS filesystem namespace path, so the kernel FS layer owns RXR path resolution.\n"
     "li v1.75.0b adds RXR bundle-internal paths for app bundle dependency files.\n"
     "li v1.74.1p removes the site-specific video-view beta surface and keeps WebStack generic: LARS link/fetch plus HTTP/HTTPS GET/POST/HEAD.\n"
@@ -1195,6 +1196,8 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command rxr\n"
     "CHECK command rxrpath\n"
     "CHECK command rxrmap\n"
+    "CHECK command vpath\n"
+    "CHECK command pathmap\n"
     "CHECK command kmod\n"
     "CHECK command kmo\n"
     "CHECK file sysrxe_guide.lardd\n"
@@ -1384,10 +1387,125 @@ static void fs_copy_name(char* dst, uint32_t cap, const char* src)
     dst[i] = '\0';
 }
 
+static char fs_lower_ascii(char c)
+{
+    if (c >= 'A' && c <= 'Z') return (char)(c + ('a' - 'A'));
+    return c;
+}
+
+static int fs_path_sep(char c)
+{
+    return c == '/' || c == '\\';
+}
+
+static uint32_t fs_path_hash(const char* s)
+{
+    uint32_t h = 2166136261u;
+    if (!s) s = "";
+    while (*s) {
+        h ^= (uint8_t)*s++;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void fs_append_hex8(char* out, uint32_t cap, uint32_t* n, uint32_t v)
+{
+    static const char hex[] = "0123456789abcdef";
+    for (int shift = 28; shift >= 0; shift -= 4) {
+        if (*n + 1u < cap) out[(*n)++] = hex[(v >> shift) & 0xFu];
+    }
+}
+
+static int fs_flatten_os_path(const char* path, char* out, uint32_t cap)
+{
+    char tmp[32];
+    uint32_t n = 0;
+    uint32_t saw_sep = 0;
+    uint32_t saw_before = 0;
+    uint32_t saw_after = 0;
+    uint32_t lossy = 0;
+    uint32_t truncated = 0;
+    uint32_t last_us = 0;
+    const char* p = path ? path : "";
+    uint32_t h = fs_path_hash(p);
+    if (!out || cap == 0) return -1;
+    out[0] = '\0';
+    while (*p == ' ' || *p == '\t') {
+        p++;
+        lossy = 1u;
+    }
+    while (*p) {
+        uint8_t uc = (uint8_t)*p++;
+        char c = (char)uc;
+        char put = 0;
+        if (fs_path_sep(c)) {
+            if (saw_before) saw_sep = 1u;
+            put = '_';
+        } else {
+            if (!saw_sep && c > ' ') saw_before = 1u;
+            if (saw_sep && c > ' ') saw_after = 1u;
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+                put = fs_lower_ascii(c);
+            } else if (c == '.' || c == '-' || c == '_') {
+                put = c;
+            } else {
+                put = '_';
+                lossy = 1u;
+            }
+        }
+        if (put == '_') {
+            if (last_us) continue;
+            last_us = 1u;
+        } else {
+            last_us = 0;
+        }
+        if (n + 1u < sizeof(tmp)) tmp[n++] = put;
+        else truncated = 1u;
+    }
+    while (n > 0 && (tmp[n - 1u] == '_' || tmp[n - 1u] == '.')) n--;
+    tmp[n] = '\0';
+    if (!saw_sep || !saw_before || !saw_after) return -2;
+    if (n == 0) {
+        tmp[0] = 'v'; tmp[1] = 'p'; tmp[2] = 'a'; tmp[3] = 't'; tmp[4] = 'h'; tmp[5] = '\0';
+        n = 5u;
+        lossy = 1u;
+    }
+    if (!lossy && !truncated && n + 1u <= cap) {
+        fs_copy_name(out, cap, tmp);
+        return 0;
+    }
+    {
+        uint32_t max_base = cap > 10u ? cap - 10u : 0u;
+        uint32_t o = 0;
+        if (max_base > 22u) max_base = 22u;
+        while (o < n && o < max_base && o + 1u < cap) {
+            out[o] = tmp[o];
+            o++;
+        }
+        while (o > 0 && out[o - 1u] == '_') o--;
+        if (o == 0 && cap > 6u) {
+            out[o++] = 'v'; out[o++] = 'p'; out[o++] = 'a'; out[o++] = 't'; out[o++] = 'h';
+        }
+        if (o + 1u < cap) out[o++] = '_';
+        fs_append_hex8(out, cap, &o, h);
+        out[o < cap ? o : cap - 1u] = '\0';
+    }
+    return 0;
+}
+
+int fs_resolve_os_path(const char* path, char* out, uint32_t cap)
+{
+    if (!out || cap == 0) return -1;
+    out[0] = '\0';
+    if (rxr_resolve_path(path, out, cap) == 0) return 0;
+    return fs_flatten_os_path(path, out, cap);
+}
+
 static const char* fs_os_name(const char* name, char* buf, uint32_t cap)
 {
     if (!name) return "";
-    if (rxr_resolve_path(name, buf, cap) == 0) return buf;
+    if (fs_resolve_os_path(name, buf, cap) == 0) return buf;
     return name;
 }
 
@@ -1402,6 +1520,19 @@ static int fs_valid_user_name(const char* name)
         i++;
     }
     return i > 0;
+}
+
+int fs_path_selftest(void)
+{
+    char out[32];
+    if (fs_resolve_os_path("docs/readme.lardd", out, sizeof(out)) != 0 ||
+        !fs_name_eq(out, "docs_readme.lardd")) return -1;
+    if (fs_resolve_os_path("Final Final Release/final fix", out, sizeof(out)) != 0 ||
+        !fs_valid_user_name(out)) return -2;
+    if (fs_resolve_os_path("plain.txt", out, sizeof(out)) == 0) return -3;
+    if (fs_resolve_os_path("rxr/notes.txt", out, sizeof(out)) != 0 ||
+        !fs_name_eq(out, "notes.txt")) return -4;
+    return 0;
 }
 
 static int lpst_entry_name_valid(const uint8_t* entry)
@@ -1491,12 +1622,16 @@ static int fs_deleted_index(const char* name)
 
 int fs_readonly_hidden(const char* name)
 {
-    return fs_hidden_index(name) >= 0 || fs_deleted_index(name) >= 0;
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
+    return fs_hidden_index(q) >= 0 || fs_deleted_index(q) >= 0;
 }
 
 int fs_readonly_deleted(const char* name)
 {
-    return fs_deleted_index(name) >= 0;
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
+    return fs_deleted_index(q) >= 0;
 }
 
 uint32_t fs_readonly_hidden_count(void)
@@ -1578,12 +1713,14 @@ static int fs_track_purge_readonly_delete(const char* name)
 
 static int fs_readonly_physical_exists(const char* name)
 {
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
     const uint8_t* data;
     uint32_t sz;
     for (uint32_t i = 0; i < FS_FILE_COUNT; i++) {
-        if (fs_name_eq(FS_FILES[i].name, name)) return 1;
+        if (fs_name_eq(FS_FILES[i].name, q)) return 1;
     }
-    return lfs_lookup(name, &data, &sz) ? 1 : 0;
+    return lfs_lookup(q, &data, &sz) ? 1 : 0;
 }
 
 static void fsdelete_rewrite_from_state(void);
@@ -1656,39 +1793,47 @@ static void fs_apply_delete_log(void)
 
 int fs_hide_readonly(const char* name)
 {
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
     int r;
-    if (!fs_readonly_physical_exists(name)) return -1;
-    r = fs_track_hide_readonly(name);
+    if (!fs_readonly_physical_exists(q)) return -1;
+    r = fs_track_hide_readonly(q);
     if (r < 0) return r;
-    fsdelete_append_record("HIDE", name);
+    fsdelete_append_record("HIDE", q);
     return r;
 }
 
 int fs_delete_readonly(const char* name)
 {
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
     int r;
-    if (!fs_readonly_physical_exists(name)) return -1;
-    r = fs_track_delete_readonly(name);
+    if (!fs_readonly_physical_exists(q)) return -1;
+    r = fs_track_delete_readonly(q);
     if (r < 0) return r;
-    fsdelete_append_record("DELETE", name);
+    fsdelete_append_record("DELETE", q);
     return r;
 }
 
 int fs_unhide_readonly(const char* name)
 {
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
     int r;
-    if (!fs_readonly_physical_exists(name)) return -1;
-    if (fs_readonly_deleted(name)) return -2;
-    r = fs_track_show_readonly(name);
-    fsdelete_append_record("SHOW", name);
+    if (!fs_readonly_physical_exists(q)) return -1;
+    if (fs_readonly_deleted(q)) return -2;
+    r = fs_track_show_readonly(q);
+    fsdelete_append_record("SHOW", q);
     return r == 0 ? 0 : 1;
 }
 
 int fs_purge_readonly_tombstone(const char* name)
 {
+    char resolved[32];
+    const char* q = fs_os_name(name, resolved, sizeof(resolved));
     int r;
     if (!name || !name[0]) return -1;
-    r = fs_track_purge_readonly_delete(name);
+    r = fs_track_purge_readonly_delete(q);
     fsdelete_rewrite_from_state();
     return r == 0 ? 0 : 1;
 }

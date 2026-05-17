@@ -340,7 +340,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
-    { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 },
+    { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 }, { "vpath", 1 }, { "pathmap", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
     { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
@@ -632,7 +632,14 @@ static void resolve_path(const char* path, char* out_drive, char* out_name, uint
 {
     char drv = s_drive;
     const char* p = path;
+    const char* end = NULL;
+    char quote = 0;
     while (*p == ' ' || *p == '\t') p++;
+    if (*p == '"' || *p == '\'') {
+        quote = *p++;
+        end = p;
+        while (*end && *end != quote) end++;
+    }
     if (p[0] && p[1] == ':') {
         drv = (char)((p[0] >= 'a' && p[0] <= 'z') ? p[0] - 32 : p[0]);
         p += 2;
@@ -640,7 +647,11 @@ static void resolve_path(const char* path, char* out_drive, char* out_name, uint
     }
     *out_drive = drv;
     uint32_t i = 0;
-    while (*p && *p != ' ' && *p != '\t' && i + 1 < name_cap) out_name[i++] = *p++;
+    if (quote) {
+        while (p < end && *p && i + 1 < name_cap) out_name[i++] = *p++;
+    } else {
+        while (*p && *p != ' ' && *p != '\t' && i + 1 < name_cap) out_name[i++] = *p++;
+    }
     out_name[i] = '\0';
 }
 
@@ -918,7 +929,13 @@ static int vcs_read_word(const char** args, char* out, uint32_t cap)
     uint32_t i = 0;
     const char* p = *args;
     while (*p == ' ' || *p == '\t') p++;
-    while (*p && *p != ' ' && *p != '\t' && i + 1 < cap) out[i++] = *p++;
+    if (*p == '"' || *p == '\'') {
+        char quote = *p++;
+        while (*p && *p != quote && i + 1 < cap) out[i++] = *p++;
+        if (*p == quote) p++;
+    } else {
+        while (*p && *p != ' ' && *p != '\t' && i + 1 < cap) out[i++] = *p++;
+    }
     out[i] = '\0';
     while (*p == ' ' || *p == '\t') p++;
     *args = p;
@@ -1712,6 +1729,7 @@ static void cmd_help(const char* args)
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
+    out_append("  vpath path|test       resolve folder/inside/path through the OS file namespace\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  media list|format Z|sync all|write Z file text  X/Y/Z/A/R drive rules\n");
@@ -3124,6 +3142,45 @@ static void cmd_rxr(const char* args)
         return;
     }
     cmd_rxr_op(sub, args);
+}
+
+static void cmd_vpath(const char* args)
+{
+    char first[80];
+    char path[80];
+    char target[64];
+    const char* p = args ? args : "";
+    if (vcs_read_word(&p, first, sizeof(first)) != 0) {
+        out_append("Usage: vpath path | vpath resolve path | vpath test\n");
+        return;
+    }
+    if (strcmp(first, "test") == 0 || strcmp(first, "selftest") == 0) {
+        out_append(fs_path_selftest() == 0 ? "vpath: selftest OK\n" : "vpath: selftest failed\n");
+        return;
+    }
+    if (strcmp(first, "resolve") == 0 || strcmp(first, "path") == 0 || strcmp(first, "map") == 0) {
+        if (vcs_read_word(&p, path, sizeof(path)) != 0) {
+            out_append("Usage: vpath resolve folder/inside/path\n");
+            return;
+        }
+    } else {
+        uint32_t i = 0;
+        while (first[i] && i + 1u < sizeof(path)) {
+            path[i] = first[i];
+            i++;
+        }
+        path[i] = '\0';
+    }
+    if (fs_resolve_os_path(path, target, sizeof(target)) != 0) {
+        out_append(path);
+        out_append(" is already a flat OS filename.\n");
+        return;
+    }
+    out_append(path);
+    out_append(" -> ");
+    out_append(target);
+    if (!fs_open(target) && !fs_open_writable(target)) out_append(" (not created/installed yet)");
+    out_append("\n");
 }
 
 static const char* oslink_type_name(uint8_t type)
@@ -8464,6 +8521,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "rxrverify") == 0) { cmd_rxr_op("verify", args); return; }
     if (strcmp(cmd, "rxrchecksum") == 0) { cmd_rxr_op("checksum", args); return; }
     if (strcmp(cmd, "rxrundo") == 0) { cmd_rxr("undo"); return; }
+    if (strcmp(cmd, "vpath") == 0 || strcmp(cmd, "pathmap") == 0) { cmd_vpath(args); return; }
     if (strcmp(cmd, "ren") == 0 || strcmp(cmd, "rename") == 0) { cmd_rename(args); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }

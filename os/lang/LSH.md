@@ -62,6 +62,7 @@
 - `larsform file` / `larsact file index` - list or run LARS button/link/fetch/input actions.
 - `lpack info|list|verify|install|undo file.lpack` - inspect, validate, install, or roll back a native LardPack package.
 - `rxr info|list|verify|install|undo file.rxr` / `rxr path rxr/file` - inspect, validate, install, roll back, or resolve a native app bundle containing one RXE/SYSRXE app plus required files. LardOS exposes bundled files through the OS filesystem namespace `rxr/name`.
+- `vpath path` / `pathmap path` - inspect the OS filesystem mapping for a virtual path such as `folder/inside/path`. Use quotes for spaces, for example `vpath "Final Final Release/final fix"`.
 - `drivers status|reload|load file.drfl|show name` - inspect loaded DRFL files, rescan installed `.drfl` files, load one driver file directly, or show the code carried inside a DRFL 2 file.
 - `set` — list or set environment variables
 - `more` — read from pipe stdin (use with `|`)

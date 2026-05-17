@@ -5,7 +5,6 @@
 #include "ldll.h"
 #include "fs.h"
 #include "mmu.h"
-#include "rxr.h"
 #include "usermode.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -52,7 +51,7 @@ int ldll_load(const char* name)
     if (copy_user_string(name, kern_name, LDLL_MAX_NAME) < 0) return -1;
     {
         char resolved[LDLL_MAX_NAME];
-        if (rxr_resolve_path(kern_name, resolved, sizeof(resolved)) >= 0) {
+        if (fs_resolve_os_path(kern_name, resolved, sizeof(resolved)) >= 0) {
             for (uint32_t i = 0; i < sizeof(kern_name); i++) {
                 kern_name[i] = resolved[i];
                 if (resolved[i] == '\0') break;

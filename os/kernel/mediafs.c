@@ -1,5 +1,6 @@
 #include "mediafs.h"
 
+#include "fs.h"
 #include "installer.h"
 #include "storage.h"
 #include "string.h"
@@ -115,6 +116,12 @@ static int media_valid_name(const char* name)
         n++;
     }
     return 1;
+}
+
+static const char* media_os_name(const char* name, char* buf, uint32_t cap)
+{
+    if (fs_resolve_os_path(name, buf, cap) == 0) return buf;
+    return name;
 }
 
 static int media_name_eq(const char* a, const char* b)
@@ -292,10 +299,12 @@ int mediafs_list(char drive, mediafs_list_cb cb, void* user)
 int mediafs_read(char drive, const char* name, const uint8_t** data, uint32_t* size)
 {
     media_dev_t* dev = media_by_drive(drive);
+    char resolved[32];
+    const char* q = media_os_name(name, resolved, sizeof(resolved));
     int idx;
-    if (!dev || !data || !size || !media_valid_name(name)) return -1;
+    if (!dev || !data || !size || !media_valid_name(q)) return -1;
     (void)media_load(dev);
-    idx = media_find_file(dev, name);
+    idx = media_find_file(dev, q);
     if (idx < 0) return -2;
     *data = dev->image + dev->files[idx].offset;
     *size = dev->files[idx].size;
@@ -324,19 +333,21 @@ int mediafs_sync(char drive)
 int mediafs_write(char drive, const char* name, const uint8_t* data, uint32_t size, int append)
 {
     media_dev_t* dev = media_by_drive(drive);
+    char resolved[32];
+    const char* q = media_os_name(name, resolved, sizeof(resolved));
     media_file_t* f;
     int idx;
     uint32_t start;
-    if (!dev || !media_valid_name(name)) return -1;
+    if (!dev || !media_valid_name(q)) return -1;
     if (size && !data) return -2;
     (void)media_load(dev);
-    idx = media_find_file(dev, name);
+    idx = media_find_file(dev, q);
     if (idx < 0) {
         if (dev->file_count >= MEDIAFS_MAX_FILES) return -3;
         idx = (int)dev->file_count++;
         f = &dev->files[idx];
         media_zero((uint8_t*)f, sizeof(*f));
-        for (uint32_t i = 0; name[i] && i < 31u; i++) f->name[i] = name[i];
+        for (uint32_t i = 0; q[i] && i < 31u; i++) f->name[i] = q[i];
         f->offset = MEDIAFS_DATA_OFF + (uint32_t)idx * MEDIAFS_FILE_CAP;
         f->cap = MEDIAFS_FILE_CAP;
         f->size = 0;
@@ -358,10 +369,12 @@ int mediafs_write(char drive, const char* name, const uint8_t* data, uint32_t si
 int mediafs_delete(char drive, const char* name)
 {
     media_dev_t* dev = media_by_drive(drive);
+    char resolved[32];
+    const char* q = media_os_name(name, resolved, sizeof(resolved));
     int idx;
-    if (!dev || !media_valid_name(name)) return -1;
+    if (!dev || !media_valid_name(q)) return -1;
     (void)media_load(dev);
-    idx = media_find_file(dev, name);
+    idx = media_find_file(dev, q);
     if (idx < 0) return -2;
     media_zero(dev->image + dev->files[idx].offset, dev->files[idx].cap);
     for (uint32_t i = (uint32_t)idx; i + 1u < dev->file_count; i++) {
@@ -396,6 +409,7 @@ int mediafs_format(char drive)
 
 int mediafs_selftest(void)
 {
+    char resolved[32];
     if (mediafs_count() != 3u) return -1;
     if (!mediafs_drive_supported('Y') || !mediafs_drive_supported('Z') ||
         !mediafs_drive_supported('A') || !mediafs_drive_supported('F') ||
@@ -403,5 +417,7 @@ int mediafs_selftest(void)
     if (MEDIAFS_FILE_CAP < 512u || MEDIAFS_MAX_FILES < 3u) return -3;
     if (MEDIAFS_DATA_OFF + MEDIAFS_MAX_FILES * MEDIAFS_FILE_CAP > MEDIAFS_BYTES) return -4;
     if (MEDIAFS_AUX_LBA != LARD_INSTALL_IMAGE_SECTORS) return -5;
+    if (fs_resolve_os_path("media/hello.txt", resolved, sizeof(resolved)) != 0 ||
+        !media_valid_name(resolved)) return -6;
     return 0;
 }

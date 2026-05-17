@@ -16,6 +16,7 @@ typedef struct FsWritableFile {
 } FsWritableFile;
 
 void fs_init(void);
+int fs_resolve_os_path(const char* path, char* out, uint32_t cap);
 const FsFile* fs_open(const char* name);
 const FsFile* fs_open_readonly(const char* name);
 uint32_t fs_read(const FsFile* file, uint32_t offset, uint8_t* buf, uint32_t len);
@@ -48,6 +49,7 @@ int fs_readonly_hidden(const char* name);
 int fs_readonly_deleted(const char* name);
 int fs_delete_overlay_selftest(void);
 int fs_rename_selftest(void);
+int fs_path_selftest(void);
 
 /* Persistent LPST store on the boot block device. */
 int fs_persist_load(void);

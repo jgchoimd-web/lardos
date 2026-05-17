@@ -174,6 +174,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: app bundle parser", rxr_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: bundle-internal paths", rxr_path_selftest() == 0, emit, user, &pass, &fail);
+    post_check("fs: virtual path namespace", fs_path_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: rxr namespace open", fs_open("rxr/notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);
     post_check("sysrxe: file app parser", sysrxe_selftest() == 0, emit, user, &pass, &fail);

@@ -45,12 +45,19 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.75.1b-ami/lardos-v1.75.1b-ami.iso`. To publish the whole hardware
+`release/v1.76.0b-ami/lardos-v1.76.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.76.0b` generalizes OS virtual paths beyond RXR. A path shaped like
+`folder/inside/path` is resolved by the kernel filesystem layer to a safe flat
+LardOS filename, and MediaFS applies the same rule for `Y:`/`Z:`/`A:` device
+stores. Quoted path words let users write names with spaces such as
+`"Final Final Release/final fix"`. RXR aliases still take priority for
+`rxr/name`, preserving app-bundle dependency behavior.
 
 `v1.75.1b` makes RXR paths OS-centered. `rxr/name` is resolved by the kernel
 filesystem layer before read-only open, writable open, create, capacity, and
@@ -180,6 +187,12 @@ commands:
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
+- `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
+  by the OS filesystem namespace. Quote paths with spaces, for example
+  `vpath "Final Final Release/final fix"`.
+- `v1.76.0b` generalizes OS virtual paths beyond RXR so `folder/inside/path`
+  resolves in the kernel FS layer while `rxr/name` keeps its bundle alias
+  priority.
 - `v1.75.1b` makes `rxr/file` an OS filesystem namespace path resolved by the
   kernel FS layer, including writable create and rename operations.
 - `v1.75.0b` adds RXR bundle-internal paths: app code can use `rxr/file` for

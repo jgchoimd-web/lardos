@@ -15,7 +15,6 @@
 #include "lafillo.h"
 #include "hash.h"
 #include "base64.h"
-#include "rxr.h"
 #include "usermode.h"
 #include <stdint.h>
 
@@ -250,7 +249,7 @@ void syscall_handler(void* frame)
         }
         {
             char resolved[SYS_PATH_MAX];
-            if (rxr_resolve_path(path, resolved, sizeof(resolved)) >= 0) {
+            if (fs_resolve_os_path(path, resolved, sizeof(resolved)) >= 0) {
                 for (uint32_t pi = 0; pi < sizeof(path); pi++) {
                     path[pi] = resolved[pi];
                     if (resolved[pi] == '\0') break;

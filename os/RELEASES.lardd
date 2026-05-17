@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.76.0b
+ITEM Beta release generalizing OS virtual file paths beyond RXR bundles.
+ITEM Any path shaped folder/inside/path is resolved by the kernel filesystem layer to a safe flat LardOS filename, and MediaFS applies the same rule for Y:/Z:/A: device stores.
+ITEM RXR aliases still take priority for rxr/name, preserving app-bundle dependency behavior while moving the general rule into FS.
+ITEM LSH now accepts quoted path words for paths with spaces and adds vpath/pathmap so users can inspect the visible mapping before opening, writing, copying, or renaming.
+ITEM POST and LUNIT now cover the generic virtual path namespace while preserving RXR/RXE/SYSRXE, KMO, DRFL, MediaFS, WebStack, and user-owned control behavior without feature loss.
+
 SECTION v1.75.1b
 ITEM Beta release correcting RXR paths to be OS-centered instead of app-runtime centered.
 ITEM The kernel filesystem layer now resolves rxr/name before read-only open, writable open, writable create, capacity checks, and rename operations.

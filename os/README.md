@@ -45,12 +45,16 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.76.0a-ami/lardos-v1.76.0a-ami.iso`. To publish the whole hardware
+`release/v1.76.1p-ami/lardos-v1.76.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.76.1p` hotpatches a VirtualBox blank black-screen boot regression by moving
+Stage2 and the boot stacks out of the larger kernel staging buffer. It keeps the
+OS virtual path namespace and user-owned control behavior unchanged.
 
 `v1.76.0a` officially promotes the OS virtual path namespace from `v1.76.0b`
 without feature loss or philosophy changes. A path shaped like
@@ -194,6 +198,9 @@ commands:
 - `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
   by the OS filesystem namespace. Quote paths with spaces, for example
   `vpath "Final Final Release/final fix"`.
+- `v1.76.1p` hotpatches the VirtualBox blank black-screen boot path by moving
+  Stage2 to 0x0600, bootinfo to 0x4000, staging the kernel at 0x5000, and
+  keeping boot stacks below the staging buffer.
 - `v1.76.0a` officially promotes OS virtual paths without feature loss or
   philosophy changes.
 - `v1.76.0b` generalizes OS virtual paths beyond RXR so `folder/inside/path`

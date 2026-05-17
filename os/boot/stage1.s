@@ -1,5 +1,5 @@
 ; boot/stage1.s - 512-byte BIOS stage1.
-; Loads stage2 from LBA 1 to 0x7E00 and jumps to it.
+; Loads stage2 from LBA 1 to 0x0600 and jumps to it.
 
 BITS 16
 ORG 0x7C00
@@ -16,7 +16,7 @@ ORG 0x7C00
 %define ISO_KERNEL_LBA 5
 %endif
 
-STAGE2_LOAD equ 0x7E00
+STAGE2_LOAD equ 0x0600
 
     jmp short start
     nop

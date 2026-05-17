@@ -441,6 +441,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.76.1p hotpatches the VirtualBox blank-screen boot layout while preserving v1.76 features.\n"
     "li v1.76.0a officially promotes OS virtual paths without feature loss or philosophy changes.\n"
     "li v1.76.0b generalizes OS virtual paths: folder/inside/address resolves through the kernel FS layer.\n"
     "li v1.75.1b makes rxr/file an OS filesystem namespace path, so the kernel FS layer owns RXR path resolution.\n"

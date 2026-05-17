@@ -1,17 +1,19 @@
 ; boot/boot.s - stage2 BIOS loader.
-; Stage1 loads this at 0x7E00, then this loads the LARDX kernel.
+; Stage1 loads this at 0x0600, then this loads the LARDX kernel.
 
 BITS 16
-ORG 0x7E00
+ORG 0x0600
 
 %ifndef KERNEL_LBA
 %define KERNEL_LBA 5
 %endif
 %ifndef KERNEL_LOAD_SEG
-%define KERNEL_LOAD_SEG 0x0900
+%define KERNEL_LOAD_SEG 0x0500
 %endif
 %define KERNEL_LOAD_PADDR (KERNEL_LOAD_SEG << 4)
 %define BOOT_IMAGE_COPY_PADDR 0x01000000
+%define BOOT_REAL_STACK 0x3000
+%define BOOT_PM_STACK   0x3000
 
 start:
     ; Optional handoff for raw-written hybrid ISO boots.
@@ -32,7 +34,7 @@ start:
     mov ds, ax
     mov es, ax
     mov ss, ax
-    mov sp, 0x7C00
+    mov sp, BOOT_REAL_STACK
     mov [boot_drive], dl
     sti
 
@@ -55,8 +57,8 @@ start:
     call vbe_try_enable
 
     ; Load LARDX executable (kernel) below VGA/EBDA into KERNEL_LOAD_SEG:0000.
-    ; v1.76.0a builds the kernel with -Os, keeping the complete native feature
-    ; set small enough for this safer BIOS-loading path.
+    ; v1.76.1p keeps Stage2, stacks, and the larger kernel staging buffer out
+    ; of each other's way so VirtualBox does not sit on a blank VBE screen.
     mov ax, KERNEL_LOAD_SEG
     mov es, ax
     xor bx, bx
@@ -185,7 +187,7 @@ protected_start:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x9F000
+    mov esp, BOOT_PM_STACK
 
     ; Preserve a full copy for the in-OS HDD/SSD installer before page tables
     ; and stacks reuse the low staging buffer.
@@ -641,8 +643,8 @@ kernel_lba_base dd KERNEL_LBA
 ; VBE (real mode) framebuffer setup
 ; -----------------------------
 
-; bootinfo struct lives below stage2 and the kernel staging buffer.
-BOOTINFO_SEG equ 0x0500
+; bootinfo struct lives below the kernel staging buffer and above boot stacks.
+BOOTINFO_SEG equ 0x0400
 BOOTINFO_OFF equ 0x0000
 VBE_MODEINFO_OFF equ 0x0200
 

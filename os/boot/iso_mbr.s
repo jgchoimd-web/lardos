@@ -16,7 +16,7 @@ ORG 0x7C00
 %define STAGE2_SECTORS 4
 %endif
 
-STAGE2_LOAD equ 0x7E00
+STAGE2_LOAD equ 0x0600
 
     jmp short start
     nop

@@ -15,6 +15,8 @@
 #define STAGE2_SECTORS 4
 #define PERSIST_START_SECTOR 2752
 #define PERSIST_SECTORS 128
+#define KERNEL_STAGE_PADDR 0x5000
+#define LOW_STAGE_LIMIT 0x9F000
 #define IMAGE_SIZE ((size_t)SECTOR_SIZE * SECTOR_COUNT)
 
 static int read_file(const char* path, unsigned char** buf, size_t* len)
@@ -102,6 +104,13 @@ int main(int argc, char** argv)
     }
     size_t kernel_off = stage2_path ? (1 + STAGE2_SECTORS) * (size_t)SECTOR_SIZE : SECTOR_SIZE;
     size_t persist_off = (size_t)PERSIST_START_SECTOR * SECTOR_SIZE;
+    if (kernel_len > (size_t)(LOW_STAGE_LIMIT - KERNEL_STAGE_PADDR)) {
+        fprintf(stderr, "mkimg: kernel too large for low boot staging buffer\n");
+        free(boot_buf);
+        free(stage2_buf);
+        free(kernel_buf);
+        return 1;
+    }
     if (kernel_len > persist_off - kernel_off) {
         fprintf(stderr, "mkimg: kernel too large for reserved LPST persistent store\n");
         free(boot_buf);

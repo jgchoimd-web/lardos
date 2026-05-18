@@ -272,6 +272,12 @@ LSH and L-DOS route `dir`, `type`, `write`, `append`, `copy`, and delete-style
 file commands through the same path, so device files are not hard-coded app
 branches.
 
+`_:` is a special merged top-level drive, not another physical disk. LSH lists
+`R:` RAM, `X:` built-in/LFS files, and the `Y:`/`Z:`/`A:` media stores together
+with prefixes when the user runs `dir _:`. Read paths search user RAM first,
+then main files, then media stores; write paths route visibly to `R:` so the
+actual writable surface is never hidden.
+
 LardKit also owns the local recovery/audit reports. `bugreplay.lardd` stores
 recent BugEye frame summaries and `bugreplay draw` renders a small replay
 panel. `trace.lardd`, `netwatch.lardd`, and `journal.lardd` capture ordered
@@ -331,9 +337,10 @@ new per-app GUI branches.
 
 `v1.60.0a` adds L-DOS mode as a compatibility layer inside LSH rather than a
 foreign DOS runtime. `dos on` switches the prompt to `L-DOS C:\>`, DOS command
-aliases are case-insensitive, `C:` maps to `X:`, `A:` maps to `Y:`, `Z:` maps
-to auxiliary `Z:`, `U:` maps to extra media `A:`, `R:` maps to RAM `R:`, and
-`dosmode.lardd` records user-visible state/history.
+aliases are case-insensitive, `_:` maps to the merged LardOS root, `C:` maps
+to `X:`, `A:` maps to `Y:`, `Z:` maps to auxiliary `Z:`, `U:` maps to extra
+media `A:`, `R:` maps to RAM `R:`, and `dosmode.lardd` records user-visible
+state/history.
 `v1.60.1p` adds the `DEL -F` tombstone overlay: read-only built-in/LFS files
 can be hidden from open/list operations by user-owned `fsdelete.lardd` records,
 and `RESTORE`/`UNDELETE` removes the tombstone.

@@ -45,12 +45,19 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.76.1p-ami/lardos-v1.76.1p-ami.iso`. To publish the whole hardware
+`release/v1.77.0b-ami/lardos-v1.77.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.77.0b` adds `_:` as a merged top-level drive over `R:`/`X:`/`Y:`/`Z:`/`A:`.
+`dir _:` shows every visible store with drive prefixes, and common read
+commands such as `type`, `copy`, `doc`, `lars`, `lardd`, `lafillo`, `larls`,
+`larx`, `vcsadd`, and L-DOS `DIR`/`TYPE`/`COPY` can read through it. Writes to
+`_:` route visibly to `R:` writable RAM slots so the OS never hides the actual
+writable surface.
 
 `v1.76.1p` hotpatches a VirtualBox blank black-screen boot regression by moving
 Stage2 and the boot stacks out of the larger kernel staging buffer. It keeps the
@@ -123,6 +130,9 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
   `rxr/name`.
 - `MDFS` stores files for the MediaFS device stores behind `Y:`/`F:`,
   `Z:`/`S:`, and `A:`/`U:`.
+- `_:` is not a separate disk. It is a merged top-level drive view over
+  `R:`/`X:`/`Y:`/`Z:`/`A:` while the individual drives remain directly
+  addressable.
 
 These formats are record-based, readable without a renderer, and parsed by freestanding C
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
@@ -159,6 +169,9 @@ commands:
   auxiliary SSD/HDD, `A:`/`U:` is the first extra USB-style store, and `R:` is
   RAM. Normal file commands also work, for example `write Z:note.txt hello`,
   `dir A:`, `type Y:boot.txt`, and `copy R:notes.txt Z:notes.txt`.
+- `dir _:` opens the merged top-level drive. It lists `R:` RAM files, `X:`
+  built-in/LFS files, and `Y:`/`Z:`/`A:` media stores together; `_:` reads
+  search those stores in user-first order and `_:` writes route visibly to `R:`.
 - `post` / `selftest` reruns the same Power-On Self-Test diagnostics available
   from the boot option. `post baseline` opens the saved POST baseline report.
 - `magic command [args]` predicts a mistyped safe built-in command and executes
@@ -170,7 +183,7 @@ commands:
   without running it.
 - `dos on|off|status|help|map|log|test` enters L-DOS mode, a native DOS-style
   compatibility shell. It uses an `L-DOS C:\>` prompt, case-insensitive
-  commands, visible `C:`/`A:`/`Z:`/`U:`/`R:` mapping to LardOS drives, and logs
+  commands, visible `_:`/`C:`/`A:`/`Z:`/`U:`/`R:` mapping to LardOS drives, and logs
   state in `dosmode.lardd`.
 - `DEL -F file` in L-DOS hard-deletes a read-only built-in/LFS file from the
   active filesystem view through a user-owned `fsdelete.lardd` DELETE record.
@@ -198,6 +211,9 @@ commands:
 - `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
   by the OS filesystem namespace. Quote paths with spaces, for example
   `vpath "Final Final Release/final fix"`.
+- `v1.77.0b` adds `_:` as a merged top-level drive over `R:`/`X:`/`Y:`/`Z:`/`A:`
+  with prefixed listings, user-first reads, L-DOS mapping, and visible `R:`
+  write routing.
 - `v1.76.1p` hotpatches the VirtualBox blank black-screen boot path by moving
   Stage2 to 0x0600, bootinfo to 0x4000, staging the kernel at 0x5000, and
   keeping boot stacks below the staging buffer.

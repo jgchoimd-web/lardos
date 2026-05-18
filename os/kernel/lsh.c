@@ -598,12 +598,16 @@ void lsh_enter_sum_shortcut(void)
     }
 }
 
-static void dir_cb(const char* nm, uint32_t sz, void* u)
+static void dir_emit_line(const char* prefix, const char* nm, uint32_t sz)
 {
-    (void)u;
     char ln[96];
     uint32_t i = 0;
-    while (nm[i] && i < 48) { ln[i] = nm[i]; i++; }
+    uint32_t pi = 0;
+    while (prefix && prefix[pi] && i + 1u < sizeof(ln)) ln[i++] = prefix[pi++];
+    while (nm[i - pi] && i < 48u + pi && i + 1u < sizeof(ln)) {
+        ln[i] = nm[i - pi];
+        i++;
+    }
     ln[i++] = ' ';
     ln[i++] = ' ';
     uint32_t s = sz;
@@ -619,13 +623,44 @@ static void dir_cb(const char* nm, uint32_t sz, void* u)
     out_append(ln);
 }
 
+static void dir_cb(const char* nm, uint32_t sz, void* u)
+{
+    (void)u;
+    dir_emit_line("", nm, sz);
+}
+
+typedef struct {
+    char drive;
+} lsh_dir_prefix_t;
+
+static void dir_merged_cb(const char* nm, uint32_t sz, void* u)
+{
+    char prefix[4];
+    lsh_dir_prefix_t* ctx = (lsh_dir_prefix_t*)u;
+    prefix[0] = ctx ? ctx->drive : '?';
+    prefix[1] = ':';
+    prefix[2] = '\0';
+    dir_emit_line(prefix, nm, sz);
+}
+
 static int drive_to_fs(char d)
 {
-    d = (char)((d >= 'a' && d <= 'z') ? d - 32 : d);
+    d = ascii_upper_char(d);
+    if (d == '_') return 3; /* merged top-level drive */
     if (d == 'Y' || d == 'Z' || d == 'A' || d == 'F' || d == 'S' || d == 'U') return 2; /* media device stores */
     if (d == 'R') return 1; /* RAM */
     if (d == 'X' || (d >= 'B' && d <= 'W')) return 0; /* main FS and unbacked legacy aliases */
     return -1;
+}
+
+static int drive_is_merged(char d)
+{
+    return drive_to_fs(d) == 3;
+}
+
+static char drive_write_target(char d)
+{
+    return drive_is_merged(d) ? 'R' : d;
 }
 
 static void resolve_path(const char* path, char* out_drive, char* out_name, uint32_t name_cap)
@@ -658,6 +693,7 @@ static void resolve_path(const char* path, char* out_drive, char* out_name, uint
 static const FsFile* lsh_open_read(char drive, const char* name)
 {
     if (drive_to_fs(drive) == 2) return NULL;
+    if (drive_is_merged(drive)) return NULL;
     if (drive_to_fs(drive) == 1) {
         if (name[0] == 'n' && name[1] == 'o' && name[2] == 't' && name[3] == 'e' &&
             name[4] == 's' && name[5] == '.' && name[6] == 't' && name[7] == 'x' && name[8] == 't' && name[9] == '\0') {
@@ -665,6 +701,101 @@ static const FsFile* lsh_open_read(char drive, const char* name)
         }
     }
     return fs_open(name);
+}
+
+static void cmd_dir_merged(void)
+{
+    lsh_dir_prefix_t ctx;
+    int r;
+    out_append("[R:] RAM\n");
+    ctx.drive = 'R';
+    fs_list_writable(dir_merged_cb, &ctx);
+    out_append("[X:] main\n");
+    ctx.drive = 'X';
+    fs_list_readonly(dir_merged_cb, &ctx);
+    out_append("[Y:] floppy\n");
+    ctx.drive = 'Y';
+    r = mediafs_list('Y', dir_merged_cb, &ctx);
+    if (r == 0) out_append("  (empty Y:)\n");
+    else if (r < 0) out_append("  (Y: unavailable)\n");
+    out_append("[Z:] aux\n");
+    ctx.drive = 'Z';
+    r = mediafs_list('Z', dir_merged_cb, &ctx);
+    if (r == 0) out_append("  (empty Z:)\n");
+    else if (r < 0) out_append("  (Z: unavailable)\n");
+    out_append("[A:] extra\n");
+    ctx.drive = 'A';
+    r = mediafs_list('A', dir_merged_cb, &ctx);
+    if (r == 0) out_append("  (empty A:)\n");
+    else if (r < 0) out_append("  (A: unavailable)\n");
+    out_append("_: writes -> R:\n");
+}
+
+static int lsh_read_merged(const char* name, const uint8_t** data, uint32_t* size, char* found_drive)
+{
+    FsWritableFile* w;
+    const FsFile* f;
+    const char media_drives[] = { 'Y', 'Z', 'A' };
+    if (!name || !name[0]) return -1;
+    w = fs_open_writable(name);
+    if (w) {
+        *data = w->data;
+        *size = w->size;
+        if (found_drive) *found_drive = 'R';
+        return 0;
+    }
+    f = lsh_open_read('X', name);
+    if (f) {
+        *data = f->data;
+        *size = f->size;
+        if (found_drive) *found_drive = 'X';
+        return 0;
+    }
+    for (uint32_t i = 0; i < sizeof(media_drives); i++) {
+        if (mediafs_read(media_drives[i], name, data, size) == 0) {
+            if (found_drive) *found_drive = media_drives[i];
+            return 0;
+        }
+    }
+    return -2;
+}
+
+static int lsh_read_drive_data_ex(char drv, const char* name, const uint8_t** data,
+                                  uint32_t* size, char* found_drive, int any_ram_fallback)
+{
+    int fs = drive_to_fs(drv);
+    const FsFile* f;
+    FsWritableFile* w;
+    if (!name || !name[0]) return -1;
+    if (fs == 3) return lsh_read_merged(name, data, size, found_drive);
+    if (fs == 2) {
+        if (mediafs_read(drv, name, data, size) == 0) {
+            if (found_drive) *found_drive = drv;
+            return 0;
+        }
+        return -2;
+    }
+    f = lsh_open_read(drv, name);
+    if (f) {
+        *data = f->data;
+        *size = f->size;
+        if (found_drive) *found_drive = drv;
+        return 0;
+    }
+    w = (fs == 1 || any_ram_fallback) ? fs_open_writable(name) : NULL;
+    if (w) {
+        *data = w->data;
+        *size = w->size;
+        if (found_drive) *found_drive = 'R';
+        return 0;
+    }
+    return -2;
+}
+
+static int lsh_read_drive_data(char drv, const char* name, const uint8_t** data,
+                               uint32_t* size, char* found_drive)
+{
+    return lsh_read_drive_data_ex(drv, name, data, size, found_drive, 0);
 }
 
 static void cmd_dir(const char* args)
@@ -685,7 +816,9 @@ static void cmd_dir(const char* args)
     out_append(buf);
     out_append("\n");
 
-    if (drive_to_fs(drv) == 0) {
+    if (drive_is_merged(drv)) {
+        cmd_dir_merged();
+    } else if (drive_to_fs(drv) == 0) {
         fs_list_readonly(dir_cb, NULL);
     } else if (drive_to_fs(drv) == 1) {
         fs_list_writable(dir_cb, NULL);
@@ -707,30 +840,14 @@ static void cmd_type(const char* args)
         out_append("Usage: type [drive:]file\n");
         return;
     }
-    if (drive_to_fs(drv) == 2) {
-        const uint8_t* data = NULL;
-        uint32_t size = 0;
-        if (mediafs_read(drv, name, &data, &size) != 0) {
-            out_append("File not found.\n");
-            return;
-        }
-        for (uint32_t i = 0; i < size && i < 1024; i++) out_append_char((char)data[i]);
-        if (size > 0) out_append("\n");
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    if (lsh_read_drive_data(drv, name, &data, &size, NULL) != 0) {
+        out_append("File not found.\n");
         return;
     }
-    const FsFile* f = lsh_open_read(drv, name);
-    if (!f) {
-        FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
-        if (w) {
-            for (uint32_t i = 0; i < w->size && i < 1024; i++) out_append_char((char)w->data[i]);
-            if (w->size > 0) out_append("\n");
-        } else {
-            out_append("File not found.\n");
-        }
-        return;
-    }
-    for (uint32_t i = 0; i < f->size && i < 1024; i++) out_append_char((char)f->data[i]);
-    if (f->size > 0) out_append("\n");
+    for (uint32_t i = 0; i < size && i < 1024; i++) out_append_char((char)data[i]);
+    if (size > 0) out_append("\n");
 }
 
 static void cmd_lafillo(const char* args)
@@ -742,14 +859,9 @@ static void cmd_lafillo(const char* args)
         out_append("Usage: lafillo [drive:]file\n");
         return;
     }
-    const FsFile* f = (drive_to_fs(drv) == 2) ? NULL : lsh_open_read(drv, name);
-    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
-    const uint8_t* md = NULL;
-    uint32_t msz = 0;
-    if (drive_to_fs(drv) == 2) (void)mediafs_read(drv, name, &md, &msz);
-    const uint8_t* d = f ? f->data : (w ? w->data : md);
-    uint32_t sz = f ? f->size : (w ? w->size : msz);
-    if (!d || sz == 0 || sz >= 4096) {
+    const uint8_t* d = NULL;
+    uint32_t sz = 0;
+    if (lsh_read_drive_data(drv, name, &d, &sz, NULL) != 0 || !d || sz == 0 || sz >= 4096) {
         out_append("lafillo: file not found or too large\n");
         return;
     }
@@ -777,18 +889,7 @@ static void cmd_larddoc(const char* args, const char* usage)
         out_append("\n");
         return;
     }
-    const FsFile* f = (drive_to_fs(drv) == 2) ? NULL : lsh_open_read(drv, name);
-    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
-    if (f) {
-        data = f->data;
-        size = f->size;
-    } else if (w) {
-        data = w->data;
-        size = w->size;
-    } else if (drive_to_fs(drv) == 2) {
-        (void)mediafs_read(drv, name, &data, &size);
-    }
-    if (!data || size == 0 || size >= 4096) {
+    if (lsh_read_drive_data(drv, name, &data, &size, NULL) != 0 || !data || size == 0 || size >= 4096) {
         out_append("doc: file not found or too large.\n");
         return;
     }
@@ -851,11 +952,9 @@ static void cmd_larls(const char* args)
         drv = 'X';
     }
 
-    const FsFile* f = lsh_open_read(drv, name);
-    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
-    const uint8_t* data = f ? f->data : (w ? w->data : NULL);
-    uint32_t size = f ? f->size : (w ? w->size : 0);
-    if (!data || size == 0) {
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    if (lsh_read_drive_data(drv, name, &data, &size, NULL) != 0 || !data || size == 0) {
         out_append("larls: archive not found.\n");
         return;
     }
@@ -900,12 +999,10 @@ static void cmd_larx(const char* args)
     char drv;
     char archive[64];
     resolve_path(archive_arg, &drv, archive, sizeof(archive));
-    const FsFile* f = lsh_open_read(drv, archive);
-    FsWritableFile* wsrc = (drive_to_fs(drv) == 1) ? fs_open_writable(archive) : NULL;
-    const uint8_t* data = f ? f->data : (wsrc ? wsrc->data : NULL);
-    uint32_t size = f ? f->size : (wsrc ? wsrc->size : 0);
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
     FsWritableFile* out = fs_open_writable("lar_extract.txt");
-    if (!data || size == 0 || !out) {
+    if (lsh_read_drive_data(drv, archive, &data, &size, NULL) != 0 || !data || size == 0 || !out) {
         out_append("larx: storage not available.\n");
         return;
     }
@@ -1051,8 +1148,6 @@ static void cmd_vcsadd(const char* args)
 {
     char drv;
     char name[64];
-    const FsFile* f;
-    FsWritableFile* w;
     const uint8_t* data;
     uint32_t size;
     int r;
@@ -1062,11 +1157,7 @@ static void cmd_vcsadd(const char* args)
         out_append("Usage: vcsadd [drive:]file\n");
         return;
     }
-    f = lsh_open_read(drv, name);
-    w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
-    data = f ? f->data : (w ? w->data : NULL);
-    size = f ? f->size : (w ? w->size : 0);
-    if (!f && !w) {
+    if (lsh_read_drive_data(drv, name, &data, &size, NULL) != 0) {
         out_append("vcsadd: file not found.\n");
         return;
     }
@@ -1232,7 +1323,7 @@ static void cmd_media(const char* args)
         strcmp(sub, "info") == 0 || strcmp(sub, "ls") == 0) {
         out_append("LardOS media stores (MDFS)\n");
         for (uint32_t i = 0; i < mediafs_count(); i++) media_print_info(i);
-        out_append("  Drives: X:=main, Y:/F:=floppy, Z:/S:=aux SSD/HDD, A:/U:=USB-style, R:=RAM.\n");
+        out_append("  Drives: _:=merged root, X:=main, Y:/F:=floppy, Z:/S:=aux SSD/HDD, A:/U:=USB-style, R:=RAM.\n");
         return;
     }
     if (strcmp(sub, "format") == 0 || strcmp(sub, "mkfs") == 0) {
@@ -1732,7 +1823,7 @@ static void cmd_help(const char* args)
     out_append("  vpath path|test       resolve folder/inside/path through the OS file namespace\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
-    out_append("  media list|format Z|sync all|write Z file text  X/Y/Z/A/R drive rules\n");
+    out_append("  media list|format Z|sync all|write Z file text  drives X/Y/Z/A/R/_\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
@@ -1758,7 +1849,7 @@ static void cmd_help(const char* args)
     out_append("  lguilib status|show|use|test [file.lguilib]\n");
     out_append("  awake on|off|status|test\n");
     out_append("  write file text  append file text  copy src dst  ren src dst\n");
-    out_append("  set NAME=value  echo text  cd drive:  X: Y: Z: A: R:\n");
+    out_append("  set NAME=value  echo text  cd drive:  X: Y: Z: A: R: _:\n");
     out_append("  shrine status|list|info|verify|run|test [file.shrine]\n");
     out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
     out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM\n");
@@ -1774,7 +1865,7 @@ static void cmd_help(const char* args)
     out_append("  bye|byebye          sync RAM files, then request firmware/VM poweroff\n");
     out_append("  restart|reboot      sync RAM files, then request firmware/VM restart\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
-    out_append("Tips: X: main, Y: floppy, Z: auxiliary media, A: first extra media, R: RAM files.\n");
+    out_append("Tips: _: merged, X: main, Y: floppy, Z: aux, A: extra, R: RAM.\n");
 }
 
 static void cmd_control(const char* args)
@@ -1784,9 +1875,10 @@ static void cmd_control(const char* args)
     out_append("  Kernel and host tools are C. Runtime features stay in-tree.\n");
     out_append("  Files live in LFS, RAM files, LPST persistence, and embedded FS tables.\n");
     out_append("  Device media uses visible MDFS stores on Y:/Z:/A: with RAM fallback when no backing sectors exist.\n");
+    out_append("  _: merges R:/X:/Y:/Z:/A:; writes go visibly to R:.\n");
     out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
     out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
-    out_append("  DOS mode is a native compatibility shell layer; it maps C:/A:/Z:/U:/R: visibly onto LardOS drives.\n");
+    out_append("  DOS mode visibly maps _:/C:/A:/Z:/U:/R: onto LardOS drives.\n");
     out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
     out_append("  Values: visible power, editable state, local formats, explainable automation, repair over halt.\n");
     out_append("  Release suffix: a=official, b=beta-experimental, p=hotpatch.\n");
@@ -2591,27 +2683,8 @@ static int lsh_doc_data_from_arg(const char* file_arg, const uint8_t** data, uin
 {
     char drv;
     char name[64];
-    const FsFile* f;
-    FsWritableFile* w;
     resolve_path(file_arg, &drv, name, sizeof(name));
-    if (!name[0]) return -1;
-    if (drive_to_fs(drv) == 2) {
-        if (mediafs_read(drv, name, data, size) == 0) return 0;
-        return -2;
-    }
-    f = lsh_open_read(drv, name);
-    w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
-    if (f) {
-        *data = f->data;
-        *size = f->size;
-        return 0;
-    }
-    if (w) {
-        *data = w->data;
-        *size = w->size;
-        return 0;
-    }
-    return -2;
+    return lsh_read_drive_data(drv, name, data, size, NULL);
 }
 
 static void copy_lsh_literal(char* out, uint32_t cap, const char* s)
@@ -5582,27 +5655,8 @@ static int lsh_read_data_arg(const char* arg, const uint8_t** data, uint32_t* si
                              char* name, uint32_t name_cap)
 {
     char drv;
-    const FsFile* f;
-    FsWritableFile* w;
     resolve_path(arg, &drv, name, name_cap);
-    if (!name[0]) return -1;
-    if (drive_to_fs(drv) == 2) {
-        if (mediafs_read(drv, name, data, size) == 0) return 0;
-        return -2;
-    }
-    f = lsh_open_read(drv, name);
-    if (f) {
-        *data = f->data;
-        *size = f->size;
-        return 0;
-    }
-    w = fs_open_writable(name);
-    if (w) {
-        *data = w->data;
-        *size = w->size;
-        return 0;
-    }
-    return -2;
+    return lsh_read_drive_data_ex(drv, name, data, size, NULL, 1);
 }
 
 #define LSH_GLYPH_MAX_BMP_PIXELS (128u * 128u)
@@ -6208,6 +6262,8 @@ static void cmd_copy(const char* args)
         return;
     }
     resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    int merged_dst = drive_is_merged(dst_drive);
+    dst_drive = drive_write_target(dst_drive);
     if (drive_to_fs(dst_drive) == 2) {
         int r = mediafs_write(dst_drive, dst_name, data, size, 0);
         if (r < 0) {
@@ -6227,7 +6283,8 @@ static void cmd_copy(const char* args)
     }
     dst = fs_open_writable(dst_name);
     if (!dst) {
-        out_append("copy: destination must be a writable RAM file.\n");
+        out_append(merged_dst ? "copy: _: writes to R:, but destination must be a writable RAM file.\n" :
+                                "copy: destination must be a writable RAM file.\n");
         return;
     }
     if (size > dst->cap) {
@@ -6237,8 +6294,9 @@ static void cmd_copy(const char* args)
     fs_write(dst, 0, data, size);
     out_append("Copied ");
     out_append(src_name);
-    out_append(" -> ");
+    out_append(merged_dst ? " -> R:" : " -> ");
     out_append(dst_name);
+    if (merged_dst) out_append(" (_:->R:)");
     out_append(" (");
     out_append_u32(size);
     out_append(" bytes)\n");
@@ -6355,6 +6413,8 @@ static void cmd_write_like(const char* args, int append)
         return;
     }
     resolve_path(file_arg, &drv, name, sizeof(name));
+    int merged_dst = drive_is_merged(drv);
+    drv = drive_write_target(drv);
     if (drive_to_fs(drv) == 2) {
         while (args[len]) len++;
         media_r = mediafs_write(drv, name, (const uint8_t*)args, len, append);
@@ -6378,8 +6438,10 @@ static void cmd_write_like(const char* args, int append)
     }
     w = fs_open_writable(name);
     if (!w) {
-        out_append(append ? "append: target must be a writable RAM file.\n" :
-                            "write: target must be a writable RAM file.\n");
+        if (merged_dst) out_append(append ? "append: _: writes to R:, but target must be a writable RAM file.\n" :
+                                            "write: _: writes to R:, but target must be a writable RAM file.\n");
+        else out_append(append ? "append: target must be a writable RAM file.\n" :
+                                 "write: target must be a writable RAM file.\n");
         return;
     }
     while (args[len]) len++;
@@ -6404,7 +6466,9 @@ static void cmd_write_like(const char* args, int append)
     }
     out_append_u32(wrote);
     out_append(" bytes to ");
+    if (merged_dst) out_append("R:");
     out_append(name);
+    if (merged_dst) out_append(" (_:->R:)");
     out_append("\n");
 }
 
@@ -6429,6 +6493,7 @@ static void fsw_append_s(FsWritableFile* w, const char* s)
 static char dos_drive_to_lard(char d)
 {
     d = ascii_upper_char(d);
+    if (d == '_') return '_';
     if (d == 'C') return 'X';
     if (d == 'A') return 'Y';
     if (d == 'R') return 'R';
@@ -6440,6 +6505,7 @@ static char dos_drive_to_lard(char d)
 static char dos_drive_from_lard(char d)
 {
     d = ascii_upper_char(d);
+    if (d == '_') return '_';
     if (d == 'X') return 'C';
     if (d == 'Y') return 'A';
     if (d == 'A') return 'U';
@@ -6499,7 +6565,7 @@ static void dos_help(void)
     out_append("  DIR [drive:]  TYPE file  COPY src dst  DEL [-F|-T] file  RESTORE file  TOMB LIST|SHOW|HIDE|DROP|CLEAR\n");
     out_append("  MD name  RD name  CD [dir|\\|..]  CLS  VER  SET  ECHO text  MEM\n");
     out_append("  EXIT leaves DOS mode; LSH command runs one native LardOS command.\n");
-    out_append("  Drive map: C: -> X: main, A: -> Y: floppy, Z: -> Z: aux, U: -> A: extra USB-style, R: -> R: RAM.\n");
+    out_append("  Map: _:=merged, C:=X main, A:=Y floppy, Z:=Z aux, U:=A extra, R:=R RAM.\n");
     out_append("  DEL -F hard-deletes read-only files from the active FS; TOMB owns the records.\n");
     out_append("  Directories are visible virtual labels; LardOS files remain flat and user-owned.\n");
 }
@@ -6523,6 +6589,7 @@ static void dos_status(void)
 static void dos_map(void)
 {
     out_append("L-DOS drive map\n");
+    out_append("  _: -> _: merged R:/X:/Y:/Z:/A:\n");
     out_append("  C: -> X: built-in/LFS main files\n");
     out_append("  A: -> Y: floppy-style MDFS media store\n");
     out_append("  Z: -> Z: auxiliary SSD/HDD MDFS media store\n");
@@ -6547,6 +6614,7 @@ static int dos_read_data_arg(const char* arg, const uint8_t** data, uint32_t* si
         if (mediafs_read(drv, name, data, size) == 0) return 0;
         return -2;
     }
+    if (drive_is_merged(drv)) return lsh_read_merged(name, data, size, NULL);
     if (drive_to_fs(drv) == 1) {
         FsWritableFile* w = fs_open_writable(name);
         if (!w) return -2;
@@ -6576,7 +6644,9 @@ static void dos_dir(const char* args)
         out_append("\\");
     }
     out_append("\n");
-    if (drive_to_fs(drv) == 0) {
+    if (drive_is_merged(drv)) {
+        cmd_dir_merged();
+    } else if (drive_to_fs(drv) == 0) {
         fs_list_readonly(dir_cb, NULL);
     } else if (drive_to_fs(drv) == 1) {
         fs_list_writable(dir_cb, NULL);
@@ -6622,6 +6692,8 @@ static void dos_copy(const char* args)
         return;
     }
     dos_resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    int merged_dst = drive_is_merged(dst_drive);
+    dst_drive = drive_write_target(dst_drive);
     if (drive_to_fs(dst_drive) == 2) {
         if (mediafs_write(dst_drive, dst_name, data, size, 0) < 0) {
             out_append("COPY: media destination failed.\n");
@@ -6639,7 +6711,8 @@ static void dos_copy(const char* args)
     }
     dst = fs_open_writable(dst_name);
     if (!dst) {
-        out_append("COPY: destination must be an existing writable RAM file.\n");
+        out_append(merged_dst ? "COPY: _: writes to R:, but destination must be an existing writable RAM file.\n" :
+                                "COPY: destination must be an existing writable RAM file.\n");
         return;
     }
     if (size > dst->cap) {
@@ -6649,8 +6722,9 @@ static void dos_copy(const char* args)
     (void)fs_write(dst, 0, data, size);
     out_append("        1 file(s) copied: ");
     out_append(src_name);
-    out_append(" -> ");
+    out_append(merged_dst ? " -> R:\\" : " -> ");
     out_append(dst_name);
+    if (merged_dst) out_append(" (_:->R:)");
     out_append("\n");
     dos_log_event("copy", dst_name);
 }
@@ -6910,6 +6984,8 @@ static void dos_rename(const char* args)
     }
     dos_resolve_path(src_arg, &src_drive, src_name, sizeof(src_name));
     dos_resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    int merged_dst = drive_is_merged(dst_drive);
+    dst_drive = drive_write_target(dst_drive);
     if (drive_to_fs(dst_drive) == 2) {
         if (mediafs_write(dst_drive, dst_name, data, size, 0) < 0) {
             out_append("REN: media destination failed.\n");
@@ -6928,7 +7004,8 @@ static void dos_rename(const char* args)
     }
     dst_w = fs_open_writable(dst_name);
     if (!dst_w) {
-        out_append("REN: destination must be an existing writable RAM file slot.\n");
+        out_append(merged_dst ? "REN: _: writes to R:, but destination must be an existing writable RAM file slot.\n" :
+                                "REN: destination must be an existing writable RAM file slot.\n");
         return;
     }
     if (size > dst_w->cap) {
@@ -7163,16 +7240,23 @@ int lsh_dosmode_selftest(void)
 {
     char drv = 0;
     char name[64];
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    char found = 0;
     if (!ascii_streq_ci("DIR", "dir")) return -1;
-    if (dos_drive_to_lard('C') != 'X' || dos_drive_to_lard('A') != 'Y' || dos_drive_to_lard('R') != 'R' ||
+    if (dos_drive_to_lard('_') != '_' || dos_drive_to_lard('C') != 'X' || dos_drive_to_lard('A') != 'Y' || dos_drive_to_lard('R') != 'R' ||
         dos_drive_to_lard('Z') != 'Z' || dos_drive_to_lard('U') != 'A' || dos_drive_to_lard('S') != 'Z') return -2;
-    if (dos_drive_from_lard('X') != 'C' || dos_drive_from_lard('Y') != 'A' ||
+    if (dos_drive_from_lard('_') != '_' || dos_drive_from_lard('X') != 'C' || dos_drive_from_lard('Y') != 'A' ||
         dos_drive_from_lard('Z') != 'Z' || dos_drive_from_lard('A') != 'U' ||
         dos_drive_from_lard('R') != 'R') return -6;
     dos_resolve_path("C:\\DOCS\\HELLO.TXT", &drv, name, sizeof(name));
     if (drv != 'X' || strcmp(name, "hello.txt") != 0) return -3;
     dos_resolve_path("R:\\NOTES.TXT", &drv, name, sizeof(name));
     if (drv != 'R' || strcmp(name, "notes.txt") != 0) return -4;
+    dos_resolve_path("_:\\README.TXT", &drv, name, sizeof(name));
+    if (drv != '_' || strcmp(name, "readme.txt") != 0) return -7;
+    if (drive_to_fs('_') != 3) return -8;
+    if (lsh_read_merged("lardos.lars", &data, &size, &found) != 0 || !data || size == 0 || found != 'X') return -9;
     if (fs_delete_overlay_selftest() != 0) return -5;
     return 0;
 }
@@ -7995,9 +8079,9 @@ static void cmd_larsh(const char* args)
         out_append("Usage: larsh [drive:]file.larsh\n");
         return;
     }
-    const FsFile* f = lsh_open_read(drv, name);
-    FsWritableFile* w = (drive_to_fs(drv) == 1) ? fs_open_writable(name) : NULL;
-    if (!f && !w) {
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    if (lsh_read_drive_data(drv, name, &data, &size, NULL) != 0 || !data || size == 0) {
         out_append("larsh: file not found.\n");
         return;
     }
@@ -8588,6 +8672,7 @@ static void parse_and_run(const char* cmd, const char* args)
         else { s_drive = drv; out_append("Drive "); out_append_char(drv); out_append(":\n"); }
         return;
     }
+    if (cmd[0] == '_' && cmd[1] == ':' && cmd[2] == '\0') { s_drive = '_'; return; }
     if (cmd[0] == 'X' && cmd[1] == ':' && cmd[2] == '\0') { s_drive = 'X'; return; }
     if (cmd[0] == 'Y' && cmd[1] == ':' && cmd[2] == '\0') { s_drive = 'Y'; return; }
     if (cmd[0] == 'Z' && cmd[1] == ':' && cmd[2] == '\0') { s_drive = 'Z'; return; }
@@ -8762,7 +8847,7 @@ char lsh_get_drive(void)
 void lsh_set_drive(char letter)
 {
     if (letter >= 'a' && letter <= 'z') letter = (char)(letter - 32);
-    if ((letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')) s_drive = letter;
+    if (letter == '_' || ((letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z'))) s_drive = letter;
 }
 
 const char* lsh_stdin(void)

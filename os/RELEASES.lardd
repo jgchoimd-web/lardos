@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.77.0b
+ITEM Beta release adding _:, a merged R:/X:/Y:/Z:/A: root while keeping every old drive.
+ITEM dir _: lists all stores; common read commands and L-DOS DIR/TYPE/COPY read through _:.
+ITEM _: writes route visibly to R: writable RAM slots.
+ITEM Keeps RXR/RXE/SYSRXE, KMO, DRFL, OS virtual paths, hardware IMG/ISO sets, and user control.
+
 SECTION v1.76.1p
 ITEM Hotpatch release fixing the VirtualBox blank black screen seen after v1.76.0a boot.
 ITEM Moves Stage2 from 0x7E00 to 0x0600, moves bootinfo to 0x4000, lowers the kernel staging buffer to 0x5000, and keeps real/protected-mode stacks below it so the larger kernel image does not cross into VGA/EBDA or overwrite its own boot stack.

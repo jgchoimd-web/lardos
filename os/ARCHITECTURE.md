@@ -43,18 +43,19 @@ flowchart LR
 The boot sector uses the 32-bit phase only as a bridge into long mode. The
 kernel payload is built with `-m64`, linked as `elf_x86_64`, and entered through
 `entry64.s`.
-Stage2 keeps bootinfo at `0x1000`, stages the kernel at `0x2000`, and uses a
-temporary real/protected-mode stack at `0x1F00`. The long-mode entry stack starts at
-`0x8F000`. The bootloader enables VBE before loading the kernel so firmware
-scratch writes cannot corrupt the LARDX header, then performs conservative
-one-sector BIOS reads into the low staging buffer. Before page tables and stacks
-reuse low memory, stage2 preserves a full boot-image copy at `0x01000000` for
-the in-OS installer. The `v1.78.0a` layout keeps the `v1.76.1p` safety rule
-while giving the kernel about 12 KiB more low staging room.
+Stage2 keeps bootinfo at `0x1000`, uses `0x2000` as a 32-sector low bounce
+buffer, and uses a temporary real/protected-mode stack at `0x1F00`. The
+long-mode entry stack starts at `0x8F000`. The bootloader enables VBE before
+loading the kernel so firmware scratch writes cannot corrupt the LARDX header.
+From `v1.79.0a`, stage2 follows the same broad pattern used by mature x86 boot
+loaders: it reads through low memory in 32-sector chunks, uses the BIOS
+extended-memory block move service (`INT 15h AH=87h`) to preserve the complete
+LARDX/BOSX boot image at `0x01000000`, and then loads kernel segments from that
+high-memory copy. Low memory no longer has to contain the whole kernel file.
 
 The in-OS installer reuses that same boot layout. `installer.c` embeds the
 stage1 and stage2 binaries as generated C arrays, validates the preserved
-LARDX/BOSX boot image at `0x01000000`, and can write LBA0, LBA1..4, and LBA5..
+LARDX/BOSX boot image at `0x01000000`, and can write LBA0, LBA1..8, and LBA9..
 to an ATA HDD/SSD target. The power-on options screen exposes this as `I`, and
 LSH exposes it as `install status`, `install hdd yes`, and `install ssd yes`.
 LPST remains reserved at LBA 2752 so installed disks keep the native writable

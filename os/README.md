@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.78.0a-ami/lardos-v1.78.0a-ami.iso`. To publish the whole hardware
+`release/v1.79.0a-ami/lardos-v1.79.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.79.0a` follows the Windows/Linux boot-loader lesson: keep the first loader
+small, read the kernel through a low-memory bounce window, and preserve the full
+boot image at `0x01000000` before loading segments. Stage2 now has eight sectors,
+the kernel starts at LBA9, and low memory no longer has to contain the whole
+LARDX/BOSX file.
 
 `v1.78.0a` expands the boot staging layout instead of trimming features to fit:
 the kernel low staging buffer now starts at `0x2000`, bootinfo moves to
@@ -221,6 +227,8 @@ commands:
 - `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
   by the OS filesystem namespace. Quote paths with spaces, for example
   `vpath "Final Final Release/final fix"`.
+- `v1.79.0a` adds high-memory boot staging so future in-tree kernel growth does
+  not depend on the whole LARDX/BOSX file fitting below VGA/EBDA.
 - `v1.78.0a` expands low boot staging so future in-tree kernel growth does not
   depend on shaving built-in docs.
 - `v1.77.0a` officially promotes `_:` merged storage without feature loss.

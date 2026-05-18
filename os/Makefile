@@ -24,18 +24,18 @@ SEEDC     := $(HOST_TOOL_DIR)/seedc
 LIL       := $(HOST_TOOL_DIR)/lil
 BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
-RELEASE_BASE_VERSION := v1.78.0a
+RELEASE_BASE_VERSION := v1.79.0a
 RELEASE_HW ?= universal
 RELEASE_HW_LIST := universal seabios ami vbox usb realpc
 RELEASE_HW_UPPER := $(shell printf '%s' '$(RELEASE_HW)' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
 RELEASE_VERSION := $(if $(filter universal,$(RELEASE_HW)),$(RELEASE_BASE_VERSION),$(RELEASE_BASE_VERSION)-$(RELEASE_HW))
 RELEASE_NAME := lardos-$(RELEASE_VERSION)
-ISO_VOLUME_BASE := LARDOS_V1_78_0A
+ISO_VOLUME_BASE := LARDOS_V1_79_0A
 ISO_VOLUME_ID := $(if $(filter universal,$(RELEASE_HW)),$(ISO_VOLUME_BASE),$(ISO_VOLUME_BASE)_$(RELEASE_HW_UPPER))
 RELEASE_DIR := release/$(RELEASE_VERSION)
 ISO_BOOTIMG_SECTOR := 23
 ISO_STAGE2_LBA := 93
-ISO_KERNEL_LBA := 97
+ISO_KERNEL_LBA := 101
 
 ifneq ($(filter $(RELEASE_HW),$(RELEASE_HW_LIST)),$(RELEASE_HW))
 $(error Unknown RELEASE_HW '$(RELEASE_HW)' (expected one of: $(RELEASE_HW_LIST)))
@@ -50,8 +50,8 @@ RELEASES_INC := $(KERNEL_DIR)/releases_lardd.inc
 BOOT_STAGE1_INC := $(KERNEL_DIR)/boot_stage1.inc
 BOOT_STAGE2_INC := $(KERNEL_DIR)/boot_stage2.inc
 
-STAGE2_SECTORS := 4
-KERNEL_LBA := 5
+STAGE2_SECTORS := 8
+KERNEL_LBA := 9
 BOOT_BIN  := $(BOOT_DIR)/stage1.bin
 BOOT_ISO_BIN := $(BOOT_DIR)/stage1_iso.bin
 STAGE2_BIN:= $(BOOT_DIR)/stage2.bin

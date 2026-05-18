@@ -5,7 +5,7 @@ BITS 16
 ORG 0x7C00
 
 %ifndef STAGE2_SECTORS
-%define STAGE2_SECTORS 4
+%define STAGE2_SECTORS 8
 %endif
 
 %ifndef ISO_ELTORITO
@@ -13,7 +13,7 @@ ORG 0x7C00
 %endif
 
 %ifndef ISO_KERNEL_LBA
-%define ISO_KERNEL_LBA 5
+%define ISO_KERNEL_LBA 9
 %endif
 
 STAGE2_LOAD equ 0x0600

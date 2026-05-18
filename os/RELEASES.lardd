@@ -5,6 +5,11 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.79.0a
+ITEM Official high-memory boot staging release: stage2 now reads through a 32-sector low bounce window and uses BIOS extended-memory block move to preserve the full LARDX/BOSX boot image at 0x01000000.
+ITEM Expands stage2 to eight sectors and moves the kernel payload to LBA9, so the full kernel file no longer has to fit below VGA/EBDA.
+ITEM Keeps bootinfo at 0x1000, stacks below staging, the installer preserved-image path, hardware IMG/ISO profiles, and all user-owned features without feature loss.
+
 SECTION v1.78.0a
 ITEM Official boot staging release: kernel low staging starts at 0x2000, bootinfo moves to 0x1000, and boot stacks move below staging.
 ITEM Gives the in-tree kernel about 12 KiB more low staging room while keeping the v1.76.1p VirtualBox blank-screen safety rule.

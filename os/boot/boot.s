@@ -5,7 +5,7 @@ BITS 16
 ORG 0x0600
 
 %ifndef KERNEL_LBA
-%define KERNEL_LBA 5
+%define KERNEL_LBA 9
 %endif
 %ifndef KERNEL_LOAD_SEG
 %define KERNEL_LOAD_SEG 0x0200
@@ -14,6 +14,7 @@ ORG 0x0600
 %define BOOT_IMAGE_COPY_PADDR 0x01000000
 %define BOOT_REAL_STACK 0x1F00
 %define BOOT_PM_STACK   0x1F00
+%define BOOT_CHUNK_SECTORS 32
 
 start:
     ; Optional handoff for raw-written hybrid ISO boots.
@@ -56,8 +57,8 @@ start:
     ; corrupt the LARDX header or entry point.
     call vbe_try_enable
 
-    ; Load LARDX executable (kernel) below VGA/EBDA into KERNEL_LOAD_SEG:0000.
-    ; v1.78.0a starts staging at 0x2000 and keeps bootinfo/stack below it.
+    ; Load the LARDX/BOSX header into the low bounce sector first.
+    ; v1.79.0a copies the full image to high memory in small chunks.
     mov ax, KERNEL_LOAD_SEG
     mov es, ax
     xor bx, bx
@@ -112,7 +113,17 @@ start:
     jb disk_error
     mov [total_sectors], ax
 
-    ; Read remaining sectors starting at KERNEL_LBA+1 into buffer+512.
+    ; Linux bzImage-style lesson: keep the low boot loader tiny and move the
+    ; large payload to high memory through a low bounce buffer.
+    call enable_a20
+
+    mov dword [copy_src], KERNEL_LOAD_PADDR
+    mov dword [copy_dst], BOOT_IMAGE_COPY_PADDR
+    mov dword [copy_count], 512
+    call bios_copy_high
+
+    ; Read remaining sectors starting at KERNEL_LBA+1 into the same low bounce
+    ; window, then copy each chunk to the preserved high boot image.
     mov si, [total_sectors]
     dec si                      ; remaining count
     jz .done_load
@@ -120,42 +131,33 @@ start:
     mov eax, [kernel_lba_base]
     inc eax
     mov dword [dap_lba], eax
-    mov bx, 512                 ; offset into buffer
+    mov dword [high_copy_dst], BOOT_IMAGE_COPY_PADDR + 512
 .read_loop:
-    cmp si, 1
-    jbe .chunk_ok
-    mov cx, 1
-    jmp .have_chunk
-.chunk_ok:
     mov cx, si
-.have_chunk:
-    ; Keep every BIOS read inside one 64KiB ES:BX window.
-    mov ax, bx
-    shr ax, 9
-    mov dx, 128
-    sub dx, ax
-    cmp cx, dx
-    jbe .chunk_fits
-    mov cx, dx
-.chunk_fits:
+    cmp cx, BOOT_CHUNK_SECTORS
+    jbe .chunk_ready
+    mov cx, BOOT_CHUNK_SECTORS
+.chunk_ready:
     mov word [dap_count], cx
-    mov word [dap_off], bx
-    mov word [dap_seg], es
+    mov word [dap_off], 0
+    mov word [dap_seg], KERNEL_LOAD_SEG
     call disk_read_lba
+
+    mov dword [copy_src], KERNEL_LOAD_PADDR
+    mov eax, [high_copy_dst]
+    mov dword [copy_dst], eax
+    movzx eax, cx
+    shl eax, 9
+    mov dword [copy_count], eax
+    call bios_copy_high
+
     mov al, '.'
     call boot_putc
-    ; ES:BX += cx*512
-    mov dx, cx
-    shl dx, 9
-    add bx, dx
-    jnc .same_read_segment
-    mov ax, es
-    add ax, 0x1000
-    mov es, ax
-.same_read_segment:
-    ; dap_lba += cx (low 32-bits)
-    mov ax, cx
-    add word [dap_lba], ax
+
+    movzx eax, cx
+    shl eax, 9
+    add dword [high_copy_dst], eax
+    add word [dap_lba], cx
     adc word [dap_lba+2], 0
     sub si, cx
     jnz .read_loop
@@ -188,15 +190,8 @@ protected_start:
     mov ss, ax
     mov esp, BOOT_PM_STACK
 
-    ; Preserve a full copy for the in-OS HDD/SSD installer before page tables
-    ; and stacks reuse the low staging buffer.
-    mov esi, KERNEL_LOAD_PADDR
-    mov edi, BOOT_IMAGE_COPY_PADDR
-    mov ecx, [kernel_file_size]
-    rep movsb
-
-    ; Parse LARDX/BOSX image in the low staging buffer and load segments.
-    mov esi, KERNEL_LOAD_PADDR
+    ; Parse LARDX/BOSX from the high preserved boot image and load segments.
+    mov esi, BOOT_IMAGE_COPY_PADDR
 
     ; phnum u16 at +0x08, phoff u32 at +0x0E, entry u32 at +0x0A (LARDX v2)
     ; BOSX: phnum +0x06, phoff +0x0C, entry +0x08. LARDX v2: phnum +0x08, phoff +0x0E, entry +0x0A
@@ -248,7 +243,7 @@ protected_start:
     movzx eax, word [phdr_size]
     add ebx, eax
     dec ebp
-    mov esi, KERNEL_LOAD_PADDR
+    mov esi, BOOT_IMAGE_COPY_PADDR
     jmp .ph_loop
 
 .jump_entry:
@@ -385,6 +380,11 @@ chs_count dw 0
 chs_cx dw 0
 chs_dx dw 0
 chs_retry db 0
+copy_src dd 0
+copy_dst dd 0
+copy_count dd 0
+high_copy_dst dd 0
+xcopy_gdt times 48 db 0
 
 ; INT 13h Extensions Disk Address Packet (DAP)
 dap:
@@ -598,6 +598,47 @@ boot_putc:
     pop cx
     pop bx
     pop ax
+    ret
+
+bios_copy_high:
+    push ds
+    push es
+    pusha
+
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
+
+    mov dx, [copy_count]
+    dec dx
+    mov eax, [copy_src]
+    mov bx, xcopy_gdt + 0x10
+    call fill_copy_desc
+    mov eax, [copy_dst]
+    mov bx, xcopy_gdt + 0x18
+    call fill_copy_desc
+
+    mov cx, [copy_count]
+    shr cx, 1
+    mov si, xcopy_gdt
+    mov ah, 0x87
+    int 0x15
+    jc disk_error
+
+    popa
+    pop es
+    pop ds
+    ret
+
+fill_copy_desc:
+    ; DX = byte limit, EAX = base, BX = descriptor address.
+    mov [bx+0], dx
+    mov [bx+2], ax
+    shr eax, 16
+    mov [bx+4], al
+    mov byte [bx+5], 0x93
+    mov byte [bx+6], 0x00
+    mov [bx+7], ah
     ret
 
 enable_a20:

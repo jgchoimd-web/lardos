@@ -112,7 +112,11 @@ void lard_install_status(char* out, uint32_t cap)
     }
     ksectors = (ksize + SECTOR_SIZE - 1u) / SECTOR_SIZE;
     total = LARD_INSTALL_KERNEL_LBA + ksectors;
-    inst_append(out, cap, "\n  layout: LBA0 stage1, LBA1..4 stage2, LBA5..");
+    inst_append(out, cap, "\n  layout: LBA0 stage1, LBA1..");
+    inst_append_u32(out, cap, LARD_INSTALL_KERNEL_LBA - 1u);
+    inst_append(out, cap, " stage2, LBA");
+    inst_append_u32(out, cap, LARD_INSTALL_KERNEL_LBA);
+    inst_append(out, cap, "..");
     inst_append_u32(out, cap, total ? total - 1u : 0u);
     inst_append(out, cap, " kernel\n  kernel bytes: ");
     inst_append_u32(out, cap, ksize);

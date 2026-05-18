@@ -43,13 +43,14 @@ flowchart LR
 The boot sector uses the 32-bit phase only as a bridge into long mode. The
 kernel payload is built with `-m64`, linked as `elf_x86_64`, and entered through
 `entry64.s`.
-Stage2 keeps bootinfo at `0x4000`, stages the kernel at `0x5000`, and uses a
-temporary real/protected-mode stack at `0x3000`. The long-mode entry stack starts at
+Stage2 keeps bootinfo at `0x1000`, stages the kernel at `0x2000`, and uses a
+temporary real/protected-mode stack at `0x1F00`. The long-mode entry stack starts at
 `0x8F000`. The bootloader enables VBE before loading the kernel so firmware
 scratch writes cannot corrupt the LARDX header, then performs conservative
 one-sector BIOS reads into the low staging buffer. Before page tables and stacks
 reuse low memory, stage2 preserves a full boot-image copy at `0x01000000` for
-the in-OS installer.
+the in-OS installer. The `v1.78.0a` layout keeps the `v1.76.1p` safety rule
+while giving the kernel about 12 KiB more low staging room.
 
 The in-OS installer reuses that same boot layout. `installer.c` embeds the
 stage1 and stage2 binaries as generated C arrays, validates the preserved

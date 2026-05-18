@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-// Written by stage2 at physical 0x4000 (identity-mapped).
+// Written by stage2 at physical 0x1000 (identity-mapped).
 // Keep this struct tiny and stable.
 typedef struct {
     uint32_t magic;      // 'BINF'
@@ -18,4 +18,4 @@ typedef struct {
     uint16_t reserved2;
 } bootinfo_t;
 
-#define BOOTINFO_PADDR 0x00004000u
+#define BOOTINFO_PADDR 0x00001000u

@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.77.0a-ami/lardos-v1.77.0a-ami.iso`. To publish the whole hardware
+`release/v1.78.0a-ami/lardos-v1.78.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.78.0a` expands the boot staging layout instead of trimming features to fit:
+the kernel low staging buffer now starts at `0x2000`, bootinfo moves to
+`0x1000`, and boot stacks stay below staging. This keeps the `v1.76.1p`
+VirtualBox blank-screen safety rule while giving the in-tree kernel about 12 KiB
+more low staging room.
 
 `v1.77.0a` officially promotes the `_:` merged-drive feature from `v1.77.0b`
 without feature loss or philosophy changes. The individual `R:`/`X:`/`Y:`/`Z:`/`A:`
@@ -215,6 +221,8 @@ commands:
 - `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
   by the OS filesystem namespace. Quote paths with spaces, for example
   `vpath "Final Final Release/final fix"`.
+- `v1.78.0a` expands low boot staging so future in-tree kernel growth does not
+  depend on shaving built-in docs.
 - `v1.77.0a` officially promotes `_:` merged storage without feature loss.
 - `v1.77.0b` adds `_:` as a merged top-level drive over `R:`/`X:`/`Y:`/`Z:`/`A:`
   with prefixed listings, user-first reads, L-DOS mapping, and visible `R:`

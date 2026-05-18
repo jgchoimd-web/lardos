@@ -8,12 +8,12 @@ ORG 0x0600
 %define KERNEL_LBA 5
 %endif
 %ifndef KERNEL_LOAD_SEG
-%define KERNEL_LOAD_SEG 0x0500
+%define KERNEL_LOAD_SEG 0x0200
 %endif
 %define KERNEL_LOAD_PADDR (KERNEL_LOAD_SEG << 4)
 %define BOOT_IMAGE_COPY_PADDR 0x01000000
-%define BOOT_REAL_STACK 0x3000
-%define BOOT_PM_STACK   0x3000
+%define BOOT_REAL_STACK 0x1F00
+%define BOOT_PM_STACK   0x1F00
 
 start:
     ; Optional handoff for raw-written hybrid ISO boots.
@@ -57,8 +57,7 @@ start:
     call vbe_try_enable
 
     ; Load LARDX executable (kernel) below VGA/EBDA into KERNEL_LOAD_SEG:0000.
-    ; v1.76.1p keeps Stage2, stacks, and the larger kernel staging buffer out
-    ; of each other's way so VirtualBox does not sit on a blank VBE screen.
+    ; v1.78.0a starts staging at 0x2000 and keeps bootinfo/stack below it.
     mov ax, KERNEL_LOAD_SEG
     mov es, ax
     xor bx, bx
@@ -643,8 +642,8 @@ kernel_lba_base dd KERNEL_LBA
 ; VBE (real mode) framebuffer setup
 ; -----------------------------
 
-; bootinfo struct lives below the kernel staging buffer and above boot stacks.
-BOOTINFO_SEG equ 0x0400
+; bootinfo lives below the kernel staging buffer and away from AP trampoline 0x4000.
+BOOTINFO_SEG equ 0x0100
 BOOTINFO_OFF equ 0x0000
 VBE_MODEINFO_OFF equ 0x0200
 

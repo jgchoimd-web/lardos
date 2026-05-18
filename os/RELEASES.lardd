@@ -5,11 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.77.0a
+ITEM Official release promoting _:, the merged R:/X:/Y:/Z:/A: root, without feature loss.
+ITEM Keeps dir _: listings, read-through commands, L-DOS mapping, visible R: write routing, and hardware IMG/ISO sets.
+
 SECTION v1.77.0b
-ITEM Beta release adding _:, a merged R:/X:/Y:/Z:/A: root while keeping every old drive.
-ITEM dir _: lists all stores; common read commands and L-DOS DIR/TYPE/COPY read through _:.
-ITEM _: writes route visibly to R: writable RAM slots.
-ITEM Keeps RXR/RXE/SYSRXE, KMO, DRFL, OS virtual paths, hardware IMG/ISO sets, and user control.
+ITEM Beta track for _:, merged R:/X:/Y:/Z:/A: root with dir _:, read-through commands, and visible R: write routing.
 
 SECTION v1.76.1p
 ITEM Hotpatch release fixing the VirtualBox blank black screen seen after v1.76.0a boot.

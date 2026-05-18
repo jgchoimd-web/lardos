@@ -45,12 +45,16 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.77.0b-ami/lardos-v1.77.0b-ami.iso`. To publish the whole hardware
+`release/v1.77.0a-ami/lardos-v1.77.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.77.0a` officially promotes the `_:` merged-drive feature from `v1.77.0b`
+without feature loss or philosophy changes. The individual `R:`/`X:`/`Y:`/`Z:`/`A:`
+drives remain directly addressable, and `_:` writes still route visibly to `R:`.
 
 `v1.77.0b` adds `_:` as a merged top-level drive over `R:`/`X:`/`Y:`/`Z:`/`A:`.
 `dir _:` shows every visible store with drive prefixes, and common read
@@ -211,6 +215,7 @@ commands:
 - `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
   by the OS filesystem namespace. Quote paths with spaces, for example
   `vpath "Final Final Release/final fix"`.
+- `v1.77.0a` officially promotes `_:` merged storage without feature loss.
 - `v1.77.0b` adds `_:` as a merged top-level drive over `R:`/`X:`/`Y:`/`Z:`/`A:`
   with prefixed listings, user-first reads, L-DOS mapping, and visible `R:`
   write routing.

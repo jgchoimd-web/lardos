@@ -12,6 +12,7 @@
 
 #define W 32
 #define H 32
+#define SSAV_HEADER_SIZE 16
 
 static void write_u16(unsigned char* p, uint16_t v) {
     p[0] = (unsigned char)(v & 0xFF);
@@ -21,7 +22,7 @@ static void write_u16(unsigned char* p, uint16_t v) {
 int main(int argc, char** argv) {
     const char* out_path = (argc >= 2) ? argv[1] : "kernel/default_ssav.bin";
 
-    unsigned char header[22];
+    unsigned char header[SSAV_HEADER_SIZE];
     memcpy(header, "SSAV", 4);
     header[4] = 1;
     header[5] = 0;
@@ -32,7 +33,6 @@ int main(int argc, char** argv) {
     write_u16(header + 12, H);
     header[14] = 32;
     header[15] = 0;
-    memset(header + 16, 0, 6);
 
     unsigned char pixels[W * H * 4];
     for (int y = 0; y < H; y++) {
@@ -55,10 +55,10 @@ int main(int argc, char** argv) {
         fprintf(stderr, "mk_default_ssav: cannot write %s\n", out_path);
         return 1;
     }
-    fwrite(header, 1, 22, f);
+    fwrite(header, 1, SSAV_HEADER_SIZE, f);
     fwrite(pixels, 1, W * H * 4, f);
     fclose(f);
 
-    printf("Wrote %s (%d bytes)\n", out_path, 22 + W * H * 4);
+    printf("Wrote %s (%d bytes)\n", out_path, SSAV_HEADER_SIZE + W * H * 4);
     return 0;
 }

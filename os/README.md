@@ -45,12 +45,16 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.79.0a-ami/lardos-v1.79.0a-ami.iso`. To publish the whole hardware
+`release/v1.79.1p-ami/lardos-v1.79.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.79.1p` hotpatches the SSAV screensaver generator so generated `.ssav`
+files match the documented 16-byte header and frame data starts at `0x10`, the
+same offset used by the kernel decoder and GUI renderer.
 
 `v1.79.0a` follows the Windows/Linux boot-loader lesson: keep the first loader
 small, read the kernel through a low-memory bounce window, and preserve the full
@@ -227,6 +231,8 @@ commands:
 - `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
   by the OS filesystem namespace. Quote paths with spaces, for example
   `vpath "Final Final Release/final fix"`.
+- `v1.79.1p` fixes generated `.ssav` headers so screensaver frame data begins
+  at the documented `0x10` offset.
 - `v1.79.0a` adds high-memory boot staging so future in-tree kernel growth does
   not depend on the whole LARDX/BOSX file fitting below VGA/EBDA.
 - `v1.78.0a` expands low boot staging so future in-tree kernel growth does not

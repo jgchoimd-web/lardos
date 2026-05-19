@@ -5,6 +5,10 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.79.1p
+ITEM Hotpatches the SSAV generator so default .ssav files use the documented 16-byte header and frame data starts at 0x10.
+ITEM Keeps the SSAV decoder, GUI screensaver renderer, and user-owned screensaver file format direction unchanged.
+
 SECTION v1.79.0a
 ITEM Official high-memory boot staging release: stage2 now reads through a 32-sector low bounce window and uses BIOS extended-memory block move to preserve the full LARDX/BOSX boot image at 0x01000000.
 ITEM Expands stage2 to eight sectors and moves the kernel payload to LBA9, so the full kernel file no longer has to fit below VGA/EBDA.

@@ -33,6 +33,34 @@ void gui_http_set_method(int method);
 int gui_http_method(void); /* 0=GET, 1=POST, 2=HEAD */
 void gui_reload_sysrxe_apps(void);
 
+#define GUI_AA_NONE 0
+#define GUI_AA_UNAA 1
+#define GUI_AA_BASIC 2
+#define GUI_AA_NONLINEAR 3
+
+typedef struct {
+    uint32_t aa_mode;
+    uint32_t brightness;
+    uint32_t quality;
+    uint32_t screenram_lsb;
+    uint32_t vblank_mode;
+    uint32_t vblank_frames;
+    uint32_t vblank_hits;
+    uint32_t vblank_misses;
+    uint32_t vblank_last;
+} gui_render_info_t;
+
+int gui_render_set_aa_mode(int mode);
+int gui_render_aa_mode(void);
+int gui_render_set_brightness(int percent);
+int gui_render_brightness(void);
+int gui_screenram_lsb_enable(int on);
+int gui_screenram_lsb_mode(void);
+int gui_vblank_enable(int on);
+int gui_vblank_mode(void);
+void gui_render_info(gui_render_info_t* out);
+int gui_render_effects_selftest(void);
+
 #define GUI_RENAME_ANY 0
 #define GUI_RENAME_APP 1
 #define GUI_RENAME_FOLDER 2
@@ -78,6 +106,7 @@ typedef struct {
     uint32_t used;
     uint32_t max_capacity;
     uint32_t last_error;
+    uint32_t lsb_mode;
 } gui_screenram_info_t;
 
 /* Screen RAM stores bytes in a reserved framebuffer/backbuffer rectangle. */

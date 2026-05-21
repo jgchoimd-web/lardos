@@ -23,6 +23,7 @@
 #include "version.h"
 #include "sysrxe.h"
 #include "rxe.h"
+#include "io.h"
 #include "string.h"
 
 #define LARSH_VIEW_W 160
@@ -204,6 +205,7 @@ static uint32_t g_screenram_h;
 static uint32_t g_screenram_capacity;
 static uint32_t g_screenram_used;
 static uint32_t g_screenram_last_error;
+static uint32_t g_screenram_lsb_mode;
 
 typedef struct {
     int mx;
@@ -306,7 +308,13 @@ typedef struct {
     int brightness;   /* 50-150, 100=normal */
     int volume;      /* 0-100 */
     int quality;     /* 0=low 1=med 2=high contrast */
-    int slider_drag; /* 0=none 1=bright 2=vol 3=quality */
+    int aa_mode;     /* GUI_AA_* */
+    int vblank_mode;
+    uint32_t vblank_frames;
+    uint32_t vblank_hits;
+    uint32_t vblank_misses;
+    uint32_t vblank_last;
+    int slider_drag; /* 0=none 1=bright 2=vol 3=quality 4=aa */
     int item_drag_area; /* 1=desktop, 2=dock */
     int item_drag_index;
     int item_drag_moved;
@@ -350,10 +358,12 @@ static int fb_from_bootinfo(fb_t* out)
 }
 
 static void fb_putpixel(const fb_t* f, uint16_t x, uint16_t y, uint32_t argb);
+static uint32_t fb_getpixel(const fb_t* f, uint16_t x, uint16_t y);
 
 static uint32_t screenram_rect_capacity(uint32_t w, uint32_t h)
 {
     uint64_t cap = (uint64_t)w * (uint64_t)h * 3u;
+    if (g_screenram_lsb_mode) cap /= 8u;
     if (cap > SCREENRAM_MAX_BYTES) cap = SCREENRAM_MAX_BYTES;
     return (uint32_t)cap;
 }
@@ -387,6 +397,32 @@ static int screenram_rect_valid(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
 static void screenram_flush_to_target(const fb_t* tgt)
 {
     if (!tgt || !g_screenram_enabled || g_screenram_capacity == 0) return;
+    if (g_screenram_lsb_mode) {
+        uint32_t bit_count = g_screenram_capacity * 8u;
+        uint32_t px_count = (bit_count + 2u) / 3u;
+        uint32_t used_bits = g_screenram_used * 8u;
+        for (uint32_t px = 0; px < px_count; px++) {
+            uint32_t x = g_screenram_x + (px % g_screenram_w);
+            uint32_t y = g_screenram_y + (px / g_screenram_w);
+            uint32_t p = fb_getpixel(tgt, (uint16_t)x, (uint16_t)y);
+            uint32_t a = (p >> 24) & 0xFFu;
+            uint32_t r = (p >> 16) & 0xFFu;
+            uint32_t gch = (p >> 8) & 0xFFu;
+            uint32_t b = p & 0xFFu;
+            uint32_t chans[3] = { r, gch, b };
+            for (uint32_t ch = 0; ch < 3u; ch++) {
+                uint32_t bit_index = px * 3u + ch;
+                uint32_t bit = 0;
+                if (bit_index < used_bits) {
+                    bit = (g_screenram_shadow[bit_index / 8u] >> (bit_index & 7u)) & 1u;
+                }
+                chans[ch] = (chans[ch] & 0xFEu) | bit;
+            }
+            fb_putpixel(tgt, (uint16_t)x, (uint16_t)y,
+                        (a << 24) | (chans[0] << 16) | (chans[1] << 8) | chans[2]);
+        }
+        return;
+    }
     for (uint32_t i = 0; i < g_screenram_capacity; i += 3u) {
         uint32_t px = i / 3u;
         uint32_t x = g_screenram_x + (px % g_screenram_w);
@@ -416,6 +452,65 @@ static int screenram_configure(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
     return 0;
 }
 
+static int clamp255(int v)
+{
+    if (v < 0) return 0;
+    if (v > 255) return 255;
+    return v;
+}
+
+static int abs_i(int v)
+{
+    return v < 0 ? -v : v;
+}
+
+static uint32_t gui_luma(uint32_t p)
+{
+    uint32_t r = (p >> 16) & 0xFFu;
+    uint32_t gch = (p >> 8) & 0xFFu;
+    uint32_t b = p & 0xFFu;
+    return (r * 30u + gch * 59u + b * 11u) / 100u;
+}
+
+static uint32_t fb_sample(const fb_t* f, uint16_t x, uint16_t y)
+{
+    return fb_getpixel(f, x, y);
+}
+
+static int gui_channel(uint32_t p, int ch)
+{
+    if (ch == 0) return (int)((p >> 16) & 0xFFu);
+    if (ch == 1) return (int)((p >> 8) & 0xFFu);
+    return (int)(p & 0xFFu);
+}
+
+static int gui_apply_brightness(int c, int br, int q)
+{
+    int contrast = (q == 0) ? 88 : (q == 1) ? 100 : 116;
+    c = ((c - 128) * contrast) / 100 + 128;
+    c = (c * br + 50) / 100;
+    return clamp255(c);
+}
+
+static int gui_filter_channel(int mode, int center, int avg, int edge, int center_luma, int avg_luma)
+{
+    if (mode == GUI_AA_BASIC) {
+        return clamp255((center * 3 + avg) / 4);
+    }
+    if (mode == GUI_AA_UNAA) {
+        return clamp255(center + ((center - avg) * 3) / 4);
+    }
+    if (mode == GUI_AA_NONLINEAR) {
+        if (edge > 48) {
+            int push = abs_i(center - avg) / 2 + edge / 10;
+            if (center_luma >= avg_luma) return clamp255(center + push);
+            return clamp255(center - push);
+        }
+        return clamp255((center * 3 + avg) / 4);
+    }
+    return center;
+}
+
 static void fb_blit(const fb_t* dst, const fb_t* src)
 {
     uint16_t w = src->w < dst->w ? src->w : dst->w;
@@ -426,26 +521,33 @@ static void fb_blit(const fb_t* dst, const fb_t* src)
     int q = g.quality;
     if (q < 0) q = 0;
     if (q > 2) q = 2;
-    float bright = (float)br / 100.f;
-    float contrast = (q == 0) ? 0.85f : (q == 1) ? 1.f : 1.2f;
+    int aa = g.aa_mode;
+    if (aa < GUI_AA_NONE) aa = GUI_AA_NONE;
+    if (aa > GUI_AA_NONLINEAR) aa = GUI_AA_NONLINEAR;
     for (uint16_t y = 0; y < h; y++) {
-        uint32_t* srow = (uint32_t*)((uintptr_t)src->fb + (uintptr_t)src->pitch_bytes * y);
         for (uint16_t x = 0; x < w; x++) {
-            uint32_t p = srow[x];
+            uint32_t p = fb_sample(src, x, y);
+            uint32_t l = fb_sample(src, x > 0 ? (uint16_t)(x - 1u) : x, y);
+            uint32_t rpx = fb_sample(src, x + 1u < w ? (uint16_t)(x + 1u) : x, y);
+            uint32_t u = fb_sample(src, x, y > 0 ? (uint16_t)(y - 1u) : y);
+            uint32_t d = fb_sample(src, x, y + 1u < h ? (uint16_t)(y + 1u) : y);
             uint32_t a = (p >> 24) & 0xFF;
-            int r = (p >> 16) & 0xFF;
-            int g_ = (p >> 8) & 0xFF;
-            int b = p & 0xFF;
-            r = (int)(((float)r - 128.f) * contrast + 128.f) * (int)(bright * 256) >> 8;
-            g_ = (int)(((float)g_ - 128.f) * contrast + 128.f) * (int)(bright * 256) >> 8;
-            b = (int)(((float)b - 128.f) * contrast + 128.f) * (int)(bright * 256) >> 8;
-            if (r < 0) r = 0;
-            if (r > 255) r = 255;
-            if (g_ < 0) g_ = 0;
-            if (g_ > 255) g_ = 255;
-            if (b < 0) b = 0;
-            if (b > 255) b = 255;
-            fb_putpixel(dst, x, y, ((uint32_t)a << 24) | ((uint32_t)r << 16) | ((uint32_t)g_ << 8) | (uint32_t)b);
+            uint32_t center_luma = gui_luma(p);
+            uint32_t avg_luma = (gui_luma(l) + gui_luma(rpx) + gui_luma(u) + gui_luma(d)) / 4u;
+            int edge = abs_i((int)center_luma - (int)gui_luma(l));
+            int e = abs_i((int)center_luma - (int)gui_luma(rpx)); if (e > edge) edge = e;
+            e = abs_i((int)center_luma - (int)gui_luma(u)); if (e > edge) edge = e;
+            e = abs_i((int)center_luma - (int)gui_luma(d)); if (e > edge) edge = e;
+            int out[3];
+            for (int ch = 0; ch < 3; ch++) {
+                int center = gui_channel(p, ch);
+                int avg = (gui_channel(l, ch) + gui_channel(rpx, ch) +
+                           gui_channel(u, ch) + gui_channel(d, ch)) / 4;
+                out[ch] = gui_filter_channel(aa, center, avg, edge, (int)center_luma, (int)avg_luma);
+                out[ch] = gui_apply_brightness(out[ch], br, q);
+            }
+            fb_putpixel(dst, x, y, ((uint32_t)a << 24) |
+                        ((uint32_t)out[0] << 16) | ((uint32_t)out[1] << 8) | (uint32_t)out[2]);
         }
     }
 }
@@ -461,6 +563,33 @@ static void fb_putpixel(const fb_t* f, uint16_t x, uint16_t y, uint32_t argb)
         p[0] = (uint8_t)(argb & 0xFFu);
         p[1] = (uint8_t)((argb >> 8) & 0xFFu);
         p[2] = (uint8_t)((argb >> 16) & 0xFFu);
+    }
+}
+
+static uint32_t fb_getpixel(const fb_t* f, uint16_t x, uint16_t y)
+{
+    if (!f || !f->fb || x >= f->w || y >= f->h) return 0xFF000000u;
+    uint8_t* row = (uint8_t*)f->fb + (uintptr_t)f->pitch_bytes * y;
+    if (f->bpp == 32) {
+        return ((uint32_t*)row)[x];
+    }
+    if (f->bpp == 24) {
+        uint8_t* p = row + (uint32_t)x * 3u;
+        return 0xFF000000u | ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | (uint32_t)p[0];
+    }
+    return 0xFF000000u;
+}
+
+static void gui_vblank_mark_frame(void)
+{
+    if (!g.vblank_mode) return;
+    g.vblank_frames++;
+    if (inb(0x3DAu) & 0x08u) {
+        g.vblank_hits++;
+        g.vblank_last = 1u;
+    } else {
+        g.vblank_misses++;
+        g.vblank_last = 0u;
     }
 }
 
@@ -789,6 +918,12 @@ int gui_init(void)
     g.brightness = 100;
     g.volume = 80;
     g.quality = 1;
+    g.aa_mode = GUI_AA_NONE;
+    g.vblank_mode = 0;
+    g.vblank_frames = 0;
+    g.vblank_hits = 0;
+    g.vblank_misses = 0;
+    g.vblank_last = 0;
     g.slider_drag = 0;
     g.item_drag_area = 0;
     g.item_drag_index = -1;
@@ -837,6 +972,7 @@ int gui_init(void)
     if (sf && ssav_decode(sf->data, sf->size, &g.ss_ssav) == 0) {
         g.ss_file = sf;
     }
+    g_screenram_lsb_mode = 0;
     screenram_default_rect(&g_screenram_x, &g_screenram_y, &g_screenram_w, &g_screenram_h);
     g_screenram_capacity = screenram_rect_capacity(g_screenram_w, g_screenram_h);
     g_screenram_used = 0;
@@ -867,6 +1003,25 @@ int gui_screenram_set_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
     if (screenram_configure(x, y, w, h) != 0) return -1;
     g_screenram_enabled = 1;
     return 0;
+}
+
+int gui_screenram_lsb_enable(int on)
+{
+    uint32_t x = g_screenram_x;
+    uint32_t y = g_screenram_y;
+    uint32_t w = g_screenram_w;
+    uint32_t h = g_screenram_h;
+    g_screenram_lsb_mode = on ? 1u : 0u;
+    if (!screenram_rect_valid(x, y, w, h)) {
+        screenram_default_rect(&x, &y, &w, &h);
+    }
+    if (screenram_configure(x, y, w, h) != 0) return -1;
+    return 0;
+}
+
+int gui_screenram_lsb_mode(void)
+{
+    return g_screenram_lsb_mode ? 1 : 0;
 }
 
 static int screenram_corner_is(const char* a, const char* b)
@@ -950,6 +1105,7 @@ void gui_screenram_info(gui_screenram_info_t* out)
     out->used = g_screenram_used;
     out->max_capacity = SCREENRAM_MAX_BYTES;
     out->last_error = g_screenram_last_error;
+    out->lsb_mode = g_screenram_lsb_mode;
 }
 
 int gui_screenram_selftest(void)
@@ -960,11 +1116,13 @@ int gui_screenram_selftest(void)
     uint32_t old_cap;
     uint32_t old_used;
     uint32_t old_enabled;
+    uint32_t old_lsb;
 
     gui_screenram_info(&old);
     old_cap = old.capacity;
     old_used = old.used;
     old_enabled = old.enabled;
+    old_lsb = old.lsb_mode;
     for (uint32_t i = 0; i < old_cap && i < SCREENRAM_MAX_BYTES; i++) {
         g_screenram_backup[i] = g_screenram_shadow[i];
     }
@@ -979,7 +1137,18 @@ int gui_screenram_selftest(void)
             if (got[i] != (uint8_t)(0x5Au ^ i)) ok = 0;
         }
     }
+    if (ok && gui_screenram_lsb_enable(1) != 0) ok = 0;
+    if (ok && g_screenram_capacity >= 16u) {
+        for (uint32_t i = 0; i < 16u; i++) got[i] = (uint8_t)(0xA0u + i);
+        if (gui_screenram_write(0, got, 16u) != 16) ok = 0;
+        for (uint32_t i = 0; i < 16u; i++) got[i] = 0;
+        if (gui_screenram_read(0, got, 16u) != 16) ok = 0;
+        for (uint32_t i = 0; i < 16u; i++) {
+            if (got[i] != (uint8_t)(0xA0u + i)) ok = 0;
+        }
+    }
 
+    g_screenram_lsb_mode = old_lsb;
     g_screenram_enabled = old_enabled;
     g_screenram_x = old.x;
     g_screenram_y = old.y;
@@ -991,6 +1160,89 @@ int gui_screenram_selftest(void)
         g_screenram_shadow[i] = g_screenram_backup[i];
     }
     g_screenram_last_error = ok ? 0u : 3u;
+    return ok ? 0 : -1;
+}
+
+int gui_render_set_aa_mode(int mode)
+{
+    if (mode < GUI_AA_NONE || mode > GUI_AA_NONLINEAR) return -1;
+    g.aa_mode = mode;
+    return 0;
+}
+
+int gui_render_aa_mode(void)
+{
+    return g.aa_mode;
+}
+
+int gui_render_set_brightness(int percent)
+{
+    if (percent < 50) percent = 50;
+    if (percent > 150) percent = 150;
+    g.brightness = percent;
+    return 0;
+}
+
+int gui_render_brightness(void)
+{
+    return g.brightness;
+}
+
+int gui_vblank_enable(int on)
+{
+    g.vblank_mode = on ? 1 : 0;
+    g.vblank_last = 0;
+    return 0;
+}
+
+int gui_vblank_mode(void)
+{
+    return g.vblank_mode ? 1 : 0;
+}
+
+void gui_render_info(gui_render_info_t* out)
+{
+    if (!out) return;
+    out->aa_mode = (uint32_t)g.aa_mode;
+    out->brightness = (uint32_t)g.brightness;
+    out->quality = (uint32_t)g.quality;
+    out->screenram_lsb = g_screenram_lsb_mode;
+    out->vblank_mode = (uint32_t)g.vblank_mode;
+    out->vblank_frames = g.vblank_frames;
+    out->vblank_hits = g.vblank_hits;
+    out->vblank_misses = g.vblank_misses;
+    out->vblank_last = g.vblank_last;
+}
+
+int gui_render_effects_selftest(void)
+{
+    int old_aa = g.aa_mode;
+    int old_br = g.brightness;
+    int old_vblank = g.vblank_mode;
+    gui_screenram_info_t old_sr;
+    int ok = 1;
+    gui_screenram_info(&old_sr);
+    if (gui_render_set_aa_mode(GUI_AA_NONE) != 0) ok = 0;
+    if (gui_render_set_aa_mode(GUI_AA_UNAA) != 0) ok = 0;
+    if (gui_render_set_aa_mode(GUI_AA_BASIC) != 0) ok = 0;
+    if (gui_render_set_aa_mode(GUI_AA_NONLINEAR) != 0) ok = 0;
+    if (gui_render_set_aa_mode(7) == 0) ok = 0;
+    if (gui_render_set_brightness(151) != 0 || g.brightness != 150) ok = 0;
+    if (gui_render_set_brightness(49) != 0 || g.brightness != 50) ok = 0;
+    if (gui_screenram_lsb_enable(1) != 0 || !g_screenram_lsb_mode) ok = 0;
+    if (gui_vblank_enable(1) != 0 || !g.vblank_mode) ok = 0;
+    g.aa_mode = old_aa;
+    g.brightness = old_br;
+    g.vblank_mode = old_vblank;
+    g_screenram_lsb_mode = old_sr.lsb_mode;
+    g_screenram_enabled = old_sr.enabled;
+    g_screenram_x = old_sr.x;
+    g_screenram_y = old_sr.y;
+    g_screenram_w = old_sr.w;
+    g_screenram_h = old_sr.h;
+    g_screenram_capacity = old_sr.capacity;
+    g_screenram_used = old_sr.used;
+    g_screenram_last_error = old_sr.last_error;
     return ok ? 0 : -1;
 }
 
@@ -1899,7 +2151,7 @@ static void gui_toggle_fullscreen(void)
 static void gui_settings_panel_rect(int* out_x, int* out_y, int* out_w, int* out_h)
 {
     int panel_w = 196;
-    int panel_h = 108;
+    int panel_h = 140;
     int panel_x;
     int panel_y = g.win_y + 24;
     if (g.win_w < panel_w + 8) panel_w = g.win_w > 8 ? g.win_w - 8 : g.win_w;
@@ -3525,6 +3777,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         if (in_rect(g.mx, g.my, track_x, panel_y + 4, track_w, th)) g.slider_drag = 1;
         else if (in_rect(g.mx, g.my, track_x, panel_y + 4 + row_h, track_w, th)) g.slider_drag = 2;
         else if (in_rect(g.mx, g.my, track_x, panel_y + 4 + row_h * 2, track_w, th)) g.slider_drag = 3;
+        else if (in_rect(g.mx, g.my, track_x, panel_y + 4 + row_h * 3, track_w, th)) g.slider_drag = 4;
     }
     /* Slider drag: while dragging, update values from mouse */
     if (g.settings_open && g.slider_drag) {
@@ -3548,6 +3801,11 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             if (v < 0) v = 0;
             if (v > 100) v = 100;
             g.quality = (v < 34) ? 0 : (v < 67) ? 1 : 2;
+        } else if (g.slider_drag == 4) {
+            int v = (g.mx - track_x) * 100 / track_w;
+            if (v < 0) v = 0;
+            if (v > 100) v = 100;
+            g.aa_mode = (v < 25) ? GUI_AA_NONE : (v < 50) ? GUI_AA_UNAA : (v < 75) ? GUI_AA_BASIC : GUI_AA_NONLINEAR;
         }
     }
     if (g.settings_open && l_down &&
@@ -4331,6 +4589,7 @@ void gui_render(void)
         render_screensaver();
         lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my, 8u, 8u, 220u, 160u);
         screenram_flush_to_target(tgt);
+        gui_vblank_mark_frame();
         if (g_have_bb) fb_blit(&g_fb, &g_bb);
         g_syscall_target_override = 0;
         return;
@@ -4346,6 +4605,7 @@ void gui_render(void)
         lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my, 8u, 32u, 220u, 160u);
         screenram_flush_to_target(tgt);
         gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
+        gui_vblank_mark_frame();
         if (g_have_bb) fb_blit(&g_fb, &g_bb);
         g_syscall_target_override = 0;
         return;
@@ -4728,6 +4988,11 @@ void gui_render(void)
         int q_pos = g.quality * track_w / 2;
         if (q_pos > track_w - 6) q_pos = track_w - 6;
         fb_fill_rect(tgt, (uint16_t)(track_x + q_pos), (uint16_t)(panel_y + 10 + row_h * 2), 6, 12, 0xFF7BE0D6);
+        fb_draw_text(tgt, (uint16_t)(panel_x + 8), (uint16_t)(panel_y + 8 + row_h * 3), "AA Mode", 0xFFFFFFFF, panel_bg);
+        fb_fill_rect(tgt, (uint16_t)track_x, (uint16_t)(panel_y + 12 + row_h * 3), (uint16_t)track_w, 8, 0xFF111619);
+        int aa_pos = g.aa_mode * track_w / 3;
+        if (aa_pos > track_w - 6) aa_pos = track_w - 6;
+        fb_fill_rect(tgt, (uint16_t)(track_x + aa_pos), (uint16_t)(panel_y + 10 + row_h * 3), 6, 12, 0xFF7BE0D6);
     }
 
     lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my,
@@ -4737,6 +5002,7 @@ void gui_render(void)
     // Cursor last: its hotspot may reach the bottom/right edge while the art clips past it.
     gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
 
+    gui_vblank_mark_frame();
     if (g_have_bb) {
         fb_blit(&g_fb, &g_bb);
     }

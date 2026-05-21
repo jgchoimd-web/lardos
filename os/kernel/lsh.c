@@ -79,6 +79,8 @@ static int s_magic_depth;
 
 static void lsh_putc(char c, void* user);
 static void parse_and_run(const char* cmd, const char* args);
+static int cfgsh_is_status_word(const char* value);
+static int cfgsh_bool_value(const char* value, int* out);
 
 static const char* env_get(const char* name)
 {
@@ -348,7 +350,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
     { "vcslog", 1 }, { "vcsshow", 1 },
     { "drivers", 1 }, { "fsstat", 1 }, { "fsload", 1 }, { "fssave", 1 }, { "sync", 1 }, { "media", 1 }, { "mediafs", 1 }, { "devstore", 1 },
-    { "sram", 1 }, { "screenram", 1 }, { "screencheck", 1 }, { "scrcheck", 1 }, { "sandbox", 1 }, { "exitsandbox", 1 },
+    { "sram", 1 }, { "screenram", 1 }, { "renderfx", 1 }, { "render", 1 }, { "gfx", 1 }, { "screencheck", 1 }, { "scrcheck", 1 }, { "sandbox", 1 }, { "exitsandbox", 1 },
     { "bye", 0 }, { "byebye", 0 }, { "poweroff", 0 }, { "shutdown", 0 }, { "restart", 0 }, { "reboot", 0 },
     { "sum", 0 }, { "exitsum", 0 }, { "peek", 0 }, { "poke", 0 }, { "asm_", 0 },
 };
@@ -1816,7 +1818,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -1843,6 +1845,7 @@ static void cmd_help(const char* args)
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
+    out_append("  renderfx status|aa|brightness|lsb|vblank|test  user-owned render modes\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
     out_append("  notes show|add|clear            syncs notes.lardd and GUI notes.txt\n");
@@ -1856,7 +1859,7 @@ static void cmd_help(const char* args)
     out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
-    out_append("  drivers [status|reload|load file.drfl|show name] fsstat fsload fssave sync mediafs devstore sram screencheck sandbox exitsandbox\n");
+    out_append("  drivers [status|reload|load file.drfl|show name] fsstat fsload fssave sync mediafs devstore sram renderfx screencheck sandbox exitsandbox\n");
     out_append("  tasktop  task list|set|urgent|history|up|down|pause|resume|drop  nice prio cmd\n");
     out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
@@ -1949,6 +1952,9 @@ static void cmd_control(const char* args)
     out_append("  kmo raw rawdoor.kmo sum create an explicit risky raw-control KMO\n");
     out_append("  kmo run mine.kmo    route that .kmo through KModTalk\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
+    out_append("  renderfx aa none|antianti|basic|nonlinear tune display filtering\n");
+    out_append("  renderfx lsb on     store ScreenRAM in quiet pixel least-significant bits\n");
+    out_append("  renderfx vblank on  detect VGA-style blanking for two-phase final blits\n");
     out_append("  screencheck retro   draw a retro boot/storage-style screen check\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
@@ -2461,6 +2467,8 @@ static void cmd_sram_status(void)
     out_append_u32(info.max_capacity);
     out_append(" used=");
     out_append_u32(info.used);
+    out_append(" lsb=");
+    out_append(info.lsb_mode ? "on" : "off");
     out_append(" err=");
     out_append_u32(info.last_error);
     out_append("\n");
@@ -2595,7 +2603,145 @@ static void cmd_sram(const char* args)
         cmd_sram_read(args);
         return;
     }
-    out_append("Usage: sram status|on|off|corner|rect|write|read|clear|test\n");
+    if (strcmp(sub, "lsb") == 0) {
+        char v[16];
+        int on = 0;
+        if (vcs_read_word(&args, v, sizeof(v)) != 0 || cfgsh_is_status_word(v)) {
+            out_append("sram lsb: ");
+            out_append(gui_screenram_lsb_mode() ? "on\n" : "off\n");
+        } else if (cfgsh_bool_value(v, &on) == 0) {
+            out_append(gui_screenram_lsb_enable(on) == 0 ? "sram: LSB storage mode updated.\n" : "sram: LSB mode failed.\n");
+        } else {
+            out_append("Usage: sram lsb on|off\n");
+        }
+        return;
+    }
+    out_append("Usage: sram status|on|off|corner|rect|lsb|write|read|clear|test\n");
+}
+
+static const char* render_aa_name(uint32_t mode)
+{
+    if (mode == GUI_AA_UNAA) return "antianti";
+    if (mode == GUI_AA_BASIC) return "basic";
+    if (mode == GUI_AA_NONLINEAR) return "nonlinear";
+    return "none";
+}
+
+static int render_parse_aa(const char* value, int* out)
+{
+    if (!value || !out) return -1;
+    if (strcmp(value, "0") == 0 || strcmp(value, "none") == 0 || strcmp(value, "noaa") == 0 || strcmp(value, "off") == 0) {
+        *out = GUI_AA_NONE; return 0;
+    }
+    if (strcmp(value, "1") == 0 || strcmp(value, "antianti") == 0 || strcmp(value, "unaa") == 0 || strcmp(value, "deaa") == 0) {
+        *out = GUI_AA_UNAA; return 0;
+    }
+    if (strcmp(value, "2") == 0 || strcmp(value, "basic") == 0 || strcmp(value, "aa") == 0 || strcmp(value, "on") == 0) {
+        *out = GUI_AA_BASIC; return 0;
+    }
+    if (strcmp(value, "3") == 0 || strcmp(value, "nonlinear") == 0 || strcmp(value, "edge") == 0 || strcmp(value, "sharp") == 0) {
+        *out = GUI_AA_NONLINEAR; return 0;
+    }
+    return -1;
+}
+
+static void cmd_renderfx_status(void)
+{
+    gui_render_info_t info;
+    gui_render_info(&info);
+    out_append("RenderFX\n  aa=");
+    out_append(render_aa_name(info.aa_mode));
+    out_append(" brightness=");
+    out_append_u32(info.brightness);
+    out_append(" quality=");
+    out_append_u32(info.quality);
+    out_append("\n  screenram-lsb=");
+    out_append(info.screenram_lsb ? "on" : "off");
+    out_append(" vblank=");
+    out_append(info.vblank_mode ? "on" : "off");
+    out_append(" frames=");
+    out_append_u32(info.vblank_frames);
+    out_append(" hits=");
+    out_append_u32(info.vblank_hits);
+    out_append(" misses=");
+    out_append_u32(info.vblank_misses);
+    out_append(" last=");
+    out_append(info.vblank_last ? "blank\n" : "draw\n");
+}
+
+static void cmd_renderfx(const char* args)
+{
+    char sub[24];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 || strcmp(sub, "status") == 0) {
+        cmd_renderfx_status();
+        return;
+    }
+    if (strcmp(sub, "aa") == 0 || strcmp(sub, "antialias") == 0) {
+        char mode[24];
+        int aa;
+        if (vcs_read_word(&args, mode, sizeof(mode)) != 0 || cfgsh_is_status_word(mode)) {
+            out_append("renderfx aa=");
+            out_append(render_aa_name((uint32_t)gui_render_aa_mode()));
+            out_append("\n");
+            return;
+        }
+        if (render_parse_aa(mode, &aa) == 0 && gui_render_set_aa_mode(aa) == 0) {
+            out_append("renderfx: aa=");
+            out_append(render_aa_name((uint32_t)aa));
+            out_append("\n");
+        } else {
+            out_append("Usage: renderfx aa none|antianti|basic|nonlinear\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "brightness") == 0 || strcmp(sub, "bright") == 0) {
+        uint64_t v;
+        if (lsh_parse_u64(&args, &v) != 0) {
+            out_append("renderfx brightness=");
+            out_append_u32((uint32_t)gui_render_brightness());
+            out_append("\n");
+            return;
+        }
+        gui_render_set_brightness((int)v);
+        out_append("renderfx: brightness=");
+        out_append_u32((uint32_t)gui_render_brightness());
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "lsb") == 0 || strcmp(sub, "screenlsb") == 0) {
+        char v[16];
+        int on = 0;
+        if (vcs_read_word(&args, v, sizeof(v)) != 0 || cfgsh_is_status_word(v)) {
+            out_append("renderfx lsb=");
+            out_append(gui_screenram_lsb_mode() ? "on\n" : "off\n");
+        } else if (cfgsh_bool_value(v, &on) == 0) {
+            (void)gui_screenram_lsb_enable(on);
+            out_append(on ? "renderfx: lsb on\n" : "renderfx: lsb off\n");
+        } else {
+            out_append("Usage: renderfx lsb on|off\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "vblank") == 0 || strcmp(sub, "vsync") == 0 || strcmp(sub, "blank") == 0) {
+        char v[16];
+        int on = 0;
+        if (vcs_read_word(&args, v, sizeof(v)) != 0 || cfgsh_is_status_word(v)) {
+            out_append("renderfx vblank=");
+            out_append(gui_vblank_mode() ? "on\n" : "off\n");
+        } else if (cfgsh_bool_value(v, &on) == 0) {
+            gui_vblank_enable(on);
+            out_append(on ? "renderfx: vblank on\n" : "renderfx: vblank off\n");
+        } else {
+            out_append("Usage: renderfx vblank on|off\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(gui_render_effects_selftest() == 0 ? "renderfx: selftest OK\n" : "renderfx: selftest failed\n");
+        return;
+    }
+    out_append("Usage: renderfx status|aa|brightness|lsb|vblank|test\n");
 }
 
 static void screencheck_report(const screencheck_info_t* info)
@@ -8138,6 +8284,10 @@ static void cfgsh_help(void)
     out_append("  ltheme name        classic|contrast|night|amber\n");
     out_append("  rollback snap|apply settings snapshot restore\n");
     out_append("  sram on|off        screen scratch RAM\n");
+    out_append("  aa 0..3            none|antianti|basic|nonlinear render filter\n");
+    out_append("  brightness 50..150 multiplicative color-preserving brightness\n");
+    out_append("  lsb on|off         store ScreenRAM bits in rendered pixel LSBs\n");
+    out_append("  vblank on|off      use detected blanking window for final blit\n");
     out_append("  http 1|2|3         GET|POST|HEAD mode\n");
     out_append("  boot 1..5          normal|safe|netoff|dev|awakening\n");
     out_append("  priority 0..10     default background task priority\n");
@@ -8179,6 +8329,12 @@ static void cfgsh_status(void)
     out_append(th.name);
     out_append("\n  sram=");
     out_append(sr.enabled ? "on" : "off");
+    out_append(" lsb=");
+    out_append(sr.lsb_mode ? "on" : "off");
+    out_append(" aa=");
+    out_append(render_aa_name((uint32_t)gui_render_aa_mode()));
+    out_append(" bright=");
+    out_append_u32((uint32_t)gui_render_brightness());
     out_append(" http=");
     out_append(lsh_http_method_name());
     out_append(" priority=");
@@ -8288,6 +8444,70 @@ static int cfgsh_apply(const char* setting, const char* args)
             out_append("cfgsh: sram cleared\n");
         } else {
             out_append("Usage: sram on|off|clear\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "aa") == 0 || strcmp(setting, "antialias") == 0 || strcmp(setting, "renderaa") == 0) {
+        int aa;
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: aa=");
+            out_append(render_aa_name((uint32_t)gui_render_aa_mode()));
+            out_append("\n");
+            return 1;
+        }
+        if (render_parse_aa(value, &aa) == 0 && gui_render_set_aa_mode(aa) == 0) {
+            out_append("cfgsh: aa=");
+            out_append(render_aa_name((uint32_t)aa));
+            out_append("\n");
+        } else {
+            out_append("Usage: aa 0..3 none|antianti|basic|nonlinear\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "brightness") == 0 || strcmp(setting, "bright") == 0) {
+        uint32_t br = 0;
+        const char* p = args ? args : "";
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: brightness=");
+            out_append_u32((uint32_t)gui_render_brightness());
+            out_append("\n");
+            return 1;
+        }
+        if (vcs_parse_u32(&p, &br) == 0) {
+            gui_render_set_brightness((int)br);
+            out_append("cfgsh: brightness=");
+            out_append_u32((uint32_t)gui_render_brightness());
+            out_append("\n");
+        } else {
+            out_append("Usage: brightness 50..150\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "lsb") == 0 || strcmp(setting, "screenlsb") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: lsb=");
+            out_append(gui_screenram_lsb_mode() ? "on\n" : "off\n");
+            return 1;
+        }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            (void)gui_screenram_lsb_enable(on);
+            out_append(on ? "cfgsh: lsb on\n" : "cfgsh: lsb off\n");
+        } else {
+            out_append("Usage: lsb on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "vblank") == 0 || strcmp(setting, "vsync") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            out_append("cfgsh: vblank=");
+            out_append(gui_vblank_mode() ? "on\n" : "off\n");
+            return 1;
+        }
+        if (cfgsh_bool_value(value, &on) == 0) {
+            gui_vblank_enable(on);
+            out_append(on ? "cfgsh: vblank on\n" : "cfgsh: vblank off\n");
+        } else {
+            out_append("Usage: vblank on|off\n");
         }
         return 1;
     }
@@ -8414,6 +8634,8 @@ int lsh_cfgsh_selftest(void)
     if (cfgsh_bool_value("0", &on) != 0 || on != 0) return -2;
     const char* s = cfgsh_boot_value("5");
     if (!s || strcmp(s, "awakening") != 0) return -6;
+    if (render_parse_aa("nonlinear", &on) != 0 || on != GUI_AA_NONLINEAR) return -7;
+    if (gui_render_effects_selftest() != 0) return -8;
     return 0;
 }
 
@@ -8636,6 +8858,7 @@ static void parse_and_run(const char* cmd, const char* args)
     }
     if (cmd[0] == 's' && cmd[1] == 'r' && cmd[2] == 'a' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_sram(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'c' && cmd[2] == 'r' && cmd[3] == 'e' && cmd[4] == 'e' && cmd[5] == 'n' && cmd[6] == 'r' && cmd[7] == 'a' && cmd[8] == 'm' && cmd[9] == '\0') { cmd_sram(args); return; }
+    if (strcmp(cmd, "renderfx") == 0 || strcmp(cmd, "render") == 0 || strcmp(cmd, "gfx") == 0) { cmd_renderfx(args); return; }
     if (strcmp(cmd, "screencheck") == 0 || strcmp(cmd, "scrcheck") == 0) { cmd_screencheck(args); return; }
     if (cmd[0] == 's' && cmd[1] == 'e' && cmd[2] == 'l' && cmd[3] == 'f' && cmd[4] == 't' && cmd[5] == 'e' && cmd[6] == 's' && cmd[7] == 't' && cmd[8] == '\0') { cmd_selftest(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'c' && cmd[2] == 'n' && cmd[3] == 't' && cmd[4] == '\0') { cmd_lcnt(args); return; }

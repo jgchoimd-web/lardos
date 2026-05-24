@@ -193,6 +193,7 @@ static const uint8_t userlaw_init[] =
     "ITEM values -> read this law.\n"
     "ITEM userlaw show -> read this law.\n"
     "ITEM userlaw reset -> restore this law.\n"
+    "ITEM bleed file -> user-owned last-resort deletion for broken files; it must report the routes it tried.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
@@ -372,6 +373,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 3, boot 4.\n"
     "li Use dos on for L-DOS mode with _:/C:/A:/Z:/U:/R: mapping and DOS-style file commands.\n"
     "li In L-DOS, DEL -F file hard-deletes read-only built-in files from the active filesystem through fsdelete.lardd, even if that breaks the OS.\n"
+    "li Use bleed dryrun file to preview a last-resort delete sweep, or bleed file to try RAM, read-only hard-delete, and media deletion routes.\n"
     "li RESTORE only removes soft TOMB HIDE records; use TOMB DROP file or TOMB CLEAR if you choose to delete hard-delete records too.\n"
     "li Use TOMB LIST, TOMB SHOW, TOMB HIDE file, TOMB DROP file, or TOMB CLEAR when you want to inspect or edit deletion records themselves.\n"
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
@@ -458,6 +460,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.83.0b adds bleed, a last-resort visible delete sweep for broken files across RAM, read-only delete overlays, and media stores.\n"
     "li v1.82.0b extends FSTWT with MAIN/SUB filesystem virtualization and coexisting namespaces.\n"
     "li v1.81.0b adds FSTWT live two-way filesystem translation scripts before RXR/vpath fallback.\n"
     "li v1.80.0b adds RenderFX beta display modes: no-AA default, antianti/basic/nonlinear AA, multiplicative brightness, ScreenRAM LSB, and VBlank sync.\n"
@@ -1245,6 +1248,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file default.fstwts\n"
     "CHECK writable fstwt.fstwts\n"
     "CHECK command fstwt\n"
+    "CHECK command bleed\n"
     "CHECK command restore\n"
     "CHECK command tomb\n"
     "CHECK command tombstone\n"

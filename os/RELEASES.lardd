@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.83.0b
+ITEM Adds bleed, a last-resort force-delete command for broken files.
+ITEM bleed file visibly sweeps writable RAM, read-only hard-delete overlay records, and media stores instead of stopping at the first failed deletion path.
+ITEM bleed dryrun file previews the routes it will try without changing bytes, so the dangerous path remains visible and user-owned.
+ITEM The command is marked raw for Magic prediction safety; use magic -f bleed file only when you explicitly want automated execution.
+ITEM Ships as beta because this is intentionally powerful deletion behavior and should be exercised before official promotion.
+
 SECTION v1.82.0b
 ITEM Extends FSTWT from a path translator into a filesystem coexistence layer with MODE TRANSLATE, MODE HYBRID, and MODE VM.
 ITEM Adds MAIN and SUB declarations in .fstwts so scripts can choose the default filesystem namespace and mount coexisting VM-style sub filesystems such as sandbox:/path.

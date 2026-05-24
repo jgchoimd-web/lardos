@@ -341,7 +341,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
-    { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
+    { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "bleed", 0 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 }, { "fstwt", 1 }, { "fstwts", 1 }, { "vpath", 1 }, { "pathmap", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
@@ -1819,7 +1819,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom fstwt cls\n");
+    out_append("  help control values status install media dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -1834,6 +1834,7 @@ static void cmd_help(const char* args)
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
     out_append("  kmo list|create|command|raw|set|delete|show|run  .kmo kernel modules and file-defined shell commands\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
+    out_append("  bleed [dryrun] [drive:]file       force-delete a broken file across RAM, read-only, and media paths\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
     out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
@@ -1900,6 +1901,8 @@ static void cmd_control(const char* args)
     out_append("  media write Z note.txt hello  save data to the auxiliary media store\n");
     out_append("  values              reread the LardOS user-law values\n");
     out_append("  tomb list           inspect active user-owned read-only deletion records\n");
+    out_append("  bleed dryrun file   preview the strongest delete sweep before using bleed file\n");
+    out_append("  bleed file          force-delete broken files across RAM, read-only, and media stores\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  magic -f bye        force an explicit raw-control prediction\n");
     out_append("  magic -f byebye     force the friendlier poweroff alias explicitly\n");
@@ -7195,6 +7198,182 @@ static void dos_delete(const char* args)
     dos_log_event("delete", name);
 }
 
+static void bleed_emit_route(const char* label, int ok)
+{
+    out_append("  ");
+    out_append(label);
+    out_append(ok ? ": deleted\n" : ": no match\n");
+}
+
+static int bleed_delete_ram(const char* name)
+{
+    FsWritableFile* w = fs_open_writable(name);
+    if (!w) return 0;
+    (void)fs_write(w, 0, (const uint8_t*)"", 0);
+    return 1;
+}
+
+static int bleed_delete_readonly(const char* name)
+{
+    return fs_delete_readonly(name) >= 0 ? 1 : 0;
+}
+
+static int bleed_delete_media(char drive, const char* name)
+{
+    return mediafs_delete(drive, name) == 0 ? 1 : 0;
+}
+
+static void bleed_show_routes(int merged_or_any, char drv)
+{
+    int fs = drive_to_fs(drv);
+    if (merged_or_any) {
+        out_append("  R: writable RAM clear\n");
+        out_append("  X: read-only hard-delete record in fsdelete.lardd\n");
+        out_append("  Y:/Z:/A: media store delete\n");
+        return;
+    }
+    if (fs == 2) {
+        out_append("  selected media store delete\n");
+    } else if (fs == 1) {
+        out_append("  R: writable RAM clear\n");
+    } else if (fs == 0) {
+        out_append("  writable RAM overlay clear\n");
+        out_append("  read-only hard-delete record in fsdelete.lardd\n");
+    } else {
+        out_append("  invalid drive\n");
+    }
+}
+
+static void cmd_bleed(const char* args)
+{
+    const char media_drives[] = { 'Y', 'Z', 'A' };
+    const char* p = args ? args : "";
+    char first[64];
+    char file_arg[64];
+    char drv;
+    char name[64];
+    int dryrun = 0;
+    int explicit_drive = 0;
+    int merged_or_any;
+    int fs;
+    int tried = 0;
+    int hits = 0;
+    int r;
+
+    while (*p == ' ' || *p == '\t') p++;
+    if (vcs_read_word(&p, first, sizeof(first)) != 0) {
+        out_append("Usage: bleed [dryrun|-f] [drive:]file\n");
+        return;
+    }
+    if (ascii_streq_ci(first, "dryrun") || ascii_streq_ci(first, "preview") ||
+        ascii_streq_ci(first, "test")) {
+        dryrun = 1;
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: bleed dryrun [drive:]file\n");
+            return;
+        }
+    } else if (ascii_streq_ci(first, "-f") || ascii_streq_ci(first, "/f") ||
+               ascii_streq_ci(first, "--force") || ascii_streq_ci(first, "force") ||
+               ascii_streq_ci(first, "yes") || ascii_streq_ci(first, "confirm")) {
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
+            out_append("Usage: bleed -f [drive:]file\n");
+            return;
+        }
+    } else {
+        uint32_t i = 0;
+        while (first[i] && i + 1u < sizeof(file_arg)) {
+            file_arg[i] = first[i];
+            i++;
+        }
+        file_arg[i] = '\0';
+    }
+
+    explicit_drive = file_arg[0] && file_arg[1] == ':';
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    if (!name[0]) {
+        out_append("Usage: bleed [dryrun|-f] [drive:]file\n");
+        return;
+    }
+
+    fs = drive_to_fs(drv);
+    merged_or_any = drive_is_merged(drv) || !explicit_drive;
+    out_append(dryrun ? "BLEED dryrun: " : "BLEED: ");
+    out_append(name);
+    out_append(merged_or_any ? " across _:/R:/X:/Y:/Z:/A:\n" : " on ");
+    if (!merged_or_any) {
+        out_append_char(drv);
+        out_append(":\n");
+    }
+    if (dryrun) {
+        bleed_show_routes(merged_or_any, drv);
+        out_append("No bytes changed.\n");
+        return;
+    }
+
+    if (merged_or_any) {
+        r = bleed_delete_ram(name);
+        tried++;
+        hits += r;
+        bleed_emit_route("R: RAM", r);
+        r = bleed_delete_readonly(name);
+        tried++;
+        hits += r;
+        bleed_emit_route("X: read-only hard-delete", r);
+        for (uint32_t i = 0; i < sizeof(media_drives); i++) {
+            char label[16];
+            label[0] = media_drives[i];
+            label[1] = ':';
+            label[2] = ' ';
+            label[3] = 'm';
+            label[4] = 'e';
+            label[5] = 'd';
+            label[6] = 'i';
+            label[7] = 'a';
+            label[8] = '\0';
+            r = bleed_delete_media(media_drives[i], name);
+            tried++;
+            hits += r;
+            bleed_emit_route(label, r);
+        }
+    } else if (fs == 2) {
+        r = bleed_delete_media(drv, name);
+        tried++;
+        hits += r;
+        bleed_emit_route("media", r);
+    } else if (fs == 1) {
+        r = bleed_delete_ram(name);
+        tried++;
+        hits += r;
+        bleed_emit_route("R: RAM", r);
+    } else if (fs == 0) {
+        r = bleed_delete_ram(name);
+        tried++;
+        hits += r;
+        bleed_emit_route("writable RAM overlay", r);
+        r = bleed_delete_readonly(name);
+        tried++;
+        hits += r;
+        bleed_emit_route("read-only hard-delete", r);
+    } else {
+        out_append("BLEED: invalid drive.\n");
+        return;
+    }
+
+    out_append("BLEED result: ");
+    out_append_u32((uint32_t)hits);
+    out_append(" deletion route(s) succeeded out of ");
+    out_append_u32((uint32_t)tried);
+    out_append(".\n");
+    if (hits > 0) {
+        r = fs_persist_save();
+        out_append("BLEED sync: ");
+        out_append(r == 0 ? "RAM/delete overlay saved.\n" : "RAM/delete overlay save unavailable; media stores may already be synced.\n");
+        dos_log_event("bleed", name);
+    } else {
+        out_append("BLEED: file not found on attempted routes, or delete tables are full.\n");
+    }
+}
+
 static void dos_restore(const char* args)
 {
     char drv;
@@ -8912,7 +9091,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) lardkit_trace_event("kmodtalk", cmd, 0);
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
     if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
-    if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0) lardkit_trace_event("fs", cmd, 0);
+    if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0 || strcmp(cmd, "bleed") == 0) lardkit_trace_event("fs", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
     if (strcmp(cmd, "ltheme") == 0 ||
@@ -9055,6 +9234,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "rxrundo") == 0) { cmd_rxr("undo"); return; }
     if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0) { cmd_fstwt(args); return; }
     if (strcmp(cmd, "vpath") == 0 || strcmp(cmd, "pathmap") == 0) { cmd_vpath(args); return; }
+    if (strcmp(cmd, "bleed") == 0) { cmd_bleed(args); return; }
     if (strcmp(cmd, "ren") == 0 || strcmp(cmd, "rename") == 0) { cmd_rename(args); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }

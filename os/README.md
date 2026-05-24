@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.82.0b-ami/lardos-v1.82.0b-ami.iso`. To publish the whole hardware
+`release/v1.83.0b-ami/lardos-v1.83.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.83.0b` adds `bleed`, a last-resort visible delete sweep for broken files.
+`bleed dryrun file` previews the routes, and `bleed file` tries writable RAM,
+read-only hard-delete overlay records, and media stores. Magic treats it as raw
+control, so automated prediction needs `magic -f`.
 
 `v1.82.0b` extends FSTWT into a filesystem coexistence layer. `.fstwts` can now
 declare `MODE TRANSLATE`, `MODE HYBRID`, or `MODE VM`, choose `MAIN name prefix
@@ -234,6 +239,9 @@ commands:
   `RESTORE file` / `UNDELETE file` only restores soft `TOMB HIDE` records.
 - `tomb list|show|hide file|drop file|clear` and `DEL -T file` let the user
   inspect, soft-hide, delete, or clear the hard-delete records too.
+- `bleed dryrun file` previews every last-resort deletion route. `bleed file`
+  then tries writable RAM, read-only DELETE records, and media store removal for
+  broken files, reporting each route instead of hiding the danger.
 - `bye` / `byebye` sync RAM files and request a user-owned poweroff;
   `restart` / `reboot` sync RAM files and request a user-owned firmware/VM
   restart.
@@ -265,6 +273,9 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.83.0b` adds `bleed`, a dangerous but visible force-delete sweep for
+  broken files while keeping `DEL -F`, `TOMB`, `RESTORE`, media stores, and
+  FSTWT path behavior available.
 - `v1.82.0b` extends FSTWT with main/sub filesystem declarations and VM-style
   coexisting namespaces while keeping MAP translation and all old path fallback
   behavior.

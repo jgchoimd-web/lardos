@@ -198,10 +198,14 @@ static const uint8_t userlaw_init[] =
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
 static FsWritableFile ram_userlaw = { "userlaw.lardd", ram_userlaw_buf, 0, USERLAW_CAP };
 
-#define FSTWTS_CAP 2048u
+#define FSTWTS_CAP 4096u
 static const uint8_t fstwts_init[] =
     "FSTWTS 1\n"
+    "MODE HYBRID\n"
+    "MAIN lardos ROOT TRANSLATE\n"
+    "SUB sandbox sbx_ VM\n"
     "# File System Two Way Translator script.\n"
+    "# MAIN can choose the default namespace; SUB adds coexisting virtual filesystems.\n"
     "# MAP your/friendly/path/ <=> flat_lardos_prefix_\n"
     "MAP fstwt/demo/ <=> f2wdemo_\n";
 static uint8_t ram_fstwts_buf[FSTWTS_CAP];
@@ -353,7 +357,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use restart or reboot to sync RAM files and request a firmware/VM restart.\n"
     "li Use install status for the HDD/SSD installer preview, or install hdd yes / install ssd yes to write LardOS to the ATA target disk.\n"
     "li Use media list, media format Z, dir Z:, type Z:note.txt, and dir _: for merged storage.\n"
-    "li Use fstwt status, fstwt use file.fstwts, fstwt to path, and fstwt from file to translate file-system names both ways.\n"
+    "li Use fstwt status, fstwt fs, fstwt main name, fstwt use file.fstwts, fstwt to path, and fstwt from file to translate or virtualize file-system names.\n"
     "li Run mode probe to enter a controlled real16 window and return to long64.\n"
     "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
@@ -454,6 +458,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.82.0b extends FSTWT with MAIN/SUB filesystem virtualization and coexisting namespaces.\n"
     "li v1.81.0b adds FSTWT live two-way filesystem translation scripts before RXR/vpath fallback.\n"
     "li v1.80.0b adds RenderFX beta display modes: no-AA default, antianti/basic/nonlinear AA, multiplicative brightness, ScreenRAM LSB, and VBlank sync.\n"
     "li v1.79.1p hotpatches the SSAV generator so frame data begins at the documented 0x10 offset.\n"
@@ -831,7 +836,10 @@ static const uint8_t file_webdemo_lars[] =
 
 static const uint8_t file_default_fstwts[] =
     "FSTWTS 1\n"
-    "# File System Two Way Translator default map.\n"
+    "MODE HYBRID\n"
+    "MAIN lardos ROOT TRANSLATE\n"
+    "SUB sandbox sbx_ VM\n"
+    "# File System Two Way Translator default map and virtual filesystem table.\n"
     "# MAP external-prefix <=> lardos-prefix\n"
     "MAP fstwt/demo/ <=> f2wdemo_\n";
 
@@ -839,11 +847,16 @@ static const uint8_t file_fstwt_guide[] =
     "LARDD 1\n"
     "TITLE FSTWT File System Two Way Translator\n"
     "TEXT FSTWT lets a file, RXR bundle, media drive, or user script carry path metadata that maps a friendly filesystem view to LardOS flat file names and back again.\n"
-    "TEXT It is a translator layer, not a replacement for RXR, vpath, mediafs, or the merged _ drive. If no rule matches, the old path behavior continues.\n"
+    "TEXT It can run as a translator or as a small filesystem virtualization layer where main and sub filesystems coexist through explicit namespaces.\n"
+    "TEXT It is not a replacement for RXR, vpath, mediafs, or the merged _ drive. If no rule matches, the old path behavior continues.\n"
     "SECTION Script\n"
     "ITEM FSTWTS 1\n"
+    "ITEM MODE TRANSLATE, MODE HYBRID, or MODE VM chooses whether MAP rules, VM-style filesystems, or both are active.\n"
+    "ITEM MAIN name prefix VM sets the default filesystem namespace for unqualified paths. MAIN lardos ROOT TRANSLATE keeps the classic LardOS root.\n"
+    "ITEM SUB name prefix VM adds a coexisting virtual filesystem reached with name:/path.\n"
     "ITEM MAP external-prefix <=> lardos-prefix\n"
     "ITEM Example: MAP app:/save/ <=> appsave_\n"
+    "ITEM Example: SUB sandbox sbx_ VM makes sandbox:/notes/today.txt resolve to sbx_notes_today.txt.\n"
     "ITEM Calling app:/save/Slot 1.lardd writes or opens appsave_slot_1.lardd.\n"
     "ITEM Calling fstwt from appsave_slot_1.lardd shows app:/save/slot_1.lardd.\n"
     "SECTION Commands\n"
@@ -853,6 +866,8 @@ static const uint8_t file_fstwt_guide[] =
     "ITEM fstwt clear - disable translation until another script is loaded.\n"
     "ITEM fstwt to friendly/path - preview friendly namespace to LardOS filename.\n"
     "ITEM fstwt from lard_filename - preview LardOS filename to friendly namespace.\n"
+    "ITEM fstwt fs - list declared main/sub filesystems.\n"
+    "ITEM fstwt main name - choose a declared MAIN filesystem at runtime; fstwt main reset returns to the script default.\n"
     "ITEM fstwt sample - print a small starter script.\n"
     "SECTION Ownership\n"
     "ITEM fstwt.fstwts is writable so the user can edit the active mapping policy.\n"

@@ -1824,7 +1824,7 @@ static void cmd_help(const char* args)
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
     out_append("  vpath path|test       resolve folder/inside/path through the OS file namespace\n");
-    out_append("  fstwt status|use file.fstwts|to path|from file  two-way filesystem translator\n");
+    out_append("  fstwt status|fs|main|use file.fstwts|to path|from file  FS translator/VM\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  media list|format Z|sync all|write Z file text  drives X/Y/Z/A/R/_\n");
@@ -1848,7 +1848,7 @@ static void cmd_help(const char* args)
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
     out_append("  renderfx status|aa|brightness|lsb|vblank|test  user-owned render modes\n");
-    out_append("  fstwt show|sample|clear|test      live .fstwts path translator scripts\n");
+    out_append("  fstwt show|sample|clear|test      live .fstwts path translator/virtual-FS scripts\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
     out_append("  notes show|add|clear            syncs notes.lardd and GUI notes.txt\n");
@@ -3420,14 +3420,22 @@ static void cmd_fstwt_status(void)
     out_append(info.active ? "active" : "off");
     out_append(" source=");
     out_append(info.source);
+    out_append(" mode=");
+    out_append(fstwt_mode_name(info.mode));
+    out_append(" main=");
+    out_append(info.main_name);
     out_append(" rules=");
     out_append_u32(info.rules);
+    out_append(" fs=");
+    out_append_u32(info.filesystems);
     out_append(" bytes=");
     out_append_u32(info.script_bytes);
     out_append(" to=");
     out_append_u32(info.to_hits);
     out_append(" from=");
     out_append_u32(info.from_hits);
+    out_append(" vm=");
+    out_append_u32(info.vm_hits);
     out_append(" miss=");
     out_append_u32(info.misses);
     out_append(" err=");
@@ -3451,9 +3459,66 @@ static void cmd_fstwt_show(void)
 static void cmd_fstwt_sample(void)
 {
     out_append("FSTWTS 1\n");
+    out_append("MODE HYBRID\n");
+    out_append("MAIN lardos ROOT TRANSLATE\n");
+    out_append("SUB sandbox sbx_ VM\n");
     out_append("# MAP external-prefix <=> lardos-prefix\n");
     out_append("MAP app:/save/ <=> appsave_\n");
     out_append("MAP usb/photos/ <=> usbphoto_\n");
+}
+
+static void cmd_fstwt_fs(void)
+{
+    uint32_t count = fstwt_fs_count();
+    fstwt_info_t info;
+    fstwt_info(&info);
+    out_append("FSTWT filesystems main=");
+    out_append(info.main_name);
+    out_append(" mode=");
+    out_append(fstwt_mode_name(info.mode));
+    out_append("\n");
+    if (count == 0) {
+        out_append("  (none; MAP-only translator)\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count && i < FSTWT_FS_MAX; i++) {
+        fstwt_fs_entry_t entry;
+        if (fstwt_fs_entry(i, &entry) != 0) continue;
+        out_append("  ");
+        out_append(entry.is_main ? "MAIN " : "SUB ");
+        out_append(entry.name);
+        out_append(" -> ");
+        out_append(entry.prefix);
+        out_append(entry.vm ? " VM" : " TRANSLATE");
+        out_append("\n");
+    }
+}
+
+static void cmd_fstwt_main(const char* args)
+{
+    char name[32];
+    if (vcs_read_word(&args, name, sizeof(name)) != 0 ||
+        ascii_streq_ci(name, "status") || ascii_streq_ci(name, "show")) {
+        fstwt_info_t info;
+        fstwt_info(&info);
+        out_append("fstwt main: ");
+        out_append(info.main_name);
+        out_append("\n");
+        return;
+    }
+    if (ascii_streq_ci(name, "reset") || ascii_streq_ci(name, "script") ||
+        ascii_streq_ci(name, "default")) {
+        (void)fstwt_set_main("");
+        out_append("fstwt main: script default\n");
+        return;
+    }
+    if (fstwt_set_main(name) != 0) {
+        out_append("fstwt: MAIN filesystem not declared in active script.\n");
+        return;
+    }
+    out_append("fstwt main: ");
+    out_append(name);
+    out_append("\n");
 }
 
 static void cmd_fstwt_use(const char* args)
@@ -3497,11 +3562,20 @@ static void cmd_fstwt(const char* args)
         return;
     }
     if (ascii_streq_ci(sub, "guide") || ascii_streq_ci(sub, "help")) {
-        cmd_larddoc("fstwt_guide.lardd", "Usage: fstwt status|show|use|clear|to|from|sample|test");
+        cmd_larddoc("fstwt_guide.lardd", "Usage: fstwt status|fs|main|show|use|clear|to|from|sample|test");
         return;
     }
     if (ascii_streq_ci(sub, "sample") || ascii_streq_ci(sub, "template")) {
         cmd_fstwt_sample();
+        return;
+    }
+    if (ascii_streq_ci(sub, "fs") || ascii_streq_ci(sub, "filesystems") ||
+        ascii_streq_ci(sub, "mounts")) {
+        cmd_fstwt_fs();
+        return;
+    }
+    if (ascii_streq_ci(sub, "main") || ascii_streq_ci(sub, "root")) {
+        cmd_fstwt_main(rest);
         return;
     }
     if (ascii_streq_ci(sub, "use") || ascii_streq_ci(sub, "load")) {
@@ -3513,7 +3587,8 @@ static void cmd_fstwt(const char* args)
         out_append("fstwt: off\n");
         return;
     }
-    if (ascii_streq_ci(sub, "to") || ascii_streq_ci(sub, "lard") || ascii_streq_ci(sub, "resolve")) {
+    if (ascii_streq_ci(sub, "to") || ascii_streq_ci(sub, "lard") ||
+        ascii_streq_ci(sub, "resolve") || ascii_streq_ci(sub, "vm")) {
         const char* path = lsh_trim_rest(rest);
         if (!path[0]) {
             out_append("Usage: fstwt to friendly/path\n");
@@ -3549,7 +3624,7 @@ static void cmd_fstwt(const char* args)
         out_append(fstwt_selftest() == 0 ? "fstwt: selftest OK\n" : "fstwt: selftest failed\n");
         return;
     }
-    out_append("Usage: fstwt status|show|use file.fstwts|clear|to path|from file|sample|test\n");
+    out_append("Usage: fstwt status|fs|main|show|use file.fstwts|clear|to path|from file|sample|test\n");
 }
 
 static const char* oslink_type_name(uint8_t type)

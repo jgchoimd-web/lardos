@@ -24,13 +24,13 @@ SEEDC     := $(HOST_TOOL_DIR)/seedc
 LIL       := $(HOST_TOOL_DIR)/lil
 BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
-RELEASE_BASE_VERSION := v1.81.0b
+RELEASE_BASE_VERSION := v1.82.0b
 RELEASE_HW ?= universal
 RELEASE_HW_LIST := universal seabios ami vbox usb realpc
 RELEASE_HW_UPPER := $(shell printf '%s' '$(RELEASE_HW)' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
 RELEASE_VERSION := $(if $(filter universal,$(RELEASE_HW)),$(RELEASE_BASE_VERSION),$(RELEASE_BASE_VERSION)-$(RELEASE_HW))
 RELEASE_NAME := lardos-$(RELEASE_VERSION)
-ISO_VOLUME_BASE := LARDOS_V1_81_0B
+ISO_VOLUME_BASE := LARDOS_V1_82_0B
 ISO_VOLUME_ID := $(if $(filter universal,$(RELEASE_HW)),$(ISO_VOLUME_BASE),$(ISO_VOLUME_BASE)_$(RELEASE_HW_UPPER))
 RELEASE_DIR := release/$(RELEASE_VERSION)
 ISO_BOOTIMG_SECTOR := 23

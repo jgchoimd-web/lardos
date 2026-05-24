@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.81.0b-ami/lardos-v1.81.0b-ami.iso`. To publish the whole hardware
+`release/v1.82.0b-ami/lardos-v1.82.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.82.0b` extends FSTWT into a filesystem coexistence layer. `.fstwts` can now
+declare `MODE TRANSLATE`, `MODE HYBRID`, or `MODE VM`, choose `MAIN name prefix
+VM`, and mount `SUB name prefix VM` virtual filesystems. `fstwt fs` lists the
+declared main/sub filesystems, and `fstwt main name` chooses a declared main
+namespace at runtime.
 
 `v1.81.0b` adds FSTWT, the File System Two Way Translator. A `.fstwts` script or
 an embedded `FSTWTS 1` block in another file can map a friendly filesystem
@@ -162,9 +168,10 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
 - `RXR` (`.rxr`) stores an app bundle: one RXE/SYSRXE executable plus required
   files. LardOS exposes installed bundle files through the OS path namespace
   `rxr/name`.
-- `FSTWTS` (`.fstwts`) stores two-way filesystem translation rules. Executables,
-  bundles, media files, and RAM files can also carry an embedded `FSTWTS 1`
-  block for the `fstwt` module to load.
+- `FSTWTS` (`.fstwts`) stores two-way filesystem translation rules plus optional
+  filesystem virtualization declarations. Executables, bundles, media files, and
+  RAM files can also carry an embedded `FSTWTS 1` block for the `fstwt` module to
+  load.
 - `MDFS` stores files for the MediaFS device stores behind `Y:`/`F:`,
   `Z:`/`S:`, and `A:`/`U:`.
 - `_:` is not a separate disk. It is a merged top-level drive view over
@@ -253,10 +260,14 @@ commands:
 - `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
   by the OS filesystem namespace. Quote paths with spaces, for example
   `vpath "Final Final Release/final fix"`.
-- `fstwt status|show|use file.fstwts|to path|from file|clear|sample|test`
+- `fstwt status|fs|main|show|use file.fstwts|to path|from file|clear|sample|test`
   controls live FSTWT scripts. FSTWT can load from `X:`, `R:`, media drives,
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
-  block.
+  block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
+  into that sub filesystem's declared flat prefix.
+- `v1.82.0b` extends FSTWT with main/sub filesystem declarations and VM-style
+  coexisting namespaces while keeping MAP translation and all old path fallback
+  behavior.
 - `v1.81.0b` adds FSTWT as a beta filesystem translator layer without removing
   RXR, virtual paths, media stores, or the merged `_:` drive behavior.
 - `v1.80.0b` adds the optional RenderFX beta bundle: four AA modes, improved

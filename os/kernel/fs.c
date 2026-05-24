@@ -195,6 +195,7 @@ static const uint8_t userlaw_init[] =
     "ITEM userlaw reset -> restore this law.\n"
     "ITEM bleed file -> user-owned last-resort deletion for broken files; it must report the routes it tried.\n"
     "ITEM bleed overflow file -> bounded in-slot wipe before deletion when the user chooses the harsher path.\n"
+    "ITEM crash command -> user-owned diagnostic fault triggers must be explicit, visible, and logged.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
@@ -392,6 +393,8 @@ static const uint8_t file_lardos_lars[] =
     "li Use bootprof set safe or bootprof set netoff to change the next boot profile.\n"
     "li Awakening mode is off by default; use awake on or awake off to choose the next boot path.\n"
     "li Use crashlog show to inspect panic and diagnostic history.\n"
+    "li Use crash status, crash dryrun panic, crash log text, or crash panic text for deliberate OS inspection triggers.\n"
+    "li Use crash ud2, crash div0, crash page, crash int3, or crash triple only when you explicitly want CPU fault/reset paths.\n"
     "li Use lpack verify sample.lpack before install, and lpack undo last to roll back the last install.\n"
     "li Use rxr verify sample.rxr, rxr list sample.rxr, and rxr install sample.rxr to install an app bundle with its files.\n"
     "li Use sysrxe list, sysrxe reload, sysrxe show userapp.sysrxe, and sysrxe run 0 text for file-defined system executables.\n"
@@ -462,6 +465,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.84.0b adds crash, a raw-control diagnostic command for deliberate PanicRoom and CPU fault testing.\n"
     "li v1.83.1b adds bleed overflow, a bounded in-slot wipe-before-delete option for stubborn broken files.\n"
     "li v1.83.0b adds bleed, a last-resort visible delete sweep for broken files across RAM, read-only delete overlays, and media stores.\n"
     "li v1.82.0b extends FSTWT with MAIN/SUB filesystem virtualization and coexisting namespaces.\n"
@@ -1252,6 +1256,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable fstwt.fstwts\n"
     "CHECK command fstwt\n"
     "CHECK command bleed\n"
+    "CHECK command crash\n"
     "CHECK command restore\n"
     "CHECK command tomb\n"
     "CHECK command tombstone\n"

@@ -38,6 +38,7 @@
 #include "crashlog.h"
 #include "installer.h"
 #include "mediafs.h"
+#include "panic.h"
 #include "version.h"
 #include "vmmon.h"
 #include "rxe.h"
@@ -339,7 +340,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "bleed", 0 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
@@ -1819,7 +1820,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom fstwt cls\n");
+    out_append("  help control values status install media dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -1868,6 +1869,7 @@ static void cmd_help(const char* args)
     out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
     out_append("  panicroom texture / panic capsule  draw real16 default texture or collect recovery state\n");
+    out_append("  crash status|dryrun mode|log|panic|ud2|div0|page|int3|triple  diagnostic crash triggers\n");
     out_append("  crashlog show|clear|test\n");
     out_append("  bye|byebye          sync RAM files, then request firmware/VM poweroff\n");
     out_append("  restart|reboot      sync RAM files, then request firmware/VM restart\n");
@@ -1937,6 +1939,8 @@ static void cmd_control(const char* args)
     out_append("  devmap draw         draw PCI/storage/network device map\n");
     out_append("  oldcheck draw       draw the retro storage check map\n");
     out_append("  lfsdoctor scan      diagnose writable files and LPST persistence state\n");
+    out_append("  crash dryrun panic  preview a deliberate OS crash trigger without executing it\n");
+    out_append("  crash panic reason  enter PanicRoom through the normal panic path\n");
     out_append("  panicroom texture   draw the real16 LPR default texture\n");
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
@@ -5953,6 +5957,114 @@ static void cmd_crashlog(const char* args)
     out_append("Usage: crashlog show|clear|test|selftest\n");
 }
 
+static const char* crash_message_tail(const char* args, const char* fallback)
+{
+    const char* p = args ? args : "";
+    while (*p == ' ' || *p == '\t') p++;
+    return *p ? p : fallback;
+}
+
+static void crash_prepare(const char* mode)
+{
+    crashlog_record("crash-command", mode);
+    lardkit_journal_event("crash", mode);
+    lardkit_trace_event("crash", mode, 0);
+    out_append("crash: triggering ");
+    out_append(mode);
+    out_append(". PanicRoom/crashlog are the expected inspection path.\n");
+    gui_set_response(s_output);
+}
+
+static void cmd_crash(const char* args)
+{
+    char sub[24];
+    const char* p = args ? args : "";
+    int dryrun = 0;
+
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "help") ||
+        ascii_streq_ci(sub, "info")) {
+        out_append("crash: deliberate OS inspection trigger. Magic treats this as raw-control.\n");
+        out_append("crashlog entries=");
+        out_append_u32(crashlog_count());
+        out_append(", panicroom=");
+        out_append(lardkit_panicroom_active() ? "entered" : "standby");
+        out_append(", entries=");
+        out_append_u32(lardkit_panicroom_entries());
+        out_append("\nUsage: crash dryrun mode | crash log [msg] | crash panic [msg] | crash ud2|div0|page|int3|triple\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "dryrun") || ascii_streq_ci(sub, "preview") ||
+        ascii_streq_ci(sub, "test")) {
+        dryrun = 1;
+        if (vcs_read_word(&p, sub, sizeof(sub)) != 0) {
+            out_append("Usage: crash dryrun panic|ud2|div0|page|int3|triple|log\n");
+            return;
+        }
+    }
+    if (dryrun) {
+        out_append("crash dryrun: would trigger ");
+        out_append(sub);
+        out_append(". No crash executed.\n");
+        out_append("Expected records: crashlog.txt, paniccapsule.lardd for panic/CPU exception paths.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "log") || ascii_streq_ci(sub, "record")) {
+        const char* msg = crash_message_tail(p, "manual crash diagnostic event");
+        crashlog_record("crash-command", msg);
+        lardkit_journal_event("crash", msg);
+        lardkit_trace_event("crash", "log", 0);
+        out_append("crash: diagnostic event recorded without crashing.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "panic") || ascii_streq_ci(sub, "now")) {
+        const char* msg = crash_message_tail(p, "user-requested crash command panic");
+        crash_prepare("panic");
+        panic(msg);
+    }
+    if (ascii_streq_ci(sub, "u64")) {
+        uint64_t v = 0xC0A5E000u;
+        const char* msg;
+        (void)lsh_parse_u64(&p, &v);
+        msg = crash_message_tail(p, "user-requested crash command u64 panic");
+        crash_prepare("panic_u64");
+        panic_u64(msg, v);
+    }
+    if (ascii_streq_ci(sub, "ud2") || ascii_streq_ci(sub, "invalid")) {
+        crash_prepare("ud2 invalid-opcode");
+        __asm__ __volatile__("ud2");
+        panic("crash ud2 returned");
+    }
+    if (ascii_streq_ci(sub, "div0") || ascii_streq_ci(sub, "divide")) {
+        crash_prepare("divide-by-zero");
+        __asm__ __volatile__(
+            "xor %%rdx, %%rdx\n"
+            "mov $1, %%rax\n"
+            "xor %%rcx, %%rcx\n"
+            "div %%rcx\n"
+            : : : "rax", "rcx", "rdx");
+        panic("crash div0 returned");
+    }
+    if (ascii_streq_ci(sub, "page") || ascii_streq_ci(sub, "pf")) {
+        volatile uint64_t* bad = (volatile uint64_t*)0x0000000100000000ULL;
+        volatile uint64_t sink;
+        crash_prepare("page-fault");
+        sink = *bad;
+        (void)sink;
+        panic("crash page returned");
+    }
+    if (ascii_streq_ci(sub, "int3") || ascii_streq_ci(sub, "break")) {
+        crash_prepare("int3 breakpoint");
+        __asm__ __volatile__("int3");
+        panic("crash int3 returned");
+    }
+    if (ascii_streq_ci(sub, "triple") || ascii_streq_ci(sub, "reset")) {
+        crash_prepare("triple-fault reset");
+        lsh_try_reboot_triple_fault();
+    }
+    out_append("Usage: crash dryrun mode | crash log [msg] | crash panic [msg] | crash ud2|div0|page|int3|triple\n");
+}
+
 static int lsh_require_sum(const char* cmd)
 {
     if (s_in_sum_mode) return 1;
@@ -9127,6 +9239,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
     if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
     if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0 || strcmp(cmd, "bleed") == 0) lardkit_trace_event("fs", cmd, 0);
+    if (strcmp(cmd, "crash") == 0) lardkit_trace_event("crash", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
     if (strcmp(cmd, "ltheme") == 0 ||
@@ -9225,6 +9338,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "postbaseline") == 0 || strcmp(cmd, "postbase") == 0) { cmd_postbaseline(args); return; }
     if (strcmp(cmd, "devmap") == 0) { cmd_devmap(args); return; }
     if (strcmp(cmd, "crashlog") == 0) { cmd_crashlog(args); return; }
+    if (strcmp(cmd, "crash") == 0) { cmd_crash(args); return; }
     if (strcmp(cmd, "panicroom") == 0 || strcmp(cmd, "panic") == 0) { cmd_panicroom(args); return; }
     if (strcmp(cmd, "paniccapsule") == 0) { cmd_paniccapsule(args); return; }
     if (strcmp(cmd, "rollback") == 0) { cmd_rollback(args); return; }

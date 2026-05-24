@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.83.1b-ami/lardos-v1.83.1b-ami.iso`. To publish the whole hardware
+`release/v1.84.0b-ami/lardos-v1.84.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.84.0b` adds `crash`, an explicit raw-control diagnostic command for OS
+inspection and recovery-path testing. `crash status` and `crash dryrun mode`
+are non-destructive, `crash log text` records an event without crashing, and
+`crash panic|ud2|div0|page|int3|triple` trigger deliberate PanicRoom/CPU fault
+paths only when the user asks.
 
 `v1.83.1b` extends `bleed` with `bleed overflow file`, a bounded in-slot
 wipe-before-delete mode for stubborn broken files. It deliberately fills writable
@@ -250,6 +256,9 @@ commands:
 - `bleed overflow file` first fills writable RAM/media file slots to capacity
   with destructive patterns, then deletes them. It is an explicit dangerous path,
   but bounded to the file slot instead of corrupting random memory.
+- `crash status|dryrun|log|panic|ud2|div0|page|int3|triple` exposes deliberate
+  crash and CPU fault triggers for OS inspection. Magic treats `crash` as raw
+  control, so predicted execution requires `magic -f`.
 - `bye` / `byebye` sync RAM files and request a user-owned poweroff;
   `restart` / `reboot` sync RAM files and request a user-owned firmware/VM
   restart.
@@ -281,6 +290,8 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.84.0b` adds the raw `crash` diagnostic command for deliberate PanicRoom,
+  crashlog, capsule, CPU exception, and reset-path testing.
 - `v1.83.1b` adds `bleed overflow file` for bounded wipe-before-delete behavior
   without removing the safer visible `bleed dryrun`/`bleed file` paths.
 - `v1.83.0b` adds `bleed`, a dangerous but visible force-delete sweep for

@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.84.0b
+ITEM Adds crash, an explicit raw-control diagnostic command for OS inspection, PanicRoom testing, and fault-path verification.
+ITEM crash status and crash dryrun mode show what will happen without crashing.
+ITEM crash log records a diagnostic event without crashing; crash panic enters the normal PanicRoom/crashlog/capsule path.
+ITEM crash ud2, div0, page, int3, and triple provide user-selected CPU exception/reset triggers for testing recovery behavior.
+ITEM Ships as beta because it intentionally gives the user direct crash and fault triggers.
+
 SECTION v1.83.1b
 ITEM Extends bleed with an explicit overflow-style wipe option for stubborn broken files.
 ITEM bleed overflow file performs a bounded in-slot overwrite pass on writable RAM files and media files before deletion, rather than an uncontrolled out-of-bounds memory corruption.

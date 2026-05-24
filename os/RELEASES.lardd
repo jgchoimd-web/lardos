@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.81.0b
+ITEM Adds FSTWT, the File System Two Way Translator, as a live user-owned filesystem namespace layer.
+ITEM .fstwts scripts use MAP external-prefix <=> lardos-prefix rules and translate both friendly paths to flat LardOS names and flat names back to friendly paths.
+ITEM fstwt use file.fstwts can load scripts from main files, RAM files, media stores, the merged _ drive, RXR-style paths, or any file carrying an embedded FSTWTS block.
+ITEM fs_resolve_os_path now checks FSTWT first, then keeps RXR aliases and existing virtual path flattening as fallback, so no prior path feature is removed.
+ITEM Ships as beta because this is a broad filesystem translation surface that should be tested before official promotion.
+
 SECTION v1.80.0b
 ITEM Adds user-selectable RenderFX modes: no anti-aliasing by default, antianti edge recovery, basic anti-aliasing, and nonlinear edge-aware anti-aliasing.
 ITEM Reworks brightness as multiplicative color-preserving post-blit scaling with the existing quality contrast control, rather than per-channel addition.

@@ -5,6 +5,7 @@
  */
 #include "lsh.h"
 #include "fs.h"
+#include "fstwt.h"
 #include "bmp.h"
 #include "img_glyph.h"
 #include "bosl_vm.h"
@@ -342,7 +343,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
-    { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 }, { "vpath", 1 }, { "pathmap", 1 },
+    { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 }, { "fstwt", 1 }, { "fstwts", 1 }, { "vpath", 1 }, { "pathmap", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
     { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
@@ -1818,11 +1819,12 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom cls\n");
+    out_append("  help control values status install media dos tomb time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
     out_append("  vpath path|test       resolve folder/inside/path through the OS file namespace\n");
+    out_append("  fstwt status|use file.fstwts|to path|from file  two-way filesystem translator\n");
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  media list|format Z|sync all|write Z file text  drives X/Y/Z/A/R/_\n");
@@ -1846,6 +1848,7 @@ static void cmd_help(const char* args)
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
     out_append("  renderfx status|aa|brightness|lsb|vblank|test  user-owned render modes\n");
+    out_append("  fstwt show|sample|clear|test      live .fstwts path translator scripts\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
     out_append("  notes show|add|clear            syncs notes.lardd and GUI notes.txt\n");
@@ -3400,6 +3403,153 @@ static void cmd_vpath(const char* args)
     out_append(target);
     if (!fs_open(target) && !fs_open_writable(target)) out_append(" (not created/installed yet)");
     out_append("\n");
+}
+
+static const char* lsh_trim_rest(const char* p)
+{
+    if (!p) return "";
+    while (*p == ' ' || *p == '\t') p++;
+    return p;
+}
+
+static void cmd_fstwt_status(void)
+{
+    fstwt_info_t info;
+    fstwt_info(&info);
+    out_append("FSTWT ");
+    out_append(info.active ? "active" : "off");
+    out_append(" source=");
+    out_append(info.source);
+    out_append(" rules=");
+    out_append_u32(info.rules);
+    out_append(" bytes=");
+    out_append_u32(info.script_bytes);
+    out_append(" to=");
+    out_append_u32(info.to_hits);
+    out_append(" from=");
+    out_append_u32(info.from_hits);
+    out_append(" miss=");
+    out_append_u32(info.misses);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_fstwt_show(void)
+{
+    const char* script = fstwt_script();
+    uint32_t size = fstwt_script_size();
+    if (!script || size == 0) {
+        out_append("fstwt: no active script.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < size && i < 1600u; i++) out_append_char(script[i]);
+    if (size > 1600u) out_append("\n... truncated ...\n");
+    else if (size == 0 || script[size - 1u] != '\n') out_append("\n");
+}
+
+static void cmd_fstwt_sample(void)
+{
+    out_append("FSTWTS 1\n");
+    out_append("# MAP external-prefix <=> lardos-prefix\n");
+    out_append("MAP app:/save/ <=> appsave_\n");
+    out_append("MAP usb/photos/ <=> usbphoto_\n");
+}
+
+static void cmd_fstwt_use(const char* args)
+{
+    char file_arg[80];
+    char name[80];
+    char drv;
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+        out_append("Usage: fstwt use [drive:]file.fstwts\n");
+        return;
+    }
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    if (lsh_read_drive_data_ex(drv, name, &data, &size, NULL, 1) != 0 || !data || size == 0) {
+        out_append("fstwt: script file not found.\n");
+        return;
+    }
+    if (fstwt_load_script(data, size, name) != 0) {
+        out_append("fstwt: no FSTWTS 1 block found, or script is invalid.\n");
+        return;
+    }
+    out_append("fstwt: loaded ");
+    out_append(name);
+    out_append("\n");
+    cmd_fstwt_status();
+}
+
+static void cmd_fstwt(const char* args)
+{
+    char sub[24];
+    char out[96];
+    const char* rest = args ? args : "";
+    if (vcs_read_word(&rest, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "info")) {
+        cmd_fstwt_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "show") || ascii_streq_ci(sub, "script")) {
+        cmd_fstwt_show();
+        return;
+    }
+    if (ascii_streq_ci(sub, "guide") || ascii_streq_ci(sub, "help")) {
+        cmd_larddoc("fstwt_guide.lardd", "Usage: fstwt status|show|use|clear|to|from|sample|test");
+        return;
+    }
+    if (ascii_streq_ci(sub, "sample") || ascii_streq_ci(sub, "template")) {
+        cmd_fstwt_sample();
+        return;
+    }
+    if (ascii_streq_ci(sub, "use") || ascii_streq_ci(sub, "load")) {
+        cmd_fstwt_use(rest);
+        return;
+    }
+    if (ascii_streq_ci(sub, "clear") || ascii_streq_ci(sub, "off")) {
+        fstwt_clear();
+        out_append("fstwt: off\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "to") || ascii_streq_ci(sub, "lard") || ascii_streq_ci(sub, "resolve")) {
+        const char* path = lsh_trim_rest(rest);
+        if (!path[0]) {
+            out_append("Usage: fstwt to friendly/path\n");
+            return;
+        }
+        if (fstwt_translate_to_lard(path, out, sizeof(out)) != 0) {
+            out_append("fstwt: no matching to-LardOS rule.\n");
+            return;
+        }
+        out_append(path);
+        out_append(" -> ");
+        out_append(out);
+        out_append("\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "from") || ascii_streq_ci(sub, "external") || ascii_streq_ci(sub, "back")) {
+        const char* path = lsh_trim_rest(rest);
+        if (!path[0]) {
+            out_append("Usage: fstwt from lard_filename\n");
+            return;
+        }
+        if (fstwt_translate_from_lard(path, out, sizeof(out)) != 0) {
+            out_append("fstwt: no matching from-LardOS rule.\n");
+            return;
+        }
+        out_append(path);
+        out_append(" -> ");
+        out_append(out);
+        out_append("\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(fstwt_selftest() == 0 ? "fstwt: selftest OK\n" : "fstwt: selftest failed\n");
+        return;
+    }
+    out_append("Usage: fstwt status|show|use file.fstwts|clear|to path|from file|sample|test\n");
 }
 
 static const char* oslink_type_name(uint8_t type)
@@ -8687,6 +8837,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) lardkit_trace_event("kmodtalk", cmd, 0);
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
     if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
+    if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0) lardkit_trace_event("fs", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
     if (strcmp(cmd, "ltheme") == 0 ||
@@ -8827,6 +8978,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "rxrverify") == 0) { cmd_rxr_op("verify", args); return; }
     if (strcmp(cmd, "rxrchecksum") == 0) { cmd_rxr_op("checksum", args); return; }
     if (strcmp(cmd, "rxrundo") == 0) { cmd_rxr("undo"); return; }
+    if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0) { cmd_fstwt(args); return; }
     if (strcmp(cmd, "vpath") == 0 || strcmp(cmd, "pathmap") == 0) { cmd_vpath(args); return; }
     if (strcmp(cmd, "ren") == 0 || strcmp(cmd, "rename") == 0) { cmd_rename(args); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }

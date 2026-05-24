@@ -45,12 +45,19 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.80.0b-ami/lardos-v1.80.0b-ami.iso`. To publish the whole hardware
+`release/v1.81.0b-ami/lardos-v1.81.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.81.0b` adds FSTWT, the File System Two Way Translator. A `.fstwts` script or
+an embedded `FSTWTS 1` block in another file can map a friendly filesystem
+namespace both ways with `MAP external-prefix <=> lardos-prefix`. Use
+`fstwt use file.fstwts`, `fstwt to path`, and `fstwt from file` to inspect and
+control it. FSTWT runs before RXR/vpath fallback, so existing path behavior stays
+available when no rule matches.
 
 `v1.80.0b` adds RenderFX as an optional beta display-control layer. The default
 is still no anti-aliasing for the sharp LardOS look. Users can choose
@@ -155,6 +162,9 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
 - `RXR` (`.rxr`) stores an app bundle: one RXE/SYSRXE executable plus required
   files. LardOS exposes installed bundle files through the OS path namespace
   `rxr/name`.
+- `FSTWTS` (`.fstwts`) stores two-way filesystem translation rules. Executables,
+  bundles, media files, and RAM files can also carry an embedded `FSTWTS 1`
+  block for the `fstwt` module to load.
 - `MDFS` stores files for the MediaFS device stores behind `Y:`/`F:`,
   `Z:`/`S:`, and `A:`/`U:`.
 - `_:` is not a separate disk. It is a merged top-level drive view over
@@ -243,6 +253,12 @@ commands:
 - `vpath path` / `pathmap path` shows how `folder/inside/path` will be resolved
   by the OS filesystem namespace. Quote paths with spaces, for example
   `vpath "Final Final Release/final fix"`.
+- `fstwt status|show|use file.fstwts|to path|from file|clear|sample|test`
+  controls live FSTWT scripts. FSTWT can load from `X:`, `R:`, media drives,
+  `_:` merged storage, RXR-style paths, or any file carrying an embedded script
+  block.
+- `v1.81.0b` adds FSTWT as a beta filesystem translator layer without removing
+  RXR, virtual paths, media stores, or the merged `_:` drive behavior.
 - `v1.80.0b` adds the optional RenderFX beta bundle: four AA modes, improved
   multiplicative brightness, ScreenRAM LSB storage, and VBlank-style render sync.
 - `v1.79.1p` fixes generated `.ssav` headers so screensaver frame data begins

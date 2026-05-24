@@ -1,4 +1,5 @@
 #include "fs.h"
+#include "fstwt.h"
 #include "lfs.h"
 #include "rxr.h"
 #include "storage.h"
@@ -197,6 +198,15 @@ static const uint8_t userlaw_init[] =
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
 static FsWritableFile ram_userlaw = { "userlaw.lardd", ram_userlaw_buf, 0, USERLAW_CAP };
 
+#define FSTWTS_CAP 2048u
+static const uint8_t fstwts_init[] =
+    "FSTWTS 1\n"
+    "# File System Two Way Translator script.\n"
+    "# MAP your/friendly/path/ <=> flat_lardos_prefix_\n"
+    "MAP fstwt/demo/ <=> f2wdemo_\n";
+static uint8_t ram_fstwts_buf[FSTWTS_CAP];
+static FsWritableFile ram_fstwts = { "fstwt.fstwts", ram_fstwts_buf, 0, FSTWTS_CAP };
+
 #define GLYPHMAP_CAP 16384u
 static const uint8_t glyphmap_init[] =
     "LARDD 1\n"
@@ -329,6 +339,7 @@ static const uint8_t file_lardos_lars[] =
     "p LGUILIB files are native GUI library records that theme the overlay without external libraries.\n"
     "p The Doc tab can switch HTTP requests between GET, POST, and HEAD; POST reads the address as URL|body.\n"
     "link Web Stack Guide | webstack_guide.lardd\n"
+    "link FSTWT Guide | fstwt_guide.lardd\n"
     "link Web Demo LARS | webdemo.lars\n"
     "fetch Example HEAD target | https://example.com/\n"
     "section Full-control starts\n"
@@ -342,6 +353,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use restart or reboot to sync RAM files and request a firmware/VM restart.\n"
     "li Use install status for the HDD/SSD installer preview, or install hdd yes / install ssd yes to write LardOS to the ATA target disk.\n"
     "li Use media list, media format Z, dir Z:, type Z:note.txt, and dir _: for merged storage.\n"
+    "li Use fstwt status, fstwt use file.fstwts, fstwt to path, and fstwt from file to translate file-system names both ways.\n"
     "li Run mode probe to enter a controlled real16 window and return to long64.\n"
     "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
@@ -442,6 +454,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.81.0b adds FSTWT live two-way filesystem translation scripts before RXR/vpath fallback.\n"
     "li v1.80.0b adds RenderFX beta display modes: no-AA default, antianti/basic/nonlinear AA, multiplicative brightness, ScreenRAM LSB, and VBlank sync.\n"
     "li v1.79.1p hotpatches the SSAV generator so frame data begins at the documented 0x10 offset.\n"
     "li v1.79.0a adds high-memory boot staging: low memory is only a bounce buffer and the full boot image lives at 0x01000000.\n"
@@ -816,6 +829,36 @@ static const uint8_t file_webdemo_lars[] =
     "input query lardos\n"
     "end\n";
 
+static const uint8_t file_default_fstwts[] =
+    "FSTWTS 1\n"
+    "# File System Two Way Translator default map.\n"
+    "# MAP external-prefix <=> lardos-prefix\n"
+    "MAP fstwt/demo/ <=> f2wdemo_\n";
+
+static const uint8_t file_fstwt_guide[] =
+    "LARDD 1\n"
+    "TITLE FSTWT File System Two Way Translator\n"
+    "TEXT FSTWT lets a file, RXR bundle, media drive, or user script carry path metadata that maps a friendly filesystem view to LardOS flat file names and back again.\n"
+    "TEXT It is a translator layer, not a replacement for RXR, vpath, mediafs, or the merged _ drive. If no rule matches, the old path behavior continues.\n"
+    "SECTION Script\n"
+    "ITEM FSTWTS 1\n"
+    "ITEM MAP external-prefix <=> lardos-prefix\n"
+    "ITEM Example: MAP app:/save/ <=> appsave_\n"
+    "ITEM Calling app:/save/Slot 1.lardd writes or opens appsave_slot_1.lardd.\n"
+    "ITEM Calling fstwt from appsave_slot_1.lardd shows app:/save/slot_1.lardd.\n"
+    "SECTION Commands\n"
+    "ITEM fstwt status - show active script, rule count, hits, and source.\n"
+    "ITEM fstwt show - print the live script currently used by the module.\n"
+    "ITEM fstwt use file.fstwts - load a script from X:, R:, Y:, Z:, A:, _:, or RXR-style paths.\n"
+    "ITEM fstwt clear - disable translation until another script is loaded.\n"
+    "ITEM fstwt to friendly/path - preview friendly namespace to LardOS filename.\n"
+    "ITEM fstwt from lard_filename - preview LardOS filename to friendly namespace.\n"
+    "ITEM fstwt sample - print a small starter script.\n"
+    "SECTION Ownership\n"
+    "ITEM fstwt.fstwts is writable so the user can edit the active mapping policy.\n"
+    "ITEM default.fstwts is read-only reference material and can be loaded again if the user wants the default.\n"
+    "END\n";
+
 static const uint8_t file_features_lil[] =
     "; LIL feature tour: assert, condition helpers, repeat, stepped for, and math helpers\n"
     "(begin\n"
@@ -1183,6 +1226,10 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command webstack\n"
     "CHECK file webstack_guide.lardd\n"
     "CHECK file webdemo.lars\n"
+    "CHECK file fstwt_guide.lardd\n"
+    "CHECK file default.fstwts\n"
+    "CHECK writable fstwt.fstwts\n"
+    "CHECK command fstwt\n"
     "CHECK command restore\n"
     "CHECK command tomb\n"
     "CHECK command tombstone\n"
@@ -1314,6 +1361,8 @@ static const FsFile FS_FILES[] = {
     { "media_guide.lardd", file_media_guide, sizeof(file_media_guide) - 1 },
     { "webstack_guide.lardd", file_webstack_guide, sizeof(file_webstack_guide) - 1 },
     { "webdemo.lars", file_webdemo_lars, sizeof(file_webdemo_lars) - 1 },
+    { "fstwt_guide.lardd", file_fstwt_guide, sizeof(file_fstwt_guide) - 1 },
+    { "default.fstwts", file_default_fstwts, sizeof(file_default_fstwts) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
     { "sample.lpack",  file_sample_lpack,  sizeof(file_sample_lpack) - 1 },
@@ -1509,6 +1558,7 @@ int fs_resolve_os_path(const char* path, char* out, uint32_t cap)
 {
     if (!out || cap == 0) return -1;
     out[0] = '\0';
+    if (fstwt_translate_to_lard(path, out, cap) == 0) return 0;
     if (rxr_resolve_path(path, out, cap) == 0) return 0;
     return fs_flatten_os_path(path, out, cap);
 }
@@ -1896,7 +1946,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 31u;
+    return 32u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -1932,6 +1982,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 28) return &ram_rxrslot1;
     if (idx == 29) return &ram_rxrslot2;
     if (idx == 30) return &ram_rxrslot3;
+    if (idx == 31) return &ram_fstwts;
     return NULL;
 }
 
@@ -1998,6 +2049,10 @@ void fs_init(void)
         ram_userlaw_buf[i] = userlaw_init[i];
     }
     ram_userlaw.size = sizeof(userlaw_init) - 1;
+    for (uint32_t i = 0; i < sizeof(fstwts_init) - 1 && i < FSTWTS_CAP; i++) {
+        ram_fstwts_buf[i] = fstwts_init[i];
+    }
+    ram_fstwts.size = sizeof(fstwts_init) - 1;
     for (uint32_t i = 0; i < sizeof(glyphmap_init) - 1 && i < GLYPHMAP_CAP; i++) {
         ram_glyphmap_buf[i] = glyphmap_init[i];
     }
@@ -2027,6 +2082,7 @@ void fs_init(void)
     ram_user3_kmo.size = 0;
     lfs_mount(lfs_volume, sizeof(lfs_volume));
     (void)fs_persist_load();
+    if (fstwt_load_script(ram_fstwts.data, ram_fstwts.size, "fstwt.fstwts") != 0) fstwt_init();
     fs_apply_delete_log();
 }
 

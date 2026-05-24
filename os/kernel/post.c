@@ -6,6 +6,7 @@
 #include "cpumode.h"
 #include "crashlog.h"
 #include "fs.h"
+#include "fstwt.h"
 #include "gui.h"
 #include "img_glyph.h"
 #include "installer.h"
@@ -136,6 +137,8 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: media guide", fs_open("media_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: webstack guide", fs_open("webstack_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: webdemo lars", fs_open("webdemo.lars") != NULL, emit, user, &pass, &fail);
+    post_check("fs: fstwt guide", fs_open("fstwt_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: default fstwt", fs_open("default.fstwts") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreport writable", fs_open_writable("bugreport.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreplay writable", fs_open_writable("bugreplay.lardd") != NULL, emit, user, &pass, &fail);
@@ -154,9 +157,10 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user kmo writable", fs_open_writable("user0.kmo") != NULL, emit, user, &pass, &fail);
+    post_check("fs: fstwt writable", fs_open_writable("fstwt.fstwts") != NULL, emit, user, &pass, &fail);
     post_check("fs: hard delete overlay ownership", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
-    post_check("fs: writable directory index", fs_writable_count() >= 31u, emit, user, &pass, &fail);
+    post_check("fs: writable directory index", fs_writable_count() >= 32u, emit, user, &pass, &fail);
     post_check("mediafs: native device stores", mediafs_selftest() == 0, emit, user, &pass, &fail);
     post_check("mediafs: floppy drive", mediafs_drive_supported('Y'), emit, user, &pass, &fail);
     post_check("mediafs: auxiliary drive", mediafs_drive_supported('Z'), emit, user, &pass, &fail);
@@ -174,6 +178,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: app bundle parser", rxr_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: bundle-internal paths", rxr_path_selftest() == 0, emit, user, &pass, &fail);
+    post_check("fstwt: two-way translator", fstwt_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: virtual path namespace", fs_path_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: rxr namespace open", fs_open("rxr/notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);

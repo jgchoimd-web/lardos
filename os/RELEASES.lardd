@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.83.1b
+ITEM Extends bleed with an explicit overflow-style wipe option for stubborn broken files.
+ITEM bleed overflow file performs a bounded in-slot overwrite pass on writable RAM files and media files before deletion, rather than an uncontrolled out-of-bounds memory corruption.
+ITEM bleed dryrun overflow file shows the extra wipe routes without changing bytes.
+ITEM Keeps the user-owned dangerous path visible, Magic raw-control gating intact, and all v1.83.0b delete routes available.
+ITEM Ships as beta because this is deliberately destructive deletion behavior.
+
 SECTION v1.83.0b
 ITEM Adds bleed, a last-resort force-delete command for broken files.
 ITEM bleed file visibly sweeps writable RAM, read-only hard-delete overlay records, and media stores instead of stopping at the first failed deletion path.

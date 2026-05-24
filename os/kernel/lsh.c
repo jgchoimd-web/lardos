@@ -1834,7 +1834,7 @@ static void cmd_help(const char* args)
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
     out_append("  kmo list|create|command|raw|set|delete|show|run  .kmo kernel modules and file-defined shell commands\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
-    out_append("  bleed [dryrun] [drive:]file       force-delete a broken file across RAM, read-only, and media paths\n");
+    out_append("  bleed [dryrun] [overflow] [drive:]file  force-delete broken files; overflow wipes slots first\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
     out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
@@ -1903,6 +1903,7 @@ static void cmd_control(const char* args)
     out_append("  tomb list           inspect active user-owned read-only deletion records\n");
     out_append("  bleed dryrun file   preview the strongest delete sweep before using bleed file\n");
     out_append("  bleed file          force-delete broken files across RAM, read-only, and media stores\n");
+    out_append("  bleed overflow file bounded overflow-style wipe, then delete broken files\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  magic -f bye        force an explicit raw-control prediction\n");
     out_append("  magic -f byebye     force the friendlier poweroff alias explicitly\n");
@@ -7205,10 +7206,24 @@ static void bleed_emit_route(const char* label, int ok)
     out_append(ok ? ": deleted\n" : ": no match\n");
 }
 
-static int bleed_delete_ram(const char* name)
+static void bleed_overflow_wipe_ram(FsWritableFile* w)
+{
+    if (!w || !w->data || !w->cap) return;
+    for (uint32_t pass = 0; pass < 3u; pass++) {
+        for (uint32_t i = 0; i < w->cap; i++) {
+            uint8_t v = (pass == 0u) ? 0xFFu : (pass == 1u ? 0x00u : (uint8_t)(0xA5u ^ (uint8_t)i));
+            w->data[i] = v;
+        }
+    }
+    w->size = w->cap;
+    fs_mark_dirty();
+}
+
+static int bleed_delete_ram(const char* name, int overflow)
 {
     FsWritableFile* w = fs_open_writable(name);
     if (!w) return 0;
+    if (overflow) bleed_overflow_wipe_ram(w);
     (void)fs_write(w, 0, (const uint8_t*)"", 0);
     return 1;
 }
@@ -7218,26 +7233,41 @@ static int bleed_delete_readonly(const char* name)
     return fs_delete_readonly(name) >= 0 ? 1 : 0;
 }
 
-static int bleed_delete_media(char drive, const char* name)
+static void bleed_fill_pattern(uint8_t* out, uint32_t size)
 {
+    if (!out) return;
+    for (uint32_t i = 0; i < size; i++) out[i] = (uint8_t)(0xA5u ^ (uint8_t)i);
+}
+
+static int bleed_delete_media(char drive, const char* name, int overflow)
+{
+    if (overflow) {
+        static uint8_t wipe[2048];
+        const uint8_t* old_data = NULL;
+        uint32_t old_size = 0;
+        if (mediafs_read(drive, name, &old_data, &old_size) == 0 && old_size > 0u) {
+            bleed_fill_pattern(wipe, sizeof(wipe));
+            (void)mediafs_write(drive, name, wipe, sizeof(wipe), 0);
+        }
+    }
     return mediafs_delete(drive, name) == 0 ? 1 : 0;
 }
 
-static void bleed_show_routes(int merged_or_any, char drv)
+static void bleed_show_routes(int merged_or_any, char drv, int overflow)
 {
     int fs = drive_to_fs(drv);
     if (merged_or_any) {
-        out_append("  R: writable RAM clear\n");
+        out_append(overflow ? "  R: bounded overflow-style RAM wipe, then clear\n" : "  R: writable RAM clear\n");
         out_append("  X: read-only hard-delete record in fsdelete.lardd\n");
-        out_append("  Y:/Z:/A: media store delete\n");
+        out_append(overflow ? "  Y:/Z:/A: media overwrite pass, then delete\n" : "  Y:/Z:/A: media store delete\n");
         return;
     }
     if (fs == 2) {
-        out_append("  selected media store delete\n");
+        out_append(overflow ? "  selected media overwrite pass, then delete\n" : "  selected media store delete\n");
     } else if (fs == 1) {
-        out_append("  R: writable RAM clear\n");
+        out_append(overflow ? "  R: bounded overflow-style RAM wipe, then clear\n" : "  R: writable RAM clear\n");
     } else if (fs == 0) {
-        out_append("  writable RAM overlay clear\n");
+        out_append(overflow ? "  writable RAM overlay bounded overflow-style wipe, then clear\n" : "  writable RAM overlay clear\n");
         out_append("  read-only hard-delete record in fsdelete.lardd\n");
     } else {
         out_append("  invalid drive\n");
@@ -7253,6 +7283,7 @@ static void cmd_bleed(const char* args)
     char drv;
     char name[64];
     int dryrun = 0;
+    int overflow = 0;
     int explicit_drive = 0;
     int merged_or_any;
     int fs;
@@ -7261,37 +7292,40 @@ static void cmd_bleed(const char* args)
     int r;
 
     while (*p == ' ' || *p == '\t') p++;
-    if (vcs_read_word(&p, first, sizeof(first)) != 0) {
-        out_append("Usage: bleed [dryrun|-f] [drive:]file\n");
-        return;
-    }
-    if (ascii_streq_ci(first, "dryrun") || ascii_streq_ci(first, "preview") ||
-        ascii_streq_ci(first, "test")) {
-        dryrun = 1;
-        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
-            out_append("Usage: bleed dryrun [drive:]file\n");
-            return;
+    file_arg[0] = '\0';
+    while (vcs_read_word(&p, first, sizeof(first)) == 0) {
+        if (ascii_streq_ci(first, "dryrun") || ascii_streq_ci(first, "preview") ||
+            ascii_streq_ci(first, "test")) {
+            dryrun = 1;
+            continue;
         }
-    } else if (ascii_streq_ci(first, "-f") || ascii_streq_ci(first, "/f") ||
-               ascii_streq_ci(first, "--force") || ascii_streq_ci(first, "force") ||
-               ascii_streq_ci(first, "yes") || ascii_streq_ci(first, "confirm")) {
-        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
-            out_append("Usage: bleed -f [drive:]file\n");
-            return;
+        if (ascii_streq_ci(first, "overflow") || ascii_streq_ci(first, "over") ||
+            ascii_streq_ci(first, "flood") || ascii_streq_ci(first, "nuke")) {
+            overflow = 1;
+            continue;
         }
-    } else {
+        if (ascii_streq_ci(first, "-f") || ascii_streq_ci(first, "/f") ||
+            ascii_streq_ci(first, "--force") || ascii_streq_ci(first, "force") ||
+            ascii_streq_ci(first, "yes") || ascii_streq_ci(first, "confirm")) {
+            continue;
+        }
         uint32_t i = 0;
         while (first[i] && i + 1u < sizeof(file_arg)) {
             file_arg[i] = first[i];
             i++;
         }
         file_arg[i] = '\0';
+        break;
+    }
+    if (!file_arg[0]) {
+        out_append("Usage: bleed [dryrun|-f] [overflow] [drive:]file\n");
+        return;
     }
 
     explicit_drive = file_arg[0] && file_arg[1] == ':';
     resolve_path(file_arg, &drv, name, sizeof(name));
     if (!name[0]) {
-        out_append("Usage: bleed [dryrun|-f] [drive:]file\n");
+        out_append("Usage: bleed [dryrun|-f] [overflow] [drive:]file\n");
         return;
     }
 
@@ -7299,22 +7333,23 @@ static void cmd_bleed(const char* args)
     merged_or_any = drive_is_merged(drv) || !explicit_drive;
     out_append(dryrun ? "BLEED dryrun: " : "BLEED: ");
     out_append(name);
+    if (overflow) out_append(" [overflow-style wipe]");
     out_append(merged_or_any ? " across _:/R:/X:/Y:/Z:/A:\n" : " on ");
     if (!merged_or_any) {
         out_append_char(drv);
         out_append(":\n");
     }
     if (dryrun) {
-        bleed_show_routes(merged_or_any, drv);
+        bleed_show_routes(merged_or_any, drv, overflow);
         out_append("No bytes changed.\n");
         return;
     }
 
     if (merged_or_any) {
-        r = bleed_delete_ram(name);
+        r = bleed_delete_ram(name, overflow);
         tried++;
         hits += r;
-        bleed_emit_route("R: RAM", r);
+        bleed_emit_route(overflow ? "R: RAM overflow-wipe" : "R: RAM", r);
         r = bleed_delete_readonly(name);
         tried++;
         hits += r;
@@ -7330,26 +7365,26 @@ static void cmd_bleed(const char* args)
             label[6] = 'i';
             label[7] = 'a';
             label[8] = '\0';
-            r = bleed_delete_media(media_drives[i], name);
+            r = bleed_delete_media(media_drives[i], name, overflow);
             tried++;
             hits += r;
             bleed_emit_route(label, r);
         }
     } else if (fs == 2) {
-        r = bleed_delete_media(drv, name);
+        r = bleed_delete_media(drv, name, overflow);
         tried++;
         hits += r;
-        bleed_emit_route("media", r);
+        bleed_emit_route(overflow ? "media overflow-wipe" : "media", r);
     } else if (fs == 1) {
-        r = bleed_delete_ram(name);
+        r = bleed_delete_ram(name, overflow);
         tried++;
         hits += r;
-        bleed_emit_route("R: RAM", r);
+        bleed_emit_route(overflow ? "R: RAM overflow-wipe" : "R: RAM", r);
     } else if (fs == 0) {
-        r = bleed_delete_ram(name);
+        r = bleed_delete_ram(name, overflow);
         tried++;
         hits += r;
-        bleed_emit_route("writable RAM overlay", r);
+        bleed_emit_route(overflow ? "writable RAM overlay overflow-wipe" : "writable RAM overlay", r);
         r = bleed_delete_readonly(name);
         tried++;
         hits += r;

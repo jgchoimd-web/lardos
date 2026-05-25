@@ -3,6 +3,8 @@
 #include "awake.h"
 #include "drfl.h"
 #include "bootprof.h"
+#include "bootinfo.h"
+#include "bootmeta.h"
 #include "cpumode.h"
 #include "crashlog.h"
 #include "fs.h"
@@ -101,8 +103,10 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     gui_post_info_t gui_info;
     int gui_ok;
     pci_addr_t pci_addr;
+    bootmeta_info_t bootmeta;
 
     lardkit_post_baseline_begin();
+    bootmeta_info(&bootmeta);
     fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
     fs_persist_detail(NULL, &generation, &bank_sectors);
     gui_ok = (gui_post_check(&gui_info) == 0);
@@ -110,6 +114,11 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("cpu: 64-bit long mode", sizeof(void*) == 8, emit, user, &pass, &fail);
     post_check("cpu: mode bridge ready", cpu_mode_bridge_ready(), emit, user, &pass, &fail);
     post_check("cpu: real/long roundtrip", cpu_mode_roundtrip_probe() == 0, emit, user, &pass, &fail);
+    post_check("boot: loader metadata", bootmeta_selftest() == 0, emit, user, &pass, &fail);
+    post_check("boot: kernel capacity headroom", bootmeta.kernel_capacity_bytes > bootmeta.kernel_file_size &&
+               bootmeta.headroom_bytes >= 128u * 1024u, emit, user, &pass, &fail);
+    post_check("boot: resizable image layout", (bootmeta.flags & BOOTINFO_FLAG_RESIZABLE_IMG) != 0 &&
+               bootmeta.boot_image_sectors >= BOOTINFO_DEFAULT_IMAGE_SECTORS, emit, user, &pass, &fail);
     post_check("mem: heap allocator pattern", post_heap_pattern(), emit, user, &pass, &fail);
     post_check("mem: heap free counter", mem_bytes_free() > 1024u * 1024u, emit, user, &pass, &fail);
 

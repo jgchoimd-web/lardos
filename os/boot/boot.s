@@ -7,6 +7,18 @@ ORG 0x0600
 %ifndef KERNEL_LBA
 %define KERNEL_LBA 9
 %endif
+%ifndef STAGE2_SECTORS
+%define STAGE2_SECTORS 8
+%endif
+%ifndef BOOT_IMAGE_SECTORS
+%define BOOT_IMAGE_SECTORS 2880
+%endif
+%ifndef BOOT_PERSIST_START_SECTOR
+%define BOOT_PERSIST_START_SECTOR 2752
+%endif
+%ifndef BOOT_PERSIST_SECTORS
+%define BOOT_PERSIST_SECTORS 128
+%endif
 %ifndef KERNEL_LOAD_SEG
 %define KERNEL_LOAD_SEG 0x0200
 %endif
@@ -15,6 +27,12 @@ ORG 0x0600
 %define BOOT_REAL_STACK 0x1F00
 %define BOOT_PM_STACK   0x1F00
 %define BOOT_CHUNK_SECTORS 32
+%define BOOT_KERNEL_CAPACITY_BYTES ((BOOT_PERSIST_START_SECTOR - KERNEL_LBA) * 512)
+%define BOOTINFO_MAGIC 0x464E4942
+%define BOOTINFO_VERSION 2
+%define BOOTINFO_FLAG_HIGH_COPY 0x00000001
+%define BOOTINFO_FLAG_LOADER_META 0x00000002
+%define BOOTINFO_FLAG_RESIZABLE_IMG 0x00000004
 
 start:
     ; Optional handoff for raw-written hybrid ISO boots.
@@ -162,6 +180,7 @@ start:
     sub si, cx
     jnz .read_loop
 .done_load:
+    call bootinfo_write_loader
 
     call enable_a20
 
@@ -707,8 +726,14 @@ vbe_try_enable:
     ; Clear bootinfo area (first 64 bytes)
     xor di, di
     xor ax, ax
-    mov cx, 32
+    mov cx, 48
     rep stosw
+
+    ; Fill the stable bootinfo header even if VBE is unavailable. A zero
+    ; framebuffer keeps the kernel on the fallback renderer, while loader
+    ; metadata remains visible to POST/status.
+    mov dword [es:BOOTINFO_OFF + 0], BOOTINFO_MAGIC
+    mov word  [es:BOOTINFO_OFF + 4], BOOTINFO_VERSION
 
     ; Query VBE mode info for 1024x768x32 (0x118)
     mov ax, 0x4F01
@@ -724,11 +749,6 @@ vbe_try_enable:
     int 0x10
     cmp ax, 0x004F
     jne .fail
-
-    ; Fill bootinfo (version 1)
-    ; magic = 'BINF'
-    mov dword [es:BOOTINFO_OFF + 0], 0x464E4942
-    mov word  [es:BOOTINFO_OFF + 4], 1
 
     ; VBE: pitch +16, xres +18, yres +20, bpp +25, physbase +40.
     ; bootinfo_t: fb_addr +8, width +12, height +14, pitch +16, bpp +18.
@@ -746,9 +766,36 @@ vbe_try_enable:
     jmp .ok
 
 .fail:
-    ; Leave bootinfo magic = 0 (kernel will fall back to text mode)
+    ; Leave framebuffer fields zero (kernel will fall back to text mode)
 .ok:
     pop es
     pop ds
+    popa
+    ret
+
+bootinfo_write_loader:
+    pusha
+    push es
+
+    mov ax, BOOTINFO_SEG
+    mov es, ax
+    mov dword [es:BOOTINFO_OFF + 0], BOOTINFO_MAGIC
+    mov word  [es:BOOTINFO_OFF + 4], BOOTINFO_VERSION
+    mov dword [es:BOOTINFO_OFF + 24], BOOT_IMAGE_COPY_PADDR
+    mov eax, [kernel_file_size]
+    mov dword [es:BOOTINFO_OFF + 28], eax
+    movzx eax, word [total_sectors]
+    mov dword [es:BOOTINFO_OFF + 32], eax
+    mov eax, [kernel_lba_base]
+    mov dword [es:BOOTINFO_OFF + 36], eax
+    mov dword [es:BOOTINFO_OFF + 40], BOOT_CHUNK_SECTORS
+    mov dword [es:BOOTINFO_OFF + 44], BOOT_IMAGE_SECTORS
+    mov dword [es:BOOTINFO_OFF + 48], BOOT_PERSIST_START_SECTOR
+    mov dword [es:BOOTINFO_OFF + 52], BOOT_PERSIST_SECTORS
+    mov dword [es:BOOTINFO_OFF + 56], BOOT_KERNEL_CAPACITY_BYTES
+    mov dword [es:BOOTINFO_OFF + 60], BOOTINFO_FLAG_HIGH_COPY | BOOTINFO_FLAG_LOADER_META | BOOTINFO_FLAG_RESIZABLE_IMG
+    mov dword [es:BOOTINFO_OFF + 64], STAGE2_SECTORS
+
+    pop es
     popa
     ret

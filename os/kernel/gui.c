@@ -343,7 +343,7 @@ static const char* gui_http_method_label(void)
 static int fb_from_bootinfo(fb_t* out)
 {
     const bootinfo_t* bi = (const bootinfo_t*)(uintptr_t)BOOTINFO_PADDR;
-    if (bi->magic != 0x464E4942u || bi->version != 1) {
+    if (bi->magic != BOOTINFO_MAGIC || bi->version < 1u) {
         return -1;
     }
     if ((bi->fb_bpp != 24 && bi->fb_bpp != 32) || bi->fb_addr_lo == 0) {

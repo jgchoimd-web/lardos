@@ -1,5 +1,6 @@
 #include "lardkit.h"
 
+#include "bootmeta.h"
 #include "bootprof.h"
 #include "fs.h"
 #include "gui.h"
@@ -77,6 +78,9 @@ static const theme_state_t s_themes[] = {
 static const char* const s_bootmap[] = {
     "bios handoff",
     "stage1/stage2 load",
+    "stage2 records boot capacity metadata",
+    "low bounce buffer",
+    "high boot-image copy",
     "protected32 bridge",
     "long64 kernel entry",
     "heap and fs",
@@ -986,6 +990,9 @@ int lardkit_bootreplay_write(void)
     static const char* const detail[] = {
         "BIOS loads stage1 and LardOS begins its own path",
         "stage1 loads stage2 and locates the kernel payload",
+        "stage2 records the kernel size, boot image capacity, and free headroom",
+        "the low buffer is only a bounce window for BIOS reads",
+        "the full kernel payload is preserved at high memory before segment loading",
         "protected32 is used as a small bridge, not as the final home",
         "long64 entry takes over and the C kernel becomes the owner",
         "memory, filesystem, LPST, and crashlog are made visible",
@@ -993,9 +1000,11 @@ int lardkit_bootreplay_write(void)
         "LSH, GUI, LARS, LARDD, and user-control surfaces come online",
         "drivers, languages, network, OSLink, and background work settle",
     };
+    bootmeta_info_t bm;
     FsWritableFile* w = fs_open_writable("bootreplay.lardd");
     static const char header[] = "LARDD 1\nTITLE Boot Replay\nSECTION Timeline\n";
     if (!w) return -1;
+    bootmeta_info(&bm);
     w->size = 0;
     if (fs_write(w, 0, (const uint8_t*)header, sizeof(header) - 1u) != sizeof(header) - 1u) return -2;
     for (uint32_t i = 0; i < sizeof(detail) / sizeof(detail[0]); i++) {
@@ -1005,6 +1014,17 @@ int lardkit_bootreplay_write(void)
         report_append(w, detail[i]);
         report_append(w, "\n");
     }
+    report_append(w, "SECTION Boot Capacity\nITEM kernel_bytes ");
+    report_append_u32(w, bm.kernel_file_size);
+    report_append(w, "\nITEM capacity_bytes ");
+    report_append_u32(w, bm.kernel_capacity_bytes);
+    report_append(w, "\nITEM free_bytes ");
+    report_append_u32(w, bm.headroom_bytes);
+    report_append(w, "\nITEM high_copy_paddr ");
+    report_append_u32(w, bm.high_copy_paddr);
+    report_append(w, "\nITEM loader_flags ");
+    report_append_u32(w, bm.flags);
+    report_append(w, "\n");
     report_append(w, "END\n");
     lardkit_journal_event("bootreplay", "timeline captured");
     return 0;

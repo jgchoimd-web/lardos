@@ -35,6 +35,7 @@
 #include "taskprio.h"
 #include "awake.h"
 #include "bootprof.h"
+#include "bootmeta.h"
 #include "crashlog.h"
 #include "installer.h"
 #include "mediafs.h"
@@ -2226,6 +2227,26 @@ static void cmd_status(const char* args)
     out_append(mode.last_roundtrip_ok ? "ok" : "none");
     out_append("\n");
 
+    bootmeta_info_t bm;
+    bootmeta_info(&bm);
+    out_append("BootLoad: ");
+    out_append(bm.present ? "stage2-meta" : "fallback-meta");
+    out_append(", kernel=");
+    out_append_u32(bm.kernel_file_size);
+    out_append("/");
+    out_append_u32(bm.kernel_capacity_bytes);
+    out_append(" bytes, free=");
+    out_append_u32(bm.headroom_bytes);
+    out_append(" (");
+    out_append_u32(bm.headroom_percent);
+    out_append("%), sectors=");
+    out_append_u32(bm.kernel_total_sectors);
+    out_append(", chunk=");
+    out_append_u32(bm.boot_chunk_sectors);
+    out_append(", high=");
+    out_append_hex32(bm.high_copy_paddr);
+    out_append("\n");
+
     gui_screenram_info_t sram;
     gui_screenram_info(&sram);
     out_append("ScreenRAM: ");
@@ -4144,19 +4165,27 @@ static void cmd_bootmap(const char* args)
     (void)args;
     bootprof_info_t bp;
     awake_info_t aw;
+    bootmeta_info_t bm;
     bootprof_info(&bp);
     awake_info(&aw);
+    bootmeta_info(&bm);
     out_append("BootMap profile=");
     out_append(bp.name);
     out_append(" awake=");
     out_append(aw.enabled ? aw.current : "off");
+    out_append(" kernel=");
+    out_append_u32(bm.kernel_file_size);
+    out_append("/");
+    out_append_u32(bm.kernel_capacity_bytes);
+    out_append(" free=");
+    out_append_u32(bm.headroom_bytes);
     out_append("\n");
     for (uint32_t i = 0; i < lardkit_bootmap_count(); i++) {
         out_append("  ");
         out_append_u32(i);
         out_append(" ");
         out_append(lardkit_bootmap_phase(i));
-        if (aw.enabled && i == 8u + aw.phase) out_append("  <- background");
+        if (aw.enabled && i == 11u + aw.phase) out_append("  <- background");
         out_append("\n");
     }
 }

@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.85.0b-ami/lardos-v1.85.0b-ami.iso`. To publish the whole hardware
+`release/v1.86.0b-ami/lardos-v1.86.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.86.0b` prepares the bootloader/staging path for future growth. Stage2 now
+records bootinfo v2 metadata for kernel size, sector count, high-memory copy
+address, image capacity, persistent-store placement, and remaining headroom.
+`status`, `post`, `bootmap`, and `bootreplay` expose that margin, while `mkimg`
+can take layout parameters from Makefile variables for later larger boot media.
 
 `v1.85.0b` adds APPKIT responsive UI layout for RXE/SYSRXE apps. Apps can use
 `LAYOUT responsive` or runtime `APPKIT LAYOUT responsive` so controls wrap
@@ -299,6 +305,10 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.86.0b` adds bootmeta growth readiness: stage2 exposes kernel size,
+  capacity, high-copy address, and free boot headroom through `status`, `post`,
+  `bootmap`, and `bootreplay`, while `mkimg` layout parameters are now
+  configurable for future larger boot profiles.
 - `v1.85.0b` adds APPKIT responsive layout for file-owned RXE/SYSRXE apps:
   `LAYOUT responsive` and `APPKIT LAYOUT responsive` keep controls from
   overlapping while preserving app-authored code and widgets.

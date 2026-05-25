@@ -24,13 +24,13 @@ SEEDC     := $(HOST_TOOL_DIR)/seedc
 LIL       := $(HOST_TOOL_DIR)/lil
 BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
-RELEASE_BASE_VERSION := v1.85.0b
+RELEASE_BASE_VERSION := v1.86.0b
 RELEASE_HW ?= universal
 RELEASE_HW_LIST := universal seabios ami vbox usb realpc
 RELEASE_HW_UPPER := $(shell printf '%s' '$(RELEASE_HW)' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
 RELEASE_VERSION := $(if $(filter universal,$(RELEASE_HW)),$(RELEASE_BASE_VERSION),$(RELEASE_BASE_VERSION)-$(RELEASE_HW))
 RELEASE_NAME := lardos-$(RELEASE_VERSION)
-ISO_VOLUME_BASE := LARDOS_V1_85_0B
+ISO_VOLUME_BASE := LARDOS_V1_86_0B
 ISO_VOLUME_ID := $(if $(filter universal,$(RELEASE_HW)),$(ISO_VOLUME_BASE),$(ISO_VOLUME_BASE)_$(RELEASE_HW_UPPER))
 RELEASE_DIR := release/$(RELEASE_VERSION)
 ISO_BOOTIMG_SECTOR := 23
@@ -52,6 +52,11 @@ BOOT_STAGE2_INC := $(KERNEL_DIR)/boot_stage2.inc
 
 STAGE2_SECTORS := 8
 KERNEL_LBA := 9
+BOOT_IMAGE_SECTORS ?= 2880
+BOOT_PERSIST_START_SECTOR ?= 2752
+BOOT_PERSIST_SECTORS ?= 128
+BOOT_META_DEFS := -D STAGE2_SECTORS=$(STAGE2_SECTORS) -D BOOT_IMAGE_SECTORS=$(BOOT_IMAGE_SECTORS) -D BOOT_PERSIST_START_SECTOR=$(BOOT_PERSIST_START_SECTOR) -D BOOT_PERSIST_SECTORS=$(BOOT_PERSIST_SECTORS)
+MKIMG_LAYOUT_ARGS := --sectors $(BOOT_IMAGE_SECTORS) --persist-start $(BOOT_PERSIST_START_SECTOR) --persist-sectors $(BOOT_PERSIST_SECTORS)
 BOOT_BIN  := $(BOOT_DIR)/stage1.bin
 BOOT_ISO_BIN := $(BOOT_DIR)/stage1_iso.bin
 STAGE2_BIN:= $(BOOT_DIR)/stage2.bin
@@ -78,19 +83,19 @@ LDFLAGS   := -T linker.ld -nostdlib -m elf_x86_64
 all: $(RAW_IMAGE)
 
 $(BOOT_BIN): $(BOOT_DIR)/stage1.s
-	$(NASM) -f bin -D STAGE2_SECTORS=$(STAGE2_SECTORS) $< -o $@
+	$(NASM) -f bin $(BOOT_META_DEFS) $< -o $@
 
 $(BOOT_ISO_BIN): $(BOOT_DIR)/stage1.s
-	$(NASM) -f bin -D STAGE2_SECTORS=$(STAGE2_SECTORS) -D ISO_ELTORITO=1 -D ISO_KERNEL_LBA=$(ISO_KERNEL_LBA) $< -o $@
+	$(NASM) -f bin $(BOOT_META_DEFS) -D ISO_ELTORITO=1 -D ISO_KERNEL_LBA=$(ISO_KERNEL_LBA) $< -o $@
 
 $(STAGE2_BIN): $(BOOT_DIR)/boot.s
-	$(NASM) -f bin -D KERNEL_LBA=$(KERNEL_LBA) $< -o $@
+	$(NASM) -f bin -D KERNEL_LBA=$(KERNEL_LBA) $(BOOT_META_DEFS) $< -o $@
 	@test $$(wc -c < $@) -le $$(($(STAGE2_SECTORS) * 512))
 
 $(ISO_MBR_BIN): $(BOOT_DIR)/iso_mbr.s
 	$(NASM) -f bin -D ISO_STAGE2_LBA=$(ISO_STAGE2_LBA) -D ISO_KERNEL_LBA=$(ISO_KERNEL_LBA) -D STAGE2_SECTORS=$(STAGE2_SECTORS) $< -o $@
 
-$(KERNEL_ELF): $(KERNEL_DIR)/entry64.o $(KERNEL_DIR)/isr64.o $(KERNEL_DIR)/kernel64.o $(KERNEL_DIR)/smp.o $(KERNEL_DIR)/ap_trampoline.o $(KERNEL_DIR)/aux_kernel.o $(KERNEL_DIR)/pci.o $(KERNEL_DIR)/rtl8139.o $(KERNEL_DIR)/net.o $(KERNEL_DIR)/oslink.o $(KERNEL_DIR)/taskprio.o $(KERNEL_DIR)/awake.o $(KERNEL_DIR)/bootprof.o $(KERNEL_DIR)/crashlog.o $(KERNEL_DIR)/lpack.o $(KERNEL_DIR)/rxr.o $(KERNEL_DIR)/fstwt.o $(KERNEL_DIR)/screencheck.o $(KERNEL_DIR)/lardkit.o $(KERNEL_DIR)/lguilib.o $(KERNEL_DIR)/guioverlay.o $(KERNEL_DIR)/lassist.o $(KERNEL_DIR)/sysrxe.o $(KERNEL_DIR)/kmodtalk.o $(KERNEL_DIR)/kmo.o $(KERNEL_DIR)/lard_tls.o $(KERNEL_DIR)/rtc.o $(KERNEL_DIR)/lardtime.o $(KERNEL_DIR)/vmmon.o $(KERNEL_DIR)/storage.o $(KERNEL_DIR)/mediafs.o $(KERNEL_DIR)/installer.o $(KERNEL_DIR)/string.o $(KERNEL_DIR)/stdlib_min.o $(KERNEL_DIR)/lard_stdio.o $(KERNEL_DIR)/lard_printf.o $(KERNEL_DIR)/fs.o $(KERNEL_DIR)/bmp.o $(KERNEL_DIR)/lard_inflate.o $(KERNEL_DIR)/lafillo.o $(KERNEL_DIR)/lard_doc.o $(KERNEL_DIR)/ldi.o $(KERNEL_DIR)/lda.o $(KERNEL_DIR)/lar.o $(KERNEL_DIR)/lvcs.o $(KERNEL_DIR)/lcontainer.o $(KERNEL_DIR)/ldll.o $(KERNEL_DIR)/img_glyph.o $(KERNEL_DIR)/drfl.o $(KERNEL_DIR)/post.o $(KERNEL_DIR)/ssav.o $(KERNEL_DIR)/lss.o $(KERNEL_DIR)/lfs.o $(KERNEL_DIR)/lsh.o $(KERNEL_DIR)/larsh.o $(KERNEL_DIR)/kr_basic.o $(KERNEL_LIB_OBJS) $(KERNEL_DIR)/lardx_load.o $(KERNEL_DIR)/gui.o $(KERNEL_DIR)/ps2.o $(KERNEL_DIR)/idt64.o $(KERNEL_DIR)/panic.o $(KERNEL_DIR)/mmu.o $(KERNEL_DIR)/cpumode.o $(KERNEL_DIR)/mode_switch.o $(KERNEL_DIR)/mem.o $(KERNEL_DIR)/gc.o $(KERNEL_DIR)/gc_demo.o $(KERNEL_DIR)/lib3d.o $(KERNEL_DIR)/lib3d_demo.o $(KERNEL_DIR)/unicode.o $(KERNEL_DIR)/console.o $(KERNEL_DIR)/bosl_vm.o $(KERNEL_DIR)/bosl_jit.o $(KERNEL_DIR)/bosl_demo.o $(KERNEL_DIR)/bosl_asm.o $(KERNEL_DIR)/lil.o $(KERNEL_DIR)/lil_demo.o $(KERNEL_DIR)/lml.o $(KERNEL_DIR)/lml_demo.o $(KERNEL_DIR)/gasm_vm.o $(KERNEL_DIR)/gasm_demo.o $(KERNEL_DIR)/lafillo_vm.o $(KERNEL_DIR)/lafillo_demo.o $(KERNEL_DIR)/os_vm.o $(KERNEL_DIR)/os_demo.o $(KERNEL_DIR)/gdt64.o $(KERNEL_DIR)/gdt64_asm.o $(KERNEL_DIR)/lipc.o $(KERNEL_DIR)/syscall.o $(KERNEL_DIR)/usermode.o $(KERNEL_DIR)/usermode_asm.o
+$(KERNEL_ELF): $(KERNEL_DIR)/entry64.o $(KERNEL_DIR)/isr64.o $(KERNEL_DIR)/kernel64.o $(KERNEL_DIR)/smp.o $(KERNEL_DIR)/ap_trampoline.o $(KERNEL_DIR)/aux_kernel.o $(KERNEL_DIR)/pci.o $(KERNEL_DIR)/rtl8139.o $(KERNEL_DIR)/net.o $(KERNEL_DIR)/oslink.o $(KERNEL_DIR)/taskprio.o $(KERNEL_DIR)/awake.o $(KERNEL_DIR)/bootprof.o $(KERNEL_DIR)/bootmeta.o $(KERNEL_DIR)/crashlog.o $(KERNEL_DIR)/lpack.o $(KERNEL_DIR)/rxr.o $(KERNEL_DIR)/fstwt.o $(KERNEL_DIR)/screencheck.o $(KERNEL_DIR)/lardkit.o $(KERNEL_DIR)/lguilib.o $(KERNEL_DIR)/guioverlay.o $(KERNEL_DIR)/lassist.o $(KERNEL_DIR)/sysrxe.o $(KERNEL_DIR)/kmodtalk.o $(KERNEL_DIR)/kmo.o $(KERNEL_DIR)/lard_tls.o $(KERNEL_DIR)/rtc.o $(KERNEL_DIR)/lardtime.o $(KERNEL_DIR)/vmmon.o $(KERNEL_DIR)/storage.o $(KERNEL_DIR)/mediafs.o $(KERNEL_DIR)/installer.o $(KERNEL_DIR)/string.o $(KERNEL_DIR)/stdlib_min.o $(KERNEL_DIR)/lard_stdio.o $(KERNEL_DIR)/lard_printf.o $(KERNEL_DIR)/fs.o $(KERNEL_DIR)/bmp.o $(KERNEL_DIR)/lard_inflate.o $(KERNEL_DIR)/lafillo.o $(KERNEL_DIR)/lard_doc.o $(KERNEL_DIR)/ldi.o $(KERNEL_DIR)/lda.o $(KERNEL_DIR)/lar.o $(KERNEL_DIR)/lvcs.o $(KERNEL_DIR)/lcontainer.o $(KERNEL_DIR)/ldll.o $(KERNEL_DIR)/img_glyph.o $(KERNEL_DIR)/drfl.o $(KERNEL_DIR)/post.o $(KERNEL_DIR)/ssav.o $(KERNEL_DIR)/lss.o $(KERNEL_DIR)/lfs.o $(KERNEL_DIR)/lsh.o $(KERNEL_DIR)/larsh.o $(KERNEL_DIR)/kr_basic.o $(KERNEL_LIB_OBJS) $(KERNEL_DIR)/lardx_load.o $(KERNEL_DIR)/gui.o $(KERNEL_DIR)/ps2.o $(KERNEL_DIR)/idt64.o $(KERNEL_DIR)/panic.o $(KERNEL_DIR)/mmu.o $(KERNEL_DIR)/cpumode.o $(KERNEL_DIR)/mode_switch.o $(KERNEL_DIR)/mem.o $(KERNEL_DIR)/gc.o $(KERNEL_DIR)/gc_demo.o $(KERNEL_DIR)/lib3d.o $(KERNEL_DIR)/lib3d_demo.o $(KERNEL_DIR)/unicode.o $(KERNEL_DIR)/console.o $(KERNEL_DIR)/bosl_vm.o $(KERNEL_DIR)/bosl_jit.o $(KERNEL_DIR)/bosl_demo.o $(KERNEL_DIR)/bosl_asm.o $(KERNEL_DIR)/lil.o $(KERNEL_DIR)/lil_demo.o $(KERNEL_DIR)/lml.o $(KERNEL_DIR)/lml_demo.o $(KERNEL_DIR)/gasm_vm.o $(KERNEL_DIR)/gasm_demo.o $(KERNEL_DIR)/lafillo_vm.o $(KERNEL_DIR)/lafillo_demo.o $(KERNEL_DIR)/os_vm.o $(KERNEL_DIR)/os_demo.o $(KERNEL_DIR)/gdt64.o $(KERNEL_DIR)/gdt64_asm.o $(KERNEL_DIR)/lipc.o $(KERNEL_DIR)/syscall.o $(KERNEL_DIR)/usermode.o $(KERNEL_DIR)/usermode_asm.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 $(KERNEL_DIR)/lard_tls.o: $(KERNEL_DIR)/lard_tls.c $(KERNEL_DIR)/lard_tls_roots.inc $(INCLUDE)/lard_tls.h $(INCLUDE)/rtc.h
@@ -103,6 +108,9 @@ $(KERNEL_DIR)/lardtime.o: $(KERNEL_DIR)/lardtime.c $(INCLUDE)/lardtime.h $(INCLU
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/vmmon.o: $(KERNEL_DIR)/vmmon.c $(INCLUDE)/vmmon.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(KERNEL_DIR)/bootmeta.o: $(KERNEL_DIR)/bootmeta.c $(INCLUDE)/bootmeta.h $(INCLUDE)/bootinfo.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/string.o: $(KERNEL_DIR)/string.c
@@ -135,7 +143,7 @@ $(KERNEL_DIR)/lss.o: $(KERNEL_DIR)/lss.c
 $(KERNEL_DIR)/lfs.o: $(KERNEL_DIR)/lfs.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/lsh.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h
+$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/lsh.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/mediafs.o: $(KERNEL_DIR)/mediafs.c $(INCLUDE)/mediafs.h $(INCLUDE)/installer.h $(INCLUDE)/storage.h
@@ -147,7 +155,7 @@ $(KERNEL_DIR)/installer.o: $(KERNEL_DIR)/installer.c $(BOOT_STAGE1_INC) $(BOOT_S
 $(KERNEL_DIR)/larsh.o: $(KERNEL_DIR)/larsh.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h
+$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/kmo.o: $(KERNEL_DIR)/kmo.c $(INCLUDE)/kmo.h $(INCLUDE)/fs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardkit.h
@@ -373,13 +381,13 @@ $(KERNEL_DIR)/os_demo.o: $(KERNEL_DIR)/os_demo.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(RAW_IMAGE): $(BOOT_BIN) $(STAGE2_BIN) $(KERNEL_EXE) $(MKIMG)
-	$(MKIMG) -o $@ -b $(BOOT_BIN) -s $(STAGE2_BIN) -k $(KERNEL_EXE)
+	$(MKIMG) $(MKIMG_LAYOUT_ARGS) -o $@ -b $(BOOT_BIN) -s $(STAGE2_BIN) -k $(KERNEL_EXE)
 
 $(IMG_IMAGE): $(RAW_IMAGE)
 	cp $< $@
 
 $(ISO_RAW_IMAGE): $(BOOT_ISO_BIN) $(STAGE2_BIN) $(KERNEL_EXE) $(MKIMG)
-	$(MKIMG) -o $@ -b $(BOOT_ISO_BIN) -s $(STAGE2_BIN) -k $(KERNEL_EXE)
+	$(MKIMG) $(MKIMG_LAYOUT_ARGS) -o $@ -b $(BOOT_ISO_BIN) -s $(STAGE2_BIN) -k $(KERNEL_EXE)
 
 $(ISO_IMAGE): $(ISO_RAW_IMAGE) $(MKISO) $(ISO_MBR_BIN)
 	$(MKISO) -o $@ -i $(ISO_RAW_IMAGE) -m $(ISO_MBR_BIN) -v $(ISO_VOLUME_ID)

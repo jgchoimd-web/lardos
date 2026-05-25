@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.86.0b
+ITEM Prepares the bootloader/staging path for future growth without removing features to fit.
+ITEM Stage2 now writes boot metadata to bootinfo v2: kernel size, total sectors, high-memory copy address, loader chunk size, boot image sector count, persistent-store start, and kernel capacity.
+ITEM Adds bootmeta so POST, status, bootmap, and bootreplay can show boot headroom and detect when the kernel is approaching the boot image limit.
+ITEM Makes mkimg layout parameters configurable from Makefile variables, keeping the current compatible 1.44MB profile while making larger boot profiles a controlled build-time change.
+ITEM Keeps the v1.79 high-memory copy path and all RXE/SYSRXE, GUI, filesystem, driver, and user-control features intact.
+ITEM Ships as beta because it changes boot metadata and build-image layout plumbing that should be exercised across BIOS/VM profiles.
+
 SECTION v1.85.0b
 ITEM Adds APPKIT responsive/smart/flow/smartui/autofit layout for RXE and SYSRXE apps.
 ITEM Responsive APPKIT keeps app-authored widget order, groups nearby rows, wraps controls instead of overlapping them, and lets OUTPUT/LIST fill remaining app space.

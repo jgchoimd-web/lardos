@@ -7,6 +7,9 @@ ORG 0x7C00
 %ifndef STAGE2_SECTORS
 %define STAGE2_SECTORS 8
 %endif
+%ifndef BOOT_IMAGE_SECTORS
+%define BOOT_IMAGE_SECTORS 2880
+%endif
 
 %ifndef ISO_ELTORITO
 %define ISO_ELTORITO 0
@@ -29,7 +32,7 @@ STAGE2_LOAD equ 0x0600
     dw 1                 ; reserved sectors
     db 2                 ; FAT count
     dw 224               ; root entries
-    dw 2880              ; total sectors
+    dw BOOT_IMAGE_SECTORS ; total sectors
     db 0xF0              ; media descriptor
     dw 9                 ; sectors per FAT
     dw 18                ; sectors per track

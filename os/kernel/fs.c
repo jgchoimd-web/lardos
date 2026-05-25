@@ -480,6 +480,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.92.1a officially promotes the native WebStack method/TLS line without feature loss or value changes.\n"
     "li v1.92.1p makes HTTPS visible with webstack tls, LardTLS info, and POST/selftest TLS checks while preserving all v1.92 methods.\n"
     "li v1.92.0b expands HTTP/HTTPS to GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS without external web libraries.\n"
     "li v1.91.1p hotpatches GUI resize hit-testing so only the visible bottom-right grip starts window resizing.\n"

@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.92.1a
+ITEM Officially promotes the v1.92 native WebStack line after the method expansion and HTTPS visibility hotpatch passed build, media, and boot checks.
+ITEM Keeps HTTP/HTTPS GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS from v1.92.0b intact.
+ITEM Keeps webstack tls / webstack https, POST HTTPS TLS coverage, and webstack selftest from v1.92.1p intact.
+ITEM Ships as a because this release changes no feature direction: it stabilizes the visible native WebStack without external browser or TLS libraries.
+ITEM Preserves the LardOS value direction: user-owned method choice, visible encrypted transport diagnostics, native formats, and no feature loss.
+
 SECTION v1.92.1p
 ITEM Hotpatches the v1.92 WebStack line so HTTPS is visible and testable, not just an internal transport path.
 ITEM Adds webstack tls / webstack https to show native LardTLS status, TLS 1.2 SNI, trust-anchor count, RSA limit, and supported cipher names.

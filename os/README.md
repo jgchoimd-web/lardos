@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.92.0b-ami/lardos-v1.92.0b-ami.iso`. To publish the whole hardware
+`release/v1.92.1a-ami/lardos-v1.92.1a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.92.1a` officially promotes the v1.92 native WebStack line. It keeps the
+seven HTTP/HTTPS methods from `v1.92.0b` and the visible HTTPS/TLS diagnostics
+from `v1.92.1p`: `webstack tls`, POST TLS coverage, and combined WebStack
+selftest. It changes no feature direction and still uses native in-tree LardOS
+code instead of an external browser or TLS library.
 
 `v1.92.1p` makes HTTPS visible in the native WebStack. `webstack tls` /
 `webstack https` now reports LardTLS TLS 1.2 SNI support, trust-anchor count,

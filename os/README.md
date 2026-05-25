@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.89.0a-ami/lardos-v1.89.0a-ami.iso`. To publish the whole hardware
+`release/v1.90.0b-ami/lardos-v1.90.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.90.0b` adds app-owned layout resize policy for RXE/SYSRXE and APPKIT.
+Apps can use `RESIZE fixed` or runtime `APPKIT RESIZE fixed` so their APPKIT
+layout keeps its design positions when the user resizes the window. `LAYOUTSIZE
+640 420` / `APPKIT LAYOUTSIZE 640 420` sets the fixed design canvas, while
+`RESIZE reflow` keeps the previous responsive recalculation behavior.
 
 `v1.89.0a` officially promotes the v1.88 GUI stability line. It keeps stable
 stretch resize as the default, preserves `renderfx resize live` for immediate
@@ -337,6 +343,9 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.90.0b` lets RXE/SYSRXE apps own their layout resize policy. `RESIZE fixed`
+  or `APPKIT RESIZE fixed` stops APPKIT from recalculating layout on window-size
+  changes, while `RESIZE reflow` keeps the older responsive behavior.
 - `v1.89.0a` officially promotes the v1.88 GUI stability line: stable stretch
   resize remains the default, live reflow stays available, and no user-control
   behavior is removed.
@@ -663,6 +672,10 @@ commands:
   `userapp.sysrxe` are the starter examples.
 - `rxe list|reload|show|run` manages normal `.rxe` executables. Built-in
   `demo_game.rxe` shows the native `TYPE GAME` path for file-defined RXE games.
+- RXE/SYSRXE APPKIT files can choose how layout reacts to window size changes:
+  `RESIZE reflow` keeps responsive recalculation, while `RESIZE fixed` or
+  `APPKIT RESIZE fixed` keeps the app's design layout and only clips at the
+  visible window edge. Use `LAYOUTSIZE 640 420` to name that design canvas.
 - `kmod list`, `kmod gui status`, `kmod fs sync`, `kmod oslink emit channel
   text`, and `kmod history` provide a direct user-to-kernel-module message
   surface. Replies are shown immediately and logged in writable

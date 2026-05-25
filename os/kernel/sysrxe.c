@@ -246,6 +246,58 @@ static int lang_from_name(const char* name)
     return SYSRXE_LANG_LSH;
 }
 
+static int resize_policy_from_name(const char* name, int fallback)
+{
+    if (!name || !name[0]) return fallback;
+    if (streq_ci(name, "REFLOW") || streq_ci(name, "RESPONSIVE") ||
+        streq_ci(name, "LIVE") || streq_ci(name, "AUTO") ||
+        streq_ci(name, "ON") || streq_ci(name, "1")) {
+        return SYSRXE_RESIZE_REFLOW;
+    }
+    if (streq_ci(name, "FIXED") || streq_ci(name, "FREEZE") ||
+        streq_ci(name, "NOREFLOW") || streq_ci(name, "NO-REFLOW") ||
+        streq_ci(name, "LOCK") || streq_ci(name, "LOCKED") ||
+        streq_ci(name, "OFF") || streq_ci(name, "0")) {
+        return SYSRXE_RESIZE_FIXED;
+    }
+    return fallback;
+}
+
+static const char* resize_policy_name(int policy)
+{
+    return policy == SYSRXE_RESIZE_FIXED ? "fixed" : "reflow";
+}
+
+static void skip_size_sep(const char** ps)
+{
+    const char* s;
+    if (!ps || !*ps) return;
+    s = *ps;
+    while (*s == ' ' || *s == '\t' || *s == 'x' || *s == 'X' ||
+           *s == ',' || *s == ':' || *s == '/') {
+        s++;
+    }
+    *ps = s;
+}
+
+static void parse_layout_size(sysrxe_app_t* app, const char* value)
+{
+    const char* p;
+    uint32_t w;
+    uint32_t h;
+    if (!app || !value) return;
+    p = value;
+    w = parse_number_adv(&p, (uint32_t)app->layout_w);
+    skip_size_sep(&p);
+    h = parse_number_adv(&p, (uint32_t)app->layout_h);
+    if (w < 120u) w = 120u;
+    if (h < 120u) h = 120u;
+    if (w > 1024u) w = 1024u;
+    if (h > 768u) h = 768u;
+    app->layout_w = (int)w;
+    app->layout_h = (int)h;
+}
+
 static const char* lang_name(int lang)
 {
     if (lang == SYSRXE_LANG_LIL) return "LIL";
@@ -397,6 +449,9 @@ static void defaults_for(sysrxe_app_t* app, const char* file)
     copy_text(app->name, sizeof(app->name), "SYSRXE App");
     copy_text(app->icon, sizeof(app->icon), "X");
     copy_text(app->layout, sizeof(app->layout), "auto");
+    app->resize_policy = SYSRXE_RESIZE_REFLOW;
+    app->layout_w = 0;
+    app->layout_h = 0;
     copy_text(app->input_label, sizeof(app->input_label), "Input:");
     copy_text(app->button_label, sizeof(app->button_label), "Run");
     app->color = 0xFF57B8A6u;
@@ -502,6 +557,16 @@ static int parse_line(sysrxe_app_t* app, const char* src)
     if ((v = value_after_key(src, "NAME")) != NULL) { copy_text(app->name, sizeof(app->name), v); return 0; }
     if ((v = value_after_key(src, "ICON")) != NULL) { copy_text(app->icon, sizeof(app->icon), v); return 0; }
     if ((v = value_after_key(src, "LAYOUT")) != NULL || (v = value_after_key(src, "SURFACE")) != NULL) { copy_text(app->layout, sizeof(app->layout), v); return 0; }
+    if ((v = value_after_key(src, "RESIZE")) != NULL || (v = value_after_key(src, "LAYOUTRESIZE")) != NULL ||
+        (v = value_after_key(src, "REFLOW")) != NULL) {
+        app->resize_policy = resize_policy_from_name(v, app->resize_policy);
+        return 0;
+    }
+    if ((v = value_after_key(src, "LAYOUTSIZE")) != NULL || (v = value_after_key(src, "BASESIZE")) != NULL ||
+        (v = value_after_key(src, "DESIGNSIZE")) != NULL) {
+        parse_layout_size(app, v);
+        return 0;
+    }
     if ((v = value_after_key(src, "UI")) != NULL || (v = value_after_key(src, "WIDGET")) != NULL) { parse_ui_widget(app, v); return 0; }
     if ((v = value_after_key(src, "USE")) != NULL || (v = value_after_key(src, "LIB")) != NULL) { return 0; }
     if ((v = value_after_key(src, "COLOR")) != NULL) { app->color = parse_number(v, app->color); return 0; }
@@ -585,6 +650,16 @@ static int appkit_apply_line(sysrxe_app_t* app, const char* line)
     }
     if ((v = value_after_key(p, "LAYOUT")) != NULL || (v = value_after_key(p, "SURFACE")) != NULL) {
         copy_text(app->layout, sizeof(app->layout), v);
+        return 1;
+    }
+    if ((v = value_after_key(p, "RESIZE")) != NULL || (v = value_after_key(p, "LAYOUTRESIZE")) != NULL ||
+        (v = value_after_key(p, "REFLOW")) != NULL) {
+        app->resize_policy = resize_policy_from_name(v, app->resize_policy);
+        return 1;
+    }
+    if ((v = value_after_key(p, "LAYOUTSIZE")) != NULL || (v = value_after_key(p, "BASESIZE")) != NULL ||
+        (v = value_after_key(p, "DESIGNSIZE")) != NULL) {
+        parse_layout_size(app, v);
         return 1;
     }
     if ((v = value_after_key(p, "UI")) != NULL || (v = value_after_key(p, "WIDGET")) != NULL) {
@@ -1328,8 +1403,10 @@ int sysrxe_format_home(int app, char* out, uint32_t out_cap)
         return 0;
     }
     snprintf(out, out_cap,
-             "SYSRXE app: %s\nfile: %s\nlayout: %s\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
-             a->name, a->file, a->layout, lang_name(a->lang), a->ui_count, a->body,
+             "SYSRXE app: %s\nfile: %s\nlayout: %s\nresize: %s %ux%u\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
+             a->name, a->file, a->layout, resize_policy_name(a->resize_policy),
+             (uint32_t)a->layout_w, (uint32_t)a->layout_h,
+             lang_name(a->lang), a->ui_count, a->body,
              a->command[0] ? "\nCommand: " : "",
              a->command[0] ? a->command : "");
     return 0;
@@ -1344,8 +1421,10 @@ int rxe_format_home(int app, char* out, uint32_t out_cap)
         return 0;
     }
     snprintf(out, out_cap,
-             "RXE executable: %s\nfile: %s\nlayout: %s\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
-             a->name, a->file, a->layout, lang_name(a->lang), a->ui_count, a->body,
+             "RXE executable: %s\nfile: %s\nlayout: %s\nresize: %s %ux%u\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
+             a->name, a->file, a->layout, resize_policy_name(a->resize_policy),
+             (uint32_t)a->layout_w, (uint32_t)a->layout_h,
+             lang_name(a->lang), a->ui_count, a->body,
              a->command[0] ? "\nCommand: " : "",
              a->command[0] ? a->command : "");
     return 0;
@@ -1407,6 +1486,8 @@ int sysrxe_selftest(void)
         "NAME Test App\n"
         "ICON T\n"
         "LAYOUT responsive\n"
+        "RESIZE fixed\n"
+        "LAYOUTSIZE 500x260\n"
         "COLOR 0xFF123456\n"
         "INPUT Thing:\n"
         "BUTTON Do\n"
@@ -1453,6 +1534,7 @@ int sysrxe_selftest(void)
     if (strcmp(app.icon, "T") != 0) return -3;
     if (app.color != 0xFF123456u) return -4;
     if (strcmp(app.layout, "responsive") != 0) return -5;
+    if (app.resize_policy != SYSRXE_RESIZE_FIXED || app.layout_w != 500 || app.layout_h != 260) return -35;
     if (app.ui_count != 7u) return -6;
     if (app.ui[1].kind != SYSRXE_UI_BUTTON || strcmp(app.ui[1].action, "go") != 0) return -7;
     if (app.ui[4].kind != SYSRXE_UI_PROGRESS || strcmp(app.ui[4].action, "66") != 0) return -17;
@@ -1465,6 +1547,8 @@ int sysrxe_selftest(void)
     if (app.ui_count != 1u || strcmp(app.ui[0].style, "KNOB") != 0 || strcmp(app.ui[0].action, "run") != 0) return -24;
     if (appkit_apply_script(&app, "APPKIT LAYOUT smartui\n", visible, sizeof(visible)) != 1u) return -33;
     if (strcmp(app.layout, "smartui") != 0) return -34;
+    if (appkit_apply_script(&app, "APPKIT RESIZE reflow\nAPPKIT LAYOUTSIZE 640 420\n", visible, sizeof(visible)) != 2u) return -36;
+    if (app.resize_policy != SYSRXE_RESIZE_REFLOW || app.layout_w != 640 || app.layout_h != 420) return -37;
     if (strcmp(app.button_label, "Do") != 0) return -8;
     if (strcmp(app.command, "echo sysrxe") != 0) return -9;
     if (parse_sysrxe(&game_app, "game.sysrxe", game, sizeof(game) - 1) != 0) return -10;

@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.90.0b
+ITEM Adds app-owned layout resize policy for RXE/SYSRXE and APPKIT apps.
+ITEM Apps can declare RESIZE fixed, RESIZE freeze, or APPKIT RESIZE fixed to keep their UI layout from being recalculated when the user changes the window size.
+ITEM Apps can declare LAYOUTSIZE width height, BASESIZE, or DESIGNSIZE to choose the fixed design canvas; APPKIT LAYOUTSIZE can change it at runtime.
+ITEM RESIZE reflow remains the default and preserves the previous responsive behavior, so existing apps keep working without feature loss.
+ITEM Ships as beta because it extends the app file/runtime UI contract while keeping user/app control intact.
+
 SECTION v1.89.0a
 ITEM Officially promotes the v1.88 GUI stability line after the hotpatch checks passed.
 ITEM Includes stable stretch window resizing as the default while keeping renderfx resize live for users who want immediate reflow.

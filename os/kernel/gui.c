@@ -1742,6 +1742,39 @@ static int gui_app_uses_responsive_ui(const sysrxe_app_t* a)
            gui_ascii_eq_ci(a->layout, "autofit");
 }
 
+static int gui_app_uses_fixed_layout(const sysrxe_app_t* a)
+{
+    return a && a->resize_policy == SYSRXE_RESIZE_FIXED;
+}
+
+static void gui_app_layout_size(const sysrxe_app_t* a, int* out_w, int* out_h)
+{
+    int ww = g.win_w;
+    int hh = g.win_h;
+    if (gui_app_uses_fixed_layout(a)) {
+        ww = a->layout_w > 0 ? a->layout_w : 640;
+        hh = a->layout_h > 0 ? a->layout_h : 420;
+    }
+    if (ww < GUI_WINDOW_MIN_W) ww = GUI_WINDOW_MIN_W;
+    if (hh < GUI_WINDOW_MIN_H) hh = GUI_WINDOW_MIN_H;
+    if (ww > 1024) ww = 1024;
+    if (hh > 768) hh = 768;
+    if (out_w) *out_w = ww;
+    if (out_h) *out_h = hh;
+}
+
+static int gui_ui_clip_to_window(int* x, int* y, int* w, int* h)
+{
+    int right = g.win_x + g.win_w - 16;
+    int bottom = g.win_y + g.win_h - 12;
+    if (!x || !y || !w || !h) return 0;
+    if (*x >= right || *y >= bottom) return 0;
+    if (*x + *w > right) *w = right - *x;
+    if (*y + *h > bottom) *h = bottom - *y;
+    if (*w < 8 || *h < 8) return 0;
+    return 1;
+}
+
 static int gui_ui_text_pref_width(const char* s, int pad, int max_w)
 {
     int n = 0;
@@ -1831,16 +1864,25 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
     int content_y = g.win_y + GUI_CONTENT_TOP;
     int left = g.win_x + 16;
     int top = content_y + 36;
-    int right = g.win_x + g.win_w - 16;
-    int bottom = g.win_y + g.win_h - 12;
-    int area_w = right - left;
-    int area_h = bottom - top;
-    int gap = area_w < 360 ? 5 : 8;
+    int layout_w;
+    int layout_ref_h;
+    int right;
+    int bottom;
+    int area_w;
+    int area_h;
+    int gap;
     int row_x = left;
     int row_y = top;
     int row_h = 0;
     int row_hint = -10000;
-    if (!a || !target || area_w < 8 || area_h < 8) return 0;
+    if (!a || !target) return 0;
+    gui_app_layout_size(a, &layout_w, &layout_ref_h);
+    right = g.win_x + layout_w - 16;
+    bottom = g.win_y + layout_ref_h - 12;
+    area_w = right - left;
+    area_h = bottom - top;
+    gap = area_w < 360 ? 5 : 8;
+    if (area_w < 8 || area_h < 8) return 0;
     for (uint32_t i = 0; i < a->ui_count && i < SYSRXE_UI_MAX_WIDGETS; i++) {
         const sysrxe_widget_t* w = &a->ui[i];
         int ww, hh, x, y;
@@ -1877,7 +1919,8 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
                 if (out_y) *out_y = y;
                 if (out_w) *out_w = ww;
                 if (out_h) *out_h = hh;
-                return 1;
+                return gui_app_uses_fixed_layout(a) ?
+                    gui_ui_clip_to_window(out_x, out_y, out_w, out_h) : 1;
             }
             row_y += layout_h + gap;
             row_x = left;
@@ -1907,7 +1950,8 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
             if (out_y) *out_y = y;
             if (out_w) *out_w = ww;
             if (out_h) *out_h = hh;
-            return 1;
+            return gui_app_uses_fixed_layout(a) ?
+                gui_ui_clip_to_window(out_x, out_y, out_w, out_h) : 1;
         }
         row_x += ww + gap;
         if (layout_h > row_h) row_h = layout_h;
@@ -1925,10 +1969,15 @@ static int gui_ui_widget_rect(const sysrxe_widget_t* w, int* out_x, int* out_y, 
     int y;
     int ww;
     int hh;
-    int max_right = g.win_x + g.win_w - 16;
-    int max_bottom = g.win_y + g.win_h - 12;
+    int layout_w;
+    int layout_h;
+    int max_right;
+    int max_bottom;
     if (!w || !w->used) return 0;
     if (gui_app_uses_responsive_ui(a) && gui_ui_responsive_rect(a, w, out_x, out_y, out_w, out_h)) return 1;
+    gui_app_layout_size(a, &layout_w, &layout_h);
+    max_right = g.win_x + layout_w - 16;
+    max_bottom = g.win_y + layout_h - 12;
     x = base_x + w->x;
     y = base_y + w->y;
     ww = w->w > 0 ? w->w : max_right - x;
@@ -1943,7 +1992,8 @@ static int gui_ui_widget_rect(const sysrxe_widget_t* w, int* out_x, int* out_y, 
     if (out_y) *out_y = y;
     if (out_w) *out_w = ww;
     if (out_h) *out_h = hh;
-    return 1;
+    return gui_app_uses_fixed_layout(a) ?
+        gui_ui_clip_to_window(out_x, out_y, out_w, out_h) : 1;
 }
 
 static const sysrxe_widget_t* gui_find_ui_widget(int app, int kind)

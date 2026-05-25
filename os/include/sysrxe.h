@@ -35,6 +35,8 @@
 #define SYSRXE_LANG_OSVM 5
 #define SYSRXE_LANG_C 6
 #define SYSRXE_LANG_LML 7
+#define SYSRXE_RESIZE_REFLOW 0
+#define SYSRXE_RESIZE_FIXED 1
 
 typedef struct sysrxe_widget {
     int used;
@@ -57,6 +59,9 @@ typedef struct sysrxe_app {
     char name[24];
     char icon[4];
     char layout[16];
+    int resize_policy;
+    int layout_w;
+    int layout_h;
     uint32_t color;
     char input_label[24];
     char button_label[24];

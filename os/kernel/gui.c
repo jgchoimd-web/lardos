@@ -48,6 +48,13 @@
 #define GUI_TITLE_BTN_SIZE 14
 #define GUI_TITLE_BTN_GAP 4
 #define GUI_TITLE_SET_W 36
+#define GUI_WINDOW_MIN_W 160
+#define GUI_WINDOW_MIN_H 160
+#define GUI_RESIZE_HIT 12
+#define GUI_RESIZE_LEFT 1
+#define GUI_RESIZE_RIGHT 2
+#define GUI_RESIZE_TOP 4
+#define GUI_RESIZE_BOTTOM 8
 #define GUI_SURFACE_TOOL 0
 #define GUI_SURFACE_DOC 1
 #define GUI_SURFACE_TERMINAL 2
@@ -188,6 +195,7 @@ static void gui_desktop_init_model(void);
 static void gui_bring_window_front(int app);
 static void gui_sync_active_window(void);
 static void gui_save_app_view(int app);
+static void gui_response_view_rect(int* out_x, int* out_y, int* out_w, int* out_h);
 static void gui_run_sysrxe_current(void);
 static void gui_run_sysrxe_input(const char* input);
 
@@ -227,6 +235,14 @@ typedef struct {
     int dragging;
     int drag_off_x;
     int drag_off_y;
+    int resizing;
+    int resize_mode;
+    int resize_start_mx;
+    int resize_start_my;
+    int resize_start_x;
+    int resize_start_y;
+    int resize_start_w;
+    int resize_start_h;
 
     // Button inside window
     int btn_pressed;
@@ -875,6 +891,14 @@ int gui_init(void)
     gui_clamp_window();
     g.win_visible = 1;
     g.dragging = 0;
+    g.resizing = 0;
+    g.resize_mode = 0;
+    g.resize_start_mx = 0;
+    g.resize_start_my = 0;
+    g.resize_start_x = 0;
+    g.resize_start_y = 0;
+    g.resize_start_w = 0;
+    g.resize_start_h = 0;
     g.btn_pressed = 0;
     g.btn_clicks = 0;
     g.tb_focused = 0;
@@ -1739,6 +1763,19 @@ static void gui_ui_preferred_size(const sysrxe_widget_t* w, int area_w, int area
     if (out_h) *out_h = hh;
 }
 
+static int gui_ui_top_label_space(const sysrxe_widget_t* w)
+{
+    if (!w || !w->text[0]) return 0;
+    if (w->kind == SYSRXE_UI_INPUT ||
+        w->kind == SYSRXE_UI_OUTPUT ||
+        w->kind == SYSRXE_UI_LIST ||
+        w->kind == SYSRXE_UI_SLIDER ||
+        w->kind == SYSRXE_UI_PROGRESS) {
+        return 14;
+    }
+    return 0;
+}
+
 static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* target,
                                   int* out_x, int* out_y, int* out_w, int* out_h)
 {
@@ -1759,8 +1796,12 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
         const sysrxe_widget_t* w = &a->ui[i];
         int ww, hh, x, y;
         int full;
+        int label_space;
+        int layout_h;
         if (!w->used) continue;
         gui_ui_preferred_size(w, area_w, bottom - row_y, &ww, &hh);
+        label_space = gui_ui_top_label_space(w);
+        layout_h = hh + label_space;
         full = w->kind == SYSRXE_UI_PANEL ||
                w->kind == SYSRXE_UI_OUTPUT ||
                w->kind == SYSRXE_UI_LIST ||
@@ -1773,7 +1814,7 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
                 row_hint = -10000;
             }
             x = left;
-            y = row_y;
+            y = row_y + label_space;
             ww = area_w;
             if ((w->kind == SYSRXE_UI_OUTPUT || w->kind == SYSRXE_UI_LIST) && w->h <= 0) {
                 hh = bottom - y;
@@ -1781,6 +1822,7 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
             }
             if (y + hh > bottom) hh = bottom - y;
             if (hh < 8) hh = 8;
+            layout_h = hh + label_space;
             if (w == target) {
                 if (out_x) *out_x = x;
                 if (out_y) *out_y = y;
@@ -1788,7 +1830,7 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
                 if (out_h) *out_h = hh;
                 return 1;
             }
-            row_y += hh + gap;
+            row_y += layout_h + gap;
             row_x = left;
             row_h = 0;
             row_hint = -10000;
@@ -1807,9 +1849,10 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
             row_h = 0;
         }
         x = row_x;
-        y = row_y;
+        y = row_y + label_space;
         if (y + hh > bottom) hh = bottom - y;
         if (hh < 8) hh = 8;
+        layout_h = hh + label_space;
         if (w == target) {
             if (out_x) *out_x = x;
             if (out_y) *out_y = y;
@@ -1818,7 +1861,7 @@ static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* 
             return 1;
         }
         row_x += ww + gap;
-        if (hh > row_h) row_h = hh;
+        if (layout_h > row_h) row_h = layout_h;
     }
     return 0;
 }
@@ -2293,8 +2336,8 @@ static void gui_clamp_window(void)
     }
     if (g.win_w > (int)g_fb.w) g.win_w = (int)g_fb.w;
     if (g.win_h > (int)g_fb.h) g.win_h = (int)g_fb.h;
-    if (g.win_w < 160 && (int)g_fb.w >= 160) g.win_w = 160;
-    if (g.win_h < 160 && (int)g_fb.h >= 160) g.win_h = 160;
+    if (g.win_w < GUI_WINDOW_MIN_W && (int)g_fb.w >= GUI_WINDOW_MIN_W) g.win_w = GUI_WINDOW_MIN_W;
+    if (g.win_h < GUI_WINDOW_MIN_H && (int)g_fb.h >= GUI_WINDOW_MIN_H) g.win_h = GUI_WINDOW_MIN_H;
     max_x = (int)g_fb.w - g.win_w;
     max_y = (int)g_fb.h - g.win_h;
     if (max_x < 0) max_x = 0;
@@ -2303,6 +2346,81 @@ static void gui_clamp_window(void)
     if (g.win_y < min_y) g.win_y = min_y;
     if (g.win_x > max_x) g.win_x = max_x;
     if (g.win_y > max_y) g.win_y = max_y;
+}
+
+static int gui_resize_corner_hit(int x, int y)
+{
+    int left;
+    int right;
+    int top;
+    int bottom;
+    if (!g.win_visible || g.fullscreen) return 0;
+    left = x >= g.win_x && x < g.win_x + GUI_RESIZE_HIT;
+    right = x >= g.win_x + g.win_w - GUI_RESIZE_HIT && x < g.win_x + g.win_w;
+    top = y >= g.win_y && y < g.win_y + GUI_RESIZE_HIT;
+    bottom = y >= g.win_y + g.win_h - GUI_RESIZE_HIT && y < g.win_y + g.win_h;
+    if (left && top) return GUI_RESIZE_LEFT | GUI_RESIZE_TOP;
+    if (right && top) return GUI_RESIZE_RIGHT | GUI_RESIZE_TOP;
+    if (left && bottom) return GUI_RESIZE_LEFT | GUI_RESIZE_BOTTOM;
+    if (right && bottom) return GUI_RESIZE_RIGHT | GUI_RESIZE_BOTTOM;
+    return 0;
+}
+
+static void gui_apply_resize_drag(void)
+{
+    int left;
+    int top;
+    int right;
+    int bottom;
+    int dx;
+    int dy;
+    if (!g_have_fb || !g.resizing || g.fullscreen) return;
+    dx = g.mx - g.resize_start_mx;
+    dy = g.my - g.resize_start_my;
+    left = g.resize_start_x;
+    top = g.resize_start_y;
+    right = g.resize_start_x + g.resize_start_w;
+    bottom = g.resize_start_y + g.resize_start_h;
+    if (g.resize_mode & GUI_RESIZE_LEFT) left += dx;
+    if (g.resize_mode & GUI_RESIZE_RIGHT) right += dx;
+    if (g.resize_mode & GUI_RESIZE_TOP) top += dy;
+    if (g.resize_mode & GUI_RESIZE_BOTTOM) bottom += dy;
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (right > (int)g_fb.w) right = (int)g_fb.w;
+    if (bottom > (int)g_fb.h) bottom = (int)g_fb.h;
+    if (right - left < GUI_WINDOW_MIN_W) {
+        if (g.resize_mode & GUI_RESIZE_LEFT) left = right - GUI_WINDOW_MIN_W;
+        else right = left + GUI_WINDOW_MIN_W;
+    }
+    if (bottom - top < GUI_WINDOW_MIN_H) {
+        if (g.resize_mode & GUI_RESIZE_TOP) top = bottom - GUI_WINDOW_MIN_H;
+        else bottom = top + GUI_WINDOW_MIN_H;
+    }
+    if (left < 0) {
+        left = 0;
+        if (right < GUI_WINDOW_MIN_W) right = GUI_WINDOW_MIN_W;
+    }
+    if (top < 0) {
+        top = 0;
+        if (bottom < GUI_WINDOW_MIN_H) bottom = GUI_WINDOW_MIN_H;
+    }
+    if (right > (int)g_fb.w) {
+        right = (int)g_fb.w;
+        if (left > right - GUI_WINDOW_MIN_W) left = right - GUI_WINDOW_MIN_W;
+    }
+    if (bottom > (int)g_fb.h) {
+        bottom = (int)g_fb.h;
+        if (top > bottom - GUI_WINDOW_MIN_H) top = bottom - GUI_WINDOW_MIN_H;
+    }
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    g.win_x = left;
+    g.win_y = top;
+    g.win_w = right - left;
+    g.win_h = bottom - top;
+    gui_clamp_window();
+    gui_sync_active_window();
 }
 
 static void gui_toggle_fullscreen(void)
@@ -2637,6 +2755,8 @@ static void gui_activate_top_window_or_none(void)
     } else {
         g.win_visible = 0;
         g.dragging = 0;
+        g.resizing = 0;
+        g.resize_mode = 0;
         g.scroll_drag = 0;
         g.slider_drag = 0;
         g.settings_open = 0;
@@ -3248,19 +3368,103 @@ int gui_desktop_interaction_selftest(void)
     return ok ? 0 : -1;
 }
 
+static void gui_draw_saved_text_block(const fb_t* tgt, int x, int y, int w, int h,
+                                      const char* text, uint32_t fg, uint32_t bg)
+{
+    int cols = (w - 12) / 8;
+    int rows = h / 10;
+    int col = 0;
+    int row = 0;
+    if (!text) text = "";
+    if (cols < 4 || rows < 1) return;
+    while (*text && row < rows) {
+        char ch = *text++;
+        if (ch == '\r') continue;
+        if (ch == '\n' || col >= cols) {
+            row++;
+            col = 0;
+            if (ch == '\n') continue;
+            if (row >= rows) break;
+        }
+        if (ch < 32 || ch > 126) ch = '?';
+        fb_draw_char(tgt, (uint16_t)(x + col * 8), (uint16_t)(y + row * 10), ch, fg, bg);
+        col++;
+    }
+}
+
+static void gui_draw_resize_grip_at(const fb_t* tgt, int x, int y, int w, int h, uint32_t c)
+{
+    int gx = x + w - 12;
+    int gy = y + h - 12;
+    if (w < 40 || h < 40) return;
+    for (int i = 0; i < 3; i++) {
+        int off = i * 3;
+        fb_fill_rect(tgt, (uint16_t)(gx + off), (uint16_t)(gy + 8), (uint16_t)(8 - off), 1, c);
+        fb_fill_rect(tgt, (uint16_t)(gx + 8), (uint16_t)(gy + off), 1, (uint16_t)(8 - off), c);
+    }
+}
+
 static void gui_draw_window_preview(const fb_t* tgt, const gui_window_t* w)
 {
     uint32_t frame = 0xFF0B0D10u;
     uint32_t bg = 0xFF1A222Bu;
     uint32_t title = 0xFF172126u;
-    const char* preview = "";
-    int px;
-    int py;
-    int cols;
-    int rows;
-    int col = 0;
-    int row = 0;
+    uint32_t accent;
+    uint32_t view_bg;
+    const char* preview;
+    const gui_app_view_t* v;
+    int old_app;
+    int old_x;
+    int old_y;
+    int old_w;
+    int old_h;
+    int old_full;
+    int old_tb_focused;
+    int old_btn_pressed;
+    char old_tb[256];
+    uint32_t old_tb_len;
+    uint32_t old_tb_cur;
+    int content_y;
+    int surface;
+    int view_x;
+    int view_y;
+    int view_w;
+    int view_h;
+    int custom_ui;
     if (!w || !w->visible) return;
+    v = (w->app >= 0 && w->app < GUI_APP_COUNT) ? &g_app_views[w->app] : NULL;
+    preview = (v && v->resp[0]) ? v->resp : gui_app_name(w->app);
+
+    old_app = g.app_id;
+    old_x = g.win_x;
+    old_y = g.win_y;
+    old_w = g.win_w;
+    old_h = g.win_h;
+    old_full = g.fullscreen;
+    old_tb_focused = g.tb_focused;
+    old_btn_pressed = g.btn_pressed;
+    gui_copy_text(old_tb, sizeof(old_tb), g.tb);
+    old_tb_len = g.tb_len;
+    old_tb_cur = g.tb_cur;
+
+    g.app_id = w->app;
+    g.win_x = w->x;
+    g.win_y = w->y;
+    g.win_w = w->w;
+    g.win_h = w->h;
+    g.fullscreen = w->fullscreen;
+    g.tb_focused = 0;
+    g.btn_pressed = 0;
+    if (v && v->saved) {
+        gui_copy_text(g.tb, sizeof(g.tb), v->tb);
+        g.tb_len = v->tb_len;
+        g.tb_cur = v->tb_cur;
+    } else {
+        g.tb[0] = '\0';
+        g.tb_len = 0;
+        g.tb_cur = 0;
+    }
+
     fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)w->y, (uint16_t)w->w, (uint16_t)w->h, bg);
     fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)w->y, (uint16_t)w->w, 20, title);
     fb_draw_text(tgt, (uint16_t)(w->x + 8), (uint16_t)(w->y + 7), gui_app_name(w->app), 0xFFFFFFFFu, title);
@@ -3268,31 +3472,46 @@ static void gui_draw_window_preview(const fb_t* tgt, const gui_window_t* w)
     fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)(w->y + w->h - 1), (uint16_t)w->w, 1, frame);
     fb_fill_rect(tgt, (uint16_t)w->x, (uint16_t)w->y, 1, (uint16_t)w->h, frame);
     fb_fill_rect(tgt, (uint16_t)(w->x + w->w - 1), (uint16_t)w->y, 1, (uint16_t)w->h, frame);
-    if (w->w > 80 && w->h > 80) {
-        fb_fill_rect(tgt, (uint16_t)(w->x + 14), (uint16_t)(w->y + GUI_CONTENT_TOP + 12),
-                     (uint16_t)(w->w - 28), (uint16_t)(w->h - GUI_CONTENT_TOP - 30), 0xFF20252Bu);
-        if (w->app >= 0 && w->app < GUI_APP_COUNT && g_app_views[w->app].saved) preview = g_app_views[w->app].resp;
-        if (!preview || !preview[0]) preview = gui_app_name(w->app);
-        px = w->x + 22;
-        py = w->y + GUI_CONTENT_TOP + 24;
-        cols = (w->w - 44) / 8;
-        rows = (w->h - GUI_CONTENT_TOP - 42) / 10;
-        if (cols < 4) cols = 4;
-        if (rows < 1) rows = 1;
-        while (*preview && row < rows) {
-            char ch = *preview++;
-            if (ch == '\r') continue;
-            if (ch == '\n' || col >= cols) {
-                row++;
-                col = 0;
-                if (ch == '\n') continue;
-                if (row >= rows) break;
-            }
-            if (ch < 32 || ch > 126) ch = '?';
-            fb_draw_char(tgt, (uint16_t)(px + col * 8), (uint16_t)(py + row * 10), ch, 0xFFCFE3FFu, 0xFF20252Bu);
-            col++;
+    if (w->w > 120 && w->h > 120) {
+        content_y = w->y + GUI_CONTENT_TOP;
+        surface = gui_app_surface(w->app);
+        accent = gui_app_accent(w->app);
+        view_bg = gui_surface_view_bg(surface);
+        gui_response_view_rect(&view_x, &view_y, &view_w, &view_h);
+        gui_draw_app_surface(tgt, surface, accent, view_bg, content_y, view_x, view_y, view_w, view_h);
+        custom_ui = gui_file_has_custom_ui(w->app);
+        if (custom_ui) {
+            gui_draw_file_ui_widgets(tgt, accent, view_bg);
+        } else if (w->h > 210) {
+            uint32_t btn_bg = gui_dim_color(accent, 3);
+            int btn_x = w->x + 16;
+            int btn_y = content_y + 36;
+            int tb_x = w->x + 16;
+            int tb_y = content_y + 118;
+            int tb_w = w->w > 292 ? 260 : w->w - 32;
+            fb_fill_rect(tgt, (uint16_t)btn_x, (uint16_t)btn_y, 96, 24, btn_bg);
+            fb_draw_text(tgt, (uint16_t)(btn_x + 10), (uint16_t)(btn_y + 8), "Open", 0xFFFFFFFFu, btn_bg);
+            fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, (uint16_t)tb_w, 22, 0xFF111619u);
+            fb_fill_rect(tgt, (uint16_t)tb_x, (uint16_t)tb_y, (uint16_t)tb_w, 1, 0xFF60717Cu);
+            fb_draw_text_cells(tgt, (uint16_t)(tb_x + 6), (uint16_t)(tb_y + 7), g.tb,
+                               (uint16_t)((tb_w - 12) / 8), 0xFFFFFFFFu, 0xFF111619u);
         }
+        gui_draw_saved_text_block(tgt, view_x + 6, view_y + 8, view_w - 18, view_h - 16,
+                                  preview, 0xFFCFE3FFu, view_bg);
     }
+    gui_draw_resize_grip_at(tgt, w->x, w->y, w->w, w->h, 0xFF60717Cu);
+
+    g.app_id = old_app;
+    g.win_x = old_x;
+    g.win_y = old_y;
+    g.win_w = old_w;
+    g.win_h = old_h;
+    g.fullscreen = old_full;
+    g.tb_focused = old_tb_focused;
+    g.btn_pressed = old_btn_pressed;
+    gui_copy_text(g.tb, sizeof(g.tb), old_tb);
+    g.tb_len = old_tb_len;
+    g.tb_cur = old_tb_cur;
 }
 
 static void gui_draw_inactive_windows(const fb_t* tgt)
@@ -3946,6 +4165,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     if (l_pressed && in_rect(g.mx, g.my, close_btn_x, title_btn_y, GUI_TITLE_BTN_SIZE, title_btn_h)) {
         g.win_visible = 0;
         g.settings_open = 0;
+        g.resizing = 0;
         g.tb_focused = 0;
         g.lafaelo_focus = 0;
         gui_save_app_view(g.app_id);
@@ -3956,6 +4176,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     if (l_pressed && in_rect(g.mx, g.my, min_btn_x, title_btn_y, GUI_TITLE_BTN_SIZE, title_btn_h)) {
         g.win_visible = 0;
         g.settings_open = 0;
+        g.resizing = 0;
         g.tb_focused = 0;
         g.lafaelo_focus = 0;
         gui_save_app_view(g.app_id);
@@ -4029,6 +4250,30 @@ void gui_handle_mouse(int dx, int dy, int buttons)
         g.slider_drag = 0;
     }
     if (settings_capture) return;
+
+    if (!g.fullscreen && l_pressed) {
+        int mode = gui_resize_corner_hit(g.mx, g.my);
+        if (mode) {
+            g.resizing = 1;
+            g.resize_mode = mode;
+            g.resize_start_mx = g.mx;
+            g.resize_start_my = g.my;
+            g.resize_start_x = g.win_x;
+            g.resize_start_y = g.win_y;
+            g.resize_start_w = g.win_w;
+            g.resize_start_h = g.win_h;
+            g.dragging = 0;
+            return;
+        }
+    }
+    if (!l_down) {
+        g.resizing = 0;
+        g.resize_mode = 0;
+    }
+    if (g.resizing) {
+        gui_apply_resize_drag();
+        return;
+    }
 
     // Title bar drag (top 20px of window, exclude settings button)
     int drag_w = set_btn_x - g.win_x - 4;
@@ -5160,6 +5405,7 @@ void gui_render(void)
             fb_fill_rect(tgt, (uint16_t)(rail_x + 1), (uint16_t)(sb_y + 8), 1, (uint16_t)(sb_h - 16), 0xFF53636Au);
         }
     }
+    if (!g.fullscreen) gui_draw_resize_grip_at(tgt, g.win_x, g.win_y, g.win_w, g.win_h, 0xFF8FF3EAu);
 
     guioverlay_state_t overlay = {
         (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h,

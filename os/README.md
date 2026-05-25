@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.88.0b-ami/lardos-v1.88.0b-ami.iso`. To publish the whole hardware
+`release/v1.88.1p-ami/lardos-v1.88.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.88.1p` hotpatches the desktop window manager: inactive windows are rendered
+from their saved app state instead of as flat previews, APPKIT responsive labels
+reserve enough vertical room to avoid accidental overlap, and normal windows can
+be resized from their four corners.
 
 `v1.88.0b` makes `os/VERSION` the single source for the active release
 version. Makefile derives release names and ISO volume IDs from it, while
@@ -317,6 +322,9 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.88.1p` hotpatches GUI overlap and window control. Inactive windows now
+  render as saved app windows, APPKIT responsive label spacing prevents accidental
+  input/output text overlap, and normal windows resize from their four corners.
 - `v1.88.0b` centralizes the active version in `os/VERSION`. Build artifacts,
   ISO volume IDs, and kernel `LARDOS_VERSION` now use generated build plumbing
   from that one file instead of repeating the version string.

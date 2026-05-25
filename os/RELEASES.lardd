@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.88.1p
+ITEM Hotpatches the desktop window manager so inactive windows are drawn as real saved app windows instead of flat preview cards.
+ITEM Adds corner resize handling for normal windows; users can drag the four corners while fullscreen remains a separate explicit mode.
+ITEM Fixes APPKIT responsive layout label spacing so input/output/progress labels reserve vertical room instead of overlapping neighboring widgets.
+ITEM Keeps custom RXE/SYSRXE UI freedom intact: responsive layouts avoid accidental overlap, while authored absolute layouts can still choose unusual placement.
+
 SECTION v1.88.0b
 ITEM Adds os/VERSION as the single source for the active release version.
 ITEM Makefile reads VERSION for release names, hardware-profile artifact paths, and ISO volume IDs instead of carrying a second hard-coded version.

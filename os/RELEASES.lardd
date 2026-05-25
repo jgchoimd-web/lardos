@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.87.0b
+ITEM Adds LiveUpdate, a runtime layer for changing files and file-owned code while LardOS is already running.
+ITEM liveupdate file name text replaces a writable/user-owned file immediately; liveupdate apply/code also reloads the matching code registry.
+ITEM .kmo changes reload KMO commands, .sysrxe and .rxe changes reload app registries and GUI launchers, .drfl reloads driver descriptors, .fstwts reloads filesystem translation, and .ltheme/.lguilib apply visual state.
+ITEM Read-only built-in targets become user-owned overlays instead of blocking the user, keeping rollback/tombstone visibility and preserving the original built-in file path.
+ITEM Adds liveupdate from source destination and liveupdate auto on/off plumbing for future automatic update flows.
+ITEM Ships as beta because live runtime update is broad and should be exercised before official promotion.
+
 SECTION v1.86.0b
 ITEM Prepares the bootloader/staging path for future growth without removing features to fit.
 ITEM Stage2 now writes boot metadata to bootinfo v2: kernel size, total sectors, high-memory copy address, loader chunk size, boot image sector count, persistent-store start, and kernel capacity.

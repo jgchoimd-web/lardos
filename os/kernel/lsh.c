@@ -47,6 +47,7 @@
 #include "net.h"
 #include "kmodtalk.h"
 #include "kmo.h"
+#include "liveupdate.h"
 #include "io.h"
 #include "pci.h"
 #include "syscall.h"
@@ -340,7 +341,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
-    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "bleed", 0 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
@@ -1821,7 +1822,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -1835,6 +1836,7 @@ static void cmd_help(const char* args)
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
     out_append("  kmo list|create|command|raw|set|delete|show|run  .kmo kernel modules and file-defined shell commands\n");
+    out_append("  liveupdate status|apply|file|append|from|reload|auto|test  runtime file/code updates\n");
     out_append("  tomb list|show|hide|drop file|clear  inspect or delete DEL -F hard-delete records\n");
     out_append("  bleed [dryrun] [overflow] [drive:]file  force-delete broken files; overflow wipes slots first\n");
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
@@ -2245,6 +2247,24 @@ static void cmd_status(const char* args)
     out_append_u32(bm.boot_chunk_sectors);
     out_append(", high=");
     out_append_hex32(bm.high_copy_paddr);
+    out_append("\n");
+
+    liveupdate_info_t lu;
+    liveupdate_info(&lu);
+    out_append("LiveUpdate: gen=");
+    out_append_u32(lu.generation);
+    out_append(", writes=");
+    out_append_u32(lu.writes);
+    out_append(", reloads=");
+    out_append_u32(lu.reloads);
+    out_append(", failures=");
+    out_append_u32(lu.failures);
+    out_append(", auto=");
+    out_append(lu.auto_enabled ? "on" : "off");
+    out_append(", last=");
+    out_append(lu.last_file[0] ? lu.last_file : "(none)");
+    out_append("/");
+    out_append(lu.last_scope);
     out_append("\n");
 
     gui_screenram_info_t sram;
@@ -6998,6 +7018,110 @@ static void cmd_append(const char* args)
     cmd_write_like(args, 1);
 }
 
+static const char* liveupdate_payload(const char* args, char* out, uint32_t cap)
+{
+    const char* p = lsh_skip_spaces(args);
+    uint32_t n = 0;
+    if (!out || cap == 0) return "";
+    if (*p == '"' || *p == '\'') {
+        char q = *p++;
+        while (*p && *p != q && n + 1u < cap) out[n++] = *p++;
+    } else {
+        while (*p && n + 1u < cap) out[n++] = *p++;
+    }
+    out[n] = '\0';
+    return out;
+}
+
+static void cmd_liveupdate(const char* args)
+{
+    const char* p = args;
+    char sub[20];
+    char a[64];
+    char b[64];
+    char payload[512];
+    char reply[160];
+    int r;
+
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        liveupdate_info_t info;
+        liveupdate_info(&info);
+        out_append("LiveUpdate gen=");
+        out_append_u32(info.generation);
+        out_append(" writes=");
+        out_append_u32(info.writes);
+        out_append(" reloads=");
+        out_append_u32(info.reloads);
+        out_append(" failures=");
+        out_append_u32(info.failures);
+        out_append(" auto=");
+        out_append(info.auto_enabled ? "on" : "off");
+        out_append(" last=");
+        out_append(info.last_file[0] ? info.last_file : "(none)");
+        out_append(" scope=");
+        out_append(info.last_scope);
+        out_append(" result=");
+        out_append_i32(info.last_result);
+        out_append("\n");
+        out_append(info.last_detail);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "auto") == 0) {
+        if (vcs_read_word(&p, a, sizeof(a)) != 0) {
+            out_append("Usage: liveupdate auto on|off\n");
+            return;
+        }
+        r = (strcmp(a, "on") == 0 || strcmp(a, "1") == 0 ||
+             strcmp(a, "yes") == 0) ? liveupdate_set_auto(1) : liveupdate_set_auto(0);
+        out_append(r == 0 ? "liveupdate: auto policy changed.\n" : "liveupdate: auto policy failed.\n");
+        return;
+    }
+    if (strcmp(sub, "reload") == 0) {
+        if (vcs_read_word(&p, a, sizeof(a)) != 0) snprintf(a, sizeof(a), "all");
+        r = liveupdate_reload(a, reply, sizeof(reply));
+        out_append(r == 0 ? "liveupdate reload: " : "liveupdate reload failed: ");
+        out_append(reply);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(liveupdate_selftest() == 0 ? "liveupdate: selftest OK\n" : "liveupdate: selftest failed\n");
+        return;
+    }
+    if (strcmp(sub, "from") == 0) {
+        if (vcs_read_word(&p, a, sizeof(a)) != 0 ||
+            vcs_read_word(&p, b, sizeof(b)) != 0) {
+            out_append("Usage: liveupdate from source destination\n");
+            return;
+        }
+        r = liveupdate_apply_from_file(a, b, LIVEUPDATE_FLAG_RELOAD, reply, sizeof(reply));
+        out_append(r == 0 ? "liveupdate: " : "liveupdate failed: ");
+        out_append(reply);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "file") == 0 || strcmp(sub, "write") == 0 ||
+        strcmp(sub, "apply") == 0 || strcmp(sub, "code") == 0 ||
+        strcmp(sub, "append") == 0) {
+        uint32_t flags = LIVEUPDATE_FLAG_DECODE;
+        if (strcmp(sub, "apply") == 0 || strcmp(sub, "code") == 0) flags |= LIVEUPDATE_FLAG_RELOAD;
+        if (strcmp(sub, "append") == 0) flags |= LIVEUPDATE_FLAG_APPEND | LIVEUPDATE_FLAG_RELOAD;
+        if (vcs_read_word(&p, a, sizeof(a)) != 0) {
+            out_append("Usage: liveupdate apply file text-with-\\n-escapes\n");
+            return;
+        }
+        (void)liveupdate_payload(p, payload, sizeof(payload));
+        r = liveupdate_apply_text(a, payload, flags, reply, sizeof(reply));
+        out_append(r == 0 ? "liveupdate: " : "liveupdate failed: ");
+        out_append(reply);
+        out_append("\n");
+        return;
+    }
+    out_append("Usage: liveupdate status|file name text|apply name text|append name text|from src dst|reload scope|auto on|off|test\n");
+}
+
 static void fsw_append_s(FsWritableFile* w, const char* s)
 {
     uint32_t n = 0;
@@ -9266,6 +9390,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) lardkit_trace_event("kmodtalk", cmd, 0);
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
+    if (strcmp(cmd, "liveupdate") == 0 || strcmp(cmd, "live") == 0) lardkit_trace_event("liveupdate", cmd, 0);
     if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
     if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0 || strcmp(cmd, "bleed") == 0) lardkit_trace_event("fs", cmd, 0);
     if (strcmp(cmd, "crash") == 0) lardkit_trace_event("crash", cmd, 0);
@@ -9392,6 +9517,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "rxe") == 0) { cmd_rxe(args); return; }
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) { cmd_kmodtalk(args); return; }
     if (strcmp(cmd, "kmo") == 0) { cmd_kmo(args); return; }
+    if (strcmp(cmd, "liveupdate") == 0 || strcmp(cmd, "live") == 0) { cmd_liveupdate(args); return; }
     if (strcmp(cmd, "larddnotes") == 0 || strcmp(cmd, "notes") == 0) { cmd_larddnotes(args); return; }
     if (strcmp(cmd, "larsform") == 0) { cmd_larsform(args); return; }
     if (strcmp(cmd, "larsact") == 0) { cmd_larsact(args); return; }
@@ -9520,6 +9646,7 @@ void lsh_init(void)
     lvcs_init();
     lardkit_init();
     kmodtalk_init();
+    liveupdate_init();
     (void)kmo_reload();
     out_append("Lard Shell ready. Type help for commands.\n");
 }

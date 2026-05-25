@@ -45,12 +45,19 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.86.0b-ami/lardos-v1.86.0b-ami.iso`. To publish the whole hardware
+`release/v1.87.0b-ami/lardos-v1.87.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.87.0b` adds LiveUpdate for runtime file/code changes. `liveupdate file`
+replaces a user-owned file immediately, while `liveupdate apply` / `code`
+reloads matching `.kmo`, `.rxe`, `.sysrxe`, `.drfl`, `.fstwts`, `.ltheme`, or
+`.lguilib` state without rebooting. Built-in read-only targets become
+user-owned overlays, so the user can update OS-owned files while the original
+path remains recoverable.
 
 `v1.86.0b` prepares the bootloader/staging path for future growth. Stage2 now
 records bootinfo v2 metadata for kernel size, sector count, high-memory copy
@@ -305,6 +312,10 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.87.0b` adds LiveUpdate runtime file/code apply. It can replace or append
+  user-owned files, overlay read-only built-ins, reload KMO/RXE/SYSRXE/driver/
+  FSTWT/theme state, and expose future auto-update policy through
+  `liveupdate auto on|off`.
 - `v1.86.0b` adds bootmeta growth readiness: stage2 exposes kernel size,
   capacity, high-copy address, and free boot headroom through `status`, `post`,
   `bootmap`, and `bootreplay`, while `mkimg` layout parameters are now

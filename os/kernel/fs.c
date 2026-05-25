@@ -370,6 +370,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use kmod list and kmod gui/fs/task/oslink/boot/time/vm/sysrxe status to talk directly with kernel modules.\n"
     "li Use kmo list, kmo run user-kmo, kmo create mine.kmo gui status, kmo set mine.kmo text hello, and kmo delete mine.kmo for user-owned .kmo kernel module files.\n"
     "li Use kmo raw rawdoor.kmo sum or set RAW 1 / TARGET raw in a .kmo when you explicitly want dangerous raw-control behavior.\n"
+    "li Use liveupdate apply hot.kmo KMO 1\\nID hot\\nCOMMAND hot\\nTARGET boot\\nDEFAULT status\\n to change file-owned code while LardOS is running.\n"
     "li Use ren old.txt new.txt, rename selected NewName, or the desktop Rename button to rename files, apps, and folders.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, http 3, boot 4.\n"
@@ -465,6 +466,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.87.0b adds LiveUpdate runtime file/code apply for writable overlays, KMO/RXE/SYSRXE reloads, drivers, FSTWT, themes, and future auto-update plumbing.\n"
     "li v1.86.0b adds bootmeta growth readiness: stage2 exposes kernel size, image capacity, high-copy address, and free boot headroom.\n"
     "li v1.85.0b adds APPKIT responsive UI layout and smarter desktop icon placement for bundled/user apps.\n"
     "li v1.84.1p hotpatches PS/2 mouse batching so pointer motion stays responsive under heavier GUI work.\n"
@@ -1130,6 +1132,29 @@ static const uint8_t file_kmo_guide[] =
     "ITEM Raw-control KMO is intentionally dangerous. It exists because the user owns the machine, not because it is the safest path.\n"
     "END\n";
 
+static const uint8_t file_liveupdate_guide[] =
+    "LARDD 1\n"
+    "TITLE LiveUpdate Runtime File And Code Updates\n"
+    "TEXT LiveUpdate is the runtime update layer for changing LardOS files and file-owned code while the OS is already running.\n"
+    "TEXT It is meant as the base for later automatic updates, without hiding power or removing user control.\n"
+    "SECTION Commands\n"
+    "ITEM liveupdate status\n"
+    "ITEM liveupdate file notes.txt text\n"
+    "ITEM liveupdate apply module.kmo KMO 1\\nID m\\nCOMMAND m\\nTARGET boot\\nDEFAULT status\\n\n"
+    "ITEM liveupdate append app.rxe TEXT more\n"
+    "ITEM liveupdate from update.tmp userapp.sysrxe\n"
+    "ITEM liveupdate reload kmo|sysrxe|rxe|drivers|fstwt|ltheme|lguilib|all\n"
+    "ITEM liveupdate auto on|off\n"
+    "SECTION Reload Scopes\n"
+    "ITEM .kmo reloads the KMO registry so kernel-module command files can change live.\n"
+    "ITEM .sysrxe and .rxe reload app registries and refresh the GUI launchers without rebooting.\n"
+    "ITEM .drfl reloads driver descriptors, .fstwts reloads filesystem translation, .ltheme and .lguilib apply display state.\n"
+    "SECTION Ownership\n"
+    "ITEM If a target is a read-only built-in file, LiveUpdate creates a user-owned overlay with the same name.\n"
+    "ITEM The original built-in file is hidden rather than destroyed, so rollback/tombstone tools remain visible.\n"
+    "ITEM Raw-control KMO and SUM still exist for deliberately dangerous paths; LiveUpdate does not remove them.\n"
+    "END\n";
+
 static const uint8_t file_gui_status_kmo[] =
     "KMO 1\n"
     "ID gui-status\n"
@@ -1261,6 +1286,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file webstack_guide.lardd\n"
     "CHECK file webdemo.lars\n"
     "CHECK file fstwt_guide.lardd\n"
+    "CHECK file liveupdate_guide.lardd\n"
     "CHECK file default.fstwts\n"
     "CHECK writable fstwt.fstwts\n"
     "CHECK command fstwt\n"
@@ -1294,6 +1320,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command pathmap\n"
     "CHECK command kmod\n"
     "CHECK command kmo\n"
+    "CHECK command liveupdate\n"
     "CHECK file sysrxe_guide.lardd\n"
     "CHECK file rxe_guide.lardd\n"
     "CHECK file rxr_guide.lardd\n"
@@ -1398,6 +1425,7 @@ static const FsFile FS_FILES[] = {
     { "webstack_guide.lardd", file_webstack_guide, sizeof(file_webstack_guide) - 1 },
     { "webdemo.lars", file_webdemo_lars, sizeof(file_webdemo_lars) - 1 },
     { "fstwt_guide.lardd", file_fstwt_guide, sizeof(file_fstwt_guide) - 1 },
+    { "liveupdate_guide.lardd", file_liveupdate_guide, sizeof(file_liveupdate_guide) - 1 },
     { "default.fstwts", file_default_fstwts, sizeof(file_default_fstwts) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },

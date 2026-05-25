@@ -22,6 +22,7 @@
 #include "lil.h"
 #include "lguilib.h"
 #include "lassist.h"
+#include "liveupdate.h"
 #include "lpack.h"
 #include "lsh.h"
 #include "lss.h"
@@ -147,6 +148,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: webstack guide", fs_open("webstack_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: webdemo lars", fs_open("webdemo.lars") != NULL, emit, user, &pass, &fail);
     post_check("fs: fstwt guide", fs_open("fstwt_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: liveupdate guide", fs_open("liveupdate_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: default fstwt", fs_open("default.fstwts") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreport writable", fs_open_writable("bugreport.lardd") != NULL, emit, user, &pass, &fail);
@@ -196,6 +198,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("rxe: normal executable parser", rxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("kmodtalk: direct module channel", kmodtalk_selftest() == 0, emit, user, &pass, &fail);
     post_check("kmo: file commands and raw-control modules", kmo_selftest() == 0, emit, user, &pass, &fail);
+    post_check("liveupdate: runtime file/code apply", liveupdate_selftest() == 0, emit, user, &pass, &fail);
     post_check("imgglyph: user-editable Unicode slots", img_glyph_selftest() == 0, emit, user, &pass, &fail);
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);

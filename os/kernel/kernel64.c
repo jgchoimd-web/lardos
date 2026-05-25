@@ -51,6 +51,31 @@ static char s_boot_report[768];
 static int s_boot_awakening_mode;
 static uint32_t s_awake_background_phase;
 
+#define MOUSE_POLL_BUDGET 48
+
+static int pump_mouse_input(void)
+{
+    int handled = 0;
+
+    /*
+     * PS/2 mouse movement arrives as 3 or 4 bytes. Polling only once per GUI
+     * frame consumes at most one byte, so heavier rendering makes the pointer
+     * feel delayed. Drain a bounded batch, preserve every button transition,
+     * then let the caller render once.
+     */
+    for (int i = 0; i < MOUSE_POLL_BUDGET; i++) {
+        int dx = 0;
+        int dy = 0;
+        int btn = 0;
+        if (ps2_mouse_poll(&dx, &dy, &btn) == 0) {
+            gui_handle_mouse(dx, dy, btn);
+            handled = 1;
+        }
+    }
+
+    return handled;
+}
+
 static void vga_put_byte(uint8_t b, void* userdata)
 {
     uint8_t color = *(uint8_t*)userdata;
@@ -636,9 +661,7 @@ void kmain(void)
     vga_puts("Native TLS loaded (external TLS removed)\n", 0x2F);
 
     for (;;) {
-        int dx = 0, dy = 0, btn = 0;
-        if (ps2_mouse_poll(&dx, &dy, &btn) == 0) {
-            gui_handle_mouse(dx, dy, btn);
+        if (pump_mouse_input()) {
             gui_render();
         }
         ps2_key_t k;

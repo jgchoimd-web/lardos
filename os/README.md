@@ -45,12 +45,16 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.84.0b-ami/lardos-v1.84.0b-ami.iso`. To publish the whole hardware
+`release/v1.84.1p-ami/lardos-v1.84.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.84.1p` hotpatches mouse movement latency. The kernel now drains a bounded
+batch of PS/2 mouse bytes before rendering once, so click/drag/wheel events are
+kept intact while heavier GUI work no longer makes the pointer feel delayed.
 
 `v1.84.0b` adds `crash`, an explicit raw-control diagnostic command for OS
 inspection and recovery-path testing. `crash status` and `crash dryrun mode`
@@ -290,6 +294,9 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.84.1p` hotpatches PS/2 mouse input batching so pointer motion stays
+  responsive under heavier GUI/kernel work without dropping click/drag/wheel
+  behavior.
 - `v1.84.0b` adds the raw `crash` diagnostic command for deliberate PanicRoom,
   crashlog, capsule, CPU exception, and reset-path testing.
 - `v1.83.1b` adds `bleed overflow file` for bounded wipe-before-delete behavior

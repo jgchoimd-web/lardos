@@ -465,6 +465,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.84.1p hotpatches PS/2 mouse batching so pointer motion stays responsive under heavier GUI work.\n"
     "li v1.84.0b adds crash, a raw-control diagnostic command for deliberate PanicRoom and CPU fault testing.\n"
     "li v1.83.1b adds bleed overflow, a bounded in-slot wipe-before-delete option for stubborn broken files.\n"
     "li v1.83.0b adds bleed, a last-resort visible delete sweep for broken files across RAM, read-only delete overlays, and media stores.\n"

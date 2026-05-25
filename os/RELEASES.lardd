@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.84.1p
+ITEM Hotpatches mouse movement latency by draining bounded PS/2 mouse batches before each GUI render.
+ITEM Preserves every click, drag, wheel, and cursor Unicode path while avoiding one full redraw per mouse packet.
+ITEM Fixes the v1.84.0b regression where heavier GUI/kernel work could make pointer motion feel slow or strange.
+ITEM Ships as p because this is a focused usability regression hotpatch with no feature or value-policy change.
+
 SECTION v1.84.0b
 ITEM Adds crash, an explicit raw-control diagnostic command for OS inspection, PanicRoom testing, and fault-path verification.
 ITEM crash status and crash dryrun mode show what will happen without crashing.

@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.88.1p-ami/lardos-v1.88.1p-ami.iso`. To publish the whole hardware
+`release/v1.88.2p-ami/lardos-v1.88.2p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.88.2p` adds stable stretch resize mode. By default, corner-drag resizing
+stretches/squashes the current window image during the drag and commits the real
+layout when the mouse is released. Use `renderfx resize live` for the previous
+live reflow behavior or `renderfx resize stretch` to return to the stable mode.
 
 `v1.88.1p` hotpatches the desktop window manager: inactive windows are rendered
 from their saved app state instead of as flat previews, APPKIT responsive labels
@@ -119,6 +124,8 @@ is still no anti-aliasing for the sharp LardOS look. Users can choose
 color-preserving multiplicative brightness with `renderfx brightness 50..150`;
 store ScreenRAM through pixel least-significant bits with `renderfx lsb on`; and
 sample a VGA-style blanking window for two-stage blits with `renderfx vblank on`.
+Window resizing can use `renderfx resize stretch` for stable stretch/squash
+preview or `renderfx resize live` for immediate live reflow.
 
 `v1.79.1p` hotpatches the SSAV screensaver generator so generated `.ssav`
 files match the documented 16-byte header and frame data starts at `0x10`, the
@@ -307,10 +314,12 @@ commands:
   scratch RAM. Use `sram on` for the default corner, `sram rect x y w h` for a
   user-selected area, then `sram write offset text` and `sram read offset len`.
   `sram lsb on` or `renderfx lsb on` stores those bytes in rendered pixel LSBs.
-- `renderfx status|aa|brightness|lsb|vblank|test` controls optional display
+- `renderfx status|aa|brightness|resize|lsb|vblank|test` controls optional display
   post-processing. `aa none` is the default, `aa antianti` sharpens away
   antialiasing, `aa basic` smooths, and `aa nonlinear` keeps sharp edges crisp
-  while smoothing low-contrast areas.
+  while smoothing low-contrast areas. `resize stretch` previews corner resizing
+  by stretching/squashing the current window image; `resize live` reflows during
+  the drag.
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.
@@ -322,6 +331,9 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.88.2p` adds stable stretch resize mode. `renderfx resize stretch` avoids
+  live layout churn while dragging a window corner; `renderfx resize live`
+  restores the previous immediate reflow behavior.
 - `v1.88.1p` hotpatches GUI overlap and window control. Inactive windows now
   render as saved app windows, APPKIT responsive label spacing prevents accidental
   input/output text overlap, and normal windows resize from their four corners.

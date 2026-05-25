@@ -37,11 +37,14 @@ void gui_reload_sysrxe_apps(void);
 #define GUI_AA_UNAA 1
 #define GUI_AA_BASIC 2
 #define GUI_AA_NONLINEAR 3
+#define GUI_RESIZE_LIVE 0
+#define GUI_RESIZE_STRETCH 1
 
 typedef struct {
     uint32_t aa_mode;
     uint32_t brightness;
     uint32_t quality;
+    uint32_t resize_mode;
     uint32_t screenram_lsb;
     uint32_t vblank_mode;
     uint32_t vblank_frames;
@@ -54,6 +57,8 @@ int gui_render_set_aa_mode(int mode);
 int gui_render_aa_mode(void);
 int gui_render_set_brightness(int percent);
 int gui_render_brightness(void);
+int gui_resize_set_mode(int mode);
+int gui_resize_mode(void);
 int gui_screenram_lsb_enable(int on);
 int gui_screenram_lsb_mode(void);
 int gui_vblank_enable(int on);

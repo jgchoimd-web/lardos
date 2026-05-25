@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.88.2p
+ITEM Adds a stable stretch resize mode for windows: during corner drag, LardOS stretches/squashes the current window image and commits the real layout when the mouse is released.
+ITEM renderfx resize stretch enables the stable mode, while renderfx resize live keeps the previous live reflow behavior available.
+ITEM RenderFX status now reports the active resize mode so users can see which behavior is running.
+ITEM This is a hotpatch for GUI stability and preserves the existing corner resize, fullscreen, RXE/SYSRXE, and APPKIT behavior.
+
 SECTION v1.88.1p
 ITEM Hotpatches the desktop window manager so inactive windows are drawn as real saved app windows instead of flat preview cards.
 ITEM Adds corner resize handling for normal windows; users can drag the four corners while fullscreen remains a separate explicit mode.

@@ -237,12 +237,17 @@ typedef struct {
     int drag_off_y;
     int resizing;
     int resize_mode;
+    int resize_visual_mode;
     int resize_start_mx;
     int resize_start_my;
     int resize_start_x;
     int resize_start_y;
     int resize_start_w;
     int resize_start_h;
+    int resize_preview_x;
+    int resize_preview_y;
+    int resize_preview_w;
+    int resize_preview_h;
 
     // Button inside window
     int btn_pressed;
@@ -840,6 +845,24 @@ static void fb_draw_image_scaled(const fb_t* f, int x, int y, const uint32_t* pi
     }
 }
 
+static void fb_blit_scaled_rect(const fb_t* dst, const fb_t* src,
+                                int sx, int sy, int sw, int sh,
+                                int dx, int dy, int dw, int dh)
+{
+    if (!dst || !src || !dst->fb || !src->fb || sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
+    for (int y = 0; y < dh; y++) {
+        int ty = dy + y;
+        int src_y = sy + (y * sh) / dh;
+        if (ty < 0 || ty >= (int)dst->h || src_y < 0 || src_y >= (int)src->h) continue;
+        for (int x = 0; x < dw; x++) {
+            int tx = dx + x;
+            int src_x = sx + (x * sw) / dw;
+            if (tx < 0 || tx >= (int)dst->w || src_x < 0 || src_x >= (int)src->w) continue;
+            fb_putpixel(dst, (uint16_t)tx, (uint16_t)ty, fb_getpixel(src, (uint16_t)src_x, (uint16_t)src_y));
+        }
+    }
+}
+
 int gui_init(void)
 {
     g_have_fb = (fb_from_bootinfo(&g_fb) == 0);
@@ -893,12 +916,17 @@ int gui_init(void)
     g.dragging = 0;
     g.resizing = 0;
     g.resize_mode = 0;
+    g.resize_visual_mode = GUI_RESIZE_STRETCH;
     g.resize_start_mx = 0;
     g.resize_start_my = 0;
     g.resize_start_x = 0;
     g.resize_start_y = 0;
     g.resize_start_w = 0;
     g.resize_start_h = 0;
+    g.resize_preview_x = g.win_x;
+    g.resize_preview_y = g.win_y;
+    g.resize_preview_w = g.win_w;
+    g.resize_preview_h = g.win_h;
     g.btn_pressed = 0;
     g.btn_clicks = 0;
     g.tb_focused = 0;
@@ -1212,6 +1240,21 @@ int gui_render_brightness(void)
     return g.brightness;
 }
 
+int gui_resize_set_mode(int mode)
+{
+    if (mode != GUI_RESIZE_LIVE && mode != GUI_RESIZE_STRETCH) return -1;
+    g.resize_visual_mode = mode;
+    return 0;
+}
+
+int gui_resize_mode(void)
+{
+    if (g.resize_visual_mode != GUI_RESIZE_LIVE && g.resize_visual_mode != GUI_RESIZE_STRETCH) {
+        return GUI_RESIZE_STRETCH;
+    }
+    return g.resize_visual_mode;
+}
+
 int gui_vblank_enable(int on)
 {
     g.vblank_mode = on ? 1 : 0;
@@ -1230,6 +1273,7 @@ void gui_render_info(gui_render_info_t* out)
     out->aa_mode = (uint32_t)g.aa_mode;
     out->brightness = (uint32_t)g.brightness;
     out->quality = (uint32_t)g.quality;
+    out->resize_mode = (uint32_t)gui_resize_mode();
     out->screenram_lsb = g_screenram_lsb_mode;
     out->vblank_mode = (uint32_t)g.vblank_mode;
     out->vblank_frames = g.vblank_frames;
@@ -1243,6 +1287,7 @@ int gui_render_effects_selftest(void)
     int old_aa = g.aa_mode;
     int old_br = g.brightness;
     int old_vblank = g.vblank_mode;
+    int old_resize = g.resize_visual_mode;
     gui_screenram_info_t old_sr;
     int ok = 1;
     gui_screenram_info(&old_sr);
@@ -1255,9 +1300,13 @@ int gui_render_effects_selftest(void)
     if (gui_render_set_brightness(49) != 0 || g.brightness != 50) ok = 0;
     if (gui_screenram_lsb_enable(1) != 0 || !g_screenram_lsb_mode) ok = 0;
     if (gui_vblank_enable(1) != 0 || !g.vblank_mode) ok = 0;
+    if (gui_resize_set_mode(GUI_RESIZE_LIVE) != 0 || gui_resize_mode() != GUI_RESIZE_LIVE) ok = 0;
+    if (gui_resize_set_mode(GUI_RESIZE_STRETCH) != 0 || gui_resize_mode() != GUI_RESIZE_STRETCH) ok = 0;
+    if (gui_resize_set_mode(7) == 0) ok = 0;
     g.aa_mode = old_aa;
     g.brightness = old_br;
     g.vblank_mode = old_vblank;
+    g.resize_visual_mode = old_resize;
     g_screenram_lsb_mode = old_sr.lsb_mode;
     g_screenram_enabled = old_sr.enabled;
     g_screenram_x = old_sr.x;
@@ -2366,7 +2415,7 @@ static int gui_resize_corner_hit(int x, int y)
     return 0;
 }
 
-static void gui_apply_resize_drag(void)
+static void gui_compute_resize_rect(int* out_x, int* out_y, int* out_w, int* out_h)
 {
     int left;
     int top;
@@ -2374,7 +2423,13 @@ static void gui_apply_resize_drag(void)
     int bottom;
     int dx;
     int dy;
-    if (!g_have_fb || !g.resizing || g.fullscreen) return;
+    if (!g_have_fb || !g.resizing || g.fullscreen) {
+        if (out_x) *out_x = g.win_x;
+        if (out_y) *out_y = g.win_y;
+        if (out_w) *out_w = g.win_w;
+        if (out_h) *out_h = g.win_h;
+        return;
+    }
     dx = g.mx - g.resize_start_mx;
     dy = g.my - g.resize_start_my;
     left = g.resize_start_x;
@@ -2415,10 +2470,42 @@ static void gui_apply_resize_drag(void)
     }
     if (left < 0) left = 0;
     if (top < 0) top = 0;
-    g.win_x = left;
-    g.win_y = top;
-    g.win_w = right - left;
-    g.win_h = bottom - top;
+    if (out_x) *out_x = left;
+    if (out_y) *out_y = top;
+    if (out_w) *out_w = right - left;
+    if (out_h) *out_h = bottom - top;
+}
+
+static void gui_commit_resize_preview(void)
+{
+    if (!g_have_fb || g.fullscreen) return;
+    if (g.resize_visual_mode == GUI_RESIZE_STRETCH) {
+        g.win_x = g.resize_preview_x;
+        g.win_y = g.resize_preview_y;
+        g.win_w = g.resize_preview_w;
+        g.win_h = g.resize_preview_h;
+    }
+    gui_clamp_window();
+    gui_sync_active_window();
+}
+
+static void gui_apply_resize_drag(void)
+{
+    int x;
+    int y;
+    int w;
+    int h;
+    if (!g_have_fb || !g.resizing || g.fullscreen) return;
+    gui_compute_resize_rect(&x, &y, &w, &h);
+    g.resize_preview_x = x;
+    g.resize_preview_y = y;
+    g.resize_preview_w = w;
+    g.resize_preview_h = h;
+    if (g.resize_visual_mode == GUI_RESIZE_STRETCH && g_have_bb) return;
+    g.win_x = x;
+    g.win_y = y;
+    g.win_w = w;
+    g.win_h = h;
     gui_clamp_window();
     gui_sync_active_window();
 }
@@ -4251,6 +4338,16 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     }
     if (settings_capture) return;
 
+    if (g.resizing) {
+        if (!l_down) {
+            gui_commit_resize_preview();
+            g.resizing = 0;
+            g.resize_mode = 0;
+            return;
+        }
+        gui_apply_resize_drag();
+        return;
+    }
     if (!g.fullscreen && l_pressed) {
         int mode = gui_resize_corner_hit(g.mx, g.my);
         if (mode) {
@@ -4262,17 +4359,13 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             g.resize_start_y = g.win_y;
             g.resize_start_w = g.win_w;
             g.resize_start_h = g.win_h;
+            g.resize_preview_x = g.win_x;
+            g.resize_preview_y = g.win_y;
+            g.resize_preview_w = g.win_w;
+            g.resize_preview_h = g.win_h;
             g.dragging = 0;
             return;
         }
-    }
-    if (!l_down) {
-        g.resizing = 0;
-        g.resize_mode = 0;
-    }
-    if (g.resizing) {
-        gui_apply_resize_drag();
-        return;
     }
 
     // Title bar drag (top 20px of window, exclude settings button)
@@ -5068,6 +5161,16 @@ void gui_render(void)
         return;
     }
 
+    fb_t* real_tgt = tgt;
+    fb_t* resize_src = &g_fb;
+    int stretch_resize = g.resizing && gui_resize_mode() == GUI_RESIZE_STRETCH && g_have_bb;
+    if (stretch_resize) {
+        fb_fill_rect(resize_src, (uint16_t)g.win_x, (uint16_t)g.win_y,
+                     (uint16_t)g.win_w, (uint16_t)g.win_h, g_bg);
+        tgt = resize_src;
+        g_syscall_target_override = tgt;
+    }
+
     // Window frame
     uint32_t win_bg = 0xFF20252B;
     uint32_t title_bg = 0xFF172126;
@@ -5453,8 +5556,22 @@ void gui_render(void)
         fb_fill_rect(tgt, (uint16_t)(track_x + aa_pos), (uint16_t)(panel_y + 10 + row_h * 3), 6, 12, 0xFF7BE0D6);
     }
 
+    if (stretch_resize) {
+        fb_blit_scaled_rect(real_tgt, resize_src,
+                            g.win_x, g.win_y, g.win_w, g.win_h,
+                            g.resize_preview_x, g.resize_preview_y,
+                            g.resize_preview_w, g.resize_preview_h);
+        gui_draw_resize_grip_at(real_tgt, g.resize_preview_x, g.resize_preview_y,
+                                g.resize_preview_w, g.resize_preview_h, 0xFFFFD166u);
+        tgt = real_tgt;
+        g_syscall_target_override = tgt;
+    }
+
     lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my,
-                 (uint32_t)g.win_x, (uint32_t)g.win_y, (uint32_t)g.win_w, (uint32_t)g.win_h);
+                 (uint32_t)(stretch_resize ? g.resize_preview_x : g.win_x),
+                 (uint32_t)(stretch_resize ? g.resize_preview_y : g.win_y),
+                 (uint32_t)(stretch_resize ? g.resize_preview_w : g.win_w),
+                 (uint32_t)(stretch_resize ? g.resize_preview_h : g.win_h));
 
     screenram_flush_to_target(tgt);
     // Cursor last: its hotspot may reach the bottom/right edge while the art clips past it.

@@ -1852,7 +1852,7 @@ static void cmd_help(const char* args)
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
-    out_append("  renderfx status|aa|brightness|lsb|vblank|test  user-owned render modes\n");
+    out_append("  renderfx status|aa|brightness|resize|lsb|vblank|test  user-owned render modes\n");
     out_append("  fstwt show|sample|clear|test      live .fstwts path translator/virtual-FS scripts\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
@@ -1967,6 +1967,7 @@ static void cmd_control(const char* args)
     out_append("  kmo run mine.kmo    route that .kmo through KModTalk\n");
     out_append("  sram on             use a quiet screen corner as scratch RAM\n");
     out_append("  renderfx aa none|antianti|basic|nonlinear tune display filtering\n");
+    out_append("  renderfx resize stretch|live choose stable stretch-preview or live reflow resizing\n");
     out_append("  renderfx lsb on     store ScreenRAM in quiet pixel least-significant bits\n");
     out_append("  renderfx vblank on  detect VGA-style blanking for two-phase final blits\n");
     out_append("  screencheck retro   draw a retro boot/storage-style screen check\n");
@@ -2679,6 +2680,11 @@ static const char* render_aa_name(uint32_t mode)
     return "none";
 }
 
+static const char* render_resize_name(uint32_t mode)
+{
+    return mode == GUI_RESIZE_LIVE ? "live" : "stretch";
+}
+
 static int render_parse_aa(const char* value, int* out)
 {
     if (!value || !out) return -1;
@@ -2707,6 +2713,8 @@ static void cmd_renderfx_status(void)
     out_append_u32(info.brightness);
     out_append(" quality=");
     out_append_u32(info.quality);
+    out_append(" resize=");
+    out_append(render_resize_name(info.resize_mode));
     out_append("\n  screenram-lsb=");
     out_append(info.screenram_lsb ? "on" : "off");
     out_append(" vblank=");
@@ -2761,6 +2769,27 @@ static void cmd_renderfx(const char* args)
         out_append("\n");
         return;
     }
+    if (strcmp(sub, "resize") == 0 || strcmp(sub, "winresize") == 0 || strcmp(sub, "rubber") == 0) {
+        char mode[24];
+        if (vcs_read_word(&args, mode, sizeof(mode)) != 0 || cfgsh_is_status_word(mode)) {
+            out_append("renderfx resize=");
+            out_append(render_resize_name((uint32_t)gui_resize_mode()));
+            out_append("\n");
+            return;
+        }
+        if (strcmp(mode, "live") == 0 || strcmp(mode, "reflow") == 0 || strcmp(mode, "0") == 0) {
+            (void)gui_resize_set_mode(GUI_RESIZE_LIVE);
+            out_append("renderfx: resize live\n");
+        } else if (strcmp(mode, "stretch") == 0 || strcmp(mode, "stable") == 0 ||
+                   strcmp(mode, "squash") == 0 || strcmp(mode, "rubber") == 0 ||
+                   strcmp(mode, "1") == 0 || strcmp(mode, "on") == 0) {
+            (void)gui_resize_set_mode(GUI_RESIZE_STRETCH);
+            out_append("renderfx: resize stretch\n");
+        } else {
+            out_append("Usage: renderfx resize live|stretch\n");
+        }
+        return;
+    }
     if (strcmp(sub, "lsb") == 0 || strcmp(sub, "screenlsb") == 0) {
         char v[16];
         int on = 0;
@@ -2793,7 +2822,7 @@ static void cmd_renderfx(const char* args)
         out_append(gui_render_effects_selftest() == 0 ? "renderfx: selftest OK\n" : "renderfx: selftest failed\n");
         return;
     }
-    out_append("Usage: renderfx status|aa|brightness|lsb|vblank|test\n");
+    out_append("Usage: renderfx status|aa|brightness|resize|lsb|vblank|test\n");
 }
 
 static void screencheck_report(const screencheck_info_t* info)

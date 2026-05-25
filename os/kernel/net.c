@@ -972,32 +972,67 @@ static uint32_t str_len(const char* s)
     return n;
 }
 
+static char ascii_upper(char c)
+{
+    if (c >= 'a' && c <= 'z') return (char)(c - ('a' - 'A'));
+    return c;
+}
+
 static int http_method_eq(const char* method, const char* expect)
 {
     uint32_t i = 0;
     if (!method || !expect) return 0;
     while (method[i] && expect[i]) {
-        if (method[i] != expect[i]) return 0;
+        if (ascii_upper(method[i]) != expect[i]) return 0;
         i++;
     }
     return method[i] == '\0' && expect[i] == '\0';
 }
 
+static int http_method_kind(const char* method)
+{
+    if (http_method_eq(method, "POST")) return 1;
+    if (http_method_eq(method, "HEAD")) return 2;
+    if (http_method_eq(method, "PUT")) return 3;
+    if (http_method_eq(method, "PATCH")) return 4;
+    if (http_method_eq(method, "DELETE")) return 5;
+    if (http_method_eq(method, "OPTIONS")) return 6;
+    return 0;
+}
+
 static int http_method_is_post(const char* method)
 {
-    return http_method_eq(method, "POST");
+    return http_method_kind(method) == 1;
 }
 
 static int http_method_is_head(const char* method)
 {
-    return http_method_eq(method, "HEAD");
+    return http_method_kind(method) == 2;
+}
+
+static int http_method_has_body(const char* method)
+{
+    int kind = http_method_kind(method);
+    return kind == 1 || kind == 3 || kind == 4;
+}
+
+static int http_method_redirect_needs_preserve(const char* method)
+{
+    int kind = http_method_kind(method);
+    return kind == 1 || kind == 3 || kind == 4 || kind == 5;
 }
 
 static const char* http_method_verb(const char* method)
 {
-    if (http_method_is_post(method)) return "POST";
-    if (http_method_is_head(method)) return "HEAD";
-    return "GET";
+    switch (http_method_kind(method)) {
+    case 1: return "POST";
+    case 2: return "HEAD";
+    case 3: return "PUT";
+    case 4: return "PATCH";
+    case 5: return "DELETE";
+    case 6: return "OPTIONS";
+    default: return "GET";
+    }
 }
 
 static int req_puts(char* out, uint32_t cap, uint32_t* pos, const char* s)
@@ -1049,9 +1084,9 @@ static int build_http_request(char* req,
 {
     if (!req || cap < 64 || !host || !path || !out_len) return -1;
     uint32_t p = 0;
-    int is_post = http_method_is_post(method);
+    int has_body = http_method_has_body(method);
     const char* verb = http_method_verb(method);
-    if (!is_post) {
+    if (!has_body) {
         body = NULL;
         body_len = 0;
     } else if (body && body_len == 0) {
@@ -1068,7 +1103,7 @@ static int build_http_request(char* req,
     if (req_puts(req, cap, &p, " HTTP/1.0\r\nHost: ") != 0) return -2;
     if (req_puts(req, cap, &p, host) != 0) return -2;
     if (req_puts(req, cap, &p, "\r\nConnection: close\r\n") != 0) return -2;
-    if (is_post) {
+    if (has_body) {
         if (req_puts(req, cap, &p, "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: ") != 0) return -2;
         if (req_put_u32(req, cap, &p, body_len) != 0) return -2;
         if (req_puts(req, cap, &p, "\r\n\r\n") != 0) return -2;
@@ -1599,11 +1634,10 @@ int net_http_request(net_stack_t* n,
 {
     // Follow up to 1 redirect.
     net_cfg_t cfg;
-    int is_post = http_method_is_post(method);
+    int preserve_redirect = http_method_redirect_needs_preserve(method);
     const char* verb = http_method_verb(method);
     lardkit_netwatch_record("http", verb, (int32_t)body_len);
-    lardkit_trace_event("net", http_method_is_post(method) ? "http POST" :
-                               http_method_is_head(method) ? "http HEAD" : "http GET", (int32_t)port);
+    lardkit_trace_event("net", verb, (int32_t)port);
     if (net_get_cfg(n, &cfg) != 0) {
         cfg.dns = (ip4_t){{10, 0, 2, 3}};
     }
@@ -1614,7 +1648,7 @@ int net_http_request(net_stack_t* n,
     if (r != 0) return r;
 
     if ((st == 301 || st == 302 || st == 307 || st == 308) && loc[0] != '\0') {
-        if (is_post && st != 307 && st != 308) return 0;
+        if (preserve_redirect && st != 307 && st != 308) return 0;
         char nhost[128];
         char npath[128];
         if (parse_location(loc, str_len(loc), nhost, sizeof(nhost), npath, sizeof(npath)) == 0) {
@@ -1665,11 +1699,10 @@ int net_https_request(net_stack_t* n,
                       uint32_t out_cap)
 {
     net_cfg_t cfg;
-    int is_post = http_method_is_post(method);
+    int preserve_redirect = http_method_redirect_needs_preserve(method);
     const char* verb = http_method_verb(method);
     lardkit_netwatch_record("https", verb, (int32_t)body_len);
-    lardkit_trace_event("net", http_method_is_post(method) ? "https POST" :
-                               http_method_is_head(method) ? "https HEAD" : "https GET", (int32_t)port);
+    lardkit_trace_event("net", verb, (int32_t)port);
     if (net_get_cfg(n, &cfg) != 0) cfg.dns = (ip4_t){{10, 0, 2, 3}};
     if (out && out_cap) out[0] = '\0';
 
@@ -1679,7 +1712,7 @@ int net_https_request(net_stack_t* n,
     if (r != 0) return r;
 
     if ((st == 301 || st == 302 || st == 307 || st == 308) && loc[0] != '\0') {
-        if (is_post && st != 307 && st != 308) return 0;
+        if (preserve_redirect && st != 307 && st != 308) return 0;
         char nhost[128];
         char npath[128];
         if (parse_location(loc, str_len(loc), nhost, sizeof(nhost), npath, sizeof(npath)) == 0) {
@@ -1752,5 +1785,17 @@ int net_http_selftest(void)
     if (!has_prefix_exact(req, "HEAD /status HTTP/1.0\r\n")) return -8;
     if (has_substr(req, "Content-Length")) return -9;
     if (!http_method_is_head("HEAD") || http_method_is_post("HEAD")) return -10;
+    if (build_http_request(req, sizeof(req), "PUT", "example.com", "/item", "x=2", 0u, &len) != 0) return -11;
+    if (!has_prefix_exact(req, "PUT /item HTTP/1.0\r\n")) return -12;
+    if (!has_substr(req, "Content-Length: 3\r\n\r\nx=2")) return -13;
+    if (build_http_request(req, sizeof(req), "patch", "example.com", "/item", "y=3", 0u, &len) != 0) return -14;
+    if (!has_prefix_exact(req, "PATCH /item HTTP/1.0\r\n")) return -15;
+    if (!has_substr(req, "Content-Length: 3\r\n\r\ny=3")) return -16;
+    if (build_http_request(req, sizeof(req), "DELETE", "example.com", "/item", "ignored", 7u, &len) != 0) return -17;
+    if (!has_prefix_exact(req, "DELETE /item HTTP/1.0\r\n")) return -18;
+    if (has_substr(req, "Content-Length")) return -19;
+    if (build_http_request(req, sizeof(req), "OPTIONS", "example.com", "*", "ignored", 7u, &len) != 0) return -20;
+    if (!has_prefix_exact(req, "OPTIONS * HTTP/1.0\r\n")) return -21;
+    if (has_substr(req, "Content-Length")) return -22;
     return 0;
 }

@@ -275,8 +275,8 @@ static void draw_button_feedback(const guioverlay_state_t* s)
     uint32_t btn_y = content_y + 36u;
     uint32_t btn_h = 28u;
     if (s->app_id == 0u) {
-        uint32_t dx[] = { 0u, 52u, 120u, 176u, 236u };
-        uint32_t ww[] = { 48u, 64u, 52u, 56u, 50u };
+        uint32_t dx[] = { 0u, 52u, 120u, 196u, 256u };
+        uint32_t ww[] = { 48u, 64u, 72u, 56u, 50u };
         for (uint32_t i = 0; i < 5u; i++) {
             uint32_t x = btn_x + dx[i];
             int hover = in_rect(s->mouse_x, s->mouse_y, x, btn_y, ww[i], btn_h);

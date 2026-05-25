@@ -45,12 +45,19 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.91.1p-ami/lardos-v1.91.1p-ami.iso`. To publish the whole hardware
+`release/v1.92.0b-ami/lardos-v1.92.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.92.0b` expands the native internet stack without adding an external browser
+or library. HTTP/HTTPS now supports `GET`, `POST`, `HEAD`, `PUT`, `PATCH`,
+`DELETE`, and `OPTIONS`; the GUI Doc tab cycles through all seven methods, and
+CFGSH accepts `http 1..7`. `POST`, `PUT`, and `PATCH` use `URL|body`; `DELETE`
+and `OPTIONS` stay bodyless and visible. NetWatch, LardTrace, WebStack docs,
+POST, and LUNIT all see the expanded method surface.
 
 `v1.91.1p` hotpatches GUI window resize hit-testing so only the visible
 bottom-right resize grip starts a resize drag. Other corners return to normal
@@ -266,10 +273,11 @@ These formats are record-based, readable without a renderer, and parsed by frees
 inside the kernel. External HTML can still be read through Lafillo, but LardOS
 does not use HTML or Markdown for its own built-in documents.
 
-The Doc tab can choose GET, POST, or HEAD for HTTP/HTTPS requests. In POST mode,
-type `URL|body` in the address field; the in-kernel request builder sends the
-body with `Content-Length` and `application/x-www-form-urlencoded`. In HEAD
-mode, the same transport asks for headers without a body.
+The Doc tab can choose GET, POST, HEAD, PUT, PATCH, DELETE, or OPTIONS for
+HTTP/HTTPS requests. In POST, PUT, or PATCH mode, type `URL|body` in the address
+field; the in-kernel request builder sends the body with `Content-Length` and
+`application/x-www-form-urlencoded`. HEAD, DELETE, and OPTIONS stay bodyless and
+visible.
 
 The classic GUI stays as the main surface. A separate GUI overlay chrome layer
 is drawn above it to show the active app, repaint compact-safe tabs when space
@@ -644,9 +652,10 @@ commands:
 - `lardtrace on|off|show|module name` and the shorter `trace` alias turn on
   LardTrace, a small event ring for kernel modules, shell commands, OSLink,
   TaskPrio, networking, and LPack.
-- `webstack status|guide|demo|selftest` exposes the native web stack: LARS
-  links/fetch records and HTTP/HTTPS GET/POST/HEAD request building.
-- `netwatch on|off|show` records readable UDP, OSLink, and HTTP/HTTPS GET/POST/HEAD
+- `webstack status|methods|guide|demo|selftest` exposes the native web stack:
+  LARS links/fetch records and HTTP/HTTPS GET/POST/HEAD/PUT/PATCH/DELETE/OPTIONS
+  request building.
+- `netwatch on|off|show` records readable UDP, OSLink, and HTTP/HTTPS method
   activity into `netwatch.lardd`.
 - `journal show|add|clear` opens the automatic `journal.lardd` event log.
 - `rollback snap|last|apply` snapshots and restores user-visible settings such as
@@ -800,7 +809,8 @@ profile rules.
 
 The kernel networking stack owns DHCP, DNS, IPv4, UDP, a small TCP path, and
 plain HTTP. HTTP requests are no longer GET-only: the shared request builder can
-send GET, POST, or HEAD, and the Doc tab exposes that as a method option. OSLink uses
+send GET, POST, HEAD, PUT, PATCH, DELETE, or OPTIONS, and the Doc tab exposes
+that as a method option. OSLink uses
 UDP port 39010 for hello, ping, text, acknowledgement, safe exec, and
 peer-discovery packets between LardOS nodes. Local OSLink messages never leave
 the kernel; they use the same inbox shape with a lightweight channel label.

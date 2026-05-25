@@ -68,6 +68,11 @@
 #define GUI_HTTP_GET 0
 #define GUI_HTTP_POST 1
 #define GUI_HTTP_HEAD 2
+#define GUI_HTTP_PUT 3
+#define GUI_HTTP_PATCH 4
+#define GUI_HTTP_DELETE 5
+#define GUI_HTTP_OPTIONS 6
+#define GUI_HTTP_METHOD_COUNT 7
 
 typedef struct {
     int app;
@@ -369,11 +374,25 @@ typedef struct {
 
 static gui_state_t g;
 
-static const char* gui_http_method_label(void)
+const char* gui_http_method_name_for(int method)
 {
-    if (g.http_post_mode == GUI_HTTP_POST) return "POST";
-    if (g.http_post_mode == GUI_HTTP_HEAD) return "HEAD";
+    if (method == GUI_HTTP_POST) return "POST";
+    if (method == GUI_HTTP_HEAD) return "HEAD";
+    if (method == GUI_HTTP_PUT) return "PUT";
+    if (method == GUI_HTTP_PATCH) return "PATCH";
+    if (method == GUI_HTTP_DELETE) return "DELETE";
+    if (method == GUI_HTTP_OPTIONS) return "OPTIONS";
     return "GET";
+}
+
+const char* gui_http_method_name(void)
+{
+    return gui_http_method_name_for(g.http_post_mode);
+}
+
+int gui_http_method_has_body(int method)
+{
+    return method == GUI_HTTP_POST || method == GUI_HTTP_PUT || method == GUI_HTTP_PATCH;
 }
 
 static int fb_from_bootinfo(fb_t* out)
@@ -4828,7 +4847,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     int btn_y = content_y_m + 36;
     int btn_w = 120;
     int btn_h = 28;
-    int lafillo_w[] = { 48, 64, 52, 56, 50 };
+    int lafillo_w[] = { 48, 64, 72, 56, 50 };
     int lafaelo_btn_w = 56;
     if (custom_ui_m) {
         if (l_pressed && gui_ui_button_at(g.mx, g.my)) {
@@ -4877,7 +4896,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             } else if (hit == 1) {
                 g.submit_pending = 1;
             } else if (hit == 2) {
-                g.http_post_mode = (g.http_post_mode + 1) % 3;
+                g.http_post_mode = (g.http_post_mode + 1) % GUI_HTTP_METHOD_COUNT;
             } else if (hit == 3) {
                 FsWritableFile* w = fs_open_writable("lafillo_saved.txt");
                 if (w) {
@@ -5381,18 +5400,19 @@ int gui_take_submit(gui_http_request_t* out)
     g.submit_pending = 0;
     if (!out) return 1;
 
-    const char* method = gui_http_method_label();
-    out->method[0] = method[0];
-    out->method[1] = method[1];
-    out->method[2] = method[2];
-    out->method[3] = method[3];
-    out->method[4] = '\0';
+    const char* method = gui_http_method_name();
+    uint32_t mi = 0;
+    while (method[mi] && mi + 1u < GUI_HTTP_METHOD_MAX) {
+        out->method[mi] = method[mi];
+        mi++;
+    }
+    out->method[mi] = '\0';
     out->body[0] = '\0';
     out->body_len = 0;
 
     uint32_t split = g.tb_len;
     int have_split = 0;
-    if (g.http_post_mode == GUI_HTTP_POST) {
+    if (gui_http_method_has_body(g.http_post_mode)) {
         for (uint32_t i = 0; i < g.tb_len; i++) {
             if (g.tb[i] == '|') {
                 split = i;
@@ -5412,7 +5432,7 @@ int gui_take_submit(gui_http_request_t* out)
     }
 
     gui_copy_trim(out->url, GUI_HTTP_URL_MAX, g.tb, 0, split);
-    if (g.http_post_mode == GUI_HTTP_POST && have_split && split + 1u < g.tb_len) {
+    if (gui_http_method_has_body(g.http_post_mode) && have_split && split + 1u < g.tb_len) {
         out->body_len = gui_copy_trim(out->body, GUI_HTTP_BODY_MAX, g.tb, split + 1u, g.tb_len);
     }
     return 1;
@@ -5430,13 +5450,13 @@ int gui_http_post_mode(void)
 
 void gui_http_set_method(int method)
 {
-    if (method < GUI_HTTP_GET || method > GUI_HTTP_HEAD) method = GUI_HTTP_GET;
+    if (method < GUI_HTTP_GET || method >= GUI_HTTP_METHOD_COUNT) method = GUI_HTTP_GET;
     g.http_post_mode = method;
 }
 
 int gui_http_method(void)
 {
-    if (g.http_post_mode < GUI_HTTP_GET || g.http_post_mode > GUI_HTTP_HEAD) return GUI_HTTP_GET;
+    if (g.http_post_mode < GUI_HTTP_GET || g.http_post_mode >= GUI_HTTP_METHOD_COUNT) return GUI_HTTP_GET;
     return g.http_post_mode;
 }
 
@@ -5681,10 +5701,10 @@ void gui_render(void)
         /* File-defined apps draw their own UI widgets through APPKIT. */
     } else if (g.app_id == 0) {
         static const char* lafillo_labels[] = { "Go", "Refresh", "", "Save", "Src" };
-        int dx[] = { 0, 52, 120, 176, 236 };
-        int dww[] = { 48, 64, 52, 56, 50 };
+        int dx[] = { 0, 52, 120, 196, 256 };
+        int dww[] = { 48, 64, 72, 56, 50 };
         for (int d = 0; d < 5; d++) {
-            const char* label = (d == 2) ? gui_http_method_label() : lafillo_labels[d];
+            const char* label = (d == 2) ? gui_http_method_name() : lafillo_labels[d];
             uint32_t dbg = g.btn_pressed ? 0xFFFFB84D : 0xFF2B7A78;
             fb_fill_rect(tgt, (uint16_t)(btn_x + dx[d]), (uint16_t)btn_y, (uint16_t)dww[d], (uint16_t)btn_h, dbg);
             fb_draw_text(tgt, (uint16_t)(btn_x + dx[d] + 4), (uint16_t)(btn_y + 10), label, 0xFFFFFFFF, dbg);
@@ -5729,7 +5749,7 @@ void gui_render(void)
     const rxe_app_t* input_rx = rxe_get_by_app(g.app_id);
     if (input_sx) input_label = input_sx->input_label;
     if (input_rx) input_label = input_rx->input_label;
-    if (g.app_id == 0 && g.http_post_mode == GUI_HTTP_POST) input_label = "URL|Body:";
+    if (g.app_id == 0 && gui_http_method_has_body(g.http_post_mode)) input_label = "URL|Body:";
     if (g.app_id == 1) input_label = "Expr:";
     else if (g.app_id == 2) input_label = "Add line:";
     else if (g.app_id == 4) input_label = "File:";

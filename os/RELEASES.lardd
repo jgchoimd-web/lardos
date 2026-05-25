@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.92.0b
+ITEM Expands the native internet stack with HTTP/HTTPS PUT, PATCH, DELETE, and OPTIONS beside the existing GET, POST, and HEAD.
+ITEM The GUI Doc tab and CFGSH can cycle/select methods 1..7; POST, PUT, and PATCH accept URL|body while DELETE and OPTIONS stay bodyless.
+ITEM NetWatch and LardTrace now record the selected generic method name instead of hard-coding only GET/POST/HEAD.
+ITEM webstack methods documents the full native method surface, and POST/LUNIT coverage checks the extended request builder.
+ITEM Ships as beta because this is a broad WebStack expansion, while preserving LARS, LARDD, NetWatch, TLS, GET/POST/HEAD, and user-owned method choice.
+
 SECTION v1.91.1p
 ITEM Hotpatches GUI window resize hit-testing so only the visible bottom-right resize grip starts a resize drag.
 ITEM Left-top, right-top, and left-bottom corners no longer resize windows, preventing accidental reverse-corner resizing while moving or selecting windows.

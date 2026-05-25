@@ -85,6 +85,7 @@ static void lsh_putc(char c, void* user);
 static void parse_and_run(const char* cmd, const char* args);
 static int cfgsh_is_status_word(const char* value);
 static int cfgsh_bool_value(const char* value, int* out);
+static int ascii_streq_ci(const char* a, const char* b);
 
 static const char* env_get(const char* name)
 {
@@ -235,10 +236,19 @@ static void out_append_i64(int64_t v)
 
 static const char* lsh_http_method_name(void)
 {
-    int method = gui_http_method();
-    if (method == 1) return "POST";
-    if (method == 2) return "HEAD";
-    return "GET";
+    return gui_http_method_name();
+}
+
+static int lsh_http_method_from_value(const char* value)
+{
+    if (ascii_streq_ci(value, "get") || strcmp(value, "1") == 0 || ascii_streq_ci(value, "off")) return 0;
+    if (ascii_streq_ci(value, "post") || strcmp(value, "2") == 0 || ascii_streq_ci(value, "on")) return 1;
+    if (ascii_streq_ci(value, "head") || strcmp(value, "3") == 0) return 2;
+    if (ascii_streq_ci(value, "put") || strcmp(value, "4") == 0) return 3;
+    if (ascii_streq_ci(value, "patch") || strcmp(value, "5") == 0) return 4;
+    if (ascii_streq_ci(value, "delete") || ascii_streq_ci(value, "del") || strcmp(value, "6") == 0) return 5;
+    if (ascii_streq_ci(value, "options") || ascii_streq_ci(value, "option") || strcmp(value, "7") == 0) return 6;
+    return -1;
 }
 
 static void out_append_hex16(uint16_t v)
@@ -1846,7 +1856,7 @@ static void cmd_help(const char* args)
     out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
     out_append("  post baseline, bootreplay show, bootmap, oldcheck, devmap boot/POST/device views\n");
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
-    out_append("  webstack status|guide|demo|selftest for native LARS/HTTP method support\n");
+    out_append("  webstack status|methods|guide|demo|selftest for native LARS/HTTP method support\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  wallpaper status|color|pattern|bmp|use|reload|reset  user-owned desktop wallpaper\n");
@@ -3219,7 +3229,7 @@ static void cmd_larsact(const char* args)
         const char* target = a.command;
         if (ascii_prefix_ci(target, "file://")) target += 7;
         if (ascii_prefix_ci(target, "http://") || ascii_prefix_ci(target, "https://")) {
-            out_append("larsact: network link; open it in the Doc tab or use cfgsh http 1|2|3 first.\n");
+            out_append("larsact: network link; open it in the Doc tab or choose a method with cfgsh http 1..7 first.\n");
             return;
         }
         if (lardkit_larsview_open(target) == 0) {
@@ -3248,11 +3258,22 @@ static void cmd_webstack(const char* args)
         out_append("  transport: HTTP/HTTPS in kernel, no external web library\n");
         out_append("  method: ");
         out_append(lsh_http_method_name());
-        out_append(" (cfgsh http 1=GET 2=POST 3=HEAD)\n");
+        out_append(" (cfgsh http 1..7 GET/POST/HEAD/PUT/PATCH/DELETE/OPTIONS)\n");
         out_append("  documents: LARS link/fetch/button/input, LARDD guides\n");
         out_append("  builder selftest: ");
         out_append(net_http_selftest() == 0 ? "OK" : "FAIL");
         out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "methods") == 0 || strcmp(sub, "method") == 0) {
+        out_append("WebStack methods\n");
+        out_append("  1 GET      read resource\n");
+        out_append("  2 POST     submit URL|body form data\n");
+        out_append("  3 HEAD     headers/status only\n");
+        out_append("  4 PUT      replace/create with URL|body\n");
+        out_append("  5 PATCH    partial update with URL|body\n");
+        out_append("  6 DELETE   request removal without request body\n");
+        out_append("  7 OPTIONS  ask server for supported methods\n");
         return;
     }
     if (strcmp(sub, "guide") == 0 || strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
@@ -3267,7 +3288,7 @@ static void cmd_webstack(const char* args)
         out_append(net_http_selftest() == 0 ? "webstack: selftest OK\n" : "webstack: selftest failed\n");
         return;
     }
-    out_append("Usage: webstack status|guide|demo|selftest\n");
+    out_append("Usage: webstack status|methods|guide|demo|selftest\n");
 }
 
 static void cmd_lpack_show(const char* file_arg, const uint8_t* data, uint32_t size, int verbose)
@@ -4180,7 +4201,7 @@ static void cmd_rollback_status(void)
         out_append("buddy=");
         out_append_u32(info.buddy_enabled);
         out_append(" http=");
-        out_append(info.http_post == 1u ? "POST" : info.http_post == 2u ? "HEAD" : "GET");
+        out_append(gui_http_method_name_for((int)info.http_post));
         out_append(" boot=");
         out_append(info.boot_profile);
         out_append(" prio=");
@@ -4745,7 +4766,7 @@ static void cmd_cfgprof(const char* args)
             out_append(" boot=");
             out_append(p.boot_profile);
             out_append(" http=");
-            out_append(p.http_post == 1u ? "POST" : p.http_post == 2u ? "HEAD" : "GET");
+            out_append(gui_http_method_name_for((int)p.http_post));
             out_append(" prio=");
             out_append_i32(p.task_default);
             out_append("\n");
@@ -9147,7 +9168,7 @@ static void cfgsh_help(void)
     out_append("  brightness 50..150 multiplicative color-preserving brightness\n");
     out_append("  lsb on|off         store ScreenRAM bits in rendered pixel LSBs\n");
     out_append("  vblank on|off      use detected blanking window for final blit\n");
-    out_append("  http 1|2|3         GET|POST|HEAD mode\n");
+    out_append("  http 1..7          GET|POST|HEAD|PUT|PATCH|DELETE|OPTIONS mode\n");
     out_append("  boot 1..5          normal|safe|netoff|dev|awakening\n");
     out_append("  priority 0..10     default background task priority\n");
     out_append("  sandbox on|off     default LARDX sandbox run mode\n");
@@ -9401,17 +9422,14 @@ static int cfgsh_apply(const char* setting, const char* args)
             out_append("\n");
             return 1;
         }
-        if (strcmp(value, "get") == 0 || strcmp(value, "1") == 0 || strcmp(value, "off") == 0) {
-            gui_http_set_method(0);
-            out_append("cfgsh: http=GET\n");
-        } else if (strcmp(value, "post") == 0 || strcmp(value, "2") == 0 || strcmp(value, "on") == 0) {
-            gui_http_set_method(1);
-            out_append("cfgsh: http=POST\n");
-        } else if (strcmp(value, "head") == 0 || strcmp(value, "3") == 0) {
-            gui_http_set_method(2);
-            out_append("cfgsh: http=HEAD\n");
+        int http_method = lsh_http_method_from_value(value);
+        if (http_method >= 0) {
+            gui_http_set_method(http_method);
+            out_append("cfgsh: http=");
+            out_append(gui_http_method_name_for(http_method));
+            out_append("\n");
         } else {
-            out_append("Usage: http get|post|head or 1|2|3\n");
+            out_append("Usage: http get|post|head|put|patch|delete|options or 1..7\n");
         }
         return 1;
     }

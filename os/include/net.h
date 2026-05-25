@@ -78,5 +78,5 @@ int net_https_get(net_stack_t* n,
                   char* out,
                   uint32_t out_cap);
 
-/* Parser/builder selftest for the native HTTP method layer. Does not open the network. */
+/* Parser/builder selftest for GET/POST/HEAD/PUT/PATCH/DELETE/OPTIONS. Does not open the network. */
 int net_http_selftest(void);

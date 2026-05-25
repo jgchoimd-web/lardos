@@ -1374,8 +1374,7 @@ int lardkit_cfgprof_write(void)
         report_append(w, " boot ");
         report_append(w, s_lardkit.cfgprof[i].boot_profile);
         report_append(w, " http ");
-        report_append(w, s_lardkit.cfgprof[i].http_post == 1u ? "POST" :
-                         s_lardkit.cfgprof[i].http_post == 2u ? "HEAD" : "GET");
+        report_append(w, gui_http_method_name_for((int)s_lardkit.cfgprof[i].http_post));
         report_append(w, " priority ");
         report_append_i32(w, s_lardkit.cfgprof[i].task_default);
         report_append(w, "\n");

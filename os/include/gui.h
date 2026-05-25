@@ -30,7 +30,10 @@ void gui_set_loading(int on);
 void gui_http_set_post_mode(int on);
 int gui_http_post_mode(void);
 void gui_http_set_method(int method);
-int gui_http_method(void); /* 0=GET, 1=POST, 2=HEAD */
+int gui_http_method(void); /* 0=GET, 1=POST, 2=HEAD, 3=PUT, 4=PATCH, 5=DELETE, 6=OPTIONS */
+const char* gui_http_method_name(void);
+const char* gui_http_method_name_for(int method);
+int gui_http_method_has_body(int method);
 void gui_reload_sysrxe_apps(void);
 
 #define GUI_AA_NONE 0

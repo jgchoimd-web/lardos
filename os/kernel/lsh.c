@@ -342,7 +342,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "bleed", 0 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
@@ -1822,7 +1822,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -1849,6 +1849,7 @@ static void cmd_help(const char* args)
     out_append("  webstack status|guide|demo|selftest for native LARS/HTTP method support\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
+    out_append("  wallpaper status|color|pattern|bmp|use|reload|reset  user-owned desktop wallpaper\n");
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
@@ -1947,6 +1948,7 @@ static void cmd_control(const char* args)
     out_append("  panicroom texture   draw the real16 LPR default texture\n");
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
+    out_append("  wallpaper bmp sample.bmp       tile a user-chosen BMP as the desktop background\n");
     out_append("  glyph live U+E000 on            enable realtime hover/click rendering for a picture glyph\n");
     out_append("  glyph pixel U+E000 0 0 ff00ff  edit an assigned Unicode picture slot in-place\n");
     out_append("  cursor mouse      restore the pretty mouse at U+E004 as the default Unicode cursor\n");
@@ -2823,6 +2825,129 @@ static void cmd_renderfx(const char* args)
         return;
     }
     out_append("Usage: renderfx status|aa|brightness|resize|lsb|vblank|test\n");
+}
+
+static void cmd_wallpaper_status(void)
+{
+    gui_wallpaper_info_t info;
+    gui_wallpaper_info(&info);
+    out_append("Wallpaper\n  mode=");
+    out_append(info.name);
+    out_append(" color=");
+    out_append_hex32(info.color1);
+    out_append(" color2=");
+    out_append_hex32(info.color2);
+    if (info.mode == GUI_WALLPAPER_BMP) {
+        out_append("\n  file=");
+        out_append(info.file[0] ? info.file : "(none)");
+        out_append(" size=");
+        out_append_u32(info.bmp_w);
+        out_append("x");
+        out_append_u32(info.bmp_h);
+    }
+    out_append(" last_error=");
+    out_append_u32(info.last_error);
+    out_append("\n  config=wallpaper.lardd (run sync to persist)\n");
+}
+
+static int cmd_wallpaper_read_color(const char** args, uint32_t* out)
+{
+    uint64_t v;
+    if (lsh_parse_u64(args, &v) != 0 || v > 0xFFFFFFFFull) return -1;
+    *out = (uint32_t)v;
+    return 0;
+}
+
+static void cmd_wallpaper_changed(const char* detail)
+{
+    lardkit_journal_event("wallpaper", detail);
+    lardkit_trace_event("gui", "wallpaper", 0);
+    cmd_wallpaper_status();
+}
+
+static void cmd_wallpaper(const char* args)
+{
+    char sub[24];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "show") == 0 ||
+        strcmp(sub, "info") == 0) {
+        cmd_wallpaper_status();
+        return;
+    }
+    if (strcmp(sub, "color") == 0 || strcmp(sub, "colour") == 0 ||
+        strcmp(sub, "plain") == 0 || strcmp(sub, "solid") == 0) {
+        uint32_t c;
+        (void)lardkit_snapshot("wallpaper");
+        if (cmd_wallpaper_read_color(&args, &c) != 0) {
+            out_append("Usage: wallpaper color 0xRRGGBB\n");
+            return;
+        }
+        if (gui_wallpaper_set_color(c) == 0) cmd_wallpaper_changed("color");
+        else out_append("wallpaper: color failed.\n");
+        return;
+    }
+    if (strcmp(sub, "pattern") == 0 || strcmp(sub, "style") == 0) {
+        char name[24];
+        uint32_t c1;
+        uint32_t c2;
+        gui_wallpaper_info_t info;
+        gui_wallpaper_info(&info);
+        c1 = info.color1;
+        c2 = info.color2;
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: wallpaper pattern grid|stripes|checker [color] [color2]\n");
+            return;
+        }
+        (void)lardkit_snapshot("wallpaper");
+        (void)cmd_wallpaper_read_color(&args, &c1);
+        (void)cmd_wallpaper_read_color(&args, &c2);
+        if (gui_wallpaper_set_pattern(name, c1, c2) == 0) cmd_wallpaper_changed("pattern");
+        else out_append("Usage: wallpaper pattern grid|stripes|checker [color] [color2]\n");
+        return;
+    }
+    if (strcmp(sub, "bmp") == 0 || strcmp(sub, "image") == 0 || strcmp(sub, "tile") == 0) {
+        char file[32];
+        (void)lardkit_snapshot("wallpaper");
+        if (vcs_read_word(&args, file, sizeof(file)) != 0) {
+            out_append("Usage: wallpaper bmp file.bmp\n");
+            return;
+        }
+        if (gui_wallpaper_set_bmp(file) == 0) cmd_wallpaper_changed("bmp");
+        else out_append("wallpaper: BMP not found, unsupported, or larger than 128x128.\n");
+        return;
+    }
+    if (strcmp(sub, "use") == 0 || strcmp(sub, "load") == 0) {
+        char file[32];
+        (void)lardkit_snapshot("wallpaper");
+        if (vcs_read_word(&args, file, sizeof(file)) != 0) {
+            out_append("Usage: wallpaper use file.lwall|wallpaper.lardd\n");
+            return;
+        }
+        if (gui_wallpaper_load_config_file(file) == 0) cmd_wallpaper_changed("use");
+        else out_append("wallpaper: config file could not be loaded.\n");
+        return;
+    }
+    if (strcmp(sub, "reload") == 0 || strcmp(sub, "refresh") == 0) {
+        if (gui_wallpaper_reload() == 0) cmd_wallpaper_changed("reload");
+        else out_append("wallpaper: reload failed.\n");
+        return;
+    }
+    if (strcmp(sub, "reset") == 0 || strcmp(sub, "default") == 0) {
+        (void)lardkit_snapshot("wallpaper");
+        if (gui_wallpaper_reset() == 0) cmd_wallpaper_changed("reset");
+        else out_append("wallpaper: reset failed.\n");
+        return;
+    }
+    if (strcmp(sub, "save") == 0 || strcmp(sub, "sync") == 0) {
+        cmd_fssave("");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(gui_wallpaper_selftest() == 0 ? "wallpaper: selftest OK\n" : "wallpaper: selftest failed\n");
+        return;
+    }
+    out_append("Usage: wallpaper status|color 0xRRGGBB|pattern grid|stripes|checker [c1] [c2]|bmp file.bmp|use file|reload|reset|save|test\n");
 }
 
 static void screencheck_report(const screencheck_info_t* info)
@@ -9015,6 +9140,7 @@ static void cfgsh_help(void)
     out_append("  buddy on|off|mood  roaming easygoing assistant\n");
     out_append("  bugeye on|off      visual bug monitor\n");
     out_append("  ltheme name        classic|contrast|night|amber\n");
+    out_append("  wallpaper color|grid|stripes|checker|bmp  desktop background\n");
     out_append("  rollback snap|apply settings snapshot restore\n");
     out_append("  sram on|off        screen scratch RAM\n");
     out_append("  aa 0..3            none|antianti|basic|nonlinear render filter\n");
@@ -9038,6 +9164,7 @@ static void cfgsh_status(void)
     lassist_info_t buddy;
     lardkit_bugeye_info_t be;
     lardkit_theme_info_t th;
+    gui_wallpaper_info_t wp;
     lardkit_rollback_info_t rb;
     bootprof_info(&bp);
     awake_info(&aw);
@@ -9046,6 +9173,7 @@ static void cfgsh_status(void)
     lassist_info(&buddy);
     lardkit_bugeye_info(&be);
     lardkit_theme_info(&th);
+    gui_wallpaper_info(&wp);
     lardkit_rollback_info(&rb);
     out_append("CFGSH status\n");
     out_append("  boot=");
@@ -9060,6 +9188,8 @@ static void cfgsh_status(void)
     out_append(be.enabled ? "on" : "off");
     out_append(" theme=");
     out_append(th.name);
+    out_append(" wallpaper=");
+    out_append(wp.name);
     out_append("\n  sram=");
     out_append(sr.enabled ? "on" : "off");
     out_append(" lsb=");
@@ -9152,6 +9282,26 @@ static int cfgsh_apply(const char* setting, const char* args)
         if (!have_value || cfgsh_is_status_word(value)) { cmd_ltheme_status(); return 1; }
         if (lardkit_theme_use(value) == 0) cmd_ltheme_status();
         else out_append("Usage: ltheme classic|contrast|night|amber\n");
+        return 1;
+    }
+    if (strcmp(setting, "wallpaper") == 0 || strcmp(setting, "wall") == 0 || strcmp(setting, "background") == 0) {
+        char cmdline[96];
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_wallpaper_status(); return 1; }
+        if (strcmp(value, "grid") == 0 || strcmp(value, "stripes") == 0 || strcmp(value, "checker") == 0) {
+            snprintf(cmdline, sizeof(cmdline), "pattern %s %s", value, rest);
+            cmd_wallpaper(cmdline);
+        } else if (strcmp(value, "plain") == 0 || strcmp(value, "solid") == 0 || strcmp(value, "color") == 0) {
+            snprintf(cmdline, sizeof(cmdline), "color %s", rest);
+            cmd_wallpaper(cmdline);
+        } else if (strcmp(value, "bmp") == 0 || strcmp(value, "image") == 0) {
+            snprintf(cmdline, sizeof(cmdline), "bmp %s", rest);
+            cmd_wallpaper(cmdline);
+        } else if (strcmp(value, "reset") == 0 || strcmp(value, "reload") == 0 || strcmp(value, "save") == 0) {
+            cmd_wallpaper(value);
+        } else {
+            snprintf(cmdline, sizeof(cmdline), "pattern %s %s", value, rest);
+            cmd_wallpaper(cmdline);
+        }
         return 1;
     }
     if (strcmp(setting, "rollback") == 0 || strcmp(setting, "undo") == 0) {
@@ -9369,6 +9519,7 @@ int lsh_cfgsh_selftest(void)
     if (!s || strcmp(s, "awakening") != 0) return -6;
     if (render_parse_aa("nonlinear", &on) != 0 || on != GUI_AA_NONLINEAR) return -7;
     if (gui_render_effects_selftest() != 0) return -8;
+    if (gui_wallpaper_selftest() != 0) return -9;
     return 0;
 }
 
@@ -9425,7 +9576,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "crash") == 0) lardkit_trace_event("crash", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
         strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) lardkit_trace_event("taskprio", cmd, 0);
-    if (strcmp(cmd, "ltheme") == 0 ||
+    if (strcmp(cmd, "ltheme") == 0 || strcmp(cmd, "wallpaper") == 0 || strcmp(cmd, "wall") == 0 ||
         strcmp(cmd, "glyph") == 0 || strcmp(cmd, "glyphs") == 0 || strcmp(cmd, "uglyph") == 0 ||
         strcmp(cmd, "picglyph") == 0) lardkit_trace_event("gui", cmd, 0);
 
@@ -9509,6 +9660,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oschat") == 0) { cmd_oschat(args); return; }
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
+    if (strcmp(cmd, "wallpaper") == 0 || strcmp(cmd, "wall") == 0) { cmd_wallpaper(args); return; }
     if (strcmp(cmd, "glyph") == 0 || strcmp(cmd, "glyphs") == 0 || strcmp(cmd, "uglyph") == 0 || strcmp(cmd, "picglyph") == 0) { cmd_glyph(args); return; }
     if (strcmp(cmd, "cursor") == 0 || strcmp(cmd, "ucursor") == 0) { cmd_cursor(args); return; }
     if (strcmp(cmd, "awake") == 0 || strcmp(cmd, "awakening") == 0) { cmd_awake(args); return; }

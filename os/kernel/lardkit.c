@@ -592,9 +592,11 @@ int lardkit_snapshot(const char* label)
     bootprof_info_t bp;
     awake_info_t aw;
     lassist_info_t bi;
+    gui_wallpaper_info_t wi;
     bootprof_info(&bp);
     awake_info(&aw);
     lassist_info(&bi);
+    gui_wallpaper_info(&wi);
     s_lardkit.rollback.valid = 1u;
     s_lardkit.rollback.snapshots++;
     scopy(s_lardkit.rollback.label, sizeof(s_lardkit.rollback.label),
@@ -605,6 +607,11 @@ int lardkit_snapshot(const char* label)
     scopy(s_lardkit.rollback.boot_profile, sizeof(s_lardkit.rollback.boot_profile), bp.name);
     s_lardkit.rollback.awake_enabled = aw.enabled;
     s_lardkit.rollback.theme = s_lardkit.active_theme;
+    s_lardkit.rollback.wallpaper_mode = wi.mode;
+    s_lardkit.rollback.wallpaper_color1 = wi.color1;
+    s_lardkit.rollback.wallpaper_color2 = wi.color2;
+    scopy(s_lardkit.rollback.wallpaper_name, sizeof(s_lardkit.rollback.wallpaper_name), wi.name);
+    scopy(s_lardkit.rollback.wallpaper_file, sizeof(s_lardkit.rollback.wallpaper_file), wi.file);
     lardkit_journal_event("rollback", "snapshot saved");
     return 0;
 }
@@ -619,6 +626,15 @@ int lardkit_rollback_apply(void)
     if (s_lardkit.rollback.awake_enabled) awake_enable(1, 3u);
     else awake_enable(0, 0);
     s_lardkit.active_theme = s_lardkit.rollback.theme;
+    if (s_lardkit.rollback.wallpaper_mode == GUI_WALLPAPER_BMP) {
+        (void)gui_wallpaper_set_bmp(s_lardkit.rollback.wallpaper_file);
+    } else if (s_lardkit.rollback.wallpaper_mode == GUI_WALLPAPER_PLAIN) {
+        (void)gui_wallpaper_set_color(s_lardkit.rollback.wallpaper_color1);
+    } else {
+        (void)gui_wallpaper_set_pattern(s_lardkit.rollback.wallpaper_name,
+                                        s_lardkit.rollback.wallpaper_color1,
+                                        s_lardkit.rollback.wallpaper_color2);
+    }
     s_lardkit.rollback.applied++;
     return 0;
 }

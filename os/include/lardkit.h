@@ -39,6 +39,11 @@ typedef struct {
     char boot_profile[LARDKIT_NAME_MAX + 1u];
     uint32_t awake_enabled;
     uint32_t theme;
+    uint32_t wallpaper_mode;
+    uint32_t wallpaper_color1;
+    uint32_t wallpaper_color2;
+    char wallpaper_name[LARDKIT_NAME_MAX + 1u];
+    char wallpaper_file[LARDKIT_NAME_MAX + 1u];
 } lardkit_rollback_info_t;
 
 typedef struct {

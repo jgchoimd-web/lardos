@@ -179,6 +179,19 @@ typedef struct {
 static fb_t g_fb;
 static int g_have_fb;
 static uint32_t g_bg;
+#define GUI_WALLPAPER_BMP_MAX_W 128u
+#define GUI_WALLPAPER_BMP_MAX_H 128u
+#define GUI_WALLPAPER_CFG_MAX 512u
+static uint32_t g_wallpaper_mode = GUI_WALLPAPER_GRID;
+static uint32_t g_wallpaper_color1 = 0xFF10151Eu;
+static uint32_t g_wallpaper_color2 = 0xFF151E29u;
+static char g_wallpaper_name[GUI_WALLPAPER_NAME_MAX + 1u] = "grid";
+static char g_wallpaper_file[GUI_WALLPAPER_NAME_MAX + 1u];
+static uint32_t g_wallpaper_bmp_w;
+static uint32_t g_wallpaper_bmp_h;
+static uint32_t g_wallpaper_last_error;
+static uint32_t g_wallpaper_pixels[GUI_WALLPAPER_BMP_MAX_W * GUI_WALLPAPER_BMP_MAX_H];
+static char g_wallpaper_cfg_buf[GUI_WALLPAPER_CFG_MAX];
 
 // Simple backbuffer (assumes <= 1024x768x32).
 static uint32_t g_backbuf[1024u * 768u];
@@ -863,6 +876,353 @@ static void fb_blit_scaled_rect(const fb_t* dst, const fb_t* src,
     }
 }
 
+static char gui_ascii_lower(char c)
+{
+    return (c >= 'A' && c <= 'Z') ? (char)(c + ('a' - 'A')) : c;
+}
+
+static int gui_streq_ci(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i] && gui_ascii_lower(a[i]) == gui_ascii_lower(b[i])) i++;
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static void gui_wallpaper_copy(char* dst, uint32_t cap, const char* src)
+{
+    uint32_t i = 0;
+    if (!dst || cap == 0) return;
+    if (!src) src = "";
+    while (src[i] && i + 1u < cap) {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
+}
+
+static uint32_t gui_wallpaper_argb(uint32_t c)
+{
+    return (c & 0xFF000000u) ? c : (0xFF000000u | c);
+}
+
+static const char* gui_wallpaper_mode_name(uint32_t mode)
+{
+    if (mode == GUI_WALLPAPER_PLAIN) return "plain";
+    if (mode == GUI_WALLPAPER_GRID) return "grid";
+    if (mode == GUI_WALLPAPER_STRIPES) return "stripes";
+    if (mode == GUI_WALLPAPER_CHECKER) return "checker";
+    if (mode == GUI_WALLPAPER_BMP) return "bmp";
+    return "unknown";
+}
+
+static int gui_wallpaper_parse_mode(const char* name, uint32_t* out)
+{
+    if (!name || !out) return -1;
+    if (gui_streq_ci(name, "plain") || gui_streq_ci(name, "solid") ||
+        gui_streq_ci(name, "color") || gui_streq_ci(name, "colour")) {
+        *out = GUI_WALLPAPER_PLAIN;
+        return 0;
+    }
+    if (gui_streq_ci(name, "grid") || gui_streq_ci(name, "default")) {
+        *out = GUI_WALLPAPER_GRID;
+        return 0;
+    }
+    if (gui_streq_ci(name, "stripes") || gui_streq_ci(name, "stripe")) {
+        *out = GUI_WALLPAPER_STRIPES;
+        return 0;
+    }
+    if (gui_streq_ci(name, "checker") || gui_streq_ci(name, "check") ||
+        gui_streq_ci(name, "tiles")) {
+        *out = GUI_WALLPAPER_CHECKER;
+        return 0;
+    }
+    if (gui_streq_ci(name, "bmp") || gui_streq_ci(name, "image") ||
+        gui_streq_ci(name, "file")) {
+        *out = GUI_WALLPAPER_BMP;
+        return 0;
+    }
+    return -1;
+}
+
+static int gui_wallpaper_hex_digit(char c, uint32_t* out)
+{
+    if (c >= '0' && c <= '9') { *out = (uint32_t)(c - '0'); return 1; }
+    if (c >= 'a' && c <= 'f') { *out = (uint32_t)(c - 'a' + 10); return 1; }
+    if (c >= 'A' && c <= 'F') { *out = (uint32_t)(c - 'A' + 10); return 1; }
+    return 0;
+}
+
+static int gui_wallpaper_parse_color(const char* s, uint32_t* out)
+{
+    uint32_t v = 0;
+    uint32_t d;
+    int hex = 0;
+    int any = 0;
+    if (!s || !out) return -1;
+    while (*s == ' ' || *s == '\t') s++;
+    if (*s == '#') { hex = 1; s++; }
+    else if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) { hex = 1; s += 2; }
+    while (*s) {
+        if (hex) {
+            if (!gui_wallpaper_hex_digit(*s, &d)) break;
+            v = (v << 4) | d;
+        } else {
+            if (*s < '0' || *s > '9') break;
+            v = v * 10u + (uint32_t)(*s - '0');
+        }
+        any = 1;
+        s++;
+    }
+    if (!any) return -1;
+    *out = gui_wallpaper_argb(v);
+    return 0;
+}
+
+static int gui_wallpaper_load_bmp_pixels(const char* file)
+{
+    const FsFile* f = fs_open(file);
+    bmp_result_t meta = { 0, 0, 0, 0 };
+    bmp_result_t br;
+    if (!f || !f->data || f->size < 54) return -1;
+    if (bmp_decode(f->data, f->size, &meta) != 0) return -2;
+    if (meta.w == 0 || meta.h == 0 ||
+        meta.w > GUI_WALLPAPER_BMP_MAX_W || meta.h > GUI_WALLPAPER_BMP_MAX_H) {
+        return -3;
+    }
+    br.pixels = g_wallpaper_pixels;
+    br.w = 0;
+    br.h = 0;
+    br.has_alpha = 0;
+    if (bmp_decode(f->data, f->size, &br) != 0) return -4;
+    g_wallpaper_bmp_w = br.w;
+    g_wallpaper_bmp_h = br.h;
+    gui_wallpaper_copy(g_wallpaper_file, sizeof(g_wallpaper_file), file);
+    return 0;
+}
+
+static int gui_wallpaper_write_config(void)
+{
+    FsWritableFile* w = fs_open_or_create_writable("wallpaper.lardd");
+    int n;
+    if (!w) return -1;
+    n = snprintf(g_wallpaper_cfg_buf, sizeof(g_wallpaper_cfg_buf),
+                 "LARDD 1\nTITLE LardOS Wallpaper\nMODE %s\nPATTERN %s\nCOLOR 0x%08x\nCOLOR2 0x%08x\nFILE %s\nEND\n",
+                 gui_wallpaper_mode_name(g_wallpaper_mode),
+                 g_wallpaper_name,
+                 g_wallpaper_color1,
+                 g_wallpaper_color2,
+                 g_wallpaper_file);
+    if (n < 0) return -2;
+    if ((uint32_t)n >= sizeof(g_wallpaper_cfg_buf)) n = (int)sizeof(g_wallpaper_cfg_buf) - 1;
+    (void)fs_write(w, 0, (const uint8_t*)g_wallpaper_cfg_buf, (uint32_t)n);
+    return 0;
+}
+
+static int gui_wallpaper_set_state(uint32_t mode, const char* name, const char* file,
+                                   uint32_t color1, uint32_t color2, int persist)
+{
+    int r = 0;
+    if (mode == GUI_WALLPAPER_BMP) {
+        r = gui_wallpaper_load_bmp_pixels(file && file[0] ? file : "sample.bmp");
+        if (r != 0) {
+            g_wallpaper_last_error = (uint32_t)(-r);
+            return r;
+        }
+        gui_wallpaper_copy(g_wallpaper_name, sizeof(g_wallpaper_name), "bmp");
+    } else {
+        g_wallpaper_bmp_w = 0;
+        g_wallpaper_bmp_h = 0;
+        g_wallpaper_file[0] = '\0';
+        gui_wallpaper_copy(g_wallpaper_name, sizeof(g_wallpaper_name),
+                           name && name[0] ? name : gui_wallpaper_mode_name(mode));
+    }
+    g_wallpaper_mode = mode;
+    g_wallpaper_color1 = gui_wallpaper_argb(color1);
+    g_wallpaper_color2 = gui_wallpaper_argb(color2);
+    g_wallpaper_last_error = 0;
+    if (persist) {
+        r = gui_wallpaper_write_config();
+        if (r != 0) {
+            g_wallpaper_last_error = (uint32_t)(-r);
+            return r;
+        }
+    }
+    return 0;
+}
+
+int gui_wallpaper_set_color(uint32_t argb)
+{
+    return gui_wallpaper_set_state(GUI_WALLPAPER_PLAIN, "plain", "",
+                                   argb, g_wallpaper_color2, 1);
+}
+
+int gui_wallpaper_set_pattern(const char* pattern, uint32_t color1, uint32_t color2)
+{
+    uint32_t mode;
+    if (gui_wallpaper_parse_mode(pattern, &mode) != 0 || mode == GUI_WALLPAPER_BMP) {
+        g_wallpaper_last_error = 10u;
+        return -1;
+    }
+    return gui_wallpaper_set_state(mode, pattern, "", color1, color2, 1);
+}
+
+int gui_wallpaper_set_bmp(const char* file)
+{
+    return gui_wallpaper_set_state(GUI_WALLPAPER_BMP, "bmp", file,
+                                   g_wallpaper_color1, g_wallpaper_color2, 1);
+}
+
+static int gui_wallpaper_parse_config_text(const char* text, uint32_t len, int persist)
+{
+    uint32_t mode = g_wallpaper_mode;
+    uint32_t c1 = g_wallpaper_color1;
+    uint32_t c2 = g_wallpaper_color2;
+    char pattern[GUI_WALLPAPER_NAME_MAX + 1u];
+    char file[GUI_WALLPAPER_NAME_MAX + 1u];
+    uint32_t n = len < GUI_WALLPAPER_CFG_MAX - 1u ? len : GUI_WALLPAPER_CFG_MAX - 1u;
+    const char* p;
+    if (!text) return -1;
+    for (uint32_t i = 0; i < n; i++) g_wallpaper_cfg_buf[i] = text[i];
+    g_wallpaper_cfg_buf[n] = '\0';
+    gui_wallpaper_copy(pattern, sizeof(pattern), g_wallpaper_name);
+    gui_wallpaper_copy(file, sizeof(file), g_wallpaper_file);
+    p = g_wallpaper_cfg_buf;
+    while (*p) {
+        char key[24];
+        char val[GUI_WALLPAPER_NAME_MAX + 1u];
+        uint32_t ki = 0;
+        uint32_t vi = 0;
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        if (*p == '#') {
+            while (*p && *p != '\n') p++;
+            continue;
+        }
+        while (*p && *p != ' ' && *p != '\t' && *p != '\r' && *p != '\n' && ki + 1u < sizeof(key)) {
+            key[ki++] = *p++;
+        }
+        key[ki] = '\0';
+        while (*p == ' ' || *p == '\t') p++;
+        while (*p && *p != '\r' && *p != '\n' && vi + 1u < sizeof(val)) {
+            val[vi++] = *p++;
+        }
+        while (vi > 0 && (val[vi - 1u] == ' ' || val[vi - 1u] == '\t')) vi--;
+        val[vi] = '\0';
+        if (gui_streq_ci(key, "MODE")) {
+            (void)gui_wallpaper_parse_mode(val, &mode);
+        } else if (gui_streq_ci(key, "PATTERN") || gui_streq_ci(key, "STYLE")) {
+            uint32_t parsed;
+            if (gui_wallpaper_parse_mode(val, &parsed) == 0 && parsed != GUI_WALLPAPER_BMP) {
+                mode = parsed;
+                gui_wallpaper_copy(pattern, sizeof(pattern), val);
+            }
+        } else if (gui_streq_ci(key, "COLOR") || gui_streq_ci(key, "COLOR1") || gui_streq_ci(key, "BG")) {
+            (void)gui_wallpaper_parse_color(val, &c1);
+        } else if (gui_streq_ci(key, "COLOR2") || gui_streq_ci(key, "ACCENT") || gui_streq_ci(key, "LINE")) {
+            (void)gui_wallpaper_parse_color(val, &c2);
+        } else if (gui_streq_ci(key, "FILE") || gui_streq_ci(key, "BMP") || gui_streq_ci(key, "IMAGE")) {
+            if (val[0]) {
+                gui_wallpaper_copy(file, sizeof(file), val);
+                mode = GUI_WALLPAPER_BMP;
+            }
+        }
+        while (*p && *p != '\n') p++;
+    }
+    return gui_wallpaper_set_state(mode, pattern, file, c1, c2, persist);
+}
+
+int gui_wallpaper_load_config_file(const char* file)
+{
+    const FsFile* f = fs_open(file && file[0] ? file : "wallpaper.lardd");
+    if (!f || !f->data || f->size == 0) {
+        g_wallpaper_last_error = 20u;
+        return -1;
+    }
+    return gui_wallpaper_parse_config_text((const char*)f->data, f->size, 1);
+}
+
+int gui_wallpaper_reload(void)
+{
+    const FsFile* f = fs_open("wallpaper.lardd");
+    if (!f || !f->data || f->size == 0) return gui_wallpaper_reset();
+    return gui_wallpaper_parse_config_text((const char*)f->data, f->size, 0);
+}
+
+int gui_wallpaper_reset(void)
+{
+    return gui_wallpaper_set_state(GUI_WALLPAPER_GRID, "grid", "",
+                                   0xFF10151Eu, 0xFF151E29u, 1);
+}
+
+void gui_wallpaper_info(gui_wallpaper_info_t* out)
+{
+    if (!out) return;
+    out->mode = g_wallpaper_mode;
+    gui_wallpaper_copy(out->name, sizeof(out->name), g_wallpaper_name);
+    gui_wallpaper_copy(out->file, sizeof(out->file), g_wallpaper_file);
+    out->color1 = g_wallpaper_color1;
+    out->color2 = g_wallpaper_color2;
+    out->bmp_w = g_wallpaper_bmp_w;
+    out->bmp_h = g_wallpaper_bmp_h;
+    out->last_error = g_wallpaper_last_error;
+}
+
+int gui_wallpaper_selftest(void)
+{
+    gui_wallpaper_info_t before;
+    int ok = 0;
+    gui_wallpaper_info(&before);
+    if (gui_wallpaper_set_pattern("checker", 0xFF111111u, 0xFF222222u) != 0) ok = -1;
+    else {
+        gui_wallpaper_info_t after;
+        gui_wallpaper_info(&after);
+        if (after.mode != GUI_WALLPAPER_CHECKER || after.color1 != 0xFF111111u ||
+            after.color2 != 0xFF222222u) ok = -2;
+    }
+    (void)gui_wallpaper_set_state(before.mode, before.name, before.file,
+                                  before.color1, before.color2, 1);
+    return ok;
+}
+
+static void gui_draw_wallpaper(const fb_t* tgt)
+{
+    int sw = (int)tgt->w;
+    int sh = (int)tgt->h;
+    if (g_wallpaper_mode == GUI_WALLPAPER_BMP && g_wallpaper_bmp_w && g_wallpaper_bmp_h) {
+        for (int y = 0; y < sh; y++) {
+            uint32_t sy = (uint32_t)y % g_wallpaper_bmp_h;
+            for (int x = 0; x < sw; x++) {
+                uint32_t sx = (uint32_t)x % g_wallpaper_bmp_w;
+                uint32_t c = g_wallpaper_pixels[sy * g_wallpaper_bmp_w + sx];
+                fb_putpixel(tgt, (uint16_t)x, (uint16_t)y, (c >> 24) ? c : g_wallpaper_color1);
+            }
+        }
+        return;
+    }
+    fb_fill_rect(tgt, 0, 0, tgt->w, tgt->h, g_wallpaper_color1);
+    if (g_wallpaper_mode == GUI_WALLPAPER_GRID) {
+        for (int y = 24; y < sh; y += 28) fb_fill_rect(tgt, 0, (uint16_t)y, tgt->w, 1, g_wallpaper_color2);
+        for (int x = 0; x < sw; x += 36) fb_fill_rect(tgt, (uint16_t)x, 24, 1, (uint16_t)(sh > 24 ? sh - 24 : 0), g_wallpaper_color2);
+    } else if (g_wallpaper_mode == GUI_WALLPAPER_STRIPES) {
+        for (int y = 24; y < sh; y++) {
+            for (int x = 0; x < sw; x++) {
+                if (((x + y) / 16) & 1) fb_putpixel(tgt, (uint16_t)x, (uint16_t)y, g_wallpaper_color2);
+            }
+        }
+    } else if (g_wallpaper_mode == GUI_WALLPAPER_CHECKER) {
+        for (int y = 24; y < sh; y += 16) {
+            for (int x = 0; x < sw; x += 16) {
+                if (((x / 16) + (y / 16)) & 1) {
+                    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)y,
+                                 (uint16_t)((x + 16 <= sw) ? 16 : sw - x),
+                                 (uint16_t)((y + 16 <= sh) ? 16 : sh - y),
+                                 g_wallpaper_color2);
+                }
+            }
+        }
+    }
+}
+
 int gui_init(void)
 {
     g_have_fb = (fb_from_bootinfo(&g_fb) == 0);
@@ -871,6 +1231,7 @@ int gui_init(void)
     lguilib_init();
     const FsFile* lguilib_file = fs_open("default.lguilib");
     if (lguilib_file) (void)lguilib_load_active(lguilib_file->data, lguilib_file->size);
+    (void)gui_wallpaper_reload();
     if (g_fb.w <= 1024 && g_fb.h <= 768) {
         g_bb.fb = g_backbuf;
         g_bb.w = g_fb.w;
@@ -2727,11 +3088,8 @@ static void gui_draw_launcher(const fb_t* tgt, const gui_item_t* item, int x, in
 static void gui_draw_desktop(const fb_t* tgt)
 {
     int sw = (int)g_fb.w;
-    int sh = (int)g_fb.h;
     int dock_x, dock_y, dock_w, dock_h, cell;
-    fb_fill_rect(tgt, 0, 0, g_fb.w, g_fb.h, 0xFF10151Eu);
-    for (int y = 24; y < sh; y += 28) fb_fill_rect(tgt, 0, (uint16_t)y, g_fb.w, 1, 0xFF151E29u);
-    for (int x = 0; x < sw; x += 36) fb_fill_rect(tgt, (uint16_t)x, 24, 1, (uint16_t)(sh > 24 ? sh - 24 : 0), 0xFF111923u);
+    gui_draw_wallpaper(tgt);
     fb_fill_rect(tgt, 0, 0, g_fb.w, 24, 0xFF121821u);
     fb_fill_rect(tgt, 0, 23, g_fb.w, 1, 0xFF2F8EA3u);
     fb_draw_text(tgt, 10, 8, "LARDOS DESKTOP", 0xFFFFFFFFu, 0xFF121821u);

@@ -90,6 +90,7 @@ static const char* auto_scope_for(const char* name)
     if (suffix_ci(name, ".fstwts")) return "fstwt";
     if (suffix_ci(name, ".ltheme")) return "ltheme";
     if (suffix_ci(name, ".lguilib")) return "lguilib";
+    if (suffix_ci(name, ".lwall") || streq_ci(name, "wallpaper.lardd")) return "wallpaper";
     return "file";
 }
 
@@ -229,6 +230,12 @@ int liveupdate_reload(const char* scope, char* out, uint32_t out_cap)
         if (f && f->data && f->size) r = lguilib_load_active(f->data, f->size);
         else r = -5;
         if (out && out_cap) sappend(out, out_cap, r == 0 ? "lguilib " : "lguilib-fail ");
+    }
+    if (streq_ci(scope, "wallpaper") || streq_ci(scope, "lwall")) {
+        const FsFile* f = fs_open(s_live.last_file[0] ? s_live.last_file : "wallpaper.lardd");
+        if (f && f->data && f->size) r = gui_wallpaper_load_config_file(f->name);
+        else r = -6;
+        if (out && out_cap) sappend(out, out_cap, r == 0 ? "wallpaper " : "wallpaper-fail ");
     }
 
     if (out && out_cap && out[0] == '\0') {

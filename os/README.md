@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.90.0b-ami/lardos-v1.90.0b-ami.iso`. To publish the whole hardware
+`release/v1.91.0b-ami/lardos-v1.91.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.91.0b` adds user-owned desktop wallpaper settings. `wallpaper color
+0xRRGGBB`, `wallpaper pattern grid|stripes|checker [c1] [c2]`, and
+`wallpaper bmp sample.bmp` apply immediately and write `wallpaper.lardd` as the
+editable config. `cfg wallpaper ...`, rollback snapshots, and LiveUpdate reloads
+can also carry the wallpaper state.
 
 `v1.90.0b` adds app-owned layout resize policy for RXE/SYSRXE and APPKIT.
 Apps can use `RESIZE fixed` or runtime `APPKIT RESIZE fixed` so their APPKIT
@@ -81,8 +87,8 @@ bumps no longer require editing the build file and the kernel header separately.
 
 `v1.87.0b` adds LiveUpdate for runtime file/code changes. `liveupdate file`
 replaces a user-owned file immediately, while `liveupdate apply` / `code`
-reloads matching `.kmo`, `.rxe`, `.sysrxe`, `.drfl`, `.fstwts`, `.ltheme`, or
-`.lguilib` state without rebooting. Built-in read-only targets become
+reloads matching `.kmo`, `.rxe`, `.sysrxe`, `.drfl`, `.fstwts`, `.ltheme`,
+`.lguilib`, or wallpaper state without rebooting. Built-in read-only targets become
 user-owned overlays, so the user can update OS-owned files while the original
 path remains recoverable.
 
@@ -633,7 +639,8 @@ commands:
   activity into `netwatch.lardd`.
 - `journal show|add|clear` opens the automatic `journal.lardd` event log.
 - `rollback snap|last|apply` snapshots and restores user-visible settings such as
-  GUI layers, HTTP method, boot profile, assistant, theme, and task priority.
+  GUI layers, HTTP method, boot profile, assistant, theme, wallpaper, and task
+  priority.
 - `trust list|allow|deny|history` exposes a user-owned permission policy map for
   core subjects such as shell, GUI, OSLink, packages, and SUM, and audits each
   permission change.
@@ -651,6 +658,10 @@ commands:
 - `ltheme list|show|use name` selects native shell theme presets or parses
   `.ltheme` files such as `default.ltheme`; `ltheme preview file.ltheme` draws
   a small preview panel before applying.
+- `wallpaper status|color|pattern|bmp|use|reload|reset` lets the user set the
+  desktop background directly. The active config lives in writable
+  `wallpaper.lardd`, and BMP wallpaper tiles are loaded through the native BMP
+  decoder without external libraries.
 - `time`, `date`, `lunar`, and `dangun` show LardOS Time ticks, five-digit
   years, Dangun year, and the native lunar calendar view.
 - `glyph move U+E000 U+E010`, `glyph copy U+E000 U+E011`,

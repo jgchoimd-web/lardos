@@ -232,6 +232,19 @@ static const uint8_t dosmode_init[] =
 static uint8_t ram_dosmode_buf[DOSMODE_CAP];
 static FsWritableFile ram_dosmode = { "dosmode.lardd", ram_dosmode_buf, 0, DOSMODE_CAP };
 
+#define WALLPAPER_CAP 512u
+static const uint8_t wallpaper_init[] =
+    "LARDD 1\n"
+    "TITLE LardOS Wallpaper\n"
+    "MODE grid\n"
+    "PATTERN grid\n"
+    "COLOR 0xFF10151E\n"
+    "COLOR2 0xFF151E29\n"
+    "FILE \n"
+    "END\n";
+static uint8_t ram_wallpaper_buf[WALLPAPER_CAP];
+static FsWritableFile ram_wallpaper = { "wallpaper.lardd", ram_wallpaper_buf, 0, WALLPAPER_CAP };
+
 #define FSDELETE_CAP 2048u
 static const uint8_t fsdelete_init[] =
     "LARDD 1\n"
@@ -365,6 +378,7 @@ static const uint8_t file_lardos_lars[] =
     "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
     "li Use renderfx aa none/antianti/basic/nonlinear, renderfx brightness, renderfx resize stretch/live, renderfx lsb, and renderfx vblank for user-owned display filtering.\n"
+    "li Use wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, or wallpaper bmp sample.bmp to set the desktop background from user-owned state.\n"
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
     "li Use kmod list and kmod gui/fs/task/oslink/boot/time/vm/sysrxe status to talk directly with kernel modules.\n"
@@ -373,7 +387,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use liveupdate apply hot.kmo KMO 1\\nID hot\\nCOMMAND hot\\nTARGET boot\\nDEFAULT status\\n to change file-owned code while LardOS is running.\n"
     "li Use ren old.txt new.txt, rename selected NewName, or the desktop Rename button to rename files, apps, and folders.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
-    "li Use cfgsh for the settings shell: awake on, ltheme night, http 3, boot 4.\n"
+    "li Use cfgsh for the settings shell: awake on, ltheme night, wallpaper grid, http 3, boot 4.\n"
     "li Use dos on for L-DOS mode with _:/C:/A:/Z:/U:/R: mapping and DOS-style file commands.\n"
     "li In L-DOS, DEL -F file hard-deletes read-only built-in files from the active filesystem through fsdelete.lardd, even if that breaks the OS.\n"
     "li Use bleed dryrun file to preview a last-resort delete sweep, or bleed file to try RAM, read-only hard-delete, and media deletion routes.\n"
@@ -410,7 +424,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use webstack status, webstack guide, and webstack demo to inspect the native LARS/HTTP stack.\n"
     "li Use netwatch on and netwatch show to inspect readable UDP, OSLink, and HTTP GET/POST/HEAD events.\n"
     "li Use journal show to read the automatic LARDD system journal.\n"
-    "li Use rollback snap and rollback last to save and restore user-visible settings.\n"
+    "li Use rollback snap and rollback last to save and restore user-visible settings, including wallpaper.\n"
     "li Use priority history to audit who granted priority lev.10.\n"
     "li Use trust list and trust history to inspect the user-owned permission policy map.\n"
     "li Use lfsdoctor scan or lfsdoctor repair to inspect and repair LPST-backed writable files.\n"
@@ -466,6 +480,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.91.0b adds user-owned desktop wallpaper settings through wallpaper.lardd, wallpaper color/pattern/bmp, cfgsh, rollback, and LiveUpdate reload paths.\n"
     "li v1.90.0b lets RXE/SYSRXE apps declare RESIZE fixed and LAYOUTSIZE so APPKIT does not recalculate layout on window-size changes unless the app wants reflow.\n"
     "li v1.89.0a officially promotes the v1.88 GUI stability line: stable stretch resize is default, live reflow remains available, and user control is preserved.\n"
     "li v1.88.2p adds stable stretch resize mode: renderfx resize stretch previews corner resize by stretching the current window image, while resize live keeps old reflow.\n"
@@ -1156,12 +1171,12 @@ static const uint8_t file_liveupdate_guide[] =
     "ITEM liveupdate apply module.kmo KMO 1\\nID m\\nCOMMAND m\\nTARGET boot\\nDEFAULT status\\n\n"
     "ITEM liveupdate append app.rxe TEXT more\n"
     "ITEM liveupdate from update.tmp userapp.sysrxe\n"
-    "ITEM liveupdate reload kmo|sysrxe|rxe|drivers|fstwt|ltheme|lguilib|all\n"
+    "ITEM liveupdate reload kmo|sysrxe|rxe|drivers|fstwt|ltheme|lguilib|wallpaper|all\n"
     "ITEM liveupdate auto on|off\n"
     "SECTION Reload Scopes\n"
     "ITEM .kmo reloads the KMO registry so kernel-module command files can change live.\n"
     "ITEM .sysrxe and .rxe reload app registries and refresh the GUI launchers without rebooting.\n"
-    "ITEM .drfl reloads driver descriptors, .fstwts reloads filesystem translation, .ltheme and .lguilib apply display state.\n"
+    "ITEM .drfl reloads driver descriptors, .fstwts reloads filesystem translation, .ltheme/.lguilib apply display state, and .lwall or wallpaper.lardd reloads the desktop wallpaper.\n"
     "SECTION Ownership\n"
     "ITEM If a target is a read-only built-in file, LiveUpdate creates a user-owned overlay with the same name.\n"
     "ITEM The original built-in file is hidden rather than destroyed, so rollback/tombstone tools remain visible.\n"
@@ -1282,9 +1297,11 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable journal.lardd\n"
     "CHECK writable userlaw.lardd\n"
     "CHECK writable glyphmap.lardd\n"
+    "CHECK writable wallpaper.lardd\n"
     "CHECK command trace\n"
     "CHECK command netwatch\n"
     "CHECK command glyph\n"
+    "CHECK command wallpaper\n"
     "CHECK command cursor\n"
     "CHECK command vm\n"
     "CHECK command gasm\n"
@@ -2023,7 +2040,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 32u;
+    return 33u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2060,6 +2077,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 29) return &ram_rxrslot2;
     if (idx == 30) return &ram_rxrslot3;
     if (idx == 31) return &ram_fstwts;
+    if (idx == 32) return &ram_wallpaper;
     return NULL;
 }
 
@@ -2138,6 +2156,10 @@ void fs_init(void)
         ram_dosmode_buf[i] = dosmode_init[i];
     }
     ram_dosmode.size = sizeof(dosmode_init) - 1;
+    for (uint32_t i = 0; i < sizeof(wallpaper_init) - 1 && i < WALLPAPER_CAP; i++) {
+        ram_wallpaper_buf[i] = wallpaper_init[i];
+    }
+    ram_wallpaper.size = sizeof(wallpaper_init) - 1;
     for (uint32_t i = 0; i < sizeof(fsdelete_init) - 1 && i < FSDELETE_CAP; i++) {
         ram_fsdelete_buf[i] = fsdelete_init[i];
     }

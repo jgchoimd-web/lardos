@@ -176,8 +176,8 @@ flowchart TB
     RTL["rtl8139"]
     Net["net.c"]
     TCP["small TCP path"]
-    HTTP["net_http_request GET/POST/HEAD"]
-    HTTPS["net_https_request GET/POST/HEAD"]
+    HTTP["net_http_request seven methods"]
+    HTTPS["net_https_request seven methods"]
     OSLink["oslink UDP 39010"]
     TLS["lard_tls"]
 
@@ -205,11 +205,13 @@ generated from Windows Root stores; the verifier walks the presented chain and
 requires the final signature to validate against that native table.
 
 HTTP request construction is shared by HTTP and HTTPS. `net_http_request` and
-`net_https_request` support GET, POST, and HEAD, while `net_http_get` and
-`net_https_get` remain wrappers for older callers. POST sends
-`Content-Length` and `application/x-www-form-urlencoded`; redirects preserve
-POST only for 307/308. HEAD uses the same native TCP/TLS transport while asking
-for headers without a response body.
+`net_https_request` support GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS,
+while `net_http_get` and `net_https_get` remain wrappers for older callers.
+POST, PUT, and PATCH send `Content-Length` and
+`application/x-www-form-urlencoded`; redirects preserve request bodies only for
+307/308. HEAD uses the same native TCP/TLS transport while asking for headers
+without a response body. `webstack tls` exposes the native TLS status,
+trust-anchor count, SNI limit, supported cipher names, and TLS selftest.
 
 `oslink.c` is the small OS-to-OS communication layer. It uses public
 `net_udp_send` and `net_udp_recv` helpers, frames packets with an `OSLK`

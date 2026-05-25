@@ -109,6 +109,20 @@ static int rest_word_allows_tail(const char* rest, const char* a, const char* b,
     return streq(word, a) || (b && streq(word, b)) || (c && streq(word, c));
 }
 
+static int rest_empty_or_webstack(const char* rest)
+{
+    char word[16];
+    const char* tail;
+    first_word(rest, word, sizeof(word), &tail);
+    if (!word[0]) return 1;
+    if (tail && tail[0]) return 0;
+    return streq(word, "status") || streq(word, "info") ||
+           streq(word, "methods") || streq(word, "method") ||
+           streq(word, "tls") || streq(word, "https") ||
+           streq(word, "guide") || streq(word, "demo") ||
+           streq(word, "selftest") || streq(word, "test");
+}
+
 static int safe_exec_command(const char* command)
 {
     char cmd[32];
@@ -127,7 +141,7 @@ static int safe_exec_command(const char* command)
     if (streq(cmd, "bootprof")) return rest_empty_or_word(rest, "status", "info", "list");
     if (streq(cmd, "awake") || streq(cmd, "awakening")) return rest_empty_or_word(rest, "status", "info", "test");
     if (streq(cmd, "crashlog")) return rest_empty_or_word(rest, "show", "status", NULL);
-    if (streq(cmd, "webstack")) return rest_empty_or_word(rest, "status", "guide", "demo");
+    if (streq(cmd, "webstack")) return rest_empty_or_webstack(rest);
     if (streq(cmd, "lpack")) return rest_word_allows_tail(rest, "info", "list", "test");
     return 0;
 }

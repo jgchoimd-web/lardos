@@ -1923,6 +1923,57 @@ int lard_tls_read(lard_tls_client_t* c, uint8_t* data, uint32_t cap, uint32_t* o
     }
 }
 
+const char* lard_tls_cipher_name(uint16_t suite)
+{
+    if (suite == TLS_RSA_WITH_AES_128_CBC_SHA) return "TLS_RSA_WITH_AES_128_CBC_SHA";
+    if (suite == TLS_RSA_WITH_AES_128_CBC_SHA256) return "TLS_RSA_WITH_AES_128_CBC_SHA256";
+    return "unsupported";
+}
+
+void lard_tls_info(lard_tls_info_t* out)
+{
+    if (!out) return;
+    out->trust_anchors = LARD_TLS_TRUST_ANCHOR_COUNT;
+    out->supported_ciphers = 2u;
+    out->rsa_max_bytes = LARD_TLS_RSA_MAX_BYTES;
+    out->sni_max = 127u;
+}
+
+static int tls_selftest_send(void* io, const uint8_t* data, uint32_t len)
+{
+    (void)io;
+    (void)data;
+    return (int)len;
+}
+
+static int tls_selftest_recv(void* io, uint8_t* data, uint32_t cap, uint32_t* out_len)
+{
+    (void)io;
+    (void)data;
+    (void)cap;
+    if (out_len) *out_len = 0;
+    return 0;
+}
+
+int lard_tls_selftest(void)
+{
+    lard_tls_client_t c;
+    lard_tls_info_t info;
+    int r = lard_tls_client_init(&c, "example.com", NULL, tls_selftest_send, tls_selftest_recv);
+    if (r != 0) return -1;
+    if (strcmp(c.server_name, "example.com") != 0) return -2;
+    if (c.protocol_version != TLS12_VERSION) return -3;
+    if (!tls_cipher_supported(TLS_RSA_WITH_AES_128_CBC_SHA)) return -4;
+    if (!tls_cipher_supported(TLS_RSA_WITH_AES_128_CBC_SHA256)) return -5;
+    if (tls_cipher_supported(0x1301u)) return -6;
+    lard_tls_info(&info);
+    if (info.trust_anchors == 0u || info.supported_ciphers != 2u) return -7;
+    if (info.rsa_max_bytes != LARD_TLS_RSA_MAX_BYTES || info.sni_max != 127u) return -8;
+    if (lard_tls_status_text(LARD_TLS_OK)[0] == '\0') return -9;
+    if (lard_tls_cipher_name(TLS_RSA_WITH_AES_128_CBC_SHA256)[0] == 'u') return -10;
+    return 0;
+}
+
 const char* lard_tls_status_text(int code)
 {
     switch (code) {

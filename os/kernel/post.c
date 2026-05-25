@@ -16,6 +16,7 @@
 #include "kmodtalk.h"
 #include "lar.h"
 #include "lard_doc.h"
+#include "lard_tls.h"
 #include "lardkit.h"
 #include "lardtime.h"
 #include "lcontainer.h"
@@ -187,6 +188,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("doc: LARDD renderer", post_doc_parse("lardd_guide.lardd"), emit, user, &pass, &fail);
     post_check("doc: LARS form actions", lard_doc_selftest() == 0, emit, user, &pass, &fail);
     post_check("web: HTTP method builder", net_http_selftest() == 0, emit, user, &pass, &fail);
+    post_check("web: HTTPS TLS surface", lard_tls_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: app bundle parser", rxr_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: bundle-internal paths", rxr_path_selftest() == 0, emit, user, &pass, &fail);

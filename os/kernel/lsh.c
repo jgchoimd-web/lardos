@@ -44,6 +44,7 @@
 #include "vmmon.h"
 #include "rxe.h"
 #include "sysrxe.h"
+#include "lard_tls.h"
 #include "net.h"
 #include "kmodtalk.h"
 #include "kmo.h"
@@ -1856,7 +1857,7 @@ static void cmd_help(const char* args)
     out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
     out_append("  post baseline, bootreplay show, bootmap, oldcheck, devmap boot/POST/device views\n");
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
-    out_append("  webstack status|methods|guide|demo|selftest for native LARS/HTTP method support\n");
+    out_append("  webstack status|methods|tls|guide|demo|selftest for native LARS/HTTP/HTTPS support\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  wallpaper status|color|pattern|bmp|use|reload|reset  user-owned desktop wallpaper\n");
@@ -3251,7 +3252,9 @@ static void cmd_larsact(const char* args)
 static void cmd_webstack(const char* args)
 {
     char sub[16];
+    lard_tls_info_t tls_info;
     if (!args) args = "";
+    lard_tls_info(&tls_info);
     if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
         strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
         out_append("WebStack native\n");
@@ -3259,9 +3262,17 @@ static void cmd_webstack(const char* args)
         out_append("  method: ");
         out_append(lsh_http_method_name());
         out_append(" (cfgsh http 1..7 GET/POST/HEAD/PUT/PATCH/DELETE/OPTIONS)\n");
+        out_append("  https: LardTLS TLS1.2 SNI roots=");
+        out_append_u32(tls_info.trust_anchors);
+        out_append(" ciphers=");
+        out_append_u32(tls_info.supported_ciphers);
+        out_append("\n");
         out_append("  documents: LARS link/fetch/button/input, LARDD guides\n");
         out_append("  builder selftest: ");
         out_append(net_http_selftest() == 0 ? "OK" : "FAIL");
+        out_append("\n");
+        out_append("  tls selftest: ");
+        out_append(lard_tls_selftest() == 0 ? "OK" : "FAIL");
         out_append("\n");
         return;
     }
@@ -3276,6 +3287,29 @@ static void cmd_webstack(const char* args)
         out_append("  7 OPTIONS  ask server for supported methods\n");
         return;
     }
+    if (strcmp(sub, "tls") == 0 || strcmp(sub, "https") == 0) {
+        out_append("WebStack HTTPS/TLS\n");
+        out_append("  transport: native LardTLS over TCP, no external TLS library\n");
+        out_append("  version: TLS 1.2 client path with SNI\n");
+        out_append("  trust anchors: ");
+        out_append_u32(tls_info.trust_anchors);
+        out_append("\n");
+        out_append("  rsa max bytes: ");
+        out_append_u32(tls_info.rsa_max_bytes);
+        out_append("\n");
+        out_append("  sni max chars: ");
+        out_append_u32(tls_info.sni_max);
+        out_append("\n");
+        out_append("  ciphers: ");
+        out_append(lard_tls_cipher_name(0x002Fu));
+        out_append(", ");
+        out_append(lard_tls_cipher_name(0x003Cu));
+        out_append("\n");
+        out_append("  methods: HTTPS uses the same GET/POST/HEAD/PUT/PATCH/DELETE/OPTIONS builder as HTTP\n");
+        out_append("  selftest: ");
+        out_append(lard_tls_selftest() == 0 ? "OK\n" : "FAIL\n");
+        return;
+    }
     if (strcmp(sub, "guide") == 0 || strcmp(sub, "show") == 0 || strcmp(sub, "doc") == 0) {
         cmd_larddoc("webstack_guide.lardd", "Usage: webstack guide");
         return;
@@ -3285,10 +3319,11 @@ static void cmd_webstack(const char* args)
         return;
     }
     if (strcmp(sub, "selftest") == 0 || strcmp(sub, "test") == 0) {
-        out_append(net_http_selftest() == 0 ? "webstack: selftest OK\n" : "webstack: selftest failed\n");
+        int ok = net_http_selftest() == 0 && lard_tls_selftest() == 0;
+        out_append(ok ? "webstack: selftest OK\n" : "webstack: selftest failed\n");
         return;
     }
-    out_append("Usage: webstack status|methods|guide|demo|selftest\n");
+    out_append("Usage: webstack status|methods|tls|guide|demo|selftest\n");
 }
 
 static void cmd_lpack_show(const char* file_arg, const uint8_t* data, uint32_t size, int verbose)

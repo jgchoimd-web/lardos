@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.92.1p` makes HTTPS visible in the native WebStack. `webstack tls` /
+`webstack https` now reports LardTLS TLS 1.2 SNI support, trust-anchor count,
+RSA limits, supported cipher names, and a TLS selftest. `webstack status`,
+`webstack selftest`, and POST now check HTTPS beside the HTTP method builder,
+while keeping the seven HTTP/HTTPS methods from `v1.92.0b` intact and still
+using no external browser or TLS library.
+
 `v1.92.0b` expands the native internet stack without adding an external browser
 or library. HTTP/HTTPS now supports `GET`, `POST`, `HEAD`, `PUT`, `PATCH`,
 `DELETE`, and `OPTIONS`; the GUI Doc tab cycles through all seven methods, and

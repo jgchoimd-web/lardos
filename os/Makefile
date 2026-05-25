@@ -152,7 +152,7 @@ $(KERNEL_DIR)/lss.o: $(KERNEL_DIR)/lss.c
 $(KERNEL_DIR)/lfs.o: $(KERNEL_DIR)/lfs.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/lsh.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
+$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/lsh.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/lard_tls.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/mediafs.o: $(KERNEL_DIR)/mediafs.c $(INCLUDE)/mediafs.h $(INCLUDE)/installer.h $(INCLUDE)/storage.h
@@ -164,7 +164,7 @@ $(KERNEL_DIR)/installer.o: $(KERNEL_DIR)/installer.c $(BOOT_STAGE1_INC) $(BOOT_S
 $(KERNEL_DIR)/larsh.o: $(KERNEL_DIR)/larsh.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
+$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/lard_tls.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/kmo.o: $(KERNEL_DIR)/kmo.c $(INCLUDE)/kmo.h $(INCLUDE)/fs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardkit.h

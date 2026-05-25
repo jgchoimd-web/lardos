@@ -5,6 +5,13 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.92.1p
+ITEM Hotpatches the v1.92 WebStack line so HTTPS is visible and testable, not just an internal transport path.
+ITEM Adds webstack tls / webstack https to show native LardTLS status, TLS 1.2 SNI, trust-anchor count, RSA limit, and supported cipher names.
+ITEM POST now checks the HTTPS TLS surface beside the HTTP method builder, and webstack selftest covers both.
+ITEM Keeps the seven-method HTTP/HTTPS builder from v1.92.0b intact: GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS.
+ITEM Preserves the LardOS value direction: native in-tree TLS, no external browser/TLS library, visible diagnostics, and no feature loss.
+
 SECTION v1.92.0b
 ITEM Expands the native internet stack with HTTP/HTTPS PUT, PATCH, DELETE, and OPTIONS beside the existing GET, POST, and HEAD.
 ITEM The GUI Doc tab and CFGSH can cycle/select methods 1..7; POST, PUT, and PATCH accept URL|body while DELETE and OPTIONS stay bodyless.

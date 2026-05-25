@@ -61,6 +61,13 @@ typedef struct {
     uint32_t rx_plain_len;
 } lard_tls_client_t;
 
+typedef struct {
+    uint32_t trust_anchors;
+    uint32_t supported_ciphers;
+    uint32_t rsa_max_bytes;
+    uint32_t sni_max;
+} lard_tls_info_t;
+
 int lard_tls_client_init(lard_tls_client_t* c,
                          const char* server_name,
                          void* io,
@@ -70,3 +77,6 @@ int lard_tls_client_handshake(lard_tls_client_t* c);
 int lard_tls_write(lard_tls_client_t* c, const uint8_t* data, uint32_t len);
 int lard_tls_read(lard_tls_client_t* c, uint8_t* data, uint32_t cap, uint32_t* out_len);
 const char* lard_tls_status_text(int code);
+const char* lard_tls_cipher_name(uint16_t suite);
+void lard_tls_info(lard_tls_info_t* out);
+int lard_tls_selftest(void);

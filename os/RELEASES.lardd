@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.89.0a
+ITEM Officially promotes the v1.88 GUI stability line after the hotpatch checks passed.
+ITEM Includes stable stretch window resizing as the default while keeping renderfx resize live for users who want immediate reflow.
+ITEM Keeps inactive-window saved-state rendering, APPKIT responsive label spacing, corner resize, fullscreen, RXE/SYSRXE apps, and user-owned render settings intact.
+ITEM Ships as a because this release changes no feature direction: it stabilizes the tested hotpatch behavior and preserves LardOS user-control values.
+
 SECTION v1.88.2p
 ITEM Adds a stable stretch resize mode for windows: during corner drag, LardOS stretches/squashes the current window image and commits the real layout when the mouse is released.
 ITEM renderfx resize stretch enables the stable mode, while renderfx resize live keeps the previous live reflow behavior available.

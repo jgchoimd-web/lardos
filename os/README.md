@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.88.2p-ami/lardos-v1.88.2p-ami.iso`. To publish the whole hardware
+`release/v1.89.0a-ami/lardos-v1.89.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.89.0a` officially promotes the v1.88 GUI stability line. It keeps stable
+stretch resize as the default, preserves `renderfx resize live` for immediate
+reflow, and carries forward inactive-window saved-state rendering, APPKIT label
+spacing, fullscreen, corner resize, RXE/SYSRXE apps, and user-owned render
+settings without feature loss or philosophy changes.
 
 `v1.88.2p` adds stable stretch resize mode. By default, corner-drag resizing
 stretches/squashes the current window image during the drag and commits the real
@@ -331,6 +337,9 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.89.0a` officially promotes the v1.88 GUI stability line: stable stretch
+  resize remains the default, live reflow stays available, and no user-control
+  behavior is removed.
 - `v1.88.2p` adds stable stretch resize mode. `renderfx resize stretch` avoids
   live layout churn while dragging a window corner; `renderfx resize live`
   restores the previous immediate reflow behavior.

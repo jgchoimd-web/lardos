@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.91.0a
+ITEM Officially promotes the user-owned desktop wallpaper feature after the beta build, release assets, and boot screenshots passed validation.
+ITEM Keeps wallpaper color/pattern/BMP commands, writable wallpaper.lardd, cfg wallpaper, rollback, POST, LUNIT, and LiveUpdate wallpaper reload paths intact.
+ITEM Preserves the previous grid desktop as the default, so existing GUI behavior remains compatible while users gain direct background control.
+ITEM Ships as a because no feature direction changed: the release stabilizes the v1.91 wallpaper track and keeps LardOS user ownership values intact.
+
 SECTION v1.91.0b
 ITEM Adds user-owned desktop wallpaper settings to the default GUI.
 ITEM wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, and wallpaper bmp file.bmp apply immediately.

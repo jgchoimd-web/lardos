@@ -45,12 +45,18 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.91.0b-ami/lardos-v1.91.0b-ami.iso`. To publish the whole hardware
+`release/v1.91.0a-ami/lardos-v1.91.0a-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.91.0a` officially promotes the user-owned desktop wallpaper feature after
+the beta build and boot checks. It keeps `wallpaper color`, generated patterns,
+BMP tiling, writable `wallpaper.lardd`, CFGSH, rollback, POST/LUNIT checks, and
+LiveUpdate wallpaper reloads intact while preserving the previous grid desktop
+as the default.
 
 `v1.91.0b` adds user-owned desktop wallpaper settings. `wallpaper color
 0xRRGGBB`, `wallpaper pattern grid|stripes|checker [c1] [c2]`, and

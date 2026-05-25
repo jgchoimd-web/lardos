@@ -480,6 +480,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.91.0a officially promotes user-owned desktop wallpaper settings without feature loss or value changes.\n"
     "li v1.91.0b adds user-owned desktop wallpaper settings through wallpaper.lardd, wallpaper color/pattern/bmp, cfgsh, rollback, and LiveUpdate reload paths.\n"
     "li v1.90.0b lets RXE/SYSRXE apps declare RESIZE fixed and LAYOUTSIZE so APPKIT does not recalculate layout on window-size changes unless the app wants reflow.\n"
     "li v1.89.0a officially promotes the v1.88 GUI stability line: stable stretch resize is default, live reflow remains available, and user control is preserved.\n"

@@ -1638,14 +1638,194 @@ static const sysrxe_app_t* gui_file_ui_app(int app)
     return rxe_get_by_app(app);
 }
 
+static int gui_ascii_eq_ci(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i]) {
+        char ca = a[i];
+        char cb = b[i];
+        if (ca >= 'A' && ca <= 'Z') ca = (char)(ca - 'A' + 'a');
+        if (cb >= 'A' && cb <= 'Z') cb = (char)(cb - 'A' + 'a');
+        if (ca != cb) return 0;
+        i++;
+    }
+    return a[i] == '\0' && b[i] == '\0';
+}
+
 static int gui_file_has_custom_ui(int app)
 {
     const sysrxe_app_t* a = gui_file_ui_app(app);
     return a && a->ui_count > 0;
 }
 
+static int gui_app_uses_responsive_ui(const sysrxe_app_t* a)
+{
+    if (!a) return 0;
+    return gui_ascii_eq_ci(a->layout, "responsive") ||
+           gui_ascii_eq_ci(a->layout, "smart") ||
+           gui_ascii_eq_ci(a->layout, "flow") ||
+           gui_ascii_eq_ci(a->layout, "smartui") ||
+           gui_ascii_eq_ci(a->layout, "autofit");
+}
+
+static int gui_ui_text_pref_width(const char* s, int pad, int max_w)
+{
+    int n = 0;
+    if (!s) s = "";
+    while (s[n] && n < 40) n++;
+    n = n * 8 + pad;
+    if (n < 32) n = 32;
+    if (n > max_w) n = max_w;
+    return n;
+}
+
+static void gui_ui_preferred_size(const sysrxe_widget_t* w, int area_w, int area_h, int* out_w, int* out_h)
+{
+    int ww = w && w->w > 0 ? w->w : 0;
+    int hh = w && w->h > 0 ? w->h : 0;
+    int max_w = area_w > 8 ? area_w : 8;
+    int max_h = area_h > 8 ? area_h : 8;
+    if (!w) {
+        if (out_w) *out_w = 8;
+        if (out_h) *out_h = 8;
+        return;
+    }
+    if (w->kind == SYSRXE_UI_PANEL) {
+        if (ww == 0 || ww > max_w) ww = max_w;
+        if (hh == 0) hh = 32;
+    } else if (w->kind == SYSRXE_UI_INPUT) {
+        if (ww == 0) ww = max_w >= 320 ? 260 : max_w;
+        if (hh == 0) hh = 24;
+    } else if (w->kind == SYSRXE_UI_OUTPUT || w->kind == SYSRXE_UI_LIST) {
+        if (ww == 0 || ww > max_w) ww = max_w;
+        if (hh == 0) hh = max_h;
+    } else if (w->kind == SYSRXE_UI_BUTTON) {
+        if (ww == 0) ww = 88;
+        if (hh == 0) hh = 24;
+    } else if (w->kind == SYSRXE_UI_TOGGLE) {
+        if (ww == 0) ww = 110;
+        if (hh == 0) hh = 22;
+    } else if (w->kind == SYSRXE_UI_SLIDER || w->kind == SYSRXE_UI_PROGRESS) {
+        if (ww == 0) ww = 140;
+        if (hh == 0) hh = 18;
+    } else if (w->kind == SYSRXE_UI_SEPARATOR) {
+        if (ww == 0 || ww > max_w) ww = max_w;
+        if (hh == 0) hh = 8;
+    } else if (w->kind == SYSRXE_UI_LABEL) {
+        if (ww == 0) ww = gui_ui_text_pref_width(w->text, 12, max_w);
+        if (hh == 0) hh = 14;
+    } else if (w->kind == SYSRXE_UI_STATUS) {
+        if (ww == 0) ww = gui_ui_text_pref_width(w->text, 20, max_w);
+        if (hh == 0) hh = 22;
+    } else if (w->kind == SYSRXE_UI_BADGE) {
+        if (ww == 0) ww = gui_ui_text_pref_width(w->text, 18, max_w);
+        if (hh == 0) hh = 18;
+    } else if (w->kind == SYSRXE_UI_ICON) {
+        if (ww == 0) ww = 44;
+        if (hh == 0) hh = 44;
+    } else if (w->kind == SYSRXE_UI_TILE) {
+        if (ww == 0) ww = 88;
+        if (hh == 0) hh = 56;
+    } else {
+        if (ww == 0) ww = 96;
+        if (hh == 0) hh = 36;
+    }
+    if (ww > max_w) ww = max_w;
+    if (hh > max_h) hh = max_h;
+    if (ww < 8) ww = 8;
+    if (hh < 8) hh = 8;
+    if (out_w) *out_w = ww;
+    if (out_h) *out_h = hh;
+}
+
+static int gui_ui_responsive_rect(const sysrxe_app_t* a, const sysrxe_widget_t* target,
+                                  int* out_x, int* out_y, int* out_w, int* out_h)
+{
+    int content_y = g.win_y + GUI_CONTENT_TOP;
+    int left = g.win_x + 16;
+    int top = content_y + 36;
+    int right = g.win_x + g.win_w - 16;
+    int bottom = g.win_y + g.win_h - 12;
+    int area_w = right - left;
+    int area_h = bottom - top;
+    int gap = area_w < 360 ? 5 : 8;
+    int row_x = left;
+    int row_y = top;
+    int row_h = 0;
+    int row_hint = -10000;
+    if (!a || !target || area_w < 8 || area_h < 8) return 0;
+    for (uint32_t i = 0; i < a->ui_count && i < SYSRXE_UI_MAX_WIDGETS; i++) {
+        const sysrxe_widget_t* w = &a->ui[i];
+        int ww, hh, x, y;
+        int full;
+        if (!w->used) continue;
+        gui_ui_preferred_size(w, area_w, bottom - row_y, &ww, &hh);
+        full = w->kind == SYSRXE_UI_PANEL ||
+               w->kind == SYSRXE_UI_OUTPUT ||
+               w->kind == SYSRXE_UI_LIST ||
+               w->kind == SYSRXE_UI_SEPARATOR;
+        if (full) {
+            if (row_h > 0) {
+                row_y += row_h + gap;
+                row_x = left;
+                row_h = 0;
+                row_hint = -10000;
+            }
+            x = left;
+            y = row_y;
+            ww = area_w;
+            if ((w->kind == SYSRXE_UI_OUTPUT || w->kind == SYSRXE_UI_LIST) && w->h <= 0) {
+                hh = bottom - y;
+                if (hh < 42) hh = 42;
+            }
+            if (y + hh > bottom) hh = bottom - y;
+            if (hh < 8) hh = 8;
+            if (w == target) {
+                if (out_x) *out_x = x;
+                if (out_y) *out_y = y;
+                if (out_w) *out_w = ww;
+                if (out_h) *out_h = hh;
+                return 1;
+            }
+            row_y += hh + gap;
+            row_x = left;
+            row_h = 0;
+            row_hint = -10000;
+            continue;
+        }
+        if (row_h == 0) row_hint = w->y;
+        if (row_h > 0 && w->y > row_hint + 6) {
+            row_y += row_h + gap;
+            row_x = left;
+            row_h = 0;
+            row_hint = w->y;
+        }
+        if (row_x != left && row_x + ww > right) {
+            row_y += row_h + gap;
+            row_x = left;
+            row_h = 0;
+        }
+        x = row_x;
+        y = row_y;
+        if (y + hh > bottom) hh = bottom - y;
+        if (hh < 8) hh = 8;
+        if (w == target) {
+            if (out_x) *out_x = x;
+            if (out_y) *out_y = y;
+            if (out_w) *out_w = ww;
+            if (out_h) *out_h = hh;
+            return 1;
+        }
+        row_x += ww + gap;
+        if (hh > row_h) row_h = hh;
+    }
+    return 0;
+}
+
 static int gui_ui_widget_rect(const sysrxe_widget_t* w, int* out_x, int* out_y, int* out_w, int* out_h)
 {
+    const sysrxe_app_t* a = gui_file_ui_app(g.app_id);
     int content_y = g.win_y + GUI_CONTENT_TOP;
     int base_x = g.win_x + 16;
     int base_y = content_y + 36;
@@ -1656,6 +1836,7 @@ static int gui_ui_widget_rect(const sysrxe_widget_t* w, int* out_x, int* out_y, 
     int max_right = g.win_x + g.win_w - 16;
     int max_bottom = g.win_y + g.win_h - 12;
     if (!w || !w->used) return 0;
+    if (gui_app_uses_responsive_ui(a) && gui_ui_responsive_rect(a, w, out_x, out_y, out_w, out_h)) return 1;
     x = base_x + w->x;
     y = base_y + w->y;
     ww = w->w > 0 ? w->w : max_right - x;
@@ -2170,7 +2351,10 @@ static void gui_settings_panel_rect(int* out_x, int* out_y, int* out_w, int* out
 
 static void gui_default_item_rect(int index, int* out_x, int* out_y, int* out_w, int* out_h)
 {
-    int cols = g_have_fb && g_fb.w >= 620 ? 2 : 1;
+    int sw = g_have_fb ? (int)g_fb.w : 640;
+    int cols = (sw - 36) / 88;
+    if (cols < 1) cols = 1;
+    if (cols > 6) cols = 6;
     int col = index % cols;
     int row = index / cols;
     if (out_x) *out_x = 18 + col * 88;
@@ -2179,11 +2363,39 @@ static void gui_default_item_rect(int index, int* out_x, int* out_y, int* out_w,
     if (out_h) *out_h = 62;
 }
 
+static int gui_rects_overlap(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh)
+{
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+static int gui_desktop_spot_free(int x, int y, int w, int h)
+{
+    int dx, dy, dw, dh, cell;
+    (void)cell;
+    if (!g_have_fb) return 1;
+    gui_dock_rect(&dx, &dy, &dw, &dh, &cell);
+    if (gui_rects_overlap(x, y, w, h, dx, dy - 6, dw, dh + 12)) return 0;
+    for (int i = 0; i < g_desktop_item_count; i++) {
+        gui_item_t* item = &g_desktop_items[i];
+        if (!item->used) continue;
+        if (gui_rects_overlap(x, y, w, h, item->x, item->y, item->w, item->h)) return 0;
+    }
+    return 1;
+}
+
 static void gui_next_desktop_spot(int* out_x, int* out_y)
 {
     int x, y, w, h;
     int idx = g_desktop_item_count;
     if (idx >= GUI_DESKTOP_ITEM_MAX) idx = GUI_DESKTOP_ITEM_MAX - 1;
+    for (int probe = 0; probe < GUI_DESKTOP_ITEM_MAX * 3; probe++) {
+        gui_default_item_rect(probe, &x, &y, &w, &h);
+        if (gui_desktop_spot_free(x, y, w, h)) {
+            if (out_x) *out_x = x;
+            if (out_y) *out_y = y;
+            return;
+        }
+    }
     gui_default_item_rect(idx, &x, &y, &w, &h);
     if (out_x) *out_x = x;
     if (out_y) *out_y = y;

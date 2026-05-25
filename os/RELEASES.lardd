@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.85.0b
+ITEM Adds APPKIT responsive/smart/flow/smartui/autofit layout for RXE and SYSRXE apps.
+ITEM Responsive APPKIT keeps app-authored widget order, groups nearby rows, wraps controls instead of overlapping them, and lets OUTPUT/LIST fill remaining app space.
+ITEM Updates bundled SYSRXE Hello, RXE Lang Demo, and RXE Maze to use responsive UI layout so their controls stay usable across window sizes.
+ITEM Adds smarter desktop launcher placement that searches for a free grid spot and avoids the dock plus existing icons when adding bundled or user-created apps/folders.
+ITEM Keeps RXE/SYSRXE file-owned app code intact; this is an app-library/layout upgrade, not an OS-owned hardcoded app rewrite.
+ITEM Ships as beta because the new responsive layout engine should stabilize across more app designs before official promotion.
+
 SECTION v1.84.1p
 ITEM Hotpatches mouse movement latency by draining bounded PS/2 mouse batches before each GUI render.
 ITEM Preserves every click, drag, wheel, and cursor Unicode path while avoiding one full redraw per mouse packet.

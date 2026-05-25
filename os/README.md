@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.84.1p-ami/lardos-v1.84.1p-ami.iso`. To publish the whole hardware
+`release/v1.85.0b-ami/lardos-v1.85.0b-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.85.0b` adds APPKIT responsive UI layout for RXE/SYSRXE apps. Apps can use
+`LAYOUT responsive` or runtime `APPKIT LAYOUT responsive` so controls wrap
+instead of overlapping, output/list views fill remaining space, and bundled apps
+such as RXE Maze stay usable across window sizes.
 
 `v1.84.1p` hotpatches mouse movement latency. The kernel now drains a bounded
 batch of PS/2 mouse bytes before rendering once, so click/drag/wheel events are
@@ -294,6 +299,9 @@ commands:
   `_:` merged storage, RXR-style paths, or any file carrying an embedded script
   block. In VM mode, `subfs:/path` coexists beside the classic root by mapping
   into that sub filesystem's declared flat prefix.
+- `v1.85.0b` adds APPKIT responsive layout for file-owned RXE/SYSRXE apps:
+  `LAYOUT responsive` and `APPKIT LAYOUT responsive` keep controls from
+  overlapping while preserving app-authored code and widgets.
 - `v1.84.1p` hotpatches PS/2 mouse input batching so pointer motion stays
   responsive under heavier GUI/kernel work without dropping click/drag/wheel
   behavior.

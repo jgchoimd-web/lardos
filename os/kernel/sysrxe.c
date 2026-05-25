@@ -1406,7 +1406,7 @@ int sysrxe_selftest(void)
         "ID test\n"
         "NAME Test App\n"
         "ICON T\n"
-        "LAYOUT panel\n"
+        "LAYOUT responsive\n"
         "COLOR 0xFF123456\n"
         "INPUT Thing:\n"
         "BUTTON Do\n"
@@ -1452,7 +1452,7 @@ int sysrxe_selftest(void)
     if (strcmp(app.name, "Test App") != 0) return -2;
     if (strcmp(app.icon, "T") != 0) return -3;
     if (app.color != 0xFF123456u) return -4;
-    if (strcmp(app.layout, "panel") != 0) return -5;
+    if (strcmp(app.layout, "responsive") != 0) return -5;
     if (app.ui_count != 7u) return -6;
     if (app.ui[1].kind != SYSRXE_UI_BUTTON || strcmp(app.ui[1].action, "go") != 0) return -7;
     if (app.ui[4].kind != SYSRXE_UI_PROGRESS || strcmp(app.ui[4].action, "66") != 0) return -17;
@@ -1463,6 +1463,8 @@ int sysrxe_selftest(void)
     if (app.ui_count != 8u || app.ui[7].kind != SYSRXE_UI_CUSTOM || strcmp(app.ui[7].style, "meter") != 0) return -22;
     if (appkit_apply_script(&app, "APPKIT CLEAR\nAPPKIT UI KNOB 1 2 3 4 Runtime | run\n", visible, sizeof(visible)) != 2u) return -23;
     if (app.ui_count != 1u || strcmp(app.ui[0].style, "KNOB") != 0 || strcmp(app.ui[0].action, "run") != 0) return -24;
+    if (appkit_apply_script(&app, "APPKIT LAYOUT smartui\n", visible, sizeof(visible)) != 1u) return -33;
+    if (strcmp(app.layout, "smartui") != 0) return -34;
     if (strcmp(app.button_label, "Do") != 0) return -8;
     if (strcmp(app.command, "echo sysrxe") != 0) return -9;
     if (parse_sysrxe(&game_app, "game.sysrxe", game, sizeof(game) - 1) != 0) return -10;

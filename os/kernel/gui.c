@@ -211,6 +211,8 @@ static void gui_save_app_view(int app);
 static void gui_response_view_rect(int* out_x, int* out_y, int* out_w, int* out_h);
 static void gui_run_sysrxe_current(void);
 static void gui_run_sysrxe_input(const char* input);
+static int gui_resize_corner_hit(int x, int y);
+static int gui_resize_hit_selftest(void);
 
 #define SCREENRAM_MAX_BYTES 8192u
 #define SCREENRAM_DEFAULT_W 64u
@@ -1664,6 +1666,7 @@ int gui_render_effects_selftest(void)
     if (gui_resize_set_mode(GUI_RESIZE_LIVE) != 0 || gui_resize_mode() != GUI_RESIZE_LIVE) ok = 0;
     if (gui_resize_set_mode(GUI_RESIZE_STRETCH) != 0 || gui_resize_mode() != GUI_RESIZE_STRETCH) ok = 0;
     if (gui_resize_set_mode(7) == 0) ok = 0;
+    if (gui_resize_hit_selftest() != 0) ok = 0;
     g.aa_mode = old_aa;
     g.brightness = old_br;
     g.vblank_mode = old_vblank;
@@ -2810,20 +2813,44 @@ static void gui_clamp_window(void)
 
 static int gui_resize_corner_hit(int x, int y)
 {
-    int left;
     int right;
-    int top;
     int bottom;
     if (!g.win_visible || g.fullscreen) return 0;
-    left = x >= g.win_x && x < g.win_x + GUI_RESIZE_HIT;
     right = x >= g.win_x + g.win_w - GUI_RESIZE_HIT && x < g.win_x + g.win_w;
-    top = y >= g.win_y && y < g.win_y + GUI_RESIZE_HIT;
     bottom = y >= g.win_y + g.win_h - GUI_RESIZE_HIT && y < g.win_y + g.win_h;
-    if (left && top) return GUI_RESIZE_LEFT | GUI_RESIZE_TOP;
-    if (right && top) return GUI_RESIZE_RIGHT | GUI_RESIZE_TOP;
-    if (left && bottom) return GUI_RESIZE_LEFT | GUI_RESIZE_BOTTOM;
     if (right && bottom) return GUI_RESIZE_RIGHT | GUI_RESIZE_BOTTOM;
     return 0;
+}
+
+static int gui_resize_hit_selftest(void)
+{
+    int old_visible = g.win_visible;
+    int old_fullscreen = g.fullscreen;
+    int old_x = g.win_x;
+    int old_y = g.win_y;
+    int old_w = g.win_w;
+    int old_h = g.win_h;
+    int ok = 1;
+
+    g.win_visible = 1;
+    g.fullscreen = 0;
+    g.win_x = 100;
+    g.win_y = 80;
+    g.win_w = 320;
+    g.win_h = 220;
+
+    if (gui_resize_corner_hit(102, 82) != 0) ok = 0;
+    if (gui_resize_corner_hit(416, 82) != 0) ok = 0;
+    if (gui_resize_corner_hit(102, 296) != 0) ok = 0;
+    if (gui_resize_corner_hit(416, 296) != (GUI_RESIZE_RIGHT | GUI_RESIZE_BOTTOM)) ok = 0;
+
+    g.win_visible = old_visible;
+    g.fullscreen = old_fullscreen;
+    g.win_x = old_x;
+    g.win_y = old_y;
+    g.win_w = old_w;
+    g.win_h = old_h;
+    return ok ? 0 : -1;
 }
 
 static void gui_compute_resize_rect(int* out_x, int* out_y, int* out_w, int* out_h)

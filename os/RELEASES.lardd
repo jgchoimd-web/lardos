@@ -5,6 +5,12 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.91.1p
+ITEM Hotpatches GUI window resize hit-testing so only the visible bottom-right resize grip starts a resize drag.
+ITEM Left-top, right-top, and left-bottom corners no longer resize windows, preventing accidental reverse-corner resizing while moving or selecting windows.
+ITEM Keeps stretch/live resize modes, app RESIZE fixed/reflow policy, fullscreen, wallpaper, dock, and desktop/window-manager behavior intact.
+ITEM Preserves the LardOS value direction: no feature is removed, and user-owned window control stays explicit through the visible grip.
+
 SECTION v1.91.0a
 ITEM Officially promotes the user-owned desktop wallpaper feature after the beta build, release assets, and boot screenshots passed validation.
 ITEM Keeps wallpaper color/pattern/BMP commands, writable wallpaper.lardd, cfg wallpaper, rollback, POST, LUNIT, and LiveUpdate wallpaper reload paths intact.

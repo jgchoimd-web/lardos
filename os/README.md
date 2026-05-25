@@ -45,12 +45,17 @@ make release RELEASE_HW=ami
 
 Known profiles are `universal`, `seabios`, `ami`, `vbox`, `usb`, and `realpc`.
 Non-universal artifacts append the profile name, for example
-`release/v1.91.0a-ami/lardos-v1.91.0a-ami.iso`. To publish the whole hardware
+`release/v1.91.1p-ami/lardos-v1.91.1p-ami.iso`. To publish the whole hardware
 set in one pass:
 
 ```bash
 make release-all-hardware
 ```
+
+`v1.91.1p` hotpatches GUI window resize hit-testing so only the visible
+bottom-right resize grip starts a resize drag. Other corners return to normal
+window interaction while stretch/live resize modes, app-owned `RESIZE`
+policies, fullscreen, wallpaper, dock, and desktop behavior stay intact.
 
 `v1.91.0a` officially promotes the user-owned desktop wallpaper feature after
 the beta build and boot checks. It keeps `wallpaper color`, generated patterns,

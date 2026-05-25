@@ -466,6 +466,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.88.0b centralizes the active release version in os/VERSION and generates kernel/build version data from it.\n"
     "li v1.87.0b adds LiveUpdate runtime file/code apply for writable overlays, KMO/RXE/SYSRXE reloads, drivers, FSTWT, themes, and future auto-update plumbing.\n"
     "li v1.86.0b adds bootmeta growth readiness: stage2 exposes kernel size, image capacity, high-copy address, and free boot headroom.\n"
     "li v1.85.0b adds APPKIT responsive UI layout and smarter desktop icon placement for bundled/user apps.\n"

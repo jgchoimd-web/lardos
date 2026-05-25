@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.88.0b
+ITEM Adds os/VERSION as the single source for the active release version.
+ITEM Makefile reads VERSION for release names, hardware-profile artifact paths, and ISO volume IDs instead of carrying a second hard-coded version.
+ITEM version.h now includes a generated version_gen.h, so kernel code uses the same VERSION source without editing version.h every release.
+ITEM clean removes generated version_gen.h and .gitignore keeps it out of source control.
+ITEM This removes repeat edits for normal version bumps while keeping RELEASES.lardd as the human release history.
+ITEM Ships as beta because it changes build/version plumbing used by every release artifact.
+
 SECTION v1.87.0b
 ITEM Adds LiveUpdate, a runtime layer for changing files and file-owned code while LardOS is already running.
 ITEM liveupdate file name text replaces a writable/user-owned file immediately; liveupdate apply/code also reloads the matching code registry.

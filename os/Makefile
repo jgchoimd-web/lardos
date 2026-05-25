@@ -24,13 +24,15 @@ SEEDC     := $(HOST_TOOL_DIR)/seedc
 LIL       := $(HOST_TOOL_DIR)/lil
 BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
-RELEASE_BASE_VERSION := v1.87.0b
+VERSION_FILE := VERSION
+RELEASE_BASE_VERSION := $(strip $(shell cat $(VERSION_FILE)))
 RELEASE_HW ?= universal
 RELEASE_HW_LIST := universal seabios ami vbox usb realpc
 RELEASE_HW_UPPER := $(shell printf '%s' '$(RELEASE_HW)' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
 RELEASE_VERSION := $(if $(filter universal,$(RELEASE_HW)),$(RELEASE_BASE_VERSION),$(RELEASE_BASE_VERSION)-$(RELEASE_HW))
 RELEASE_NAME := lardos-$(RELEASE_VERSION)
-ISO_VOLUME_BASE := LARDOS_V1_87_0B
+VERSION_TOKEN := $(shell printf '%s' '$(RELEASE_BASE_VERSION)' | tr '[:lower:]' '[:upper:]' | tr '.-' '__')
+ISO_VOLUME_BASE := LARDOS_$(VERSION_TOKEN)
 ISO_VOLUME_ID := $(if $(filter universal,$(RELEASE_HW)),$(ISO_VOLUME_BASE),$(ISO_VOLUME_BASE)_$(RELEASE_HW_UPPER))
 RELEASE_DIR := release/$(RELEASE_VERSION)
 ISO_BOOTIMG_SECTOR := 23
@@ -47,6 +49,7 @@ LAFILLO_BOSX:= $(LANG_EX)/lafillo_demo.bosx
 LAFILLO_INC := $(KERNEL_DIR)/lafillo_demo_data.inc
 RELEASES_DOC := RELEASES.lardd
 RELEASES_INC := $(KERNEL_DIR)/releases_lardd.inc
+VERSION_GEN := $(INCLUDE)/version_gen.h
 BOOT_STAGE1_INC := $(KERNEL_DIR)/boot_stage1.inc
 BOOT_STAGE2_INC := $(KERNEL_DIR)/boot_stage2.inc
 
@@ -81,6 +84,9 @@ CFLAGS    := -std=gnu11 -ffreestanding -Os -Wall -Wextra -m64 -mno-red-zone -mcm
 LDFLAGS   := -T linker.ld -nostdlib -m elf_x86_64
 
 all: $(RAW_IMAGE)
+
+$(VERSION_GEN): $(VERSION_FILE)
+	@printf '#pragma once\n#define LARDOS_VERSION "%s"\n' "$$(cat $(VERSION_FILE))" > $@
 
 $(BOOT_BIN): $(BOOT_DIR)/stage1.s
 	$(NASM) -f bin $(BOOT_META_DEFS) $< -o $@
@@ -146,7 +152,7 @@ $(KERNEL_DIR)/lss.o: $(KERNEL_DIR)/lss.c
 $(KERNEL_DIR)/lfs.o: $(KERNEL_DIR)/lfs.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/lsh.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h $(INCLUDE)/bootmeta.h
+$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/lsh.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/mediafs.o: $(KERNEL_DIR)/mediafs.c $(INCLUDE)/mediafs.h $(INCLUDE)/installer.h $(INCLUDE)/storage.h
@@ -158,7 +164,7 @@ $(KERNEL_DIR)/installer.o: $(KERNEL_DIR)/installer.c $(BOOT_STAGE1_INC) $(BOOT_S
 $(KERNEL_DIR)/larsh.o: $(KERNEL_DIR)/larsh.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h $(INCLUDE)/bootmeta.h
+$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/kmo.o: $(KERNEL_DIR)/kmo.c $(INCLUDE)/kmo.h $(INCLUDE)/fs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardkit.h
@@ -290,7 +296,7 @@ $(KERNEL_DIR)/aux_kernel.o: $(KERNEL_DIR)/aux_kernel.s
 $(KERNEL_DIR)/smp.o: $(KERNEL_DIR)/smp.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/kernel64.o: $(KERNEL_DIR)/kernel64.c $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/version.h
+$(KERNEL_DIR)/kernel64.o: $(KERNEL_DIR)/kernel64.c $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/version.h $(VERSION_GEN)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/pci.o: $(KERNEL_DIR)/pci.c
@@ -302,7 +308,7 @@ $(KERNEL_DIR)/rtl8139.o: $(KERNEL_DIR)/rtl8139.c
 $(KERNEL_DIR)/net.o: $(KERNEL_DIR)/net.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/gui.o: $(KERNEL_DIR)/gui.c $(INCLUDE)/bootinfo.h $(INCLUDE)/gui.h $(INCLUDE)/version.h
+$(KERNEL_DIR)/gui.o: $(KERNEL_DIR)/gui.c $(INCLUDE)/bootinfo.h $(INCLUDE)/gui.h $(INCLUDE)/version.h $(VERSION_GEN)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/ps2.o: $(KERNEL_DIR)/ps2.c
@@ -427,6 +433,6 @@ run-iso: $(ISO_IMAGE)
 
 clean:
 	rm -f $(BOOT_BIN) $(BOOT_ISO_BIN) $(STAGE2_BIN) $(ISO_MBR_BIN) $(KERNEL_ELF) $(KERNEL_EXE) $(RAW_IMAGE) $(ISO_RAW_IMAGE) $(IMG_IMAGE) $(ISO_IMAGE) \
-	      $(KERNEL_DIR)/*.o $(KERNEL_DIR)/lafillo_demo_data.inc $(RELEASES_INC) $(BOOT_STAGE1_INC) $(BOOT_STAGE2_INC) \
+	      $(KERNEL_DIR)/*.o $(KERNEL_DIR)/lafillo_demo_data.inc $(RELEASES_INC) $(VERSION_GEN) $(BOOT_STAGE1_INC) $(BOOT_STAGE2_INC) \
 	      $(LAFILLO_ELF) $(LAFILLO_BOSX) $(LANG_EX)/lafillo_demo.o \
 	      $(MKLDLL) $(MKARDX) $(MKLFS) $(MK_SSAV) $(MKEXE) $(MKIMG) $(MKISO) $(BIN2INC) $(BOSLA) $(SEEDC) $(LIL)

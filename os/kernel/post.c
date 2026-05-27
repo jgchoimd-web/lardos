@@ -84,11 +84,7 @@ static int post_doc_parse(const char* name)
 
 static int post_version_suffix_known(void)
 {
-    uint32_t i = 0;
-    while (LARDOS_VERSION[i]) i++;
-    if (i == 0) return 0;
-    char suffix = LARDOS_VERSION[i - 1u];
-    return suffix == 'a' || suffix == 'b' || suffix == 'p';
+    return lardos_release_channel_char(lardos_release_channel_suffix(LARDOS_VERSION));
 }
 
 void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)

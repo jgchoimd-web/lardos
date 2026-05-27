@@ -4,6 +4,16 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
+TEXT LTS codenames append after the channel, for example v1.99.0a-tiara. Only one LTS line is active at a time.
+
+SECTION v1.99.0a-tiara
+ITEM Official LTS release named Tiara, promoting the v1.99 Connect raw-control compatibility track after build, media, POST policy, and boot-smoke checks.
+ITEM Adds release lts and lts.lardd so the active LTS codename and one-LTS-at-a-time rule are visible inside LardOS.
+ITEM Fixes release-channel parsing so future LTS names such as Mirage do not break a/b/p channel detection.
+ITEM Keeps normal lconnect default-off, manual-grant, and non-input; deprecated lconnect input/quiet controls remain confirm-gated and logged.
+ITEM Keeps OSLink, LardOS Connect normal mode, MegaClipboard, LardSec, AuxKernel, MediaFS, installer, WebStack, RenderFX, FSTWT, RXR/RXE/SYSRXE, KMO, SUM, software ECC, GUI, and branch-role separation intact.
+ITEM Support policy: Tiara is the current LTS line; when Mirage ships as the next LTS, Tiara support ends because only one LTS may be active.
+ITEM Ships as a because this is a stability/LTS promotion with no feature direction change and no feature loss.
 
 SECTION v1.99.0b
 ITEM Adds a Deprecated raw-control namespace for LardOS Connect edge cases.

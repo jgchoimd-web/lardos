@@ -301,20 +301,9 @@ static void out_append_ip4(ip4_t ip)
     out_append_u32(ip.b[3]);
 }
 
-static char lardos_version_suffix(void)
-{
-    uint32_t i = 0;
-    while (LARDOS_VERSION[i]) i++;
-    return i ? LARDOS_VERSION[i - 1] : '?';
-}
-
 static const char* lardos_version_channel(void)
 {
-    char suffix = lardos_version_suffix();
-    if (suffix == 'a') return "official";
-    if (suffix == 'b') return "beta-experimental";
-    if (suffix == 'p') return "hotpatch";
-    return "unknown";
+    return lardos_release_channel_name();
 }
 
 static char ascii_lower_char(char c)
@@ -926,6 +915,23 @@ static void cmd_larddoc(const char* args, const char* usage)
 static void cmd_release(const char* args)
 {
     while (args && (*args == ' ' || *args == '\t')) args++;
+    if (args && (strcmp(args, "lts") == 0 || strcmp(args, "support") == 0)) {
+        out_append("LTS support policy\n");
+        out_append("  current: ");
+        out_append(LARDOS_VERSION);
+#if LARDOS_LTS_ACTIVE
+        out_append(" (");
+        out_append(LARDOS_LTS_NAME);
+        out_append(")\n");
+#else
+        out_append(" (no active LTS codename)\n");
+#endif
+        out_append("  rule: only one LTS line is active at a time.\n");
+        out_append("  when the next LTS ships, the previous LTS support line ends.\n");
+        out_append("  next planned codename: mirage.\n");
+        out_append("  LTS does not remove raw-control, recovery, native formats, or user ownership.\n");
+        return;
+    }
     if (args && (strcmp(args, "policy") == 0 || strcmp(args, "channel") == 0 || strcmp(args, "channels") == 0)) {
         out_append("Release channel policy\n");
         out_append("  current: ");
@@ -933,19 +939,25 @@ static void cmd_release(const char* args)
         out_append(" (");
         out_append(lardos_version_channel());
         out_append(")\n");
+        if (LARDOS_LTS_ACTIVE) {
+            out_append("  LTS codename: ");
+            out_append(LARDOS_LTS_NAME);
+            out_append("\n");
+        }
         out_append("  hardware: ");
         out_append(LARDOS_HARDWARE_PROFILE);
         out_append("\n");
         out_append("  a = official: promoted stable builds after boot, POST, GUI, and media checks.\n");
         out_append("  b = beta-experimental: new or risky feature bundles before promotion.\n");
         out_append("  p = hotpatch: narrow emergency fixes for an existing release line.\n");
+        out_append("  LTS codenames append after the channel, for example vX.Y.Za-tiara.\n");
         out_append("  hardware profiles: universal, seabios, ami, vbox, usb, realpc.\n");
         out_append("  artifact names append the hardware profile, for example vX.Y.Zb-ami.\n");
         out_append("  Do not use a just because a feature was added; choose the channel by risk.\n");
         return;
     }
     if (args && args[0]) {
-        out_append("Usage: release [policy]\n");
+        out_append("Usage: release [policy|lts]\n");
         return;
     }
     cmd_larddoc("releases.lardd", "Usage: release");
@@ -2125,7 +2137,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|lts] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");

@@ -189,6 +189,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Keyboard completeness: mouse workflows should also have keyboard and shortcut routes so the full OS can be driven without a mouse.\n"
     "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
+    "ITEM LTS honesty: only one LTS line is active at a time, and support changes must be visible through release lts.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
     "SECTION Commands\n"
     "ITEM values -> read this law.\n"
@@ -700,8 +701,10 @@ static const uint8_t file_lardos_lars[] =
     "cmd post\n"
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
+    "cmd lardd lts.lardd\n"
+    "cmd release lts\n"
     "cmd lardd dosmode_guide.lardd\n"
-    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch. Hardware profiles: universal, seabios, ami, vbox, usb, realpc.\n"
+    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch. LTS codenames append after the suffix, like v1.99.0a-tiara.\n"
     "end\n";
 
 static const uint8_t file_default_lguilib[] =
@@ -768,6 +771,19 @@ static const uint8_t file_lardd_guide[] =
     "TEXT A local LardOS document.\n"
     "ITEM One record per line.\n"
     "ENDCODE\n"
+    "END\n";
+
+static const uint8_t file_lts_lardd[] =
+    "LARDD 1\n"
+    "TITLE LardOS LTS\n"
+    "TEXT Current LTS: Tiara.\n"
+    "TEXT Active version: v1.99.0a-tiara.\n"
+    "TEXT Only one LTS line is active at a time; when the next LTS ships, the old LTS support line ends.\n"
+    "TEXT Next planned LTS codename: Mirage.\n"
+    "TEXT LTS means long-support promotion, not feature removal or value changes.\n"
+    "SECTION Values\n"
+    "ITEM User ownership, raw-control visibility, native formats, recovery paths, and keyboard completeness remain part of the supported surface.\n"
+    "ITEM Deprecated raw-control paths may exist, but they must remain confirm-gated and auditable.\n"
     "END\n";
 
 static const uint8_t file_glyph_guide[] =
@@ -1552,6 +1568,7 @@ static const FsFile FS_FILES[] = {
     { "default.lguilib", file_default_lguilib, sizeof(file_default_lguilib) - 1 },
     { "default.ltheme", file_default_ltheme, sizeof(file_default_ltheme) - 1 },
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
+    { "lts.lardd", file_lts_lardd, sizeof(file_lts_lardd) - 1 },
     { "glyph_guide.lardd", file_glyph_guide, sizeof(file_glyph_guide) - 1 },
     { "lardtime_guide.lardd", file_lardtime_guide, sizeof(file_lardtime_guide) - 1 },
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },

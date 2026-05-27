@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.99.0a-tiara` is the Tiara LTS release. It promotes the v1.99 Connect
+compatibility work to an official `a` build, adds `release lts` plus
+`lts.lardd`, and fixes channel parsing so future LTS codenames such as
+`mirage` do not break the `a`/`b`/`p` policy. LardOS supports one LTS line at a
+time: Tiara is current, and when Mirage ships, Tiara support ends. This is a
+support-policy promotion, not a feature removal.
+
 `v1.99.0b` adds a Deprecated raw-control namespace for LardOS Connect. Normal
 `lconnect` still defaults to visible, manual, non-input sharing, but
 `deprecated lconnect input on confirm` unlocks keyboard/mouse resource names and
@@ -869,7 +876,9 @@ commands:
   The built-in `sample.rxr` installs a normal `.rxe` app and reads its required
   `rxr_data.txt` dependency through the OS-owned `rxr/rxr_data.txt` namespace,
   keeping app source independent from the installed drive/path.
-- `release` renders the current release log from `releases.lardd`.
+- `release` renders the current release log from `releases.lardd`; `release lts`
+  shows the active LTS codename, the one-LTS-at-a-time rule, and the next
+  planned LTS name.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
   assertion checks, stepped loops, repeat loops, and integer math helpers.
@@ -908,7 +917,8 @@ kernel version, add an entry to `os/RELEASES.lardd`, keep the embedded
 `releases.lardd` in sync so LSH can show it with `release`, and run
 `make release` or `make release-all-hardware` so the matching ISO/IMG artifacts
 are available. Inside LSH, `release policy` prints the channel and hardware
-profile rules.
+profile rules. LTS releases append a codename after the channel, such as
+`v1.99.0a-tiara`, and `release lts` makes the active support line visible.
 
 ### Networking And TLS
 

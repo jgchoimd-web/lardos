@@ -1,2 +1,0 @@
-; lipc.boslib — LardOS LIPC opcodes (see include/lipc.h, lang/README.md).
-; Opcodes: lipc_send, lipc_recv, lipc_pending, lipc_send_str (no defines here).

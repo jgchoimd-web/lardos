@@ -1,7 +1,0 @@
-; Lafillo VM demo - HTML to text
-; Run: lafvm lafillo_vm_demo.dvm (if on FS)
-
-push "<html><head><title>Test</title></head><body><h1>Hello</h1><p>From Lafillo VM.</p></body></html>"
-lafillo
-print
-halt

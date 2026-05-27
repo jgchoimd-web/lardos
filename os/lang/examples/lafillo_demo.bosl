@@ -1,9 +1,0 @@
-; lafillo_demo.bosl - HTML to text via lafillo_print
-; Usage: bosla lafillo_demo.bosl -o lafillo_demo.bosli -I lang
-;        bosl lafillo_demo.bosli (on LardOS with file on FS)
-
-include "../lib/lafillo.boslib"
-
-pushc "<html><body><h1>Hello</h1><p>From Lafillo.</p></body></html>"
-call lafillo_print
-halt

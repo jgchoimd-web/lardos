@@ -1,6 +1,0 @@
-; Classic demo: (40+2) as result
-pushi 40
-pushi 2
-add
-print
-halt

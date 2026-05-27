@@ -14,6 +14,8 @@ typedef struct {
     uint32_t bytes;
     uint32_t lba;
     uint32_t sectors;
+    uint32_t sealed;
+    uint32_t lardsec_locked;
     int last_error;
 } mediafs_info_t;
 

@@ -2,6 +2,7 @@
 
 #include "fs.h"
 #include "installer.h"
+#include "lardsec.h"
 #include "storage.h"
 #include "string.h"
 
@@ -18,6 +19,7 @@
 #define MEDIAFS_ENTRY_OFF  32u
 #define MEDIAFS_ENTRY_SIZE 48u
 #define MEDIAFS_DATA_OFF   MEDIAFS_HEADER_LEN
+#define MEDIAFS_USED_BYTES (MEDIAFS_DATA_OFF + MEDIAFS_MAX_FILES * MEDIAFS_FILE_CAP)
 
 #define MEDIAFS_AUX_LBA     LARD_INSTALL_IMAGE_SECTORS
 #define MEDIAFS_USB_LBA     (MEDIAFS_AUX_LBA + MEDIAFS_SECTORS)
@@ -44,6 +46,7 @@ typedef struct {
     uint32_t persistent;
     uint32_t dirty;
     uint32_t generation;
+    uint32_t sealed;
     int last_error;
 } media_dev_t;
 
@@ -52,6 +55,8 @@ static media_dev_t s_media[] = {
     { .drive = 'Z', .name = "aux", .label = "Auxiliary SSD/HDD media store", .base_lba = MEDIAFS_AUX_LBA, .sectors = MEDIAFS_SECTORS },
     { .drive = 'A', .name = "usb", .label = "USB-style removable store", .base_lba = MEDIAFS_USB_LBA, .sectors = MEDIAFS_SECTORS },
 };
+
+static uint8_t s_media_scratch[MEDIAFS_BYTES];
 
 static uint32_t rd32(const uint8_t* p)
 {
@@ -196,6 +201,7 @@ static void media_format_memory(media_dev_t* dev)
     media_zero((uint8_t*)dev->files, sizeof(dev->files));
     dev->file_count = 0;
     dev->generation++;
+    dev->sealed = 0;
     media_write_header(dev);
 }
 
@@ -226,6 +232,20 @@ static int media_load(media_dev_t* dev)
                 dev->mounted = 1;
                 return r;
             }
+        }
+        if (lardsec_is_sealed_image(dev->image, sizeof(dev->image))) {
+            int sr = lardsec_open_media_image(dev->drive, dev->base_lba, dev->image,
+                                              s_media_scratch, sizeof(dev->image), MEDIAFS_USED_BYTES);
+            dev->sealed = 1;
+            if (sr != 0) {
+                dev->last_error = sr;
+                dev->mounted = 1;
+                dev->file_count = 0;
+                return sr;
+            }
+            media_copy(dev->image, s_media_scratch, sizeof(dev->image));
+        } else {
+            dev->sealed = 0;
         }
         invalid = media_parse_header(dev);
         if (invalid != 0) {
@@ -276,6 +296,8 @@ int mediafs_info(uint32_t idx, mediafs_info_t* out)
     out->bytes = bytes;
     out->lba = dev->base_lba;
     out->sectors = dev->sectors;
+    out->sealed = dev->sealed;
+    out->lardsec_locked = lardsec_locked();
     out->last_error = dev->last_error;
     return 0;
 }
@@ -290,6 +312,7 @@ int mediafs_list(char drive, mediafs_list_cb cb, void* user)
     media_dev_t* dev = media_by_drive(drive);
     if (!dev) return -1;
     (void)media_load(dev);
+    if (lardsec_locked()) return -5;
     for (uint32_t i = 0; i < dev->file_count; i++) {
         if (cb) cb(dev->files[i].name, dev->files[i].size, user);
     }
@@ -304,6 +327,7 @@ int mediafs_read(char drive, const char* name, const uint8_t** data, uint32_t* s
     int idx;
     if (!dev || !data || !size || !media_valid_name(q)) return -1;
     (void)media_load(dev);
+    if (lardsec_locked()) return -5;
     idx = media_find_file(dev, q);
     if (idx < 0) return -2;
     *data = dev->image + dev->files[idx].offset;
@@ -316,10 +340,23 @@ int mediafs_sync(char drive)
     media_dev_t* dev = media_by_drive(drive);
     if (!dev) return -1;
     (void)media_load(dev);
+    if (lardsec_locked()) return -5;
     if (!dev->persistent) return -2;
     media_write_header(dev);
     for (uint32_t i = 0; i < dev->sectors; i++) {
-        int r = storage_write_sector(dev->base_lba + i, dev->image + i * STORAGE_SECTOR_SIZE);
+        int r;
+        const uint8_t* sector;
+        if (i == 0) {
+            int sr = lardsec_seal_media_image(dev->drive, dev->base_lba, dev->image,
+                                              s_media_scratch, sizeof(dev->image), MEDIAFS_USED_BYTES);
+            if (sr < 0) {
+                dev->last_error = sr;
+                return sr;
+            }
+            dev->sealed = sr == 0 ? 1u : 0u;
+        }
+        sector = (dev->sealed ? s_media_scratch : dev->image) + i * STORAGE_SECTOR_SIZE;
+        r = storage_write_sector(dev->base_lba + i, sector);
         if (r != 0) {
             dev->last_error = r;
             return r;
@@ -341,6 +378,7 @@ int mediafs_write(char drive, const char* name, const uint8_t* data, uint32_t si
     if (!dev || !media_valid_name(q)) return -1;
     if (size && !data) return -2;
     (void)media_load(dev);
+    if (lardsec_locked()) return -5;
     idx = media_find_file(dev, q);
     if (idx < 0) {
         if (dev->file_count >= MEDIAFS_MAX_FILES) return -3;
@@ -374,6 +412,7 @@ int mediafs_delete(char drive, const char* name)
     int idx;
     if (!dev || !media_valid_name(q)) return -1;
     (void)media_load(dev);
+    if (lardsec_locked()) return -5;
     idx = media_find_file(dev, q);
     if (idx < 0) return -2;
     media_zero(dev->image + dev->files[idx].offset, dev->files[idx].cap);
@@ -401,6 +440,7 @@ int mediafs_format(char drive)
     media_dev_t* dev = media_by_drive(drive);
     if (!dev) return -1;
     (void)media_load(dev);
+    if (lardsec_locked()) return -5;
     media_format_memory(dev);
     dev->dirty = 1;
     if (dev->persistent) return mediafs_sync(dev->drive);

@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.94.0b
+ITEM Adds optional LardSec/LardLocker media sealing for user-owned at-rest protection.
+ITEM secure key shows the visible recovery key; secure on/off, seal, lock, unlock KEY, ecc on/off, regen, scrub, and test are available from LSH and CFGSH.
+ITEM MDFS media stores Y:/Z:/A: can be written as native LSEC sealed containers with stream encryption, scrubbed unused slack bytes, and block ECC records.
+ITEM The ECC path can correct a single flipped bit per sealed block and refuses corrupted sealed media instead of silently trusting bad data.
+ITEM The feature is on by default for at-rest media writes but remains reversible with secure off, and Magic treats secure/bitlocker as raw-control so accidental predicted execution requires magic -f.
+ITEM Existing MediaFS, installer, WebStack, RenderFX, FSTWT, RXR/RXE/SYSRXE, KMO, SUM, and user-owned delete/repair controls remain intact.
+
 SECTION v1.93.0b
 ITEM Adds SPFX 1, a native subpixel display-defect filter script format for user-owned screen correction.
 ITEM renderfx subpx can enable/disable, clear, manually add RECT/PIXEL rules, load displayfix.spfx, and selftest the filter path.

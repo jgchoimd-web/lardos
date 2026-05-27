@@ -38,6 +38,7 @@
 #include "bootmeta.h"
 #include "crashlog.h"
 #include "installer.h"
+#include "lardsec.h"
 #include "mediafs.h"
 #include "panic.h"
 #include "version.h"
@@ -350,7 +351,7 @@ typedef struct {
 } magic_cmd_entry_t;
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
-    { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
+    { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
@@ -1316,6 +1317,9 @@ static void media_print_info(uint32_t idx)
     out_append_u32(info.lba);
     out_append("+");
     out_append_u32(info.sectors);
+    out_append("  seal=");
+    out_append(info.sealed ? "lsec" : "plain");
+    if (info.lardsec_locked) out_append("/locked");
     out_append("  files=");
     out_append_u32(info.files);
     out_append("  bytes=");
@@ -1433,6 +1437,129 @@ static void cmd_media(const char* args)
         return;
     }
     out_append("Usage: media list|format Y|Z|A|sync [Z|all]|read Z file|write Z file text|append Z file text|delete Z file\n");
+}
+
+static void lardsec_sync_all(const char* label)
+{
+    for (uint32_t i = 0; i < mediafs_count(); i++) {
+        mediafs_info_t info;
+        if (mediafs_info(i, &info) == 0) {
+            int r = mediafs_sync(info.drive);
+            out_append(label);
+            out_append(" ");
+            out_append_char(info.drive);
+            out_append(r == 0 ? ": synced\n" : ": ram-fallback or sync failed\n");
+        }
+    }
+}
+
+static void cmd_lardsec_status(void)
+{
+    lardsec_info_t info;
+    lardsec_info(&info);
+    out_append("LardSec / LardLocker\n  at_rest=");
+    out_append(info.enabled ? "on" : "off");
+    out_append(" lock=");
+    out_append(info.locked ? "locked" : "open");
+    out_append(" ecc=");
+    out_append(info.ecc_enabled ? "on" : "off");
+    out_append(" key_hash=0x");
+    out_append_hex32(info.key_hash);
+    out_append("\n  sealed_writes=");
+    out_append_u32(info.sealed_writes);
+    out_append(" opened=");
+    out_append_u32(info.opened_seals);
+    out_append(" ecc_fix=");
+    out_append_u32(info.ecc_corrections);
+    out_append(" ecc_fail=");
+    out_append_u32(info.ecc_failures);
+    out_append(" scrubbed=");
+    out_append_u32(info.scrubbed_bytes);
+    out_append(" last=");
+    out_append_u32(info.last_error);
+    out_append("\n  recovery_key=");
+    out_append(info.recovery_key);
+    out_append("\n  scope: MDFS media stores Y:/Z:/A: are sealed on disk; RAM stays usable while unlocked.\n");
+}
+
+static void cmd_lardsec(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        cfgsh_is_status_word(sub) || strcmp(sub, "show") == 0) {
+        cmd_lardsec_status();
+        return;
+    }
+    if (strcmp(sub, "key") == 0 || strcmp(sub, "recovery") == 0 || strcmp(sub, "bitlockerkey") == 0) {
+        lardsec_info_t info;
+        lardsec_info(&info);
+        out_append("LardLocker recovery key: ");
+        out_append(info.recovery_key);
+        out_append("\n");
+        return;
+    }
+    if (strcmp(sub, "on") == 0 || strcmp(sub, "enable") == 0) {
+        lardsec_enable(1);
+        out_append("lardsec: at-rest sealing enabled. Run secure seal or media sync all to write sealed stores.\n");
+        cmd_lardsec_status();
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "disable") == 0) {
+        (void)lardsec_unlock("");
+        lardsec_enable(0);
+        lardsec_sync_all("lardsec plaintext");
+        cmd_lardsec_status();
+        return;
+    }
+    if (strcmp(sub, "ecc") == 0) {
+        char value[16];
+        int on;
+        if (vcs_read_word(&args, value, sizeof(value)) != 0 || cfgsh_bool_value(value, &on) != 0) {
+            out_append("Usage: secure ecc on|off\n");
+            return;
+        }
+        lardsec_set_ecc(on);
+        cmd_lardsec_status();
+        return;
+    }
+    if (strcmp(sub, "regen") == 0 || strcmp(sub, "newkey") == 0) {
+        uint32_t seed = 0;
+        (void)vcs_parse_u32(&args, &seed);
+        lardsec_regen_key(seed);
+        out_append("lardsec: new user-visible recovery key generated.\n");
+        cmd_lardsec_status();
+        return;
+    }
+    if (strcmp(sub, "seal") == 0 || strcmp(sub, "syncseal") == 0 || strcmp(sub, "scrub") == 0) {
+        lardsec_enable(1);
+        lardsec_sync_all("lardsec seal");
+        cmd_lardsec_status();
+        return;
+    }
+    if (strcmp(sub, "lock") == 0) {
+        lardsec_enable(1);
+        lardsec_sync_all("lardsec seal");
+        lardsec_lock();
+        out_append("lardsec: locked. Use secure unlock KEY to reopen media stores.\n");
+        cmd_lardsec_status();
+        return;
+    }
+    if (strcmp(sub, "unlock") == 0 || strcmp(sub, "open") == 0) {
+        char key[64];
+        if (vcs_read_word(&args, key, sizeof(key)) != 0 || lardsec_unlock(key) != 0) {
+            out_append("Usage: secure unlock LARD-XXXX-XXXX-XXXX-XXXX\n");
+            return;
+        }
+        out_append("lardsec: unlocked.\n");
+        cmd_lardsec_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lardsec_selftest() == 0 ? "lardsec: selftest OK\n" : "lardsec: selftest failed\n");
+        return;
+    }
+    out_append("Usage: secure status|key|on|off|ecc on|off|regen [seed]|seal|lock|unlock KEY|scrub|test\n");
 }
 
 static void drivers_lsh_cb(uint16_t vendor_id, uint16_t device_id, uint8_t type,
@@ -1833,7 +1960,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -1842,6 +1969,7 @@ static void cmd_help(const char* args)
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  media list|format Z|sync all|write Z file text  drives X/Y/Z/A/R/_\n");
+    out_append("  secure status|key|on|off|seal|lock|unlock KEY|ecc on|off  user-owned disk sealing\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
@@ -1916,6 +2044,8 @@ static void cmd_control(const char* args)
     out_append("  install hdd yes     write the current LardOS boot image to the target disk\n");
     out_append("  media list          inspect floppy, auxiliary, and extra media stores\n");
     out_append("  media write Z note.txt hello  save data to the auxiliary media store\n");
+    out_append("  secure key         show the user-owned LardLocker-style recovery key\n");
+    out_append("  secure seal        write encrypted-at-rest MDFS stores with ECC and scrubbed slack\n");
     out_append("  values              reread the LardOS user-law values\n");
     out_append("  tomb list           inspect active user-owned read-only deletion records\n");
     out_append("  bleed dryrun file   preview the strongest delete sweep before using bleed file\n");
@@ -2221,6 +2351,17 @@ static void cmd_status(const char* args)
     out_append("\n");
     out_append("MediaFS:\n");
     for (uint32_t i = 0; i < mediafs_count(); i++) media_print_info(i);
+    lardsec_info_t sec;
+    lardsec_info(&sec);
+    out_append("Security: at_rest=");
+    out_append(sec.enabled ? "on" : "off");
+    out_append(", lock=");
+    out_append(sec.locked ? "locked" : "open");
+    out_append(", ecc=");
+    out_append(sec.ecc_enabled ? "on" : "off");
+    out_append(", key_hash=0x");
+    out_append_hex32(sec.key_hash);
+    out_append("\n");
     out_append("Drivers: ");
     out_append_u32(drivers);
     out_append(" DRFL entries\n");
@@ -9319,6 +9460,7 @@ static void cfgsh_help(void)
     out_append("  lsb on|off         store ScreenRAM bits in rendered pixel LSBs\n");
     out_append("  vblank on|off      use detected blanking window for final blit\n");
     out_append("  subpx on|off|use file.spfx|add x y w h r g b  RGB subpixel defect filter\n");
+    out_append("  secure on|off|seal|lock|unlock KEY  optional at-rest media sealing\n");
     out_append("  http 1..7          GET|POST|HEAD|PUT|PATCH|DELETE|OPTIONS mode\n");
     out_append("  boot 1..5          normal|safe|netoff|dev|awakening\n");
     out_append("  priority 0..10     default background task priority\n");
@@ -9338,6 +9480,7 @@ static void cfgsh_status(void)
     lardkit_theme_info_t th;
     gui_wallpaper_info_t wp;
     gui_subpx_filter_info_t spx;
+    lardsec_info_t sec;
     lardkit_rollback_info_t rb;
     bootprof_info(&bp);
     awake_info(&aw);
@@ -9348,6 +9491,7 @@ static void cfgsh_status(void)
     lardkit_theme_info(&th);
     gui_wallpaper_info(&wp);
     gui_subpx_filter_info(&spx);
+    lardsec_info(&sec);
     lardkit_rollback_info(&rb);
     out_append("CFGSH status\n");
     out_append("  boot=");
@@ -9376,6 +9520,8 @@ static void cfgsh_status(void)
     out_append(spx.enabled ? "on" : "off");
     out_append("/");
     out_append_u32(spx.rules);
+    out_append(" secure=");
+    out_append(sec.enabled ? (sec.locked ? "locked" : "on") : "off");
     out_append(" http=");
     out_append(lsh_http_method_name());
     out_append(" priority=");
@@ -9581,6 +9727,15 @@ static int cfgsh_apply(const char* setting, const char* args)
         }
         return 1;
     }
+    if (strcmp(setting, "secure") == 0 || strcmp(setting, "lardsec") == 0 ||
+        strcmp(setting, "locker") == 0 || strcmp(setting, "bitlocker") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_lardsec_status();
+        } else {
+            cmd_lardsec(args);
+        }
+        return 1;
+    }
     if (strcmp(setting, "http") == 0 || strcmp(setting, "method") == 0) {
         if (!have_value || cfgsh_is_status_word(value)) {
             out_append("cfgsh: http=");
@@ -9756,6 +9911,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
     if (strcmp(cmd, "liveupdate") == 0 || strcmp(cmd, "live") == 0) lardkit_trace_event("liveupdate", cmd, 0);
     if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
+    if (strcmp(cmd, "secure") == 0 || strcmp(cmd, "lardsec") == 0 ||
+        strcmp(cmd, "locker") == 0 || strcmp(cmd, "bitlocker") == 0) lardkit_trace_event("security", cmd, 0);
     if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0 || strcmp(cmd, "bleed") == 0) lardkit_trace_event("fs", cmd, 0);
     if (strcmp(cmd, "crash") == 0) lardkit_trace_event("crash", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
@@ -9821,6 +9978,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "values") == 0 || strcmp(cmd, "philosophy") == 0) { cmd_values(args); return; }
     if (strcmp(cmd, "status") == 0) { cmd_status(args); return; }
     if (strcmp(cmd, "install") == 0 || strcmp(cmd, "installer") == 0) { cmd_install(args); return; }
+    if (strcmp(cmd, "secure") == 0 || strcmp(cmd, "lardsec") == 0 ||
+        strcmp(cmd, "locker") == 0 || strcmp(cmd, "bitlocker") == 0) { cmd_lardsec(args); return; }
     if (strcmp(cmd, "dos") == 0 || strcmp(cmd, "dosmode") == 0) { cmd_dos(args); return; }
     if (strcmp(cmd, "tomb") == 0 || strcmp(cmd, "tombstone") == 0 || strcmp(cmd, "tombstones") == 0) { dos_tombstone(args); return; }
     if (strcmp(cmd, "time") == 0 || strcmp(cmd, "lardtime") == 0 || strcmp(cmd, "ltime") == 0) { cmd_lardtime_mode(args, "now"); return; }

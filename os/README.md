@@ -52,6 +52,15 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.94.0b` adds optional user-owned LardSec/LardLocker media sealing. `secure
+key` shows the visible recovery key, `secure on` enables encrypted-at-rest MDFS
+writes, `secure seal` writes Y:/Z:/A: stores as native LSEC containers with
+scrubbed slack space, `secure lock` blocks media access until `secure unlock
+KEY`, and `secure ecc on` keeps block ECC records that can correct a single bit
+flip per sealed block. It is on by default for at-rest media writes, but not
+mandatory: `secure off` writes plaintext again, preserving the LardOS rule that
+the user owns the machine.
+
 `v1.93.0b` adds native SPFX subpixel display-defect filters. Use `renderfx
 subpx use displayfix.spfx` to load the editable script, `renderfx subpx add x y
 w h r g b` for a rectangle, or `renderfx subpx pixel x y r g b` for one pixel.
@@ -325,6 +334,10 @@ commands:
   auxiliary SSD/HDD, `A:`/`U:` is the first extra USB-style store, and `R:` is
   RAM. Normal file commands also work, for example `write Z:note.txt hello`,
   `dir A:`, `type Y:boot.txt`, and `copy R:notes.txt Z:notes.txt`.
+- `secure status|key|on|off|seal|lock|unlock KEY|ecc on|off` controls optional
+  LardSec at-rest protection for MDFS media stores. It writes native LSEC sealed
+  containers with stream encryption, scrubbed unused bytes, and block ECC while
+  leaving the recovery key visible to the user through the shell.
 - `dir _:` opens the merged top-level drive. It lists `R:` RAM files, `X:`
   built-in/LFS files, and `Y:`/`Z:`/`A:` media stores together; `_:` reads
   search those stores in user-first order and `_:` writes route visibly to `R:`.

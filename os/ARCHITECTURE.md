@@ -472,6 +472,7 @@ containers, the installer boot-stage selftest, and LIL feature forms.
 `LSH` provides command discovery (`help`), a system control map (`control`), a
 system snapshot (`status`), predicted safe command execution (`magic command`),
 HDD/SSD installer preview and write controls (`install`),
+optional encrypted-at-rest media sealing (`secure`, `bitlocker`, and LSEC),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
 RenderFX display correction (`renderfx subpx` and `displayfix.spfx`), visual screen diagnostics (`screencheck`),
 OS-to-OS messaging, local bus messages, and safe remote command requests (`oslink`), task priority

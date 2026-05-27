@@ -37,6 +37,7 @@
 #include "string.h"
 #include "fs.h"
 #include "installer.h"
+#include "lardsec.h"
 #include "mediafs.h"
 #include "version.h"
 
@@ -609,6 +610,7 @@ void kmain(void)
     /* Custom language demos: BOSL (bytecode) + LIL (s-expr interpreter). */
     mem_init();
     fs_init();
+    lardsec_init();
     mediafs_init();
     gui_reload_sysrxe_apps();
     crashlog_init();

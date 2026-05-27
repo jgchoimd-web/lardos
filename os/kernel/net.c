@@ -46,6 +46,18 @@ typedef struct __attribute__((packed)) {
     uint16_t csum;
 } udp_hdr_t;
 
+#define UDP_PENDING_SLOTS 2u
+#define UDP_PENDING_CAP 768u
+
+typedef struct {
+    int used;
+    uint16_t dst_port;
+    uint16_t src_port;
+    ip4_t src;
+    uint32_t len;
+    uint8_t data[UDP_PENDING_CAP];
+} udp_pending_t;
+
 typedef struct __attribute__((packed)) {
     uint16_t src_port;
     uint16_t dst_port;
@@ -67,6 +79,7 @@ typedef struct net_stack_impl {
     uint8_t rx[2048];
     net_cfg_t cfg;
     int cfg_valid;
+    udp_pending_t pending[UDP_PENDING_SLOTS];
 } net_stack_impl_t;
 
 static inline net_stack_impl_t* impl(net_stack_t* n) { return (net_stack_impl_t*)(void*)n; }
@@ -241,6 +254,7 @@ int net_init(net_stack_t* n)
     s->ip_id = 0x1234;
     s->tcp_iss = 0x10000;
     s->cfg_valid = 0;
+    for (uint32_t i = 0; i < UDP_PENDING_SLOTS; i++) s->pending[i].used = 0;
     if (drfl_probe_net(&s->nic, "rtl8139", (drfl_net_init_fn)rtl8139_init) != 0) return -1;
     return 0;
 }
@@ -251,6 +265,29 @@ int net_get_cfg(net_stack_t* n, net_cfg_t* out)
     if (!s->cfg_valid) return -1;
     *out = s->cfg;
     return 0;
+}
+
+int net_set_cfg(net_stack_t* n, const net_cfg_t* cfg)
+{
+    if (!n || !cfg) return -1;
+    net_stack_impl_t* s = impl(n);
+    s->cfg = *cfg;
+    for (int i = 0; i < 6; i++) s->cfg.mac[i] = s->nic.mac[i];
+    s->gw_mac_valid = 0;
+    s->cfg_valid = 1;
+    return 0;
+}
+
+int net_set_ipv4(net_stack_t* n, ip4_t ip, ip4_t mask, ip4_t gw, ip4_t dns)
+{
+    net_cfg_t cfg;
+    if (!n) return -1;
+    for (int i = 0; i < 6; i++) cfg.mac[i] = 0;
+    cfg.ip = ip;
+    cfg.mask = mask;
+    cfg.gw = gw;
+    cfg.dns = dns;
+    return net_set_cfg(n, &cfg);
 }
 
 static int ip_is_broadcast(ip4_t ip)
@@ -297,6 +334,50 @@ int net_udp_send(net_stack_t* n,
     return r;
 }
 
+static int udp_pending_take(net_stack_impl_t* s,
+                            uint16_t dst_port,
+                            void* out_payload,
+                            uint32_t out_cap,
+                            ip4_t* out_src,
+                            uint16_t* out_src_port)
+{
+    for (uint32_t i = 0; i < UDP_PENDING_SLOTS; i++) {
+        udp_pending_t* p = &s->pending[i];
+        if (!p->used || p->dst_port != dst_port) continue;
+        if (p->len > out_cap) return -1;
+        for (uint32_t j = 0; j < p->len; j++) ((uint8_t*)out_payload)[j] = p->data[j];
+        if (out_src) *out_src = p->src;
+        if (out_src_port) *out_src_port = p->src_port;
+        uint32_t len = p->len;
+        p->used = 0;
+        lardkit_netwatch_record("udp-recv", "pending", (int32_t)len);
+        return (int)len;
+    }
+    return 0;
+}
+
+static void udp_pending_store(net_stack_impl_t* s,
+                              uint16_t dst_port,
+                              ip4_t src,
+                              uint16_t src_port,
+                              const uint8_t* data,
+                              uint32_t len)
+{
+    if (!s || !data || len > UDP_PENDING_CAP) return;
+    for (uint32_t i = 0; i < UDP_PENDING_SLOTS; i++) {
+        udp_pending_t* p = &s->pending[i];
+        if (p->used) continue;
+        p->used = 1;
+        p->dst_port = dst_port;
+        p->src_port = src_port;
+        p->src = src;
+        p->len = len;
+        for (uint32_t j = 0; j < len; j++) p->data[j] = data[j];
+        lardkit_netwatch_record("udp-pend", "port", (int32_t)dst_port);
+        return;
+    }
+}
+
 int net_udp_recv(net_stack_t* n,
                  uint16_t dst_port,
                  void* out_payload,
@@ -305,6 +386,9 @@ int net_udp_recv(net_stack_t* n,
                  uint16_t* out_src_port)
 {
     if (!n || !out_payload || out_cap == 0) return -1;
+    net_stack_impl_t* s = impl(n);
+    int pending = udp_pending_take(s, dst_port, out_payload, out_cap, out_src, out_src_port);
+    if (pending != 0) return pending;
     uint8_t* rx = NULL;
     uint32_t rx_len = 0;
     if (nic_rx(n, &rx, &rx_len) != 0) return 0;
@@ -317,22 +401,27 @@ int net_udp_recv(net_stack_t* n,
     if (ihl < sizeof(ip4_hdr_t)) return 0;
     if (rx_len < sizeof(eth_hdr_t) + ihl + sizeof(udp_hdr_t)) return 0;
     const udp_hdr_t* udp = (const udp_hdr_t*)((const uint8_t*)ip + ihl);
-    if (ntohs(udp->dst_port) != dst_port) return 0;
     uint16_t udp_len = ntohs(udp->len);
     if (udp_len < sizeof(udp_hdr_t)) return 0;
     if (rx_len < sizeof(eth_hdr_t) + ihl + udp_len) return 0;
     uint32_t pay_len = (uint32_t)udp_len - sizeof(udp_hdr_t);
-    if (pay_len > out_cap) return -1;
+    uint32_t src_raw = ntohl(ip->src);
+    ip4_t src_ip;
+    src_ip.b[0] = (uint8_t)(src_raw >> 24);
+    src_ip.b[1] = (uint8_t)(src_raw >> 16);
+    src_ip.b[2] = (uint8_t)(src_raw >> 8);
+    src_ip.b[3] = (uint8_t)src_raw;
+    uint16_t got_dst = ntohs(udp->dst_port);
+    uint16_t got_src = ntohs(udp->src_port);
     const uint8_t* pay = (const uint8_t*)udp + sizeof(udp_hdr_t);
-    for (uint32_t i = 0; i < pay_len; i++) ((uint8_t*)out_payload)[i] = pay[i];
-    if (out_src) {
-        uint32_t src = ntohl(ip->src);
-        out_src->b[0] = (uint8_t)(src >> 24);
-        out_src->b[1] = (uint8_t)(src >> 16);
-        out_src->b[2] = (uint8_t)(src >> 8);
-        out_src->b[3] = (uint8_t)src;
+    if (got_dst != dst_port) {
+        udp_pending_store(s, got_dst, src_ip, got_src, pay, pay_len);
+        return 0;
     }
-    if (out_src_port) *out_src_port = ntohs(udp->src_port);
+    if (pay_len > out_cap) return -1;
+    for (uint32_t i = 0; i < pay_len; i++) ((uint8_t*)out_payload)[i] = pay[i];
+    if (out_src) *out_src = src_ip;
+    if (out_src_port) *out_src_port = got_src;
     lardkit_netwatch_record("udp-recv", "packet", (int32_t)pay_len);
     return (int)pay_len;
 }

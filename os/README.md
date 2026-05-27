@@ -52,6 +52,15 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.98.0b` adds LardOS Connect, a native LAN resource-sharing control plane for
+LardOS machines connected by cable/IP. It can advertise and request
+MegaClipboard, CPU, GPU, storage, and peripheral resources while deliberately
+keeping keyboard and mouse input local-only. It is off by default and uses
+manual grants by default; use `lconnect on`, `lconnect direct IP [MASK]`,
+`lconnect discover [IP]`, `lconnect share all on`, `lconnect mode auto|manual`,
+`lconnect syncclip IP`, and `lconnect request|grant|deny IP resource` to inspect
+and control it.
+
 `v1.97.0b` adds MegaClipboard, a keyboard-first clipboard system with ten
 typed slots for text, file bytes, labels, paths, and future OS objects. The
 default mode is stack: newest content is slot `1`, older content moves down,
@@ -381,6 +390,10 @@ commands:
 - `megaclip status|list|mode stack|single|order|push text|file path|pull slot|write slot file`
   manages the ten-slot MegaClipboard. The same system is available from the GUI
   with `Ctrl+Y`, `Ctrl+P`, and `Ctrl+Space` then `1..9`/`0`.
+- `lconnect status|on|off|direct IP [MASK]|discover [IP]|share all on|mode manual|auto|syncclip IP|request IP resource|grant IP resource|deny IP resource|log`
+  controls LardOS Connect, the LAN resource-sharing layer for LardOS machines.
+  It shares MegaClipboard, CPU, GPU, storage, and peripheral leases only when the
+  user enables them; keyboard and mouse input stay local.
 - `auxkernel status|report|lockdown confirm|keydrop confirm` exposes the tiny
   built-in emergency microkernel path. It works without KMO modules and uses
   visible containment instead of fan, thermal, or hardware-damaging behavior.

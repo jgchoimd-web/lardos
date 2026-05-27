@@ -137,6 +137,9 @@ static int safe_exec_command(const char* command)
         return 1;
     }
     if (streq(cmd, "oslink")) return rest_empty_or_word(rest, "status", "peers", "poll");
+    if (streq(cmd, "lconnect") || streq(cmd, "connect") || streq(cmd, "lardconnect")) {
+        return rest_empty_or_word(rest, "status", "peers", "poll");
+    }
     if (streq(cmd, "task") || streq(cmd, "tasks")) return rest_empty_or_word(rest, "list", "status", "ls");
     if (streq(cmd, "bootprof")) return rest_empty_or_word(rest, "status", "info", "list");
     if (streq(cmd, "awake") || streq(cmd, "awakening")) return rest_empty_or_word(rest, "status", "info", "test");

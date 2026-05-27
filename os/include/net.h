@@ -21,6 +21,8 @@ typedef struct net_stack {
 int net_init(net_stack_t* n);
 int net_dhcp(net_stack_t* n, net_cfg_t* out);
 int net_get_cfg(net_stack_t* n, net_cfg_t* out);
+int net_set_cfg(net_stack_t* n, const net_cfg_t* cfg);
+int net_set_ipv4(net_stack_t* n, ip4_t ip, ip4_t mask, ip4_t gw, ip4_t dns);
 int net_dns_a(net_stack_t* n, ip4_t dns, const char* name, ip4_t* out_ip);
 
 int net_udp_send(net_stack_t* n,

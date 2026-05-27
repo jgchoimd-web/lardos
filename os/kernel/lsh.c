@@ -32,6 +32,7 @@
 #include "lassist.h"
 #include "lardtime.h"
 #include "oslink.h"
+#include "lconnect.h"
 #include "taskprio.h"
 #include "awake.h"
 #include "bootprof.h"
@@ -356,7 +357,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "bleed", 0 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
@@ -2124,7 +2125,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -2155,6 +2156,7 @@ static void cmd_help(const char* args)
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  wallpaper status|color|pattern|bmp|use|reload|reset  user-owned desktop wallpaper\n");
     out_append("  megaclip status|list|mode|push|file|pull|write  10-slot keyboard-first clipboard\n");
+    out_append("  lconnect on|direct|discover|share|syncclip|request|grant|deny  LAN resource sharing except keyboard/mouse\n");
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
@@ -2195,6 +2197,7 @@ static void cmd_control(const char* args)
     out_append("  Files live in LFS, RAM files, LPST persistence, and embedded FS tables.\n");
     out_append("  Device media uses visible MDFS stores on Y:/Z:/A: with RAM fallback when no backing sectors exist.\n");
     out_append("  _: merges R:/X:/Y:/Z:/A:; writes go visibly to R:.\n");
+    out_append("  LardOS Connect can share MegaClipboard, CPU, GPU, storage, and peripherals over LAN; keyboard/mouse stay local.\n");
     out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
     out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
     out_append("  DOS mode visibly maps _:/C:/A:/Z:/U:/R: onto LardOS drives.\n");
@@ -2549,6 +2552,21 @@ static void cmd_status(const char* args)
     out_append_u32(clip.pushes);
     out_append(", pulls=");
     out_append_u32(clip.pulls);
+    out_append("\n");
+    lconnect_info_t lc;
+    char lc_res[96];
+    lconnect_info(&lc);
+    lconnect_resource_list(lc.resources, lc_res, sizeof(lc_res));
+    out_append("LardOS Connect: ");
+    out_append(lc.enabled ? "on" : "off");
+    out_append(lc.configured ? ", ip=" : ", ip=unconfigured");
+    if (lc.configured) out_append_ip4(lc.ip);
+    out_append(", shared=");
+    out_append(lc_res);
+    out_append(", peers=");
+    out_append_u32(lc.peer_count);
+    out_append(", leases=");
+    out_append_u32(lc.leases);
     out_append("\n");
     auxkernel_info_t aux;
     auxkernel_info(&aux);
@@ -4543,6 +4561,281 @@ static void cmd_oslink(const char* args)
         return;
     }
     out_append("Usage: oslink status|bus|emit|hello|ping|send|exec|recv|peers|poll|test\n");
+}
+
+static void out_append_lconnect_resources(uint32_t mask)
+{
+    char buf[96];
+    lconnect_resource_list(mask, buf, sizeof(buf));
+    out_append(buf);
+}
+
+static int lconnect_word_onoff(const char* word, int* out)
+{
+    if (!word || !out) return -1;
+    if (strcmp(word, "on") == 0 || strcmp(word, "1") == 0 ||
+        strcmp(word, "yes") == 0 || strcmp(word, "enable") == 0) {
+        *out = 1;
+        return 0;
+    }
+    if (strcmp(word, "off") == 0 || strcmp(word, "0") == 0 ||
+        strcmp(word, "no") == 0 || strcmp(word, "disable") == 0) {
+        *out = 0;
+        return 0;
+    }
+    return -1;
+}
+
+static void cmd_lconnect_status(void)
+{
+    lconnect_info_t info;
+    lconnect_info(&info);
+    out_append("LardOS Connect ");
+    out_append(info.enabled ? "on" : "off");
+    out_append(info.present ? ", nic=present" : ", nic=none");
+    out_append(info.configured ? ", ip=" : ", ip=unconfigured");
+    if (info.configured) out_append_ip4(info.ip);
+    out_append(", port=");
+    out_append_u32(LCONNECT_PORT);
+    out_append(", mode=");
+    out_append(info.auto_grant ? "auto-grant" : "manual-grant");
+    out_append("\nshared=");
+    out_append_lconnect_resources(info.resources);
+    out_append(" (keyboard/mouse input is not shared)\npeers=");
+    out_append_u32(info.peer_count);
+    out_append(", sent=");
+    out_append_u32(info.sent);
+    out_append(", recv=");
+    out_append_u32(info.received);
+    out_append(", dropped=");
+    out_append_u32(info.dropped);
+    out_append(", grants=");
+    out_append_u32(info.grants);
+    out_append(", denied=");
+    out_append_u32(info.denied);
+    out_append(", pending=");
+    out_append_u32(info.pending);
+    out_append(", leases=");
+    out_append_u32(info.leases);
+    out_append("\nmegaclip out=");
+    out_append_u32(info.clip_out);
+    out_append(", in=");
+    out_append_u32(info.clip_in);
+    out_append(", err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_lconnect_peers(void)
+{
+    uint32_t count = lconnect_peer_count();
+    if (count == 0) {
+        out_append("lconnect: no peers yet. Try lconnect discover [ip].\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lconnect_peer_t p;
+        if (lconnect_peer_at(i, &p) == 0) {
+            out_append_u32(i);
+            out_append(" ");
+            out_append_ip4(p.ip);
+            out_append(" ");
+            out_append(p.node);
+            out_append(" resources=");
+            out_append_lconnect_resources(p.resources);
+            out_append(" seen=");
+            out_append_u32(p.seen);
+            out_append(" grants=");
+            out_append_u32(p.grants);
+            out_append(" denied=");
+            out_append_u32(p.denied);
+            out_append("\n");
+        }
+    }
+}
+
+static void cmd_lconnect_log(void)
+{
+    uint32_t count = lconnect_log_count();
+    if (count == 0) {
+        out_append("lconnect: log empty.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lconnect_event_t e;
+        if (lconnect_log_at(i, &e) == 0) {
+            out_append_u32(i);
+            out_append(" ");
+            out_append(e.action);
+            out_append(" ");
+            out_append_ip4(e.ip);
+            out_append(" ");
+            out_append(e.node);
+            out_append(" res=");
+            out_append_lconnect_resources(e.resource);
+            out_append(" seq=");
+            out_append_u32(e.seq);
+            if (e.detail[0]) {
+                out_append(" ");
+                out_append(e.detail);
+            }
+            out_append("\n");
+        }
+    }
+}
+
+static void cmd_lconnect_share(const char* args)
+{
+    char res_word[24];
+    char state_word[16];
+    int on;
+    uint32_t res;
+    if (vcs_read_word(&args, res_word, sizeof(res_word)) != 0) {
+        out_append("Shared resources: ");
+        out_append_lconnect_resources(lconnect_share_mask());
+        out_append("\nInput rule: mouse and keyboard are intentionally local-only.\n");
+        return;
+    }
+    res = lconnect_resource_from_name(res_word);
+    if (res == 0) {
+        out_append("lconnect share: resource must be all|megaclip|cpu|gpu|storage|peripheral.\n");
+        return;
+    }
+    if (vcs_read_word(&args, state_word, sizeof(state_word)) != 0 ||
+        lconnect_word_onoff(state_word, &on) != 0) {
+        out_append("Usage: lconnect share all|megaclip|cpu|gpu|storage|peripheral on|off\n");
+        return;
+    }
+    if (lconnect_set_share(res, on) == 0) {
+        out_append("lconnect: share ");
+        out_append_lconnect_resources(res);
+        out_append(on ? " on\n" : " off\n");
+    } else {
+        out_append("lconnect: cannot share that resource.\n");
+    }
+}
+
+static int lconnect_read_ip_resource(const char** args, ip4_t* ip, uint32_t* resource)
+{
+    char res_word[24];
+    if (lsh_parse_ip4_arg(args, ip) != 0) return -1;
+    if (vcs_read_word(args, res_word, sizeof(res_word)) != 0) return -2;
+    *resource = lconnect_resource_from_name(res_word);
+    if (*resource == 0) return -3;
+    return 0;
+}
+
+static void cmd_lconnect(const char* args)
+{
+    char sub[24];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_lconnect_status();
+        return;
+    }
+    if (strcmp(sub, "on") == 0 || strcmp(sub, "enable") == 0) {
+        lconnect_enable(1);
+        out_append("lconnect: on. Use 'lconnect share all on' to export non-input hardware resources.\n");
+        return;
+    }
+    if (strcmp(sub, "off") == 0 || strcmp(sub, "disable") == 0) {
+        lconnect_enable(0);
+        out_append("lconnect: off.\n");
+        return;
+    }
+    if (strcmp(sub, "mode") == 0) {
+        char mode[16];
+        if (vcs_read_word(&args, mode, sizeof(mode)) != 0) {
+            out_append("Usage: lconnect mode manual|auto\n");
+            return;
+        }
+        if (strcmp(mode, "auto") == 0 || strcmp(mode, "autogrant") == 0) {
+            lconnect_set_auto(1);
+            out_append("lconnect: auto-grant mode on for shared resources.\n");
+        } else if (strcmp(mode, "manual") == 0) {
+            lconnect_set_auto(0);
+            out_append("lconnect: manual-grant mode on.\n");
+        } else {
+            out_append("Usage: lconnect mode manual|auto\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "share") == 0 || strcmp(sub, "resource") == 0 || strcmp(sub, "resources") == 0) {
+        cmd_lconnect_share(args);
+        return;
+    }
+    if (strcmp(sub, "direct") == 0 || strcmp(sub, "ip") == 0) {
+        ip4_t ip;
+        ip4_t mask = {{0, 0, 0, 0}};
+        if (lsh_parse_ip4_arg(&args, &ip) != 0) {
+            out_append("Usage: lconnect direct 169.254.10.1 [255.255.255.0]\n");
+            return;
+        }
+        if (args && args[0]) (void)lsh_parse_ip4_arg(&args, &mask);
+        if (lconnect_direct(ip, mask) == 0) {
+            out_append("lconnect: direct cable IP set to ");
+            out_append_ip4(ip);
+            out_append("\n");
+        } else {
+            out_append("lconnect: direct IP failed; network driver may be unavailable.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "discover") == 0 || strcmp(sub, "hello") == 0) {
+        ip4_t ip = {{0, 0, 0, 0}};
+        if (args && args[0]) {
+            if (lsh_parse_ip4_arg(&args, &ip) != 0) {
+                out_append("Usage: lconnect discover [ip]\n");
+                return;
+            }
+        }
+        out_append(lconnect_discover(ip) == 0 ? "lconnect: discover sent.\n" : "lconnect: discover failed.\n");
+        return;
+    }
+    if (strcmp(sub, "peers") == 0 || strcmp(sub, "peer") == 0) {
+        cmd_lconnect_peers();
+        return;
+    }
+    if (strcmp(sub, "log") == 0 || strcmp(sub, "history") == 0) {
+        cmd_lconnect_log();
+        return;
+    }
+    if (strcmp(sub, "syncclip") == 0 || strcmp(sub, "clip") == 0 || strcmp(sub, "megaclip") == 0) {
+        ip4_t ip;
+        if (lsh_parse_ip4_arg(&args, &ip) != 0) {
+            out_append("Usage: lconnect syncclip ip\n");
+            return;
+        }
+        out_append(lconnect_send_clip(ip) == 0 ? "lconnect: MegaClipboard sent.\n" : "lconnect: MegaClipboard send failed.\n");
+        return;
+    }
+    if (strcmp(sub, "request") == 0 || strcmp(sub, "req") == 0 ||
+        strcmp(sub, "grant") == 0 || strcmp(sub, "deny") == 0) {
+        ip4_t ip;
+        uint32_t res;
+        int r;
+        if (lconnect_read_ip_resource(&args, &ip, &res) != 0) {
+            out_append("Usage: lconnect request|grant|deny ip megaclip|cpu|gpu|storage|peripheral [detail]\n");
+            return;
+        }
+        while (*args == ' ' || *args == '\t') args++;
+        if (strcmp(sub, "grant") == 0) r = lconnect_grant(ip, res, args);
+        else if (strcmp(sub, "deny") == 0) r = lconnect_deny(ip, res, args);
+        else r = lconnect_request(ip, res, args);
+        out_append(r == 0 ? "lconnect: packet sent.\n" : "lconnect: send failed.\n");
+        return;
+    }
+    if (strcmp(sub, "poll") == 0) {
+        lconnect_poll();
+        out_append("lconnect: polled.\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lconnect_selftest() == 0 ? "lconnect: selftest OK\n" : "lconnect: selftest failed\n");
+        return;
+    }
+    out_append("Usage: lconnect status|on|off|direct|discover|peers|share|mode|syncclip|request|grant|deny|log|poll|test\n");
 }
 
 static void cmd_bugeye_status(void)
@@ -9919,6 +10212,7 @@ static void cfgsh_help(void)
     out_append("  sum on|off         ring-0 full-control mode\n");
     out_append("  secure ecc ram|storage on|off  software ECC placement\n");
     out_append("  megaclip stack|single|order  clipboard slot mode\n");
+    out_append("  lconnect on|off|auto|manual  LAN resource sharing control\n");
     out_append("  sync               persist writable settings/files\n");
 }
 
@@ -9935,6 +10229,7 @@ static void cfgsh_status(void)
     gui_subpx_filter_info_t spx;
     lardsec_info_t sec;
     megaclip_status_t clip;
+    lconnect_info_t lc;
     lardkit_rollback_info_t rb;
     bootprof_info(&bp);
     awake_info(&aw);
@@ -9947,6 +10242,7 @@ static void cfgsh_status(void)
     gui_subpx_filter_info(&spx);
     lardsec_info(&sec);
     megaclip_status(&clip);
+    lconnect_info(&lc);
     lardkit_rollback_info(&rb);
     out_append("CFGSH status\n");
     out_append("  boot=");
@@ -9985,6 +10281,8 @@ static void cfgsh_status(void)
     out_append(sec.ecc_storage_enabled ? "store" : "-");
     out_append(" clip=");
     out_append(megaclip_mode_name(clip.mode));
+    out_append(" connect=");
+    out_append(lc.enabled ? "on" : "off");
     out_append(" http=");
     out_append(lsh_http_method_name());
     out_append(" priority=");
@@ -10214,6 +10512,24 @@ static int cfgsh_apply(const char* setting, const char* args)
             megaclip_print_status();
         } else {
             out_append("Usage: megaclip stack|single|order\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "lconnect") == 0 || strcmp(setting, "connect") == 0 ||
+        strcmp(setting, "lardconnect") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_lconnect_status();
+        } else if (cfgsh_bool_value(value, &on) == 0) {
+            lconnect_enable(on);
+            out_append(on ? "cfgsh: lconnect on\n" : "cfgsh: lconnect off\n");
+        } else if (strcmp(value, "auto") == 0 || strcmp(value, "autogrant") == 0) {
+            lconnect_set_auto(1);
+            out_append("cfgsh: lconnect auto-grant\n");
+        } else if (strcmp(value, "manual") == 0) {
+            lconnect_set_auto(0);
+            out_append("cfgsh: lconnect manual-grant\n");
+        } else {
+            out_append("Usage: lconnect on|off|auto|manual\n");
         }
         return 1;
     }
@@ -10487,6 +10803,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "journal") == 0) { cmd_journal(args); return; }
     if (strcmp(cmd, "oslink") == 0) { cmd_oslink(args); return; }
     if (strcmp(cmd, "oschat") == 0) { cmd_oschat(args); return; }
+    if (strcmp(cmd, "lconnect") == 0 || strcmp(cmd, "connect") == 0 ||
+        strcmp(cmd, "lardconnect") == 0) { cmd_lconnect(args); return; }
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
     if (strcmp(cmd, "wallpaper") == 0 || strcmp(cmd, "wall") == 0) { cmd_wallpaper(args); return; }

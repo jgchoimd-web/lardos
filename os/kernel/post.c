@@ -21,6 +21,7 @@
 #include "lardsec.h"
 #include "lardkit.h"
 #include "lardtime.h"
+#include "lconnect.h"
 #include "lcontainer.h"
 #include "lil.h"
 #include "lguilib.h"
@@ -172,6 +173,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: displayfix writable", fs_open_writable("displayfix.spfx") != NULL, emit, user, &pass, &fail);
     post_check("fs: security policy writable", fs_open_writable("security.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: megaclip guide writable", fs_open_writable("megaclip.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: lconnect guide writable", fs_open_writable("lconnect.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: auxkernel report writable", fs_open_writable("auxkernel.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
@@ -199,6 +201,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("security: lardlocker seal/ecc", lardsec_selftest() == 0, emit, user, &pass, &fail);
     post_check("security: auxkernel microkernel", auxkernel_selftest() == 0, emit, user, &pass, &fail);
     post_check("ui: megaclip slots", megaclip_selftest() == 0, emit, user, &pass, &fail);
+    post_check("net: lardos connect control", lconnect_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: app bundle parser", rxr_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: bundle-internal paths", rxr_path_selftest() == 0, emit, user, &pass, &fail);

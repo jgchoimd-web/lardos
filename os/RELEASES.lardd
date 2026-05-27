@@ -5,6 +5,15 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.98.0b
+ITEM Adds LardOS Connect, a native LAN resource-sharing control plane for LardOS computers connected by cable/IP.
+ITEM LardOS Connect can advertise and request MegaClipboard, CPU, GPU, storage, and peripheral resources while deliberately excluding keyboard and mouse input from sharing.
+ITEM Adds lconnect/connect/lardconnect commands for status, on/off, direct manual IP, discover, peers, share, manual/auto grants, MegaClipboard sync, resource request/grant/deny, logs, poll, and selftest.
+ITEM Default is off and manual-grant; the user must explicitly enable sharing and choose resources such as lconnect share all on.
+ITEM Adds lconnect.lardd, POST coverage, status output, cfgsh control, netwatch/trace/journal events, and direct-cable IP setup for networks without DHCP.
+ITEM Keeps OSLink, MegaClipboard, LardSec, AuxKernel, MediaFS, installer, WebStack, RenderFX, FSTWT, RXR/RXE/SYSRXE, KMO, SUM, software ECC, and branch-role separation intact.
+ITEM Ships as beta because cross-machine hardware-resource sharing is broad and should mature visibly before promotion to a.
+
 SECTION v1.97.0b
 ITEM Adds MegaClipboard, a native keyboard-first clipboard system with ten typed slots for text, file bytes, labels, paths, and future OS objects.
 ITEM Default mode is stack; megaclip mode single keeps one current slot, and megaclip mode order lists entries by copy order.

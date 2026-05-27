@@ -39,6 +39,7 @@
 #include "installer.h"
 #include "lardsec.h"
 #include "megaclip.h"
+#include "lconnect.h"
 #include "auxkernel.h"
 #include "mediafs.h"
 #include "version.h"
@@ -533,11 +534,12 @@ static void boot_network_start(int foreground)
         }
         return;
     }
+    lconnect_init(&s_net, NULL, "lardos");
     if (net_dhcp(&s_net, &s_cfg) != 0) {
         awake_fail(11u, "dhcp");
         if (foreground) {
             vga_puts("DHCP unavailable; continuing offline\n", 0x4F);
-            append_line(s_boot_report, sizeof(s_boot_report), "DHCP: unavailable, offline mode\n");
+            append_line(s_boot_report, sizeof(s_boot_report), "DHCP: unavailable, lconnect direct IP remains available\n");
             gui_set_response(s_boot_report);
             gui_render();
         }
@@ -545,6 +547,7 @@ static void boot_network_start(int foreground)
     }
     s_net_ready = 1;
     oslink_init(&s_net, &s_cfg, "lardos");
+    lconnect_set_cfg(&s_cfg);
     if (foreground) vga_puts("DHCP OK\n", 0x2F);
 
     ip4_t ip;
@@ -766,6 +769,7 @@ void kmain(void)
         gui_tick();
         awakening_background_poll();
         oslink_poll();
+        lconnect_poll();
         if (gui_screensaver_active()) gui_render();
         __asm__ __volatile__("pause");
     }

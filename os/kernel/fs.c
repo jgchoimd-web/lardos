@@ -199,6 +199,7 @@ static const uint8_t userlaw_init[] =
     "ITEM crash command -> user-owned diagnostic fault triggers must be explicit, visible, and logged.\n"
     "ITEM auxkernel -> emergency containment must be visible, module-independent, and must not damage hardware.\n"
     "ITEM megaclip -> keyboard-first 10-slot clipboard for moving data through the OS.\n"
+    "ITEM lconnect -> LardOS computers may share non-input resources over a visible LAN protocol, while keyboard and mouse stay local unless the user designs a separate input tool.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
@@ -291,6 +292,19 @@ static const uint8_t megaclip_init_doc[] =
     "END\n";
 static uint8_t ram_megaclip_buf[MEGACLIP_CAP];
 static FsWritableFile ram_megaclip = { "megaclip.lardd", ram_megaclip_buf, 0, MEGACLIP_CAP };
+
+#define LCONNECT_CAP 2048u
+static const uint8_t lconnect_init_doc[] =
+    "LARDD 1\n"
+    "TITLE LardOS Connect\n"
+    "TEXT LardOS Connect shares non-input hardware resources between LardOS computers over LAN cable/IP.\n"
+    "TEXT It can advertise MegaClipboard, CPU, GPU, storage, and peripheral resources; keyboard and mouse are intentionally local-only.\n"
+    "TEXT Default is off and manual-grant so sharing is user-owned, visible, and reversible.\n"
+    "TEXT Use lconnect direct IP MASK when two machines are connected without DHCP.\n"
+    "TEXT Commands: lconnect on, off, direct, discover, peers, share all on, mode manual/auto, syncclip ip, request ip resource, grant ip resource, deny ip resource, log.\n"
+    "END\n";
+static uint8_t ram_lconnect_buf[LCONNECT_CAP];
+static FsWritableFile ram_lconnect = { "lconnect.lardd", ram_lconnect_buf, 0, LCONNECT_CAP };
 
 #define AUXKERNEL_CAP 1024u
 static const uint8_t auxkernel_init[] =
@@ -440,6 +454,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use renderfx subpx use displayfix.spfx to apply per-region R/G/B subpixel defect correction from an editable script.\n"
     "li Use wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, or wallpaper bmp sample.bmp to set the desktop background from user-owned state.\n"
     "li Use Ctrl+Y, Ctrl+P, Ctrl+Space then 1..9/0, or megaclip status/list/mode/push/file/pull/write for the 10-slot MegaClipboard.\n"
+    "li Use lconnect on, lconnect direct, lconnect discover, and lconnect share all on to share non-input resources with another LardOS machine over LAN.\n"
     "li Use secure key, secure seal, secure lock, secure ecc ram on, secure ecc storage on, and secure unlock KEY for optional user-owned encrypted-at-rest media stores with software ECC.\n"
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
@@ -1385,6 +1400,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable wallpaper.lardd\n"
     "CHECK command trace\n"
     "CHECK command netwatch\n"
+    "CHECK command lconnect\n"
     "CHECK command glyph\n"
     "CHECK command wallpaper\n"
     "CHECK command cursor\n"
@@ -1453,6 +1469,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable user0.kmo\n"
     "CHECK writable displayfix.spfx\n"
     "CHECK writable security.lardd\n"
+    "CHECK writable lconnect.lardd\n"
     "CHECK writable auxkernel.lardd\n"
     "END\n";
 
@@ -2129,7 +2146,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 37u;
+    return 38u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2170,7 +2187,8 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 33) return &ram_displayfix;
     if (idx == 34) return &ram_security;
     if (idx == 35) return &ram_megaclip;
-    if (idx == 36) return &ram_auxkernel;
+    if (idx == 36) return &ram_lconnect;
+    if (idx == 37) return &ram_auxkernel;
     return NULL;
 }
 
@@ -2265,6 +2283,10 @@ void fs_init(void)
         ram_megaclip_buf[i] = megaclip_init_doc[i];
     }
     ram_megaclip.size = sizeof(megaclip_init_doc) - 1;
+    for (uint32_t i = 0; i < sizeof(lconnect_init_doc) - 1 && i < LCONNECT_CAP; i++) {
+        ram_lconnect_buf[i] = lconnect_init_doc[i];
+    }
+    ram_lconnect.size = sizeof(lconnect_init_doc) - 1;
     for (uint32_t i = 0; i < sizeof(auxkernel_init) - 1 && i < AUXKERNEL_CAP; i++) {
         ram_auxkernel_buf[i] = auxkernel_init[i];
     }

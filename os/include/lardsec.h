@@ -15,6 +15,7 @@ typedef struct {
     uint32_t scrubbed_bytes;
     uint32_t last_error;
     uint32_t key_hash;
+    uint32_t key_discarded;
     char recovery_key[LARDSEC_KEY_TEXT_MAX + 1u];
 } lardsec_info_t;
 
@@ -24,6 +25,7 @@ int lardsec_set_ecc(int on);
 int lardsec_regen_key(uint32_t seed);
 int lardsec_lock(void);
 int lardsec_unlock(const char* recovery_key);
+int lardsec_emergency_forget_key(uint32_t seed);
 int lardsec_locked(void);
 int lardsec_is_sealed_image(const uint8_t* image, uint32_t image_size);
 int lardsec_seal_media_image(char drive, uint32_t base_lba,

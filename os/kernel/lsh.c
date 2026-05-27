@@ -39,6 +39,7 @@
 #include "crashlog.h"
 #include "installer.h"
 #include "lardsec.h"
+#include "auxkernel.h"
 #include "mediafs.h"
 #include "panic.h"
 #include "version.h"
@@ -351,7 +352,7 @@ typedef struct {
 } magic_cmd_entry_t;
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
-    { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
+    { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
@@ -1465,6 +1466,7 @@ static void cmd_lardsec_status(void)
     out_append(info.ecc_enabled ? "on" : "off");
     out_append(" key_hash=0x");
     out_append_hex32(info.key_hash);
+    out_append(info.key_discarded ? " key=discarded" : " key=present");
     out_append("\n  sealed_writes=");
     out_append_u32(info.sealed_writes);
     out_append(" opened=");
@@ -1560,6 +1562,126 @@ static void cmd_lardsec(const char* args)
         return;
     }
     out_append("Usage: secure status|key|on|off|ecc on|off|regen [seed]|seal|lock|unlock KEY|scrub|test\n");
+}
+
+static void cmd_auxkernel_status(void)
+{
+    auxkernel_info_t info;
+    auxkernel_info(&info);
+    out_append("AuxKernel emergency microkernel\n  init=");
+    out_append(info.initialized ? "yes" : "no");
+    out_append(" active=");
+    out_append(info.active ? "yes" : "no");
+    out_append(" module_independent=");
+    out_append(info.module_independent ? "yes" : "no");
+    out_append("\n  panicroom=");
+    out_append_u32(info.panicroom_entries);
+    out_append(" lockdowns=");
+    out_append_u32(info.lockdowns);
+    out_append(" key_discards=");
+    out_append_u32(info.key_discards);
+    out_append(" reports=");
+    out_append_u32(info.reports);
+    out_append("\n  media_sync=");
+    out_append_u32(info.media_sync_attempts);
+    out_append(" failures=");
+    out_append_u32(info.media_sync_failures);
+    out_append(" last_action=");
+    out_append_u32(info.last_action);
+    out_append(" result=");
+    out_append_i32(info.last_result);
+    out_append("\n  reason=");
+    out_append(info.last_reason);
+    out_append("\n  safety: no fan/thermal/hardware-damage path; use lockdown or keydrop for containment.\n");
+}
+
+static int auxkernel_confirm(const char* args)
+{
+    char word[24];
+    const char* p = args ? args : "";
+    if (vcs_read_word(&p, word, sizeof(word)) != 0) return 0;
+    return ascii_streq_ci(word, "yes") || ascii_streq_ci(word, "confirm") ||
+           ascii_streq_ci(word, "now") || ascii_streq_ci(word, "i-own-this");
+}
+
+static const char* auxkernel_reason_tail(const char* args, const char* fallback)
+{
+    char word[24];
+    const char* p = args ? args : "";
+    if (vcs_read_word(&p, word, sizeof(word)) == 0) {
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p) return p;
+    }
+    return fallback;
+}
+
+static void cmd_auxkernel(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        cfgsh_is_status_word(sub) || strcmp(sub, "show") == 0) {
+        cmd_auxkernel_status();
+        return;
+    }
+    if (strcmp(sub, "help") == 0 || strcmp(sub, "guide") == 0 || strcmp(sub, "?") == 0) {
+        out_append("Usage: auxkernel status|report|panicroom|lockdown confirm [reason]|keydrop confirm [reason]|test\n");
+        out_append("AuxKernel is a tiny built-in emergency path independent of KMO modules.\n");
+        out_append("It refuses hardware-damaging self-destruct; emergency containment locks media and can discard volatile keys.\n");
+        return;
+    }
+    if (strcmp(sub, "report") == 0 || strcmp(sub, "capsule") == 0) {
+        out_append(auxkernel_report() == 0 ? "auxkernel: auxkernel.lardd written\n" : "auxkernel: report failed\n");
+        cmd_auxkernel_status();
+        return;
+    }
+    if (strcmp(sub, "panicroom") == 0 || strcmp(sub, "panic") == 0) {
+        auxkernel_enter_panicroom(args && args[0] ? args : "manual panicroom bridge");
+        (void)auxkernel_report();
+        out_append("auxkernel: panicroom bridge noted; normal PanicRoom remains available.\n");
+        cmd_auxkernel_status();
+        return;
+    }
+    if (strcmp(sub, "lockdown") == 0 || strcmp(sub, "contain") == 0 || strcmp(sub, "seal") == 0) {
+        if (!auxkernel_confirm(args)) {
+            out_append("auxkernel: lockdown is raw emergency control. Run auxkernel lockdown confirm [reason].\n");
+            return;
+        }
+        out_append(auxkernel_lockdown(auxkernel_reason_tail(args, "manual lockdown")) == 0 ?
+                   "auxkernel: media sealed and locked.\n" :
+                   "auxkernel: lockdown completed with partial media sync failures.\n");
+        cmd_auxkernel_status();
+        return;
+    }
+    if (strcmp(sub, "keydrop") == 0 || strcmp(sub, "discard") == 0 ||
+        strcmp(sub, "burn") == 0 || strcmp(sub, "selfdestruct") == 0) {
+        if (!auxkernel_confirm(args)) {
+            out_append("auxkernel: keydrop discards volatile media keys. Run auxkernel keydrop confirm [reason].\n");
+            return;
+        }
+        out_append(auxkernel_discard_keys(auxkernel_reason_tail(args, "manual key discard")) == 0 ?
+                   "auxkernel: volatile media key discarded after lockdown.\n" :
+                   "auxkernel: key discard ran after partial lockdown.\n");
+        out_append("auxkernel: hardware damage paths are intentionally unavailable.\n");
+        cmd_auxkernel_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(auxkernel_selftest() == 0 ? "auxkernel: selftest OK\n" : "auxkernel: selftest failed\n");
+        return;
+    }
+    out_append("Usage: auxkernel status|report|panicroom|lockdown confirm [reason]|keydrop confirm [reason]|test\n");
+}
+
+static void cmd_auxkernel_selfdestruct_alias(const char* args)
+{
+    char line[160];
+    if (!args || !args[0]) {
+        cmd_auxkernel("help");
+        return;
+    }
+    snprintf(line, sizeof(line), "keydrop %s", args);
+    cmd_auxkernel(line);
 }
 
 static void drivers_lsh_cb(uint16_t vendor_id, uint16_t device_id, uint8_t type,
@@ -1960,7 +2082,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -1970,6 +2092,7 @@ static void cmd_help(const char* args)
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  media list|format Z|sync all|write Z file text  drives X/Y/Z/A/R/_\n");
     out_append("  secure status|key|on|off|seal|lock|unlock KEY|ecc on|off  user-owned disk sealing\n");
+    out_append("  auxkernel status|report|lockdown confirm|keydrop confirm  tiny emergency kernel path\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
@@ -2012,6 +2135,7 @@ static void cmd_help(const char* args)
     out_append("  task priorities are 0..10; lev.10 is user-grantable urgent work\n");
     out_append("  bootprof status|set normal|safe|netoff|dev|awakening\n");
     out_append("  panicroom texture / panic capsule  draw real16 default texture or collect recovery state\n");
+    out_append("  auxkernel report|lockdown confirm|keydrop confirm  KMO-independent emergency containment\n");
     out_append("  crash status|dryrun mode|log|panic|ud2|div0|page|int3|triple  diagnostic crash triggers\n");
     out_append("  crashlog show|clear|test\n");
     out_append("  bye|byebye          sync RAM files, then request firmware/VM poweroff\n");
@@ -2046,6 +2170,9 @@ static void cmd_control(const char* args)
     out_append("  media write Z note.txt hello  save data to the auxiliary media store\n");
     out_append("  secure key         show the user-owned LardLocker-style recovery key\n");
     out_append("  secure seal        write encrypted-at-rest MDFS stores with ECC and scrubbed slack\n");
+    out_append("  auxkernel status   inspect the KMO-independent emergency microkernel path\n");
+    out_append("  auxkernel lockdown confirm reason  seal/sync/lock media during emergency containment\n");
+    out_append("  auxkernel keydrop confirm reason   discard volatile media keys without hardware damage\n");
     out_append("  values              reread the LardOS user-law values\n");
     out_append("  tomb list           inspect active user-owned read-only deletion records\n");
     out_append("  bleed dryrun file   preview the strongest delete sweep before using bleed file\n");
@@ -2361,6 +2488,18 @@ static void cmd_status(const char* args)
     out_append(sec.ecc_enabled ? "on" : "off");
     out_append(", key_hash=0x");
     out_append_hex32(sec.key_hash);
+    out_append(sec.key_discarded ? ", key=discarded" : ", key=present");
+    out_append("\n");
+    auxkernel_info_t aux;
+    auxkernel_info(&aux);
+    out_append("AuxKernel: ");
+    out_append(aux.active ? "active" : "standby");
+    out_append(", panicroom=");
+    out_append_u32(aux.panicroom_entries);
+    out_append(", lockdowns=");
+    out_append_u32(aux.lockdowns);
+    out_append(", keydrops=");
+    out_append_u32(aux.key_discards);
     out_append("\n");
     out_append("Drivers: ");
     out_append_u32(drivers);
@@ -9913,6 +10052,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
     if (strcmp(cmd, "secure") == 0 || strcmp(cmd, "lardsec") == 0 ||
         strcmp(cmd, "locker") == 0 || strcmp(cmd, "bitlocker") == 0) lardkit_trace_event("security", cmd, 0);
+    if (strcmp(cmd, "auxkernel") == 0 || strcmp(cmd, "aux") == 0 ||
+        strcmp(cmd, "emergency") == 0 || strcmp(cmd, "selfdestruct") == 0) lardkit_trace_event("auxkernel", cmd, 0);
     if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0 || strcmp(cmd, "bleed") == 0) lardkit_trace_event("fs", cmd, 0);
     if (strcmp(cmd, "crash") == 0) lardkit_trace_event("crash", cmd, 0);
     if (strcmp(cmd, "task") == 0 || strcmp(cmd, "tasks") == 0 || strcmp(cmd, "tasktop") == 0 ||
@@ -9980,6 +10121,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "install") == 0 || strcmp(cmd, "installer") == 0) { cmd_install(args); return; }
     if (strcmp(cmd, "secure") == 0 || strcmp(cmd, "lardsec") == 0 ||
         strcmp(cmd, "locker") == 0 || strcmp(cmd, "bitlocker") == 0) { cmd_lardsec(args); return; }
+    if (strcmp(cmd, "selfdestruct") == 0) { cmd_auxkernel_selfdestruct_alias(args); return; }
+    if (strcmp(cmd, "auxkernel") == 0 || strcmp(cmd, "aux") == 0 ||
+        strcmp(cmd, "emergency") == 0) { cmd_auxkernel(args); return; }
     if (strcmp(cmd, "dos") == 0 || strcmp(cmd, "dosmode") == 0) { cmd_dos(args); return; }
     if (strcmp(cmd, "tomb") == 0 || strcmp(cmd, "tombstone") == 0 || strcmp(cmd, "tombstones") == 0) { dos_tombstone(args); return; }
     if (strcmp(cmd, "time") == 0 || strcmp(cmd, "lardtime") == 0 || strcmp(cmd, "ltime") == 0) { cmd_lardtime_mode(args, "now"); return; }

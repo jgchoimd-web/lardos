@@ -1,4 +1,5 @@
 #include "panic.h"
+#include "auxkernel.h"
 #include "cpumode.h"
 #include "crashlog.h"
 #include "lardkit.h"
@@ -256,6 +257,7 @@ __attribute__((noreturn)) void panic(const char* msg)
         panic_halt_forever();
     }
     lardkit_panicroom_enter();
+    auxkernel_enter_panicroom(msg ? msg : "panic");
     real16_result = cpu_mode_panicroom_texture();
     capsule_result = lardkit_panic_capsule_write();
     panicroom_loop(msg, NULL, capsule_result, real16_result);
@@ -274,6 +276,7 @@ __attribute__((noreturn)) void panic_u64(const char* msg, uint64_t v)
         panic_halt_forever();
     }
     lardkit_panicroom_enter();
+    auxkernel_enter_panicroom(msg ? msg : "panic_u64");
     real16_result = cpu_mode_panicroom_texture();
     capsule_result = lardkit_panic_capsule_write();
     panicroom_loop(msg, hex, capsule_result, real16_result);

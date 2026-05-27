@@ -38,6 +38,7 @@
 #include "fs.h"
 #include "installer.h"
 #include "lardsec.h"
+#include "auxkernel.h"
 #include "mediafs.h"
 #include "version.h"
 
@@ -612,6 +613,7 @@ void kmain(void)
     fs_init();
     lardsec_init();
     mediafs_init();
+    auxkernel_init();
     gui_reload_sysrxe_apps();
     crashlog_init();
     bootprof_load();

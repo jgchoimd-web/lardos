@@ -1,6 +1,7 @@
 #include "post.h"
 
 #include "awake.h"
+#include "auxkernel.h"
 #include "drfl.h"
 #include "bootprof.h"
 #include "bootinfo.h"
@@ -169,6 +170,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: wallpaper writable", fs_open_writable("wallpaper.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: displayfix writable", fs_open_writable("displayfix.spfx") != NULL, emit, user, &pass, &fail);
     post_check("fs: security policy writable", fs_open_writable("security.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: auxkernel report writable", fs_open_writable("auxkernel.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);
@@ -176,7 +178,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: fstwt writable", fs_open_writable("fstwt.fstwts") != NULL, emit, user, &pass, &fail);
     post_check("fs: hard delete overlay ownership", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
-    post_check("fs: writable directory index", fs_writable_count() >= 35u, emit, user, &pass, &fail);
+    post_check("fs: writable directory index", fs_writable_count() >= 36u, emit, user, &pass, &fail);
     post_check("mediafs: native device stores", mediafs_selftest() == 0, emit, user, &pass, &fail);
     post_check("mediafs: floppy drive", mediafs_drive_supported('Y'), emit, user, &pass, &fail);
     post_check("mediafs: auxiliary drive", mediafs_drive_supported('Z'), emit, user, &pass, &fail);
@@ -193,6 +195,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("web: HTTP method builder", net_http_selftest() == 0, emit, user, &pass, &fail);
     post_check("web: HTTPS TLS surface", lard_tls_selftest() == 0, emit, user, &pass, &fail);
     post_check("security: lardlocker seal/ecc", lardsec_selftest() == 0, emit, user, &pass, &fail);
+    post_check("security: auxkernel microkernel", auxkernel_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: app bundle parser", rxr_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: bundle-internal paths", rxr_path_selftest() == 0, emit, user, &pass, &fail);

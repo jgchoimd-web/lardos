@@ -52,6 +52,16 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.95.0a` adds AuxKernel, a tiny built-in emergency microkernel path for
+PanicRoom bridging, media lockdown, visible `auxkernel.lardd` reports, and
+user-confirmed volatile key discard. It is compiled into the kernel and does not
+need KMO modules, KModTalk, app launchers, or the normal GUI. Use `auxkernel
+status`, `auxkernel report`, `auxkernel lockdown confirm reason`, or
+`auxkernel keydrop confirm reason`; `selfdestruct confirm reason` is a raw-control
+alias for key discard only. LardOS does not implement fan, thermal, overheating,
+or hardware-damaging self-destruct paths: emergency containment stays visible,
+local, auditable, and user-confirmed.
+
 `v1.94.0a` officially promotes optional user-owned LardSec/LardLocker media
 sealing after build and boot checks. It keeps the v1.94.0b command surface:
 `secure key` shows the visible recovery key, `secure on` enables encrypted-at-rest MDFS
@@ -349,6 +359,9 @@ commands:
   LardSec at-rest protection for MDFS media stores. It writes native LSEC sealed
   containers with stream encryption, scrubbed unused bytes, and block ECC while
   leaving the recovery key visible to the user through the shell.
+- `auxkernel status|report|lockdown confirm|keydrop confirm` exposes the tiny
+  built-in emergency microkernel path. It works without KMO modules and uses
+  visible containment instead of fan, thermal, or hardware-damaging behavior.
 - `dir _:` opens the merged top-level drive. It lists `R:` RAM files, `X:`
   built-in/LFS files, and `Y:`/`Z:`/`A:` media stores together; `_:` reads
   search those stores in user-first order and `_:` writes route visibly to `R:`.

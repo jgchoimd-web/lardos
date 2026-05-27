@@ -20,6 +20,7 @@ static uint32_t s_ecc_corrections;
 static uint32_t s_ecc_failures;
 static uint32_t s_scrubbed_bytes;
 static uint32_t s_last_error;
+static uint32_t s_key_discarded;
 static char s_recovery_key[LARDSEC_KEY_TEXT_MAX + 1u];
 
 static uint32_t rd32(const uint8_t* p)
@@ -187,6 +188,7 @@ void lardsec_init(void)
     s_ecc_failures = 0;
     s_scrubbed_bytes = 0;
     s_last_error = 0;
+    s_key_discarded = 0;
     lardsec_make_key(0x105EA5EDu);
     lardsec_update_key_text();
 }
@@ -211,6 +213,7 @@ int lardsec_regen_key(uint32_t seed)
     if (seed == 0) seed = 0x105EA5EDu;
     lardsec_make_key(seed);
     lardsec_update_key_text();
+    s_key_discarded = 0;
     s_locked = 0;
     s_last_error = 0;
     return 0;
@@ -226,12 +229,54 @@ int lardsec_lock(void)
 
 int lardsec_unlock(const char* recovery_key)
 {
+    if (s_key_discarded) {
+        s_last_error = 11;
+        return -1;
+    }
     if (!key_matches(recovery_key)) {
         s_last_error = 1;
         return -1;
     }
     s_locked = 0;
     s_last_error = 0;
+    return 0;
+}
+
+int lardsec_emergency_forget_key(uint32_t seed)
+{
+    if (seed == 0) seed = 0xA11CE11u;
+    s_key[0] = mix32(seed ^ 0x41555831u);
+    s_key[1] = mix32(seed ^ 0x4B455932u);
+    s_key[2] = mix32(seed ^ 0x44524F50u);
+    s_key[3] = mix32(seed ^ 0x53414645u);
+    s_key_hash = 0;
+    s_recovery_key[0] = 'L';
+    s_recovery_key[1] = 'A';
+    s_recovery_key[2] = 'R';
+    s_recovery_key[3] = 'D';
+    s_recovery_key[4] = '-';
+    s_recovery_key[5] = 'A';
+    s_recovery_key[6] = 'U';
+    s_recovery_key[7] = 'X';
+    s_recovery_key[8] = '-';
+    s_recovery_key[9] = 'K';
+    s_recovery_key[10] = 'E';
+    s_recovery_key[11] = 'Y';
+    s_recovery_key[12] = '-';
+    s_recovery_key[13] = 'D';
+    s_recovery_key[14] = 'I';
+    s_recovery_key[15] = 'S';
+    s_recovery_key[16] = 'C';
+    s_recovery_key[17] = 'A';
+    s_recovery_key[18] = 'R';
+    s_recovery_key[19] = 'D';
+    s_recovery_key[20] = 'E';
+    s_recovery_key[21] = 'D';
+    s_recovery_key[22] = '\0';
+    s_enabled = 1;
+    s_locked = 1;
+    s_key_discarded = 1;
+    s_last_error = 11;
     return 0;
 }
 
@@ -359,6 +404,7 @@ void lardsec_info(lardsec_info_t* out)
     out->scrubbed_bytes = s_scrubbed_bytes;
     out->last_error = s_last_error;
     out->key_hash = s_key_hash;
+    out->key_discarded = s_key_discarded;
     while (s_recovery_key[i] && i < LARDSEC_KEY_TEXT_MAX) {
         out->recovery_key[i] = s_recovery_key[i];
         i++;
@@ -382,6 +428,7 @@ int lardsec_selftest(void)
     uint32_t old_ecc_failures = s_ecc_failures;
     uint32_t old_scrubbed_bytes = s_scrubbed_bytes;
     uint32_t old_last_error = s_last_error;
+    uint32_t old_key_discarded = s_key_discarded;
     char old_text[LARDSEC_KEY_TEXT_MAX + 1u];
     int ok = 1;
     for (uint32_t i = 0; i <= LARDSEC_KEY_TEXT_MAX; i++) old_text[i] = s_recovery_key[i];
@@ -414,5 +461,6 @@ int lardsec_selftest(void)
     s_ecc_failures = old_ecc_failures;
     s_scrubbed_bytes = old_scrubbed_bytes;
     s_last_error = old_last_error;
+    s_key_discarded = old_key_discarded;
     return ok ? 0 : -1;
 }

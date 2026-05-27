@@ -5,6 +5,15 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.95.0a
+ITEM Adds AuxKernel, a tiny built-in emergency microkernel path for PanicRoom bridging, media lockdown, visible reports, and user-confirmed volatile key discard.
+ITEM AuxKernel is compiled into the kernel and does not require KMO modules, KModTalk, app launchers, or the normal GUI to keep an emergency control path available.
+ITEM Adds auxkernel/aux/emergency status, report, panicroom, lockdown confirm, keydrop confirm, and selftest commands; selfdestruct is a raw-control alias for keydrop confirm.
+ITEM Integrates PanicRoom with AuxKernel entry counters and adds POST coverage plus writable auxkernel.lardd reports.
+ITEM Keeps LardSec/LardLocker, MediaFS, installer, WebStack, RenderFX, FSTWT, RXR/RXE/SYSRXE, KMO, SUM, raw-control gating, and delete/repair behavior intact.
+ITEM Does not implement fan, thermal, overheating, or hardware-damaging self-destruct paths; emergency containment uses visible lock, sync, audit, and key-discard operations only.
+ITEM Ships as a because the implemented subset is defensive, explicit, local, inspectable, and matches the LardOS value rule that the user owns control without hidden damage.
+
 SECTION v1.94.0a
 ITEM Officially promotes the LardSec/LardLocker media sealing track after build, release media, and boot checks.
 ITEM Keeps secure key, secure on/off, seal, lock, unlock KEY, ecc on/off, regen, scrub, and test from v1.94.0b.

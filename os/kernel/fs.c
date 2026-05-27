@@ -184,7 +184,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Local self-reliance: OS features use in-tree C, native file formats, and LardOS languages before outside dependencies.\n"
     "ITEM Explainable automation: magic may execute predicted commands, but magic explain must say why.\n"
     "ITEM Reversibility: settings, packages, and risky changes should have rollback, history, or capsule trails.\n"
-    "ITEM Repair over halt: panic room, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
+    "ITEM Repair over halt: panic room, auxkernel, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
     "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
@@ -196,6 +196,7 @@ static const uint8_t userlaw_init[] =
     "ITEM bleed file -> user-owned last-resort deletion for broken files; it must report the routes it tried.\n"
     "ITEM bleed overflow file -> bounded in-slot wipe before deletion when the user chooses the harsher path.\n"
     "ITEM crash command -> user-owned diagnostic fault triggers must be explicit, visible, and logged.\n"
+    "ITEM auxkernel -> emergency containment must be visible, module-independent, and must not damage hardware.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
@@ -269,9 +270,21 @@ static const uint8_t security_init[] =
     "TEXT secure seal writes Y:/Z:/A: as LSEC sealed containers with ECC records.\n"
     "TEXT secure lock seals then blocks media access until secure unlock KEY.\n"
     "TEXT secure off writes plaintext again because the machine belongs to the user.\n"
+    "TEXT auxkernel keydrop confirm discards volatile media keys only after explicit emergency confirmation.\n"
     "END\n";
 static uint8_t ram_security_buf[SECURITY_CAP];
 static FsWritableFile ram_security = { "security.lardd", ram_security_buf, 0, SECURITY_CAP };
+
+#define AUXKERNEL_CAP 1024u
+static const uint8_t auxkernel_init[] =
+    "LARDD 1\n"
+    "TITLE AuxKernel Emergency Microkernel\n"
+    "TEXT Built-in emergency control path that does not require KMO modules.\n"
+    "TEXT It supports PanicRoom bridging, media lockdown, reports, and user-confirmed key discard.\n"
+    "TEXT It does not implement fan, thermal, or hardware-damaging self-destruct behavior.\n"
+    "END\n";
+static uint8_t ram_auxkernel_buf[AUXKERNEL_CAP];
+static FsWritableFile ram_auxkernel = { "auxkernel.lardd", ram_auxkernel_buf, 0, AUXKERNEL_CAP };
 
 #define FSDELETE_CAP 2048u
 static const uint8_t fsdelete_init[] =
@@ -401,6 +414,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use restart or reboot to sync RAM files and request a firmware/VM restart.\n"
     "li Use install status for the HDD/SSD installer preview, or install hdd yes / install ssd yes to write LardOS to the ATA target disk.\n"
     "li Use media list, media format Z, dir Z:, type Z:note.txt, and dir _: for merged storage.\n"
+    "li Use auxkernel status, auxkernel lockdown confirm, or auxkernel keydrop confirm for the KMO-independent emergency microkernel path.\n"
     "li Use fstwt status, fstwt fs, fstwt main name, fstwt use file.fstwts, fstwt to path, and fstwt from file to translate or virtualize file-system names.\n"
     "li Run mode probe to enter a controlled real16 window and return to long64.\n"
     "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
@@ -511,6 +525,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
     "li v1.93.0b adds SPFX subpixel display-defect filter scripts through renderfx subpx and writable displayfix.spfx.\n"
+    "li v1.95.0a adds AuxKernel, a tiny KMO-independent emergency microkernel path for PanicRoom bridge, lockdown, reports, and keydrop containment.\n"
     "li v1.94.0a officially promotes LardSec/LardLocker media sealing and keeps POST selftests from changing user-visible security counters.\n"
     "li v1.94.0b adds optional LardSec/LardLocker at-rest media sealing with visible recovery keys and ECC.\n"
     "li v1.92.1a officially promotes the native WebStack method/TLS line without feature loss or value changes.\n"
@@ -1391,6 +1406,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command mode\n"
     "CHECK command panicroom\n"
     "CHECK command paniccapsule\n"
+    "CHECK command auxkernel\n"
     "CHECK command sysrxe\n"
     "CHECK command rxe\n"
     "CHECK command rxr\n"
@@ -1417,6 +1433,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable user0.kmo\n"
     "CHECK writable displayfix.spfx\n"
     "CHECK writable security.lardd\n"
+    "CHECK writable auxkernel.lardd\n"
     "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
@@ -2092,7 +2109,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 35u;
+    return 36u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2132,6 +2149,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 32) return &ram_wallpaper;
     if (idx == 33) return &ram_displayfix;
     if (idx == 34) return &ram_security;
+    if (idx == 35) return &ram_auxkernel;
     return NULL;
 }
 
@@ -2222,6 +2240,10 @@ void fs_init(void)
         ram_security_buf[i] = security_init[i];
     }
     ram_security.size = sizeof(security_init) - 1;
+    for (uint32_t i = 0; i < sizeof(auxkernel_init) - 1 && i < AUXKERNEL_CAP; i++) {
+        ram_auxkernel_buf[i] = auxkernel_init[i];
+    }
+    ram_auxkernel.size = sizeof(auxkernel_init) - 1;
     for (uint32_t i = 0; i < sizeof(fsdelete_init) - 1 && i < FSDELETE_CAP; i++) {
         ram_fsdelete_buf[i] = fsdelete_init[i];
     }

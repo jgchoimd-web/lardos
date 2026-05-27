@@ -52,6 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.96.0b` adds software ECC placement controls to LardSec/LardLocker for
+machines whose CPU or board does not provide hardware ECC. `secure ecc on|off`
+still controls the master single-bit correction path, while `secure ecc ram
+on|off` stores the latest sealed media ECC records in a volatile kernel RAM
+mirror and `secure ecc storage on|off` stores block ECC records inside native
+LSEC sealed headers. Storage ECC remains on by default, RAM ECC is explicit, and
+`secure status` shows the placement state plus RAM mirror validity.
+
 `v1.95.0a` adds AuxKernel, a tiny built-in emergency microkernel path for
 PanicRoom bridging, media lockdown, visible `auxkernel.lardd` reports, and
 user-confirmed volatile key discard. It is compiled into the kernel and does not
@@ -355,10 +363,12 @@ commands:
   auxiliary SSD/HDD, `A:`/`U:` is the first extra USB-style store, and `R:` is
   RAM. Normal file commands also work, for example `write Z:note.txt hello`,
   `dir A:`, `type Y:boot.txt`, and `copy R:notes.txt Z:notes.txt`.
-- `secure status|key|on|off|seal|lock|unlock KEY|ecc on|off` controls optional
+- `secure status|key|on|off|seal|lock|unlock KEY|ecc on|off|ram on|storage on`
+  controls optional
   LardSec at-rest protection for MDFS media stores. It writes native LSEC sealed
-  containers with stream encryption, scrubbed unused bytes, and block ECC while
-  leaving the recovery key visible to the user through the shell.
+  containers with stream encryption, scrubbed unused bytes, storage ECC records,
+  and an optional volatile RAM ECC mirror while leaving the recovery key visible
+  to the user through the shell.
 - `auxkernel status|report|lockdown confirm|keydrop confirm` exposes the tiny
   built-in emergency microkernel path. It works without KMO modules and uses
   visible containment instead of fan, thermal, or hardware-damaging behavior.

@@ -5,13 +5,24 @@
 
 #define LARDSEC_MAGIC 0x4345534Cu /* "LSEC" */
 #define LARDSEC_VERSION 1u
-#define LARDSEC_FLAG_ECC 1u
+#define LARDSEC_FLAG_ECC_STORAGE 1u
+#define LARDSEC_FLAG_ECC_RAM 2u
+#define LARDSEC_FLAG_ECC LARDSEC_FLAG_ECC_STORAGE
 #define LARDSEC_HEADER_BYTES 512u
 #define LARDSEC_MAX_BLOCKS 32u
 
 static uint32_t s_enabled;
 static uint32_t s_locked;
 static uint32_t s_ecc_enabled;
+static uint32_t s_ecc_ram_enabled;
+static uint32_t s_ecc_storage_enabled;
+static uint32_t s_ram_ecc_valid;
+static char s_ram_ecc_drive;
+static uint32_t s_ram_ecc_base_lba;
+static uint32_t s_ram_ecc_used_size;
+static uint32_t s_ram_ecc_hash;
+static uint32_t s_ram_ecc_blocks;
+static uint32_t s_ram_ecc_records[LARDSEC_MAX_BLOCKS];
 static uint32_t s_key[4];
 static uint32_t s_key_hash;
 static uint32_t s_sealed_writes;
@@ -177,11 +188,49 @@ static void fill_scrub(char drive, uint32_t base_lba, uint8_t* p, uint32_t size,
     s_scrubbed_bytes += size;
 }
 
+static void ram_ecc_clear(void)
+{
+    s_ram_ecc_valid = 0;
+    s_ram_ecc_drive = 0;
+    s_ram_ecc_base_lba = 0;
+    s_ram_ecc_used_size = 0;
+    s_ram_ecc_hash = 0;
+    s_ram_ecc_blocks = 0;
+    for (uint32_t i = 0; i < LARDSEC_MAX_BLOCKS; i++) s_ram_ecc_records[i] = 0;
+}
+
+static void ram_ecc_store(char drive, uint32_t base_lba, uint32_t used_size,
+                          uint32_t plain_hash, const uint32_t* records, uint32_t blocks)
+{
+    if (!s_ecc_enabled || !s_ecc_ram_enabled || !records || blocks > LARDSEC_MAX_BLOCKS) return;
+    s_ram_ecc_valid = 1;
+    s_ram_ecc_drive = drive;
+    s_ram_ecc_base_lba = base_lba;
+    s_ram_ecc_used_size = used_size;
+    s_ram_ecc_hash = plain_hash;
+    s_ram_ecc_blocks = blocks;
+    for (uint32_t i = 0; i < LARDSEC_MAX_BLOCKS; i++) {
+        s_ram_ecc_records[i] = i < blocks ? records[i] : 0;
+    }
+}
+
+static int ram_ecc_matches(char drive, uint32_t base_lba, uint32_t used_size,
+                           uint32_t plain_hash, uint32_t blocks)
+{
+    return s_ecc_enabled && s_ecc_ram_enabled && s_ram_ecc_valid &&
+           s_ram_ecc_drive == drive && s_ram_ecc_base_lba == base_lba &&
+           s_ram_ecc_used_size == used_size && s_ram_ecc_hash == plain_hash &&
+           s_ram_ecc_blocks == blocks && blocks <= LARDSEC_MAX_BLOCKS;
+}
+
 void lardsec_init(void)
 {
     s_enabled = 1;
     s_locked = 0;
     s_ecc_enabled = 1;
+    s_ecc_ram_enabled = 0;
+    s_ecc_storage_enabled = 1;
+    ram_ecc_clear();
     s_sealed_writes = 0;
     s_opened_seals = 0;
     s_ecc_corrections = 0;
@@ -204,6 +253,25 @@ int lardsec_enable(int on)
 int lardsec_set_ecc(int on)
 {
     s_ecc_enabled = on ? 1u : 0u;
+    if (s_ecc_enabled && !s_ecc_ram_enabled && !s_ecc_storage_enabled) s_ecc_storage_enabled = 1;
+    if (!s_ecc_enabled) ram_ecc_clear();
+    s_last_error = 0;
+    return 0;
+}
+
+int lardsec_set_ecc_ram(int on)
+{
+    s_ecc_ram_enabled = on ? 1u : 0u;
+    if (s_ecc_ram_enabled) s_ecc_enabled = 1;
+    else ram_ecc_clear();
+    s_last_error = 0;
+    return 0;
+}
+
+int lardsec_set_ecc_storage(int on)
+{
+    s_ecc_storage_enabled = on ? 1u : 0u;
+    if (s_ecc_storage_enabled) s_ecc_enabled = 1;
     s_last_error = 0;
     return 0;
 }
@@ -295,31 +363,46 @@ int lardsec_seal_media_image(char drive, uint32_t base_lba,
                              uint32_t image_size, uint32_t used_size)
 {
     uint32_t blocks;
+    uint32_t flags;
+    uint32_t plain_hash;
+    uint32_t ecc_records[LARDSEC_MAX_BLOCKS];
     if (!s_enabled) return 1;
     if (!plain || !sealed || image_size < LARDSEC_HEADER_BYTES || used_size + LARDSEC_HEADER_BYTES > image_size) {
         s_last_error = 2;
         return -1;
     }
-    for (uint32_t i = 0; i < image_size; i++) sealed[i] = 0;
-    wr32(sealed + 0, LARDSEC_MAGIC);
-    wr32(sealed + 4, LARDSEC_VERSION);
-    wr32(sealed + 8, s_ecc_enabled ? LARDSEC_FLAG_ECC : 0u);
-    wr32(sealed + 12, (uint32_t)(uint8_t)drive);
-    wr32(sealed + 16, base_lba);
-    wr32(sealed + 20, used_size);
-    wr32(sealed + 24, s_key_hash);
-    wr32(sealed + 28, image_hash(plain, used_size));
     blocks = (used_size + 511u) / 512u;
     if (blocks > LARDSEC_MAX_BLOCKS) {
         s_last_error = 3;
         return -1;
     }
-    wr32(sealed + 32, blocks);
+    plain_hash = image_hash(plain, used_size);
     for (uint32_t i = 0; i < blocks; i++) {
         uint32_t off = i * 512u;
         uint32_t n = used_size - off;
         if (n > 512u) n = 512u;
-        wr32(sealed + 64u + i * 4u, ecc_block(plain + off, n));
+        ecc_records[i] = ecc_block(plain + off, n);
+    }
+    flags = 0;
+    if (s_ecc_enabled && s_ecc_storage_enabled) flags |= LARDSEC_FLAG_ECC_STORAGE;
+    if (s_ecc_enabled && s_ecc_ram_enabled) flags |= LARDSEC_FLAG_ECC_RAM;
+    for (uint32_t i = 0; i < image_size; i++) sealed[i] = 0;
+    wr32(sealed + 0, LARDSEC_MAGIC);
+    wr32(sealed + 4, LARDSEC_VERSION);
+    wr32(sealed + 8, flags);
+    wr32(sealed + 12, (uint32_t)(uint8_t)drive);
+    wr32(sealed + 16, base_lba);
+    wr32(sealed + 20, used_size);
+    wr32(sealed + 24, s_key_hash);
+    wr32(sealed + 28, plain_hash);
+    wr32(sealed + 32, blocks);
+    if (flags & LARDSEC_FLAG_ECC_STORAGE) {
+        for (uint32_t i = 0; i < blocks; i++) {
+            wr32(sealed + 64u + i * 4u, ecc_records[i]);
+        }
+    }
+    if (flags & LARDSEC_FLAG_ECC_RAM) {
+        ram_ecc_store(drive, base_lba, used_size, plain_hash, ecc_records, blocks);
     }
     crypt_payload(drive, base_lba, plain, sealed + LARDSEC_HEADER_BYTES, used_size);
     if (LARDSEC_HEADER_BYTES + used_size < image_size) {
@@ -364,14 +447,21 @@ int lardsec_open_media_image(char drive, uint32_t base_lba,
     crypt_payload(drive, base_lba, sealed + LARDSEC_HEADER_BYTES, plain, stored_used);
     flags = rd32(sealed + 8);
     blocks = rd32(sealed + 32);
-    if ((flags & LARDSEC_FLAG_ECC) && blocks <= LARDSEC_MAX_BLOCKS) {
+    if (s_ecc_enabled && blocks <= LARDSEC_MAX_BLOCKS &&
+        ((flags & LARDSEC_FLAG_ECC_STORAGE) ||
+         ram_ecc_matches(drive, base_lba, stored_used, rd32(sealed + 28), blocks))) {
+        int use_ram = ram_ecc_matches(drive, base_lba, stored_used, rd32(sealed + 28), blocks);
+        int use_storage = !use_ram && s_ecc_storage_enabled && (flags & LARDSEC_FLAG_ECC_STORAGE);
         for (uint32_t i = 0; i < blocks; i++) {
             uint32_t off = i * 512u;
             uint32_t n = stored_used - off;
+            uint32_t expected;
             int fix;
             if (off >= stored_used) break;
             if (n > 512u) n = 512u;
-            fix = ecc_fix_block(plain + off, n, rd32(sealed + 64u + i * 4u));
+            if (!use_ram && !use_storage) break;
+            expected = use_ram ? s_ram_ecc_records[i] : rd32(sealed + 64u + i * 4u);
+            fix = ecc_fix_block(plain + off, n, expected);
             if (fix > 0) s_ecc_corrections++;
             if (fix < 0) {
                 s_ecc_failures++;
@@ -397,6 +487,10 @@ void lardsec_info(lardsec_info_t* out)
     out->enabled = s_enabled;
     out->locked = s_locked;
     out->ecc_enabled = s_ecc_enabled;
+    out->ecc_ram_enabled = s_ecc_ram_enabled;
+    out->ecc_storage_enabled = s_ecc_storage_enabled;
+    out->ecc_ram_valid = s_ram_ecc_valid;
+    out->ecc_ram_blocks = s_ram_ecc_blocks;
     out->sealed_writes = s_sealed_writes;
     out->opened_seals = s_opened_seals;
     out->ecc_corrections = s_ecc_corrections;
@@ -420,6 +514,15 @@ int lardsec_selftest(void)
     uint32_t old_enabled = s_enabled;
     uint32_t old_locked = s_locked;
     uint32_t old_ecc = s_ecc_enabled;
+    uint32_t old_ecc_ram = s_ecc_ram_enabled;
+    uint32_t old_ecc_storage = s_ecc_storage_enabled;
+    uint32_t old_ram_ecc_valid = s_ram_ecc_valid;
+    char old_ram_ecc_drive = s_ram_ecc_drive;
+    uint32_t old_ram_ecc_base_lba = s_ram_ecc_base_lba;
+    uint32_t old_ram_ecc_used_size = s_ram_ecc_used_size;
+    uint32_t old_ram_ecc_hash = s_ram_ecc_hash;
+    uint32_t old_ram_ecc_blocks = s_ram_ecc_blocks;
+    uint32_t old_ram_ecc_records[LARDSEC_MAX_BLOCKS];
     uint32_t old_key[4] = { s_key[0], s_key[1], s_key[2], s_key[3] };
     uint32_t old_hash = s_key_hash;
     uint32_t old_sealed_writes = s_sealed_writes;
@@ -431,11 +534,14 @@ int lardsec_selftest(void)
     uint32_t old_key_discarded = s_key_discarded;
     char old_text[LARDSEC_KEY_TEXT_MAX + 1u];
     int ok = 1;
+    for (uint32_t i = 0; i < LARDSEC_MAX_BLOCKS; i++) old_ram_ecc_records[i] = s_ram_ecc_records[i];
     for (uint32_t i = 0; i <= LARDSEC_KEY_TEXT_MAX; i++) old_text[i] = s_recovery_key[i];
     for (uint32_t i = 0; i < sizeof(plain); i++) plain[i] = (uint8_t)(i * 3u + 7u);
     lardsec_regen_key(1234u);
     lardsec_enable(1);
     lardsec_set_ecc(1);
+    lardsec_set_ecc_storage(1);
+    lardsec_set_ecc_ram(0);
     if (lardsec_seal_media_image('Z', 100u, plain, sealed, sizeof(sealed), sizeof(plain)) != 0) ok = 0;
     if (ok && !lardsec_is_sealed_image(sealed, sizeof(sealed))) ok = 0;
     if (ok) sealed[LARDSEC_HEADER_BYTES + 21u] ^= 0x04u;
@@ -443,8 +549,18 @@ int lardsec_selftest(void)
     for (uint32_t i = 0; ok && i < sizeof(plain); i++) {
         if (plain[i] != opened[i]) ok = 0;
     }
+    lardsec_set_ecc_storage(0);
+    lardsec_set_ecc_ram(1);
+    if (ok && lardsec_seal_media_image('Y', 200u, plain, sealed, sizeof(sealed), sizeof(plain)) != 0) ok = 0;
+    if (ok && (rd32(sealed + 8) & LARDSEC_FLAG_ECC_STORAGE)) ok = 0;
+    if (ok && !(rd32(sealed + 8) & LARDSEC_FLAG_ECC_RAM)) ok = 0;
+    if (ok) sealed[LARDSEC_HEADER_BYTES + 37u] ^= 0x02u;
+    if (ok && lardsec_open_media_image('Y', 200u, sealed, opened, sizeof(sealed), sizeof(plain)) != 0) ok = 0;
+    for (uint32_t i = 0; ok && i < sizeof(plain); i++) {
+        if (plain[i] != opened[i]) ok = 0;
+    }
     if (ok && lardsec_lock() != 0) ok = 0;
-    if (ok && lardsec_open_media_image('Z', 100u, sealed, opened, sizeof(sealed), sizeof(plain)) == 0) ok = 0;
+    if (ok && lardsec_open_media_image('Y', 200u, sealed, opened, sizeof(sealed), sizeof(plain)) == 0) ok = 0;
     if (ok && lardsec_unlock(s_recovery_key) != 0) ok = 0;
     s_key[0] = old_key[0];
     s_key[1] = old_key[1];
@@ -455,6 +571,15 @@ int lardsec_selftest(void)
     s_enabled = old_enabled;
     s_locked = old_locked;
     s_ecc_enabled = old_ecc;
+    s_ecc_ram_enabled = old_ecc_ram;
+    s_ecc_storage_enabled = old_ecc_storage;
+    s_ram_ecc_valid = old_ram_ecc_valid;
+    s_ram_ecc_drive = old_ram_ecc_drive;
+    s_ram_ecc_base_lba = old_ram_ecc_base_lba;
+    s_ram_ecc_used_size = old_ram_ecc_used_size;
+    s_ram_ecc_hash = old_ram_ecc_hash;
+    s_ram_ecc_blocks = old_ram_ecc_blocks;
+    for (uint32_t i = 0; i < LARDSEC_MAX_BLOCKS; i++) s_ram_ecc_records[i] = old_ram_ecc_records[i];
     s_sealed_writes = old_sealed_writes;
     s_opened_seals = old_opened_seals;
     s_ecc_corrections = old_ecc_corrections;

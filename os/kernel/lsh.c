@@ -1464,6 +1464,10 @@ static void cmd_lardsec_status(void)
     out_append(info.locked ? "locked" : "open");
     out_append(" ecc=");
     out_append(info.ecc_enabled ? "on" : "off");
+    out_append(" ram=");
+    out_append(info.ecc_ram_enabled ? "on" : "off");
+    out_append(" storage=");
+    out_append(info.ecc_storage_enabled ? "on" : "off");
     out_append(" key_hash=0x");
     out_append_hex32(info.key_hash);
     out_append(info.key_discarded ? " key=discarded" : " key=present");
@@ -1475,6 +1479,9 @@ static void cmd_lardsec_status(void)
     out_append_u32(info.ecc_corrections);
     out_append(" ecc_fail=");
     out_append_u32(info.ecc_failures);
+    out_append(" ram_mirror=");
+    out_append(info.ecc_ram_valid ? "valid/" : "empty/");
+    out_append_u32(info.ecc_ram_blocks);
     out_append(" scrubbed=");
     out_append_u32(info.scrubbed_bytes);
     out_append(" last=");
@@ -1517,8 +1524,41 @@ static void cmd_lardsec(const char* args)
     if (strcmp(sub, "ecc") == 0) {
         char value[16];
         int on;
-        if (vcs_read_word(&args, value, sizeof(value)) != 0 || cfgsh_bool_value(value, &on) != 0) {
-            out_append("Usage: secure ecc on|off\n");
+        if (vcs_read_word(&args, value, sizeof(value)) != 0 ||
+            cfgsh_is_status_word(value) || strcmp(value, "show") == 0) {
+            cmd_lardsec_status();
+            return;
+        }
+        if (strcmp(value, "ram") == 0 || strcmp(value, "memory") == 0 || strcmp(value, "mem") == 0) {
+            char state[16];
+            if (vcs_read_word(&args, state, sizeof(state)) != 0 || cfgsh_bool_value(state, &on) != 0) {
+                out_append("Usage: secure ecc ram on|off\n");
+                return;
+            }
+            lardsec_set_ecc_ram(on);
+            cmd_lardsec_status();
+            return;
+        }
+        if (strcmp(value, "storage") == 0 || strcmp(value, "store") == 0 ||
+            strcmp(value, "disk") == 0 || strcmp(value, "media") == 0) {
+            char state[16];
+            if (vcs_read_word(&args, state, sizeof(state)) != 0 || cfgsh_bool_value(state, &on) != 0) {
+                out_append("Usage: secure ecc storage on|off\n");
+                return;
+            }
+            lardsec_set_ecc_storage(on);
+            cmd_lardsec_status();
+            return;
+        }
+        if (strcmp(value, "both") == 0 || strcmp(value, "all") == 0) {
+            lardsec_set_ecc(1);
+            lardsec_set_ecc_ram(1);
+            lardsec_set_ecc_storage(1);
+            cmd_lardsec_status();
+            return;
+        }
+        if (cfgsh_bool_value(value, &on) != 0) {
+            out_append("Usage: secure ecc on|off|ram on|off|storage on|off|both\n");
             return;
         }
         lardsec_set_ecc(on);
@@ -1561,7 +1601,7 @@ static void cmd_lardsec(const char* args)
         out_append(lardsec_selftest() == 0 ? "lardsec: selftest OK\n" : "lardsec: selftest failed\n");
         return;
     }
-    out_append("Usage: secure status|key|on|off|ecc on|off|regen [seed]|seal|lock|unlock KEY|scrub|test\n");
+    out_append("Usage: secure status|key|on|off|ecc on|off|ram on|off|storage on|off|regen [seed]|seal|lock|unlock KEY|scrub|test\n");
 }
 
 static void cmd_auxkernel_status(void)
@@ -2091,7 +2131,7 @@ static void cmd_help(const char* args)
     out_append("  cfgsh              enter settings shell: mode-name on|off or 1|2|3\n");
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  media list|format Z|sync all|write Z file text  drives X/Y/Z/A/R/_\n");
-    out_append("  secure status|key|on|off|seal|lock|unlock KEY|ecc on|off  user-owned disk sealing\n");
+    out_append("  secure status|key|on|off|seal|lock|unlock KEY|ecc on|off|ram on|storage on  user-owned disk sealing\n");
     out_append("  auxkernel status|report|lockdown confirm|keydrop confirm  tiny emergency kernel path\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
@@ -2486,6 +2526,10 @@ static void cmd_status(const char* args)
     out_append(sec.locked ? "locked" : "open");
     out_append(", ecc=");
     out_append(sec.ecc_enabled ? "on" : "off");
+    out_append(", ecc_ram=");
+    out_append(sec.ecc_ram_enabled ? "on" : "off");
+    out_append(", ecc_storage=");
+    out_append(sec.ecc_storage_enabled ? "on" : "off");
     out_append(", key_hash=0x");
     out_append_hex32(sec.key_hash);
     out_append(sec.key_discarded ? ", key=discarded" : ", key=present");
@@ -9605,6 +9649,7 @@ static void cfgsh_help(void)
     out_append("  priority 0..10     default background task priority\n");
     out_append("  sandbox on|off     default LARDX sandbox run mode\n");
     out_append("  sum on|off         ring-0 full-control mode\n");
+    out_append("  secure ecc ram|storage on|off  software ECC placement\n");
     out_append("  sync               persist writable settings/files\n");
 }
 
@@ -9661,6 +9706,12 @@ static void cfgsh_status(void)
     out_append_u32(spx.rules);
     out_append(" secure=");
     out_append(sec.enabled ? (sec.locked ? "locked" : "on") : "off");
+    out_append(" ecc=");
+    out_append(sec.ecc_enabled ? "on" : "off");
+    out_append("/");
+    out_append(sec.ecc_ram_enabled ? "ram" : "-");
+    out_append("/");
+    out_append(sec.ecc_storage_enabled ? "store" : "-");
     out_append(" http=");
     out_append(lsh_http_method_name());
     out_append(" priority=");

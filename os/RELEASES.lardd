@@ -5,6 +5,15 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.96.0b
+ITEM Adds LardSec software ECC placement controls for machines whose CPU or board does not expose hardware ECC.
+ITEM Keeps secure ecc on/off as the master single-bit correction switch and adds secure ecc ram on/off plus secure ecc storage on/off.
+ITEM Storage ECC remains on by default in native LSEC sealed headers; RAM ECC is explicit and keeps a volatile in-kernel ECC mirror for the latest sealed media image.
+ITEM secure status now shows ecc, ram, storage, and ram_mirror state so the user can see where correction data lives.
+ITEM POST selftest covers both storage-header ECC and RAM-only ECC correction without changing user-visible security counters.
+ITEM Preserves LardSec keys, sealing, locking, AuxKernel, MediaFS, installer, WebStack, RenderFX, FSTWT, RXR/RXE/SYSRXE, KMO, SUM, raw-control gating, and delete/repair behavior intact.
+ITEM Ships as beta because this adds a new software-ECC placement surface while keeping the LardOS value rule: visible, local, reversible, and user-owned control.
+
 SECTION v1.95.0a
 ITEM Adds AuxKernel, a tiny built-in emergency microkernel path for PanicRoom bridging, media lockdown, visible reports, and user-confirmed volatile key discard.
 ITEM AuxKernel is compiled into the kernel and does not require KMO modules, KModTalk, app launchers, or the normal GUI to keep an emergency control path available.

@@ -8,6 +8,10 @@ typedef struct {
     uint32_t enabled;
     uint32_t locked;
     uint32_t ecc_enabled;
+    uint32_t ecc_ram_enabled;
+    uint32_t ecc_storage_enabled;
+    uint32_t ecc_ram_valid;
+    uint32_t ecc_ram_blocks;
     uint32_t sealed_writes;
     uint32_t opened_seals;
     uint32_t ecc_corrections;
@@ -22,6 +26,8 @@ typedef struct {
 void lardsec_init(void);
 int lardsec_enable(int on);
 int lardsec_set_ecc(int on);
+int lardsec_set_ecc_ram(int on);
+int lardsec_set_ecc_storage(int on);
 int lardsec_regen_key(uint32_t seed);
 int lardsec_lock(void);
 int lardsec_unlock(const char* recovery_key);

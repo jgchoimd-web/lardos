@@ -52,6 +52,17 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.94.0a` officially promotes optional user-owned LardSec/LardLocker media
+sealing after build and boot checks. It keeps the v1.94.0b command surface:
+`secure key` shows the visible recovery key, `secure on` enables encrypted-at-rest MDFS
+writes, `secure seal` writes Y:/Z:/A: stores as native LSEC containers with
+scrubbed slack space, `secure lock` blocks media access until `secure unlock
+KEY`, and `secure ecc on` keeps block ECC records that can correct a single bit
+flip per sealed block. It is on by default for at-rest media writes, but not
+mandatory: `secure off` writes plaintext again, preserving the LardOS rule that
+the user owns the machine. POST now validates seal/ECC behavior without changing
+the user's visible security counters.
+
 `v1.94.0b` adds optional user-owned LardSec/LardLocker media sealing. `secure
 key` shows the visible recovery key, `secure on` enables encrypted-at-rest MDFS
 writes, `secure seal` writes Y:/Z:/A: stores as native LSEC containers with

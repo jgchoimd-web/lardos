@@ -376,6 +376,12 @@ int lardsec_selftest(void)
     uint32_t old_ecc = s_ecc_enabled;
     uint32_t old_key[4] = { s_key[0], s_key[1], s_key[2], s_key[3] };
     uint32_t old_hash = s_key_hash;
+    uint32_t old_sealed_writes = s_sealed_writes;
+    uint32_t old_opened_seals = s_opened_seals;
+    uint32_t old_ecc_corrections = s_ecc_corrections;
+    uint32_t old_ecc_failures = s_ecc_failures;
+    uint32_t old_scrubbed_bytes = s_scrubbed_bytes;
+    uint32_t old_last_error = s_last_error;
     char old_text[LARDSEC_KEY_TEXT_MAX + 1u];
     int ok = 1;
     for (uint32_t i = 0; i <= LARDSEC_KEY_TEXT_MAX; i++) old_text[i] = s_recovery_key[i];
@@ -402,6 +408,11 @@ int lardsec_selftest(void)
     s_enabled = old_enabled;
     s_locked = old_locked;
     s_ecc_enabled = old_ecc;
-    s_last_error = 0;
+    s_sealed_writes = old_sealed_writes;
+    s_opened_seals = old_opened_seals;
+    s_ecc_corrections = old_ecc_corrections;
+    s_ecc_failures = old_ecc_failures;
+    s_scrubbed_bytes = old_scrubbed_bytes;
+    s_last_error = old_last_error;
     return ok ? 0 : -1;
 }

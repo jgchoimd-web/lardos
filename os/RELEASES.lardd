@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.94.0a
+ITEM Officially promotes the LardSec/LardLocker media sealing track after build, release media, and boot checks.
+ITEM Keeps secure key, secure on/off, seal, lock, unlock KEY, ecc on/off, regen, scrub, and test from v1.94.0b.
+ITEM Keeps default encrypted-at-rest MDFS media writes while preserving user choice through secure off and visible recovery keys.
+ITEM Tightens the LardSec selftest so POST validates seal/ECC behavior without changing user-visible seal, ECC, or scrub counters.
+ITEM Preserves MediaFS, installer, WebStack, RenderFX, FSTWT, RXR/RXE/SYSRXE, KMO, SUM, raw-control gating, and delete/repair features without feature loss.
+ITEM Ships as a because the beta surface is stable and matches the LardOS value rule: security is visible, reversible, local, and user-owned.
+
 SECTION v1.94.0b
 ITEM Adds optional LardSec/LardLocker media sealing for user-owned at-rest protection.
 ITEM secure key shows the visible recovery key; secure on/off, seal, lock, unlock KEY, ecc on/off, regen, scrub, and test are available from LSH and CFGSH.

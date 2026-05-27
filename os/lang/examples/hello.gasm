@@ -1,5 +1,0 @@
-; GASM hello: 40 + 2 = 42
-load 40
-add 2
-print
-halt

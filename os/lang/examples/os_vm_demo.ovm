@@ -1,6 +1,0 @@
-; OS VM demo - 40 + 2 = 42
-push 40
-push 2
-add
-print
-halt

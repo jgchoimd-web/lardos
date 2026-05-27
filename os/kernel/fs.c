@@ -186,6 +186,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Reversibility: settings, packages, and risky changes should have rollback, history, or capsule trails.\n"
     "ITEM Repair over halt: panic room, auxkernel, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
+    "ITEM Keyboard completeness: mouse workflows should also have keyboard and shortcut routes so the full OS can be driven without a mouse.\n"
     "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
@@ -197,6 +198,7 @@ static const uint8_t userlaw_init[] =
     "ITEM bleed overflow file -> bounded in-slot wipe before deletion when the user chooses the harsher path.\n"
     "ITEM crash command -> user-owned diagnostic fault triggers must be explicit, visible, and logged.\n"
     "ITEM auxkernel -> emergency containment must be visible, module-independent, and must not damage hardware.\n"
+    "ITEM megaclip -> keyboard-first 10-slot clipboard for moving data through the OS.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
@@ -276,6 +278,19 @@ static const uint8_t security_init[] =
     "END\n";
 static uint8_t ram_security_buf[SECURITY_CAP];
 static FsWritableFile ram_security = { "security.lardd", ram_security_buf, 0, SECURITY_CAP };
+
+#define MEGACLIP_CAP 1024u
+static const uint8_t megaclip_init_doc[] =
+    "LARDD 1\n"
+    "TITLE MegaClipboard\n"
+    "TEXT Keyboard-first 10-slot clipboard for text, file bytes, paths, labels, and future OS objects.\n"
+    "TEXT Default mode is stack: newest is slot 1, older entries follow, and slot 0 means the tenth slot.\n"
+    "TEXT single mode keeps one current clipboard space; order mode lists copied items by copy order.\n"
+    "TEXT Ctrl+Y copies the active editor/response/item, Ctrl+P pastes latest, Ctrl+Space then 1..9/0 pulls a slot.\n"
+    "TEXT Commands: megaclip status, list, mode stack/single/order, push text, file path, pull slot, write slot file.\n"
+    "END\n";
+static uint8_t ram_megaclip_buf[MEGACLIP_CAP];
+static FsWritableFile ram_megaclip = { "megaclip.lardd", ram_megaclip_buf, 0, MEGACLIP_CAP };
 
 #define AUXKERNEL_CAP 1024u
 static const uint8_t auxkernel_init[] =
@@ -424,6 +439,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use renderfx aa none/antianti/basic/nonlinear, renderfx brightness, renderfx resize stretch/live, renderfx lsb, renderfx vblank, and renderfx subpx for user-owned display filtering.\n"
     "li Use renderfx subpx use displayfix.spfx to apply per-region R/G/B subpixel defect correction from an editable script.\n"
     "li Use wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, or wallpaper bmp sample.bmp to set the desktop background from user-owned state.\n"
+    "li Use Ctrl+Y, Ctrl+P, Ctrl+Space then 1..9/0, or megaclip status/list/mode/push/file/pull/write for the 10-slot MegaClipboard.\n"
     "li Use secure key, secure seal, secure lock, secure ecc ram on, secure ecc storage on, and secure unlock KEY for optional user-owned encrypted-at-rest media stores with software ECC.\n"
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
@@ -529,6 +545,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.93.0b adds SPFX subpixel display-defect filter scripts through renderfx subpx and writable displayfix.spfx.\n"
     "li v1.95.0a adds AuxKernel, a tiny KMO-independent emergency microkernel path for PanicRoom bridge, lockdown, reports, and keydrop containment.\n"
     "li v1.96.0b adds software ECC placement controls: secure ecc ram on/off and secure ecc storage on/off.\n"
+    "li v1.97.0b adds MegaClipboard: 10 slots, stack/single/order modes, commands, and Ctrl+Y/Ctrl+P/Ctrl+Space slot pull shortcuts.\n"
     "li v1.94.0a officially promotes LardSec/LardLocker media sealing and keeps POST selftests from changing user-visible security counters.\n"
     "li v1.94.0b adds optional LardSec/LardLocker at-rest media sealing with visible recovery keys and ECC.\n"
     "li v1.92.1a officially promotes the native WebStack method/TLS line without feature loss or value changes.\n"
@@ -2112,7 +2129,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 36u;
+    return 37u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2152,7 +2169,8 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 32) return &ram_wallpaper;
     if (idx == 33) return &ram_displayfix;
     if (idx == 34) return &ram_security;
-    if (idx == 35) return &ram_auxkernel;
+    if (idx == 35) return &ram_megaclip;
+    if (idx == 36) return &ram_auxkernel;
     return NULL;
 }
 
@@ -2243,6 +2261,10 @@ void fs_init(void)
         ram_security_buf[i] = security_init[i];
     }
     ram_security.size = sizeof(security_init) - 1;
+    for (uint32_t i = 0; i < sizeof(megaclip_init_doc) - 1 && i < MEGACLIP_CAP; i++) {
+        ram_megaclip_buf[i] = megaclip_init_doc[i];
+    }
+    ram_megaclip.size = sizeof(megaclip_init_doc) - 1;
     for (uint32_t i = 0; i < sizeof(auxkernel_init) - 1 && i < AUXKERNEL_CAP; i++) {
         ram_auxkernel_buf[i] = auxkernel_init[i];
     }

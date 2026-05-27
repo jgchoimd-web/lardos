@@ -13,6 +13,7 @@
 #include "lsh.h"
 #include "larsh.h"
 #include "lar.h"
+#include "megaclip.h"
 #include "ps2.h"
 #include "kr_basic.h"
 #include "guioverlay.h"
@@ -218,6 +219,7 @@ static void gui_run_sysrxe_current(void);
 static void gui_run_sysrxe_input(const char* input);
 static int gui_resize_corner_hit(int x, int y);
 static int gui_resize_hit_selftest(void);
+static int gui_active_edit_buffer(char** out_buf, uint32_t** out_len, uint32_t** out_cur, uint32_t* out_cap);
 
 #define SCREENRAM_MAX_BYTES 8192u
 #define SCREENRAM_DEFAULT_W 64u
@@ -384,6 +386,7 @@ typedef struct {
     int item_drag_orig_y;
     int selected_area; /* 0=none, 1=desktop, 2=dock */
     int selected_index;
+    int megaclip_pull_wait;
 } gui_state_t;
 
 #define SS_IDLE_THRESHOLD  120
@@ -5473,6 +5476,119 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     }
 }
 
+static int gui_active_edit_buffer(char** out_buf, uint32_t** out_len, uint32_t** out_cur, uint32_t* out_cap)
+{
+    if (!g.tb_focused && !(g.app_id == 9 && g.lafaelo_focus)) return 0;
+    if (g.app_id == 1) {
+        *out_buf = g.calc_display;
+        *out_len = &g.calc_len;
+        *out_cur = &g.calc_cur;
+        *out_cap = sizeof(g.calc_display);
+        return 1;
+    }
+    if (g.app_id == 9 && g.lafaelo_focus) {
+        *out_buf = g.lafaelo_buf;
+        *out_len = &g.lafaelo_len;
+        *out_cur = &g.lafaelo_cur;
+        *out_cap = sizeof(g.lafaelo_buf);
+        return 1;
+    }
+    *out_buf = g.tb;
+    *out_len = &g.tb_len;
+    *out_cur = &g.tb_cur;
+    *out_cap = sizeof(g.tb);
+    return 1;
+}
+
+static void gui_megaclip_feedback(const char* msg)
+{
+    gui_resp_clear();
+    gui_resp_append("MegaClipboard: ");
+    gui_resp_append(msg);
+    gui_resp_append("\n");
+}
+
+static int gui_megaclip_insert(const megaclip_item_t* item)
+{
+    char* edit_buf;
+    uint32_t* edit_len;
+    uint32_t* edit_cur;
+    uint32_t edit_cap;
+    if (!item || !gui_active_edit_buffer(&edit_buf, &edit_len, &edit_cur, &edit_cap)) return -1;
+    for (uint32_t i = 0; i < item->size && *edit_len + 1u < edit_cap; i++) {
+        char ch = (char)item->data[i];
+        if (ch == 0) break;
+        if ((ch < ' ' || ch > '~') && ch != '\n' && ch != '\t') continue;
+        for (uint32_t j = *edit_len; j > *edit_cur; j--) edit_buf[j] = edit_buf[j - 1u];
+        edit_buf[(*edit_cur)++] = ch;
+        (*edit_len)++;
+        edit_buf[*edit_len] = '\0';
+    }
+    return 0;
+}
+
+static void gui_megaclip_yank(void)
+{
+    char* edit_buf;
+    uint32_t* edit_len;
+    uint32_t* edit_cur;
+    uint32_t edit_cap;
+    (void)edit_cur;
+    (void)edit_cap;
+    if (gui_active_edit_buffer(&edit_buf, &edit_len, &edit_cur, &edit_cap)) {
+        if (megaclip_push("text", "gui-edit", (const uint8_t*)edit_buf, *edit_len) == 0) {
+            gui_megaclip_feedback("copied active editor with Ctrl+Y");
+        } else {
+            gui_megaclip_feedback("copy failed");
+        }
+        return;
+    }
+    if (g.resp[0]) {
+        if (megaclip_push_text("gui-response", g.resp) == 0) gui_megaclip_feedback("copied response view with Ctrl+Y");
+        else gui_megaclip_feedback("copy failed");
+        return;
+    }
+    if (g.selected_area == 1 && g.selected_index >= 0 && g.selected_index < g_desktop_item_count) {
+        if (megaclip_push_text("desktop-item", g_desktop_items[g.selected_index].name) == 0) gui_megaclip_feedback("copied desktop item label");
+        else gui_megaclip_feedback("copy failed");
+        return;
+    }
+    if (g.selected_area == 2 && g.selected_index >= 0 && g.selected_index < g_dock_item_count) {
+        if (megaclip_push_text("dock-item", g_dock_items[g.selected_index].name) == 0) gui_megaclip_feedback("copied dock item label");
+        else gui_megaclip_feedback("copy failed");
+        return;
+    }
+    gui_megaclip_feedback("nothing focused to copy");
+}
+
+static void gui_megaclip_paste_index(uint32_t index)
+{
+    megaclip_item_t item;
+    if (megaclip_pull(index, &item) != 0) {
+        gui_megaclip_feedback("slot empty");
+        return;
+    }
+    if (gui_megaclip_insert(&item) != 0) {
+        gui_megaclip_feedback("focus an input/editor before paste");
+        return;
+    }
+    gui_megaclip_feedback("pasted selected slot");
+}
+
+static void gui_megaclip_paste_latest(void)
+{
+    megaclip_item_t item;
+    if (megaclip_pull_latest(&item) != 0) {
+        gui_megaclip_feedback("empty");
+        return;
+    }
+    if (gui_megaclip_insert(&item) != 0) {
+        gui_megaclip_feedback("focus an input/editor before paste");
+        return;
+    }
+    gui_megaclip_feedback("pasted latest with Ctrl+P");
+}
+
 void gui_handle_key(char ch)
 {
     gui_activity();
@@ -5482,34 +5598,26 @@ void gui_handle_key(char ch)
     }
     if (!g_have_fb) return;
     if (!g.win_visible) return;
+    if (g.megaclip_pull_wait) {
+        if (ch >= '0' && ch <= '9') {
+            uint32_t slot = ch == '0' ? 9u : (uint32_t)(ch - '1');
+            g.megaclip_pull_wait = 0;
+            gui_megaclip_paste_index(slot);
+            return;
+        }
+        g.megaclip_pull_wait = 0;
+    }
     if (!g.tb_focused && gui_file_rxe_game(g.app_id)) {
         if (ch == 'w' || ch == 'W') { gui_run_sysrxe_input("up"); return; }
         if (ch == 'a' || ch == 'A') { gui_run_sysrxe_input("left"); return; }
         if (ch == 's' || ch == 'S') { gui_run_sysrxe_input("down"); return; }
         if (ch == 'd' || ch == 'D') { gui_run_sysrxe_input("right"); return; }
     }
-    if (!g.tb_focused) return;
-
     char* edit_buf;
     uint32_t* edit_len;
     uint32_t* edit_cur;
     uint32_t edit_cap;
-    if (g.app_id == 1) {
-        edit_buf = g.calc_display;
-        edit_len = &g.calc_len;
-        edit_cur = &g.calc_cur;
-        edit_cap = sizeof(g.calc_display);
-    } else if (g.app_id == 9 && g.lafaelo_focus) {
-        edit_buf = g.lafaelo_buf;
-        edit_len = &g.lafaelo_len;
-        edit_cur = &g.lafaelo_cur;
-        edit_cap = sizeof(g.lafaelo_buf);
-    } else {
-        edit_buf = g.tb;
-        edit_len = &g.tb_len;
-        edit_cur = &g.tb_cur;
-        edit_cap = sizeof(g.tb);
-    }
+    if (!gui_active_edit_buffer(&edit_buf, &edit_len, &edit_cur, &edit_cap)) return;
 
     if (ch == '\b') {
         if (*edit_cur > 0 && *edit_len) {
@@ -5597,6 +5705,19 @@ void gui_handle_key_nav(int kind)
     gui_activity();
     if (g.ss_active) {
         g.ss_active = 0;
+        return;
+    }
+    if (kind == PS2K_CTRL_Y) {
+        gui_megaclip_yank();
+        return;
+    }
+    if (kind == PS2K_CTRL_P) {
+        gui_megaclip_paste_latest();
+        return;
+    }
+    if (kind == PS2K_CTRL_SPACE) {
+        g.megaclip_pull_wait = 1;
+        gui_megaclip_feedback("stack pull armed; press 1..9 or 0");
         return;
     }
     if (kind == PS2K_F10) {

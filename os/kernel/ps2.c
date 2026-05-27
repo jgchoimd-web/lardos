@@ -244,6 +244,7 @@ static char scancode_to_ascii(uint8_t sc, int shift)
 int ps2_kbd_poll(ps2_key_t* out)
 {
     static int shift;
+    static int ctrl;
     static int ext;
 
     uint8_t st = inb(PS2_STAT);
@@ -268,7 +269,34 @@ int ps2_kbd_poll(ps2_key_t* out)
         return 1;
     }
 
+    if (code == 0x1D) {
+        ctrl = released ? 0 : 1;
+        ext = 0;
+        return 1;
+    }
+
     if (released) return 1;
+
+    if (ctrl) {
+        if (code == 0x15) {
+            out->kind = PS2K_CTRL_Y;
+            out->ch = 0;
+            ext = 0;
+            return 0;
+        }
+        if (code == 0x19) {
+            out->kind = PS2K_CTRL_P;
+            out->ch = 0;
+            ext = 0;
+            return 0;
+        }
+        if (code == 0x39) {
+            out->kind = PS2K_CTRL_SPACE;
+            out->ch = 0;
+            ext = 0;
+            return 0;
+        }
+    }
 
     if (code == 0x44) {
         out->kind = PS2K_F10;

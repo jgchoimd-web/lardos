@@ -52,6 +52,15 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.97.0b` adds MegaClipboard, a keyboard-first clipboard system with ten
+typed slots for text, file bytes, labels, paths, and future OS objects. The
+default mode is stack: newest content is slot `1`, older content moves down,
+and `0` addresses the tenth slot. `megaclip mode single` keeps one current
+space, and `megaclip mode order` lists entries by copy order. In the GUI,
+`Ctrl+Y` copies the active editor, response, or selected launcher; `Ctrl+P`
+pastes the latest entry; and `Ctrl+Space` followed by `1..9` or `0` pulls a
+specific slot without requiring the mouse.
+
 `v1.96.0b` adds software ECC placement controls to LardSec/LardLocker for
 machines whose CPU or board does not provide hardware ECC. `secure ecc on|off`
 still controls the master single-bit correction path, while `secure ecc ram
@@ -369,6 +378,9 @@ commands:
   containers with stream encryption, scrubbed unused bytes, storage ECC records,
   and an optional volatile RAM ECC mirror while leaving the recovery key visible
   to the user through the shell.
+- `megaclip status|list|mode stack|single|order|push text|file path|pull slot|write slot file`
+  manages the ten-slot MegaClipboard. The same system is available from the GUI
+  with `Ctrl+Y`, `Ctrl+P`, and `Ctrl+Space` then `1..9`/`0`.
 - `auxkernel status|report|lockdown confirm|keydrop confirm` exposes the tiny
   built-in emergency microkernel path. It works without KMO modules and uses
   visible containment instead of fan, thermal, or hardware-damaging behavior.

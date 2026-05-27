@@ -40,6 +40,7 @@
 #include "installer.h"
 #include "lardsec.h"
 #include "auxkernel.h"
+#include "megaclip.h"
 #include "mediafs.h"
 #include "panic.h"
 #include "version.h"
@@ -356,6 +357,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
     { "del", 1 }, { "erase", 1 }, { "restore", 1 }, { "undelete", 1 }, { "bleed", 0 }, { "tomb", 1 }, { "tombstone", 1 }, { "tombstones", 1 }, { "ren", 1 }, { "rename", 1 }, { "md", 1 }, { "mkdir", 1 }, { "rd", 1 }, { "rmdir", 1 }, { "mem", 1 },
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
@@ -2122,7 +2124,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -2152,6 +2154,7 @@ static void cmd_help(const char* args)
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  wallpaper status|color|pattern|bmp|use|reload|reset  user-owned desktop wallpaper\n");
+    out_append("  megaclip status|list|mode|push|file|pull|write  10-slot keyboard-first clipboard\n");
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
@@ -2533,6 +2536,19 @@ static void cmd_status(const char* args)
     out_append(", key_hash=0x");
     out_append_hex32(sec.key_hash);
     out_append(sec.key_discarded ? ", key=discarded" : ", key=present");
+    out_append("\n");
+    megaclip_status_t clip;
+    megaclip_status(&clip);
+    out_append("MegaClipboard: mode=");
+    out_append(megaclip_mode_name(clip.mode));
+    out_append(", slots=");
+    out_append_u32(clip.count);
+    out_append("/");
+    out_append_u32(clip.capacity);
+    out_append(", pushes=");
+    out_append_u32(clip.pushes);
+    out_append(", pulls=");
+    out_append_u32(clip.pulls);
     out_append("\n");
     auxkernel_info_t aux;
     auxkernel_info(&aux);
@@ -7487,6 +7503,258 @@ static void cmd_copy(const char* args)
     out_append(" bytes)\n");
 }
 
+static uint32_t megaclip_slot_number(uint32_t view_index)
+{
+    return view_index == 9u ? 0u : view_index + 1u;
+}
+
+static int megaclip_parse_slot_word(const char* word, uint32_t* out)
+{
+    uint32_t v = 0;
+    uint32_t i = 0;
+    if (!word || !word[0] || !out) return -1;
+    while (word[i]) {
+        if (word[i] < '0' || word[i] > '9') return -1;
+        v = v * 10u + (uint32_t)(word[i] - '0');
+        i++;
+    }
+    if (v == 0u) {
+        *out = 9u;
+        return 0;
+    }
+    if (v >= 1u && v <= 10u) {
+        *out = v - 1u;
+        return 0;
+    }
+    return -1;
+}
+
+static void megaclip_print_item(uint32_t view_index, const megaclip_item_t* item)
+{
+    uint32_t preview = 0;
+    out_append("  ");
+    out_append_u32(megaclip_slot_number(view_index));
+    out_append(": ");
+    out_append(item->kind);
+    out_append(" ");
+    out_append(item->label);
+    out_append(" ");
+    out_append_u32(item->size);
+    out_append(" bytes seq=");
+    out_append_u32(item->sequence);
+    out_append(" [");
+    while (preview < item->size && preview < 48u) {
+        char ch = (char)item->data[preview++];
+        out_append_char(ch >= ' ' && ch <= '~' ? ch : '.');
+    }
+    if (item->size > preview) out_append("...");
+    out_append("]\n");
+}
+
+static void megaclip_print_status(void)
+{
+    megaclip_status_t st;
+    megaclip_status(&st);
+    out_append("MegaClipboard mode=");
+    out_append(megaclip_mode_name(st.mode));
+    out_append(" slots=");
+    out_append_u32(st.count);
+    out_append("/");
+    out_append_u32(st.capacity);
+    out_append(" pushes=");
+    out_append_u32(st.pushes);
+    out_append(" pulls=");
+    out_append_u32(st.pulls);
+    out_append(" dropped=");
+    out_append_u32(st.dropped);
+    out_append(" last=");
+    out_append_u32(st.last_error);
+    out_append("\n  keys: Ctrl+Y copy, Ctrl+P paste latest, Ctrl+Space then 1..9/0 pull a slot.\n");
+}
+
+static void megaclip_write_item(const megaclip_item_t* item, const char* dst_arg)
+{
+    char dst_name[64];
+    char dst_drive;
+    FsWritableFile* dst;
+    resolve_path(dst_arg, &dst_drive, dst_name, sizeof(dst_name));
+    int merged_dst = drive_is_merged(dst_drive);
+    dst_drive = drive_write_target(dst_drive);
+    if (drive_to_fs(dst_drive) == 2) {
+        int r = mediafs_write(dst_drive, dst_name, item->data, item->size, 0);
+        if (r < 0) {
+            out_append("megaclip: media destination failed.\n");
+            return;
+        }
+        out_append("megaclip: wrote slot -> ");
+        out_append_char(dst_drive);
+        out_append(":");
+        out_append(dst_name);
+        out_append(" (");
+        out_append_u32(item->size);
+        out_append(" bytes)\n");
+        return;
+    }
+    dst = fs_open_writable(dst_name);
+    if (!dst) {
+        out_append(merged_dst ? "megaclip: _: writes to R:, but destination must be a writable RAM file.\n" :
+                                "megaclip: destination must be a writable RAM file.\n");
+        return;
+    }
+    if (item->size > dst->cap) {
+        out_append("megaclip: destination too small.\n");
+        return;
+    }
+    fs_write(dst, 0, item->data, item->size);
+    out_append("megaclip: wrote slot -> ");
+    out_append(merged_dst ? "R:" : "");
+    out_append(dst_name);
+    out_append(" (");
+    out_append_u32(item->size);
+    out_append(" bytes)\n");
+}
+
+static void cmd_megaclip(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        cfgsh_is_status_word(sub) || strcmp(sub, "show") == 0) {
+        megaclip_print_status();
+        return;
+    }
+    if (strcmp(sub, "stack") == 0 || strcmp(sub, "single") == 0 ||
+        strcmp(sub, "slot") == 0 || strcmp(sub, "order") == 0 || strcmp(sub, "fifo") == 0) {
+        if (strcmp(sub, "stack") == 0) megaclip_set_mode(MEGACLIP_MODE_STACK);
+        else if (strcmp(sub, "single") == 0 || strcmp(sub, "slot") == 0) megaclip_set_mode(MEGACLIP_MODE_SINGLE);
+        else megaclip_set_mode(MEGACLIP_MODE_ORDER);
+        megaclip_print_status();
+        return;
+    }
+    if (strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0) {
+        megaclip_item_t item;
+        megaclip_print_status();
+        for (uint32_t i = 0; i < MEGACLIP_SLOTS; i++) {
+            if (megaclip_pull(i, &item) == 0) megaclip_print_item(i, &item);
+        }
+        return;
+    }
+    if (strcmp(sub, "mode") == 0) {
+        char value[16];
+        if (vcs_read_word(&args, value, sizeof(value)) != 0) {
+            out_append("Usage: megaclip mode stack|single|order\n");
+            return;
+        }
+        if (strcmp(value, "stack") == 0) megaclip_set_mode(MEGACLIP_MODE_STACK);
+        else if (strcmp(value, "single") == 0 || strcmp(value, "slot") == 0) megaclip_set_mode(MEGACLIP_MODE_SINGLE);
+        else if (strcmp(value, "order") == 0 || strcmp(value, "fifo") == 0) megaclip_set_mode(MEGACLIP_MODE_ORDER);
+        else {
+            out_append("Usage: megaclip mode stack|single|order\n");
+            return;
+        }
+        megaclip_print_status();
+        return;
+    }
+    if (strcmp(sub, "push") == 0 || strcmp(sub, "copy") == 0 || strcmp(sub, "yank") == 0) {
+        while (*args == ' ' || *args == '\t') args++;
+        if (!args[0]) {
+            out_append("Usage: megaclip push text\n");
+            return;
+        }
+        if (megaclip_push("text", "shell-text", (const uint8_t*)args, strlen(args)) != 0) {
+            out_append("megaclip: push failed.\n");
+            return;
+        }
+        out_append("megaclip: pushed text.\n");
+        return;
+    }
+    if (strcmp(sub, "file") == 0 || strcmp(sub, "copyfile") == 0) {
+        char file_arg[64];
+        char name[64];
+        const uint8_t* data;
+        uint32_t size;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0 ||
+            lsh_read_data_arg(file_arg, &data, &size, name, sizeof(name)) != 0) {
+            out_append("Usage: megaclip file [drive:]file\n");
+            return;
+        }
+        if (megaclip_push("file", name, data, size) != 0) {
+            out_append("megaclip: file too large or unreadable.\n");
+            return;
+        }
+        out_append("megaclip: copied file ");
+        out_append(name);
+        out_append(" (");
+        out_append_u32(size);
+        out_append(" bytes");
+        if (size > MEGACLIP_DATA_MAX) {
+            out_append(", stored first ");
+            out_append_u32(MEGACLIP_DATA_MAX);
+            out_append(" bytes");
+        }
+        out_append(")\n");
+        return;
+    }
+    if (strcmp(sub, "pull") == 0 || strcmp(sub, "paste") == 0) {
+        char slot_word[16];
+        megaclip_item_t item;
+        int have_slot = vcs_read_word(&args, slot_word, sizeof(slot_word)) == 0;
+        if (!have_slot) {
+            if (megaclip_pull_latest(&item) != 0) {
+                out_append("megaclip: empty.\n");
+                return;
+            }
+            megaclip_print_item(0, &item);
+            return;
+        }
+        uint32_t slot;
+        if (megaclip_parse_slot_word(slot_word, &slot) != 0 || megaclip_pull(slot, &item) != 0) {
+            out_append("Usage: megaclip pull [1..10 or 0]\n");
+            return;
+        }
+        megaclip_print_item(slot, &item);
+        return;
+    }
+    if (strcmp(sub, "write") == 0 || strcmp(sub, "save") == 0) {
+        char a[64];
+        char b[64];
+        uint32_t slot = 0;
+        megaclip_item_t item;
+        if (vcs_read_word(&args, a, sizeof(a)) != 0) {
+            out_append("Usage: megaclip write [slot] file\n");
+            return;
+        }
+        if (vcs_read_word(&args, b, sizeof(b)) == 0) {
+            if (megaclip_parse_slot_word(a, &slot) != 0) {
+                out_append("Usage: megaclip write [slot] file\n");
+                return;
+            }
+            if (megaclip_pull(slot, &item) != 0) {
+                out_append("megaclip: slot empty.\n");
+                return;
+            }
+            megaclip_write_item(&item, b);
+            return;
+        }
+        if (megaclip_pull_latest(&item) != 0) {
+            out_append("megaclip: empty.\n");
+            return;
+        }
+        megaclip_write_item(&item, a);
+        return;
+    }
+    if (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0) {
+        megaclip_clear();
+        out_append("megaclip: cleared.\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(megaclip_selftest() == 0 ? "megaclip: selftest OK\n" : "megaclip: selftest failed\n");
+        return;
+    }
+    out_append("Usage: megaclip status|list|mode stack|single|order|push text|file path|pull [slot]|write [slot] file|clear|test\n");
+}
+
 static const char* lsh_skip_spaces(const char* s)
 {
     while (s && (*s == ' ' || *s == '\t')) s++;
@@ -9650,6 +9918,7 @@ static void cfgsh_help(void)
     out_append("  sandbox on|off     default LARDX sandbox run mode\n");
     out_append("  sum on|off         ring-0 full-control mode\n");
     out_append("  secure ecc ram|storage on|off  software ECC placement\n");
+    out_append("  megaclip stack|single|order  clipboard slot mode\n");
     out_append("  sync               persist writable settings/files\n");
 }
 
@@ -9665,6 +9934,7 @@ static void cfgsh_status(void)
     gui_wallpaper_info_t wp;
     gui_subpx_filter_info_t spx;
     lardsec_info_t sec;
+    megaclip_status_t clip;
     lardkit_rollback_info_t rb;
     bootprof_info(&bp);
     awake_info(&aw);
@@ -9676,6 +9946,7 @@ static void cfgsh_status(void)
     gui_wallpaper_info(&wp);
     gui_subpx_filter_info(&spx);
     lardsec_info(&sec);
+    megaclip_status(&clip);
     lardkit_rollback_info(&rb);
     out_append("CFGSH status\n");
     out_append("  boot=");
@@ -9712,6 +9983,8 @@ static void cfgsh_status(void)
     out_append(sec.ecc_ram_enabled ? "ram" : "-");
     out_append("/");
     out_append(sec.ecc_storage_enabled ? "store" : "-");
+    out_append(" clip=");
+    out_append(megaclip_mode_name(clip.mode));
     out_append(" http=");
     out_append(lsh_http_method_name());
     out_append(" priority=");
@@ -9923,6 +10196,24 @@ static int cfgsh_apply(const char* setting, const char* args)
             cmd_lardsec_status();
         } else {
             cmd_lardsec(args);
+        }
+        return 1;
+    }
+    if (strcmp(setting, "megaclip") == 0 || strcmp(setting, "mclip") == 0 ||
+        strcmp(setting, "clip") == 0 || strcmp(setting, "clipboard") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            megaclip_print_status();
+        } else if (strcmp(value, "stack") == 0) {
+            megaclip_set_mode(MEGACLIP_MODE_STACK);
+            megaclip_print_status();
+        } else if (strcmp(value, "single") == 0 || strcmp(value, "slot") == 0) {
+            megaclip_set_mode(MEGACLIP_MODE_SINGLE);
+            megaclip_print_status();
+        } else if (strcmp(value, "order") == 0 || strcmp(value, "fifo") == 0) {
+            megaclip_set_mode(MEGACLIP_MODE_ORDER);
+            megaclip_print_status();
+        } else {
+            out_append("Usage: megaclip stack|single|order\n");
         }
         return 1;
     }
@@ -10199,6 +10490,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
     if (strcmp(cmd, "wallpaper") == 0 || strcmp(cmd, "wall") == 0) { cmd_wallpaper(args); return; }
+    if (strcmp(cmd, "megaclip") == 0 || strcmp(cmd, "mclip") == 0 ||
+        strcmp(cmd, "clip") == 0 || strcmp(cmd, "clipboard") == 0) { cmd_megaclip(args); return; }
     if (strcmp(cmd, "glyph") == 0 || strcmp(cmd, "glyphs") == 0 || strcmp(cmd, "uglyph") == 0 || strcmp(cmd, "picglyph") == 0) { cmd_glyph(args); return; }
     if (strcmp(cmd, "cursor") == 0 || strcmp(cmd, "ucursor") == 0) { cmd_cursor(args); return; }
     if (strcmp(cmd, "awake") == 0 || strcmp(cmd, "awakening") == 0) { cmd_awake(args); return; }

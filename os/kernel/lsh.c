@@ -1864,7 +1864,7 @@ static void cmd_help(const char* args)
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
-    out_append("  renderfx status|aa|brightness|resize|lsb|vblank|test  user-owned render modes\n");
+    out_append("  renderfx status|aa|brightness|resize|lsb|vblank|subpx|test  user-owned render modes\n");
     out_append("  fstwt show|sample|clear|test      live .fstwts path translator/virtual-FS scripts\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
@@ -1983,6 +1983,7 @@ static void cmd_control(const char* args)
     out_append("  renderfx resize stretch|live choose stable stretch-preview or live reflow resizing\n");
     out_append("  renderfx lsb on     store ScreenRAM in quiet pixel least-significant bits\n");
     out_append("  renderfx vblank on  detect VGA-style blanking for two-phase final blits\n");
+    out_append("  renderfx subpx use displayfix.spfx applies user-owned RGB subpixel defect filters\n");
     out_append("  screencheck retro   draw a retro boot/storage-style screen check\n");
     out_append("  write notes.txt ... edit the writable RAM filesystem\n");
     out_append("  vcs status          inspect the in-OS source/history layer\n");
@@ -2740,6 +2741,115 @@ static void cmd_renderfx_status(void)
     out_append_u32(info.vblank_misses);
     out_append(" last=");
     out_append(info.vblank_last ? "blank\n" : "draw\n");
+    out_append("  subpx=");
+    out_append(info.subpx_enabled ? "on" : "off");
+    out_append(" rules=");
+    out_append_u32(info.subpx_rules);
+    out_append(" last_error=");
+    out_append_u32(info.subpx_last_error);
+    out_append("\n");
+}
+
+static void cmd_renderfx_subpx_status(void)
+{
+    gui_subpx_filter_info_t info;
+    gui_subpx_filter_info(&info);
+    out_append("RenderFX subpixel filter\n  state=");
+    out_append(info.enabled ? "on" : "off");
+    out_append(" rules=");
+    out_append_u32(info.rules);
+    out_append("/");
+    out_append_u32(info.max_rules);
+    out_append(" last_error=");
+    out_append_u32(info.last_error);
+    out_append("\n  script=");
+    out_append(info.script[0] ? info.script : "(manual/none)");
+    out_append("\n  script lines: SPFX 1, ON/OFF, RECT x y w h r% g% b%, PIXEL x y r% g% b%, END\n");
+}
+
+static void cmd_renderfx_subpx(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        cfgsh_is_status_word(sub) || ascii_streq_ci(sub, "show")) {
+        cmd_renderfx_subpx_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "on") || ascii_streq_ci(sub, "enable")) {
+        gui_subpx_filter_enable(1);
+        cmd_renderfx_subpx_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "off") || ascii_streq_ci(sub, "disable")) {
+        gui_subpx_filter_enable(0);
+        cmd_renderfx_subpx_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "clear") || ascii_streq_ci(sub, "reset")) {
+        gui_subpx_filter_clear();
+        out_append("renderfx: subpx rules cleared\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "use") || ascii_streq_ci(sub, "load") || ascii_streq_ci(sub, "script")) {
+        char file_arg[96];
+        char drv;
+        char name[64];
+        const uint8_t* data = NULL;
+        uint32_t size = 0;
+        if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
+            file_arg[0] = '\0';
+        }
+        if (!file_arg[0]) {
+            const char* def = "displayfix.spfx";
+            uint32_t i = 0;
+            while (def[i] && i + 1u < sizeof(file_arg)) {
+                file_arg[i] = def[i];
+                i++;
+            }
+            file_arg[i] = '\0';
+        }
+        resolve_path(file_arg, &drv, name, sizeof(name));
+        if (!name[0] || lsh_read_drive_data_ex(drv, name, &data, &size, NULL, 1) != 0 ||
+            gui_subpx_filter_load_data(file_arg, data, size) != 0) {
+            out_append("renderfx: subpx script failed. Try displayfix.spfx or RECT x y w h r g b.\n");
+            return;
+        }
+        cmd_renderfx_subpx_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "add") || ascii_streq_ci(sub, "rect") || ascii_streq_ci(sub, "rule")) {
+        uint64_t x, y, w, h, r, gch, b;
+        if (lsh_parse_u64(&args, &x) != 0 || lsh_parse_u64(&args, &y) != 0 ||
+            lsh_parse_u64(&args, &w) != 0 || lsh_parse_u64(&args, &h) != 0 ||
+            lsh_parse_u64(&args, &r) != 0 || lsh_parse_u64(&args, &gch) != 0 ||
+            lsh_parse_u64(&args, &b) != 0 ||
+            gui_subpx_filter_add((uint32_t)x, (uint32_t)y, (uint32_t)w, (uint32_t)h,
+                                 (uint32_t)r, (uint32_t)gch, (uint32_t)b) != 0) {
+            out_append("Usage: renderfx subpx add x y w h r% g% b%\n");
+            return;
+        }
+        cmd_renderfx_subpx_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "pixel") || ascii_streq_ci(sub, "px")) {
+        uint64_t x, y, r, gch, b;
+        if (lsh_parse_u64(&args, &x) != 0 || lsh_parse_u64(&args, &y) != 0 ||
+            lsh_parse_u64(&args, &r) != 0 || lsh_parse_u64(&args, &gch) != 0 ||
+            lsh_parse_u64(&args, &b) != 0 ||
+            gui_subpx_filter_add((uint32_t)x, (uint32_t)y, 1u, 1u,
+                                 (uint32_t)r, (uint32_t)gch, (uint32_t)b) != 0) {
+            out_append("Usage: renderfx subpx pixel x y r% g% b%\n");
+            return;
+        }
+        cmd_renderfx_subpx_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(gui_subpx_filter_selftest() == 0 ? "renderfx subpx: selftest OK\n" : "renderfx subpx: selftest failed\n");
+        return;
+    }
+    out_append("Usage: renderfx subpx status|on|off|use file.spfx|add x y w h r g b|pixel x y r g b|clear|test\n");
 }
 
 static void cmd_renderfx(const char* args)
@@ -2831,11 +2941,16 @@ static void cmd_renderfx(const char* args)
         }
         return;
     }
+    if (ascii_streq_ci(sub, "subpx") || ascii_streq_ci(sub, "subpixel") ||
+        ascii_streq_ci(sub, "displayfix") || ascii_streq_ci(sub, "defect")) {
+        cmd_renderfx_subpx(args);
+        return;
+    }
     if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
         out_append(gui_render_effects_selftest() == 0 ? "renderfx: selftest OK\n" : "renderfx: selftest failed\n");
         return;
     }
-    out_append("Usage: renderfx status|aa|brightness|resize|lsb|vblank|test\n");
+    out_append("Usage: renderfx status|aa|brightness|resize|lsb|vblank|subpx|test\n");
 }
 
 static void cmd_wallpaper_status(void)
@@ -9203,6 +9318,7 @@ static void cfgsh_help(void)
     out_append("  brightness 50..150 multiplicative color-preserving brightness\n");
     out_append("  lsb on|off         store ScreenRAM bits in rendered pixel LSBs\n");
     out_append("  vblank on|off      use detected blanking window for final blit\n");
+    out_append("  subpx on|off|use file.spfx|add x y w h r g b  RGB subpixel defect filter\n");
     out_append("  http 1..7          GET|POST|HEAD|PUT|PATCH|DELETE|OPTIONS mode\n");
     out_append("  boot 1..5          normal|safe|netoff|dev|awakening\n");
     out_append("  priority 0..10     default background task priority\n");
@@ -9221,6 +9337,7 @@ static void cfgsh_status(void)
     lardkit_bugeye_info_t be;
     lardkit_theme_info_t th;
     gui_wallpaper_info_t wp;
+    gui_subpx_filter_info_t spx;
     lardkit_rollback_info_t rb;
     bootprof_info(&bp);
     awake_info(&aw);
@@ -9230,6 +9347,7 @@ static void cfgsh_status(void)
     lardkit_bugeye_info(&be);
     lardkit_theme_info(&th);
     gui_wallpaper_info(&wp);
+    gui_subpx_filter_info(&spx);
     lardkit_rollback_info(&rb);
     out_append("CFGSH status\n");
     out_append("  boot=");
@@ -9254,6 +9372,10 @@ static void cfgsh_status(void)
     out_append(render_aa_name((uint32_t)gui_render_aa_mode()));
     out_append(" bright=");
     out_append_u32((uint32_t)gui_render_brightness());
+    out_append(" subpx=");
+    out_append(spx.enabled ? "on" : "off");
+    out_append("/");
+    out_append_u32(spx.rules);
     out_append(" http=");
     out_append(lsh_http_method_name());
     out_append(" priority=");
@@ -9447,6 +9569,15 @@ static int cfgsh_apply(const char* setting, const char* args)
             out_append(on ? "cfgsh: vblank on\n" : "cfgsh: vblank off\n");
         } else {
             out_append("Usage: vblank on|off\n");
+        }
+        return 1;
+    }
+    if (strcmp(setting, "subpx") == 0 || strcmp(setting, "subpixel") == 0 ||
+        strcmp(setting, "displayfix") == 0 || strcmp(setting, "defect") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_renderfx_subpx_status();
+        } else {
+            cmd_renderfx_subpx(args);
         }
         return 1;
     }

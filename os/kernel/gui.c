@@ -222,6 +222,7 @@ static int gui_resize_hit_selftest(void);
 #define SCREENRAM_MAX_BYTES 8192u
 #define SCREENRAM_DEFAULT_W 64u
 #define SCREENRAM_DEFAULT_H 16u
+#define GUI_SUBPX_RULE_MAX 32u
 
 static uint8_t g_screenram_shadow[SCREENRAM_MAX_BYTES];
 static uint8_t g_screenram_backup[SCREENRAM_MAX_BYTES];
@@ -234,6 +235,22 @@ static uint32_t g_screenram_capacity;
 static uint32_t g_screenram_used;
 static uint32_t g_screenram_last_error;
 static uint32_t g_screenram_lsb_mode;
+
+typedef struct {
+    uint16_t x;
+    uint16_t y;
+    uint16_t w;
+    uint16_t h;
+    uint16_t r_percent;
+    uint16_t g_percent;
+    uint16_t b_percent;
+} gui_subpx_rule_t;
+
+static gui_subpx_rule_t g_subpx_rules[GUI_SUBPX_RULE_MAX];
+static uint32_t g_subpx_rule_count;
+static uint32_t g_subpx_enabled;
+static uint32_t g_subpx_last_error;
+static char g_subpx_script[GUI_SUBPX_SCRIPT_NAME_MAX + 1u];
 
 typedef struct {
     int mx;
@@ -566,6 +583,142 @@ static int gui_filter_channel(int mode, int center, int avg, int edge, int cente
     return center;
 }
 
+static int subpx_name_eq(const char* a, const char* b)
+{
+    uint32_t i = 0;
+    if (!a || !b) return 0;
+    while (a[i] && b[i]) {
+        char ca = a[i];
+        char cb = b[i];
+        if (ca >= 'a' && ca <= 'z') ca = (char)(ca - 32);
+        if (cb >= 'a' && cb <= 'z') cb = (char)(cb - 32);
+        if (ca != cb) return 0;
+        i++;
+    }
+    return a[i] == '\0' && b[i] == '\0';
+}
+
+static int subpx_parse_u32(const char* s, uint32_t* out)
+{
+    uint32_t v = 0;
+    int hex = 0;
+    int any = 0;
+    if (!s || !out) return -1;
+    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        hex = 1;
+        s += 2;
+    }
+    while (*s) {
+        uint32_t d;
+        if (*s >= '0' && *s <= '9') d = (uint32_t)(*s - '0');
+        else if (hex && *s >= 'a' && *s <= 'f') d = (uint32_t)(*s - 'a' + 10);
+        else if (hex && *s >= 'A' && *s <= 'F') d = (uint32_t)(*s - 'A' + 10);
+        else return -1;
+        if (d >= (hex ? 16u : 10u)) return -1;
+        v = v * (hex ? 16u : 10u) + d;
+        any = 1;
+        s++;
+    }
+    if (!any) return -1;
+    *out = v;
+    return 0;
+}
+
+static int subpx_next_token(const uint8_t* data, uint32_t size, uint32_t* pos,
+                            char* out, uint32_t cap)
+{
+    uint32_t p;
+    uint32_t i = 0;
+    if (!data || !pos || !out || cap == 0) return -1;
+    p = *pos;
+    for (;;) {
+        while (p < size && (data[p] == ' ' || data[p] == '\t' ||
+               data[p] == '\r' || data[p] == '\n')) p++;
+        if (p < size && data[p] == '#') {
+            while (p < size && data[p] != '\n') p++;
+            continue;
+        }
+        break;
+    }
+    if (p >= size) {
+        *pos = p;
+        out[0] = '\0';
+        return -1;
+    }
+    while (p < size && data[p] != ' ' && data[p] != '\t' &&
+           data[p] != '\r' && data[p] != '\n' && data[p] != '#') {
+        if (i + 1u < cap) out[i++] = (char)data[p];
+        p++;
+    }
+    out[i] = '\0';
+    *pos = p;
+    return i ? 0 : -1;
+}
+
+static int subpx_read_u32(const uint8_t* data, uint32_t size, uint32_t* pos, uint32_t* out)
+{
+    char tok[24];
+    if (subpx_next_token(data, size, pos, tok, sizeof(tok)) != 0) return -1;
+    return subpx_parse_u32(tok, out);
+}
+
+static void subpx_copy_script_name(const char* name)
+{
+    uint32_t i = 0;
+    if (!name) name = "";
+    while (name[i] && i < GUI_SUBPX_SCRIPT_NAME_MAX) {
+        g_subpx_script[i] = name[i];
+        i++;
+    }
+    g_subpx_script[i] = '\0';
+}
+
+static int subpx_add_to(gui_subpx_rule_t* rules, uint32_t* count,
+                        uint32_t x, uint32_t y, uint32_t w, uint32_t h,
+                        uint32_t r_percent, uint32_t g_percent, uint32_t b_percent)
+{
+    if (!rules || !count || *count >= GUI_SUBPX_RULE_MAX || w == 0 || h == 0) return -1;
+    if (x > 65535u || y > 65535u || w > 65535u || h > 65535u) return -1;
+    if (r_percent > 200u) r_percent = 200u;
+    if (g_percent > 200u) g_percent = 200u;
+    if (b_percent > 200u) b_percent = 200u;
+    rules[*count].x = (uint16_t)x;
+    rules[*count].y = (uint16_t)y;
+    rules[*count].w = (uint16_t)w;
+    rules[*count].h = (uint16_t)h;
+    rules[*count].r_percent = (uint16_t)r_percent;
+    rules[*count].g_percent = (uint16_t)g_percent;
+    rules[*count].b_percent = (uint16_t)b_percent;
+    (*count)++;
+    return 0;
+}
+
+static uint32_t gui_apply_subpx_filter(uint16_t x, uint16_t y, uint32_t argb)
+{
+    uint32_t a;
+    int r;
+    int gch;
+    int b;
+    if (!g_subpx_enabled || g_subpx_rule_count == 0) return argb;
+    a = argb & 0xFF000000u;
+    r = (int)((argb >> 16) & 0xFFu);
+    gch = (int)((argb >> 8) & 0xFFu);
+    b = (int)(argb & 0xFFu);
+    for (uint32_t i = 0; i < g_subpx_rule_count; i++) {
+        const gui_subpx_rule_t* rule = &g_subpx_rules[i];
+        uint32_t rx2 = (uint32_t)rule->x + (uint32_t)rule->w;
+        uint32_t ry2 = (uint32_t)rule->y + (uint32_t)rule->h;
+        if ((uint32_t)x < rule->x || (uint32_t)y < rule->y ||
+            (uint32_t)x >= rx2 || (uint32_t)y >= ry2) {
+            continue;
+        }
+        r = clamp255((r * (int)rule->r_percent + 50) / 100);
+        gch = clamp255((gch * (int)rule->g_percent + 50) / 100);
+        b = clamp255((b * (int)rule->b_percent + 50) / 100);
+    }
+    return a | ((uint32_t)r << 16) | ((uint32_t)gch << 8) | (uint32_t)b;
+}
+
 static void fb_blit(const fb_t* dst, const fb_t* src)
 {
     uint16_t w = src->w < dst->w ? src->w : dst->w;
@@ -601,8 +754,10 @@ static void fb_blit(const fb_t* dst, const fb_t* src)
                 out[ch] = gui_filter_channel(aa, center, avg, edge, (int)center_luma, (int)avg_luma);
                 out[ch] = gui_apply_brightness(out[ch], br, q);
             }
-            fb_putpixel(dst, x, y, ((uint32_t)a << 24) |
-                        ((uint32_t)out[0] << 16) | ((uint32_t)out[1] << 8) | (uint32_t)out[2]);
+            uint32_t outp = ((uint32_t)a << 24) |
+                            ((uint32_t)out[0] << 16) | ((uint32_t)out[1] << 8) | (uint32_t)out[2];
+            outp = gui_apply_subpx_filter(x, y, outp);
+            fb_putpixel(dst, x, y, outp);
         }
     }
 }
@@ -1412,6 +1567,10 @@ int gui_init(void)
     g_screenram_used = 0;
     g_screenram_enabled = 0;
     g_screenram_last_error = 0;
+    g_subpx_rule_count = 0;
+    g_subpx_enabled = 0;
+    g_subpx_last_error = 0;
+    g_subpx_script[0] = '\0';
     lassist_init();
     return 0;
 }
@@ -1649,6 +1808,136 @@ int gui_vblank_mode(void)
     return g.vblank_mode ? 1 : 0;
 }
 
+int gui_subpx_filter_enable(int on)
+{
+    g_subpx_enabled = on ? 1u : 0u;
+    g_subpx_last_error = 0;
+    return 0;
+}
+
+int gui_subpx_filter_clear(void)
+{
+    g_subpx_rule_count = 0;
+    g_subpx_last_error = 0;
+    g_subpx_script[0] = '\0';
+    return 0;
+}
+
+int gui_subpx_filter_add(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
+                         uint32_t r_percent, uint32_t g_percent, uint32_t b_percent)
+{
+    int r = subpx_add_to(g_subpx_rules, &g_subpx_rule_count, x, y, w, h,
+                        r_percent, g_percent, b_percent);
+    if (r != 0) {
+        g_subpx_last_error = 1;
+        return -1;
+    }
+    g_subpx_enabled = 1;
+    g_subpx_last_error = 0;
+    subpx_copy_script_name("(manual)");
+    return 0;
+}
+
+int gui_subpx_filter_load_data(const char* script_name, const uint8_t* data, uint32_t size)
+{
+    gui_subpx_rule_t rules[GUI_SUBPX_RULE_MAX];
+    uint32_t count = 0;
+    uint32_t pos = 0;
+    uint32_t enabled = 1;
+    char tok[24];
+    if (!data || size == 0) {
+        g_subpx_last_error = 2;
+        return -1;
+    }
+    while (subpx_next_token(data, size, &pos, tok, sizeof(tok)) == 0) {
+        uint32_t x, y, w, h, r, gch, b;
+        if (subpx_name_eq(tok, "SPFX")) {
+            while (pos < size && data[pos] != '\n') pos++;
+            continue;
+        }
+        if (subpx_name_eq(tok, "ON") || subpx_name_eq(tok, "ENABLE")) {
+            enabled = 1;
+            continue;
+        }
+        if (subpx_name_eq(tok, "OFF") || subpx_name_eq(tok, "DISABLE")) {
+            enabled = 0;
+            continue;
+        }
+        if (subpx_name_eq(tok, "CLEAR") || subpx_name_eq(tok, "RESET")) {
+            count = 0;
+            continue;
+        }
+        if (subpx_name_eq(tok, "END")) {
+            break;
+        }
+        if (subpx_name_eq(tok, "RECT") || subpx_name_eq(tok, "SUBPX") ||
+            subpx_name_eq(tok, "RULE")) {
+            if (subpx_read_u32(data, size, &pos, &x) != 0 ||
+                subpx_read_u32(data, size, &pos, &y) != 0 ||
+                subpx_read_u32(data, size, &pos, &w) != 0 ||
+                subpx_read_u32(data, size, &pos, &h) != 0 ||
+                subpx_read_u32(data, size, &pos, &r) != 0 ||
+                subpx_read_u32(data, size, &pos, &gch) != 0 ||
+                subpx_read_u32(data, size, &pos, &b) != 0 ||
+                subpx_add_to(rules, &count, x, y, w, h, r, gch, b) != 0) {
+                g_subpx_last_error = 3;
+                return -1;
+            }
+            continue;
+        }
+        if (subpx_name_eq(tok, "PIXEL") || subpx_name_eq(tok, "PX")) {
+            if (subpx_read_u32(data, size, &pos, &x) != 0 ||
+                subpx_read_u32(data, size, &pos, &y) != 0 ||
+                subpx_read_u32(data, size, &pos, &r) != 0 ||
+                subpx_read_u32(data, size, &pos, &gch) != 0 ||
+                subpx_read_u32(data, size, &pos, &b) != 0 ||
+                subpx_add_to(rules, &count, x, y, 1u, 1u, r, gch, b) != 0) {
+                g_subpx_last_error = 4;
+                return -1;
+            }
+            continue;
+        }
+        g_subpx_last_error = 5;
+        return -1;
+    }
+    for (uint32_t i = 0; i < count; i++) g_subpx_rules[i] = rules[i];
+    g_subpx_rule_count = count;
+    g_subpx_enabled = enabled;
+    subpx_copy_script_name(script_name);
+    g_subpx_last_error = 0;
+    return 0;
+}
+
+int gui_subpx_filter_load(const char* file)
+{
+    const FsFile* f;
+    FsWritableFile* w;
+    if (!file || !file[0]) file = "displayfix.spfx";
+    w = fs_open_writable(file);
+    if (w) return gui_subpx_filter_load_data(file, w->data, w->size);
+    f = fs_open(file);
+    if (!f) {
+        g_subpx_last_error = 6;
+        return -1;
+    }
+    return gui_subpx_filter_load_data(file, f->data, f->size);
+}
+
+void gui_subpx_filter_info(gui_subpx_filter_info_t* out)
+{
+    uint32_t i = 0;
+    if (!out) return;
+    out->enabled = g_subpx_enabled;
+    out->rules = g_subpx_rule_count;
+    out->max_rules = GUI_SUBPX_RULE_MAX;
+    out->last_error = g_subpx_last_error;
+    while (g_subpx_script[i] && i < GUI_SUBPX_SCRIPT_NAME_MAX) {
+        out->script[i] = g_subpx_script[i];
+        i++;
+    }
+    out->script[i] = '\0';
+}
+
 void gui_render_info(gui_render_info_t* out)
 {
     if (!out) return;
@@ -1662,6 +1951,49 @@ void gui_render_info(gui_render_info_t* out)
     out->vblank_hits = g.vblank_hits;
     out->vblank_misses = g.vblank_misses;
     out->vblank_last = g.vblank_last;
+    out->subpx_enabled = g_subpx_enabled;
+    out->subpx_rules = g_subpx_rule_count;
+    out->subpx_last_error = g_subpx_last_error;
+}
+
+int gui_subpx_filter_selftest(void)
+{
+    gui_subpx_rule_t old_rules[GUI_SUBPX_RULE_MAX];
+    uint32_t old_count = g_subpx_rule_count;
+    uint32_t old_enabled = g_subpx_enabled;
+    uint32_t old_error = g_subpx_last_error;
+    char old_script[GUI_SUBPX_SCRIPT_NAME_MAX + 1u];
+    static const uint8_t script[] =
+        "SPFX 1\n"
+        "ON\n"
+        "RECT 2 3 4 5 80 100 120\n"
+        "PIXEL 9 9 150 90 100\n"
+        "END\n";
+    int ok = 1;
+    uint32_t before = 0xFF6496C8u;
+    uint32_t after;
+    uint32_t i;
+
+    for (i = 0; i < old_count && i < GUI_SUBPX_RULE_MAX; i++) old_rules[i] = g_subpx_rules[i];
+    for (i = 0; i < GUI_SUBPX_SCRIPT_NAME_MAX; i++) old_script[i] = g_subpx_script[i];
+    old_script[GUI_SUBPX_SCRIPT_NAME_MAX] = '\0';
+
+    if (gui_subpx_filter_load_data("selftest.spfx", script, sizeof(script) - 1u) != 0) ok = 0;
+    if (ok && (!g_subpx_enabled || g_subpx_rule_count != 2u)) ok = 0;
+    after = gui_apply_subpx_filter(2u, 3u, before);
+    if (ok && after != 0xFF5096F0u) ok = 0;
+    after = gui_apply_subpx_filter(0u, 0u, before);
+    if (ok && after != before) ok = 0;
+    if (ok && gui_subpx_filter_add(1u, 1u, 1u, 1u, 100u, 100u, 100u) != 0) ok = 0;
+    if (ok && g_subpx_rule_count != 3u) ok = 0;
+    if (ok && gui_subpx_filter_add(1u, 1u, 0u, 1u, 100u, 100u, 100u) == 0) ok = 0;
+
+    for (i = 0; i < old_count && i < GUI_SUBPX_RULE_MAX; i++) g_subpx_rules[i] = old_rules[i];
+    g_subpx_rule_count = old_count;
+    g_subpx_enabled = old_enabled;
+    g_subpx_last_error = old_error;
+    for (i = 0; i <= GUI_SUBPX_SCRIPT_NAME_MAX; i++) g_subpx_script[i] = old_script[i];
+    return ok ? 0 : -1;
 }
 
 int gui_render_effects_selftest(void)
@@ -1686,6 +2018,7 @@ int gui_render_effects_selftest(void)
     if (gui_resize_set_mode(GUI_RESIZE_STRETCH) != 0 || gui_resize_mode() != GUI_RESIZE_STRETCH) ok = 0;
     if (gui_resize_set_mode(7) == 0) ok = 0;
     if (gui_resize_hit_selftest() != 0) ok = 0;
+    if (gui_subpx_filter_selftest() != 0) ok = 0;
     g.aa_mode = old_aa;
     g.brightness = old_br;
     g.vblank_mode = old_vblank;

@@ -48,6 +48,7 @@ void gui_reload_sysrxe_apps(void);
 #define GUI_WALLPAPER_CHECKER 3
 #define GUI_WALLPAPER_BMP 4
 #define GUI_WALLPAPER_NAME_MAX 31u
+#define GUI_SUBPX_SCRIPT_NAME_MAX 31u
 
 typedef struct {
     uint32_t aa_mode;
@@ -60,6 +61,9 @@ typedef struct {
     uint32_t vblank_hits;
     uint32_t vblank_misses;
     uint32_t vblank_last;
+    uint32_t subpx_enabled;
+    uint32_t subpx_rules;
+    uint32_t subpx_last_error;
 } gui_render_info_t;
 
 typedef struct {
@@ -73,6 +77,14 @@ typedef struct {
     uint32_t last_error;
 } gui_wallpaper_info_t;
 
+typedef struct {
+    uint32_t enabled;
+    uint32_t rules;
+    uint32_t max_rules;
+    uint32_t last_error;
+    char script[GUI_SUBPX_SCRIPT_NAME_MAX + 1u];
+} gui_subpx_filter_info_t;
+
 int gui_render_set_aa_mode(int mode);
 int gui_render_aa_mode(void);
 int gui_render_set_brightness(int percent);
@@ -85,6 +97,14 @@ int gui_vblank_enable(int on);
 int gui_vblank_mode(void);
 void gui_render_info(gui_render_info_t* out);
 int gui_render_effects_selftest(void);
+int gui_subpx_filter_enable(int on);
+int gui_subpx_filter_clear(void);
+int gui_subpx_filter_add(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
+                         uint32_t r_percent, uint32_t g_percent, uint32_t b_percent);
+int gui_subpx_filter_load_data(const char* script_name, const uint8_t* data, uint32_t size);
+int gui_subpx_filter_load(const char* file);
+void gui_subpx_filter_info(gui_subpx_filter_info_t* out);
+int gui_subpx_filter_selftest(void);
 int gui_wallpaper_set_color(uint32_t argb);
 int gui_wallpaper_set_pattern(const char* pattern, uint32_t color1, uint32_t color2);
 int gui_wallpaper_set_bmp(const char* file);

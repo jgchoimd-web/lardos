@@ -245,6 +245,20 @@ static const uint8_t wallpaper_init[] =
 static uint8_t ram_wallpaper_buf[WALLPAPER_CAP];
 static FsWritableFile ram_wallpaper = { "wallpaper.lardd", ram_wallpaper_buf, 0, WALLPAPER_CAP };
 
+#define DISPLAYFIX_CAP 1024u
+static const uint8_t displayfix_init[] =
+    "SPFX 1\n"
+    "# User-owned subpixel display defect filter.\n"
+    "# ON applies rules; OFF keeps the script editable but inactive.\n"
+    "OFF\n"
+    "# RECT x y w h r% g% b%\n"
+    "# Example: darken red subpixels in a too-bright patch.\n"
+    "# RECT 100 40 20 12 85 100 100\n"
+    "# PIXEL x y r% g% b% fixes one physical pixel.\n"
+    "END\n";
+static uint8_t ram_displayfix_buf[DISPLAYFIX_CAP];
+static FsWritableFile ram_displayfix = { "displayfix.spfx", ram_displayfix_buf, 0, DISPLAYFIX_CAP };
+
 #define FSDELETE_CAP 2048u
 static const uint8_t fsdelete_init[] =
     "LARDD 1\n"
@@ -377,7 +391,8 @@ static const uint8_t file_lardos_lars[] =
     "li Run mode probe to enter a controlled real16 window and return to long64.\n"
     "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
-    "li Use renderfx aa none/antianti/basic/nonlinear, renderfx brightness, renderfx resize stretch/live, renderfx lsb, and renderfx vblank for user-owned display filtering.\n"
+    "li Use renderfx aa none/antianti/basic/nonlinear, renderfx brightness, renderfx resize stretch/live, renderfx lsb, renderfx vblank, and renderfx subpx for user-owned display filtering.\n"
+    "li Use renderfx subpx use displayfix.spfx to apply per-region R/G/B subpixel defect correction from an editable script.\n"
     "li Use wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, or wallpaper bmp sample.bmp to set the desktop background from user-owned state.\n"
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
@@ -480,6 +495,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.71.2a officially makes DRFL 2 .drfl files carry editable driver CODE and adds drivers show for in-OS inspection.\n"
     "li v1.72.0b lets .kmo files bind COMMAND names so new shell commands can live as module files instead of LSH branches.\n"
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
+    "li v1.93.0b adds SPFX subpixel display-defect filter scripts through renderfx subpx and writable displayfix.spfx.\n"
     "li v1.92.1a officially promotes the native WebStack method/TLS line without feature loss or value changes.\n"
     "li v1.92.1p makes HTTPS visible with webstack tls, LardTLS info, and POST/selftest TLS checks while preserving all v1.92 methods.\n"
     "li v1.92.0b expands HTTP/HTTPS to GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS without external web libraries.\n"
@@ -1382,6 +1398,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable userapp.sysrxe\n"
     "CHECK writable kmodtalk.lardd\n"
     "CHECK writable user0.kmo\n"
+    "CHECK writable displayfix.spfx\n"
     "END\n";
 
 /* bundle.lar - native LAR1 multi-file archive, method 0 = stored. */
@@ -2057,7 +2074,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 33u;
+    return 34u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2095,6 +2112,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 30) return &ram_rxrslot3;
     if (idx == 31) return &ram_fstwts;
     if (idx == 32) return &ram_wallpaper;
+    if (idx == 33) return &ram_displayfix;
     return NULL;
 }
 
@@ -2177,6 +2195,10 @@ void fs_init(void)
         ram_wallpaper_buf[i] = wallpaper_init[i];
     }
     ram_wallpaper.size = sizeof(wallpaper_init) - 1;
+    for (uint32_t i = 0; i < sizeof(displayfix_init) - 1 && i < DISPLAYFIX_CAP; i++) {
+        ram_displayfix_buf[i] = displayfix_init[i];
+    }
+    ram_displayfix.size = sizeof(displayfix_init) - 1;
     for (uint32_t i = 0; i < sizeof(fsdelete_init) - 1 && i < FSDELETE_CAP; i++) {
         ram_fsdelete_buf[i] = fsdelete_init[i];
     }

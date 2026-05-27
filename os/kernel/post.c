@@ -166,6 +166,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: glyph map writable", fs_open_writable("glyphmap.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode writable", fs_open_writable("dosmode.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: wallpaper writable", fs_open_writable("wallpaper.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: displayfix writable", fs_open_writable("displayfix.spfx") != NULL, emit, user, &pass, &fail);
     post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);
@@ -173,7 +174,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: fstwt writable", fs_open_writable("fstwt.fstwts") != NULL, emit, user, &pass, &fail);
     post_check("fs: hard delete overlay ownership", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
-    post_check("fs: writable directory index", fs_writable_count() >= 33u, emit, user, &pass, &fail);
+    post_check("fs: writable directory index", fs_writable_count() >= 34u, emit, user, &pass, &fail);
     post_check("mediafs: native device stores", mediafs_selftest() == 0, emit, user, &pass, &fail);
     post_check("mediafs: floppy drive", mediafs_drive_supported('Y'), emit, user, &pass, &fail);
     post_check("mediafs: auxiliary drive", mediafs_drive_supported('Z'), emit, user, &pass, &fail);

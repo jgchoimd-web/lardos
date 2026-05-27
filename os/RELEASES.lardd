@@ -5,6 +5,14 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.93.0b
+ITEM Adds SPFX 1, a native subpixel display-defect filter script format for user-owned screen correction.
+ITEM renderfx subpx can enable/disable, clear, manually add RECT/PIXEL rules, load displayfix.spfx, and selftest the filter path.
+ITEM Each rule applies a region or single pixel with independent R/G/B subpixel percent multipliers so too-bright or too-dark screen defects can be corrected locally.
+ITEM Adds writable displayfix.spfx so the user can edit and persist defect-correction scripts like other LardOS-owned settings.
+ITEM POST and RenderFX selftests cover the parser and channel correction while preserving AA, brightness, ScreenRAM LSB, VBlank, resize modes, wallpaper, and WebStack behavior.
+ITEM Ships as beta because this is a new display calibration surface; it adds control without removing any existing feature or changing LardOS values.
+
 SECTION v1.92.1a
 ITEM Officially promotes the v1.92 native WebStack line after the method expansion and HTTPS visibility hotpatch passed build, media, and boot checks.
 ITEM Keeps HTTP/HTTPS GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS from v1.92.0b intact.

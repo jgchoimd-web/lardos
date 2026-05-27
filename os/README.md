@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.93.0b` adds native SPFX subpixel display-defect filters. Use `renderfx
+subpx use displayfix.spfx` to load the editable script, `renderfx subpx add x y
+w h r g b` for a rectangle, or `renderfx subpx pixel x y r g b` for one pixel.
+The `r/g/b` values are per-channel percentages, so a too-bright red subpixel
+patch can be corrected without changing the rest of the screen. POST and
+RenderFX selftests cover the parser and filter path.
+
 `v1.92.1a` officially promotes the v1.92 native WebStack line. It keeps the
 seven HTTP/HTTPS methods from `v1.92.0b` and the visible HTTPS/TLS diagnostics
 from `v1.92.1p`: `webstack tls`, POST TLS coverage, and combined WebStack
@@ -364,12 +371,13 @@ commands:
   scratch RAM. Use `sram on` for the default corner, `sram rect x y w h` for a
   user-selected area, then `sram write offset text` and `sram read offset len`.
   `sram lsb on` or `renderfx lsb on` stores those bytes in rendered pixel LSBs.
-- `renderfx status|aa|brightness|resize|lsb|vblank|test` controls optional display
+- `renderfx status|aa|brightness|resize|lsb|vblank|subpx|test` controls optional display
   post-processing. `aa none` is the default, `aa antianti` sharpens away
   antialiasing, `aa basic` smooths, and `aa nonlinear` keeps sharp edges crisp
   while smoothing low-contrast areas. `resize stretch` previews corner resizing
   by stretching/squashing the current window image; `resize live` reflows during
-  the drag.
+  the drag. `subpx` loads SPFX scripts that apply per-region R/G/B channel
+  multipliers for display defect correction.
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.

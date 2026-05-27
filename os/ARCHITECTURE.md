@@ -473,7 +473,7 @@ containers, the installer boot-stage selftest, and LIL feature forms.
 system snapshot (`status`), predicted safe command execution (`magic command`),
 HDD/SSD installer preview and write controls (`install`),
 CPU mode bridge inspection (`mode`), ScreenRAM control (`sram`, `screenram`),
-visual screen diagnostics (`screencheck`),
+RenderFX display correction (`renderfx subpx` and `displayfix.spfx`), visual screen diagnostics (`screencheck`),
 OS-to-OS messaging, local bus messages, and safe remote command requests (`oslink`), task priority
 control (`task`, `prio`, `nice`), boot profile control (`bootprof`), crash
 history (`crashlog`), POST reruns (`post`, `selftest`), native document

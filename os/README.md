@@ -52,6 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v1.99.0b` adds a Deprecated raw-control namespace for LardOS Connect. Normal
+`lconnect` still defaults to visible, manual, non-input sharing, but
+`deprecated lconnect input on confirm` unlocks keyboard/mouse resource names and
+`deprecated lconnect quiet on confirm` enables promptless grant behavior for
+shared resources. These paths are hidden from normal help, require `confirm`,
+and still appear in `lconnect status`/`lconnect log` so user control does not
+become invisible control.
+
 `v1.98.0b` adds LardOS Connect, a native LAN resource-sharing control plane for
 LardOS machines connected by cable/IP. It can advertise and request
 MegaClipboard, CPU, GPU, storage, and peripheral resources while deliberately
@@ -394,6 +402,10 @@ commands:
   controls LardOS Connect, the LAN resource-sharing layer for LardOS machines.
   It shares MegaClipboard, CPU, GPU, storage, and peripheral leases only when the
   user enables them; keyboard and mouse input stay local.
+- `deprecated lconnect input on confirm`, `deprecated lconnect quiet on confirm`,
+  and `deprecated lconnect share input on confirm` expose the older/raw Connect
+  edge cases behind an explicit deprecated namespace. They are not in normal
+  help, but they are not invisible: status and logs show them.
 - `auxkernel status|report|lockdown confirm|keydrop confirm` exposes the tiny
   built-in emergency microkernel path. It works without KMO modules and uses
   visible containment instead of fan, thermal, or hardware-damaging behavior.

@@ -5,6 +5,15 @@ TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 
+SECTION v1.99.0b
+ITEM Adds a Deprecated raw-control namespace for LardOS Connect edge cases.
+ITEM Normal lconnect remains default-off, manual-grant, and non-input by default.
+ITEM deprecated lconnect input on confirm unlocks keyboard/mouse/input resource names for user-chosen sharing, request, grant, and deny packets.
+ITEM deprecated lconnect quiet on confirm enables promptless grants for resources the user already shared; it is deliberately not invisible because status and lconnect log show it.
+ITEM Adds deprecated lconnect share/request/grant/deny forms with confirm gates, plus selftest coverage that normal lconnect still rejects input names unless the deprecated path is armed.
+ITEM Keeps OSLink, LardOS Connect normal mode, MegaClipboard, LardSec, AuxKernel, MediaFS, installer, WebStack, RenderFX, FSTWT, RXR/RXE/SYSRXE, KMO, SUM, software ECC, and branch-role separation intact.
+ITEM Ships as beta because input-resource and quiet-grant controls are raw-control compatibility paths and must mature before any stable promotion.
+
 SECTION v1.98.0b
 ITEM Adds LardOS Connect, a native LAN resource-sharing control plane for LardOS computers connected by cable/IP.
 ITEM LardOS Connect can advertise and request MegaClipboard, CPU, GPU, storage, and peripheral resources while deliberately excluding keyboard and mouse input from sharing.

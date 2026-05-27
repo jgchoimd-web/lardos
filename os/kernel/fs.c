@@ -199,7 +199,7 @@ static const uint8_t userlaw_init[] =
     "ITEM crash command -> user-owned diagnostic fault triggers must be explicit, visible, and logged.\n"
     "ITEM auxkernel -> emergency containment must be visible, module-independent, and must not damage hardware.\n"
     "ITEM megaclip -> keyboard-first 10-slot clipboard for moving data through the OS.\n"
-    "ITEM lconnect -> LardOS computers may share non-input resources over a visible LAN protocol, while keyboard and mouse stay local unless the user designs a separate input tool.\n"
+    "ITEM lconnect -> LardOS computers may share resources over a visible LAN protocol; input sharing and quiet grants live only behind deprecated confirm commands and must remain logged.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
@@ -302,6 +302,7 @@ static const uint8_t lconnect_init_doc[] =
     "TEXT Default is off and manual-grant so sharing is user-owned, visible, and reversible.\n"
     "TEXT Use lconnect direct IP MASK when two machines are connected without DHCP.\n"
     "TEXT Commands: lconnect on, off, direct, discover, peers, share all on, mode manual/auto, syncclip ip, request ip resource, grant ip resource, deny ip resource, log.\n"
+    "TEXT Deprecated raw-control: deprecated lconnect input on confirm and deprecated lconnect quiet on confirm can expose input or quiet grants, but status/log still show it.\n"
     "END\n";
 static uint8_t ram_lconnect_buf[LCONNECT_CAP];
 static FsWritableFile ram_lconnect = { "lconnect.lardd", ram_lconnect_buf, 0, LCONNECT_CAP };

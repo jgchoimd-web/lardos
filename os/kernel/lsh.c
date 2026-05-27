@@ -355,7 +355,7 @@ typedef struct {
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
@@ -4601,7 +4601,7 @@ static void cmd_lconnect_status(void)
     out_append(info.auto_grant ? "auto-grant" : "manual-grant");
     out_append("\nshared=");
     out_append_lconnect_resources(info.resources);
-    out_append(" (keyboard/mouse input is not shared)\npeers=");
+    out_append(info.deprecated_input ? " (deprecated input sharing armed)\npeers=" : " (keyboard/mouse input is not shared)\npeers=");
     out_append_u32(info.peer_count);
     out_append(", sent=");
     out_append_u32(info.sent);
@@ -4623,6 +4623,14 @@ static void cmd_lconnect_status(void)
     out_append_u32(info.clip_in);
     out_append(", err=");
     out_append_u32(info.last_error);
+    if (info.deprecated_input || info.deprecated_quiet || info.deprecated_events) {
+        out_append("\ndeprecated: input=");
+        out_append(info.deprecated_input ? "on" : "off");
+        out_append(", quiet-grant=");
+        out_append(info.deprecated_quiet ? "on" : "off");
+        out_append(", events=");
+        out_append_u32(info.deprecated_events);
+    }
     out_append("\n");
 }
 
@@ -4721,6 +4729,16 @@ static int lconnect_read_ip_resource(const char** args, ip4_t* ip, uint32_t* res
     if (lsh_parse_ip4_arg(args, ip) != 0) return -1;
     if (vcs_read_word(args, res_word, sizeof(res_word)) != 0) return -2;
     *resource = lconnect_resource_from_name(res_word);
+    if (*resource == 0) return -3;
+    return 0;
+}
+
+static int lconnect_deprecated_read_ip_resource(const char** args, ip4_t* ip, uint32_t* resource)
+{
+    char res_word[24];
+    if (lsh_parse_ip4_arg(args, ip) != 0) return -1;
+    if (vcs_read_word(args, res_word, sizeof(res_word)) != 0) return -2;
+    *resource = lconnect_deprecated_resource_from_name(res_word);
     if (*resource == 0) return -3;
     return 0;
 }
@@ -4836,6 +4854,123 @@ static void cmd_lconnect(const char* args)
         return;
     }
     out_append("Usage: lconnect status|on|off|direct|discover|peers|share|mode|syncclip|request|grant|deny|log|poll|test\n");
+}
+
+static int deprecated_read_confirm(const char** args)
+{
+    char word[16];
+    if (vcs_read_word(args, word, sizeof(word)) != 0) return 0;
+    return strcmp(word, "confirm") == 0 || strcmp(word, "yes") == 0 ||
+           strcmp(word, "i-own-this") == 0;
+}
+
+static void cmd_deprecated_lconnect(const char* args)
+{
+    char sub[24];
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_lconnect_status();
+        out_append("deprecated lconnect: hidden raw-control surface; actions require confirm and are logged.\n");
+        return;
+    }
+    if (strcmp(sub, "input") == 0 || strcmp(sub, "hid") == 0) {
+        char state[16];
+        int on = 0;
+        if (vcs_read_word(&args, state, sizeof(state)) != 0 ||
+            lconnect_word_onoff(state, &on) != 0 || !deprecated_read_confirm(&args)) {
+            out_append("Usage: deprecated lconnect input on|off confirm\n");
+            return;
+        }
+        if (lconnect_deprecated_set_input(on, "confirm") == 0) {
+            out_append(on ? "deprecated lconnect: keyboard/mouse resource names unlocked and logged.\n" :
+                            "deprecated lconnect: input resource sharing locked again.\n");
+        } else {
+            out_append("deprecated lconnect: input toggle failed.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "quiet") == 0 || strcmp(sub, "quietgrant") == 0 || strcmp(sub, "silent") == 0) {
+        char state[16];
+        int on = 0;
+        if (vcs_read_word(&args, state, sizeof(state)) != 0 ||
+            lconnect_word_onoff(state, &on) != 0 || !deprecated_read_confirm(&args)) {
+            out_append("Usage: deprecated lconnect quiet on|off confirm\n");
+            return;
+        }
+        if (lconnect_deprecated_set_quiet(on, "confirm") == 0) {
+            out_append(on ? "deprecated lconnect: quiet grants on; still visible in status/log.\n" :
+                            "deprecated lconnect: quiet grants off.\n");
+        } else {
+            out_append("deprecated lconnect: quiet toggle failed.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "share") == 0) {
+        char res_word[24];
+        char state[16];
+        uint32_t res;
+        int on = 0;
+        if (vcs_read_word(&args, res_word, sizeof(res_word)) != 0 ||
+            vcs_read_word(&args, state, sizeof(state)) != 0 ||
+            lconnect_word_onoff(state, &on) != 0 || !deprecated_read_confirm(&args)) {
+            out_append("Usage: deprecated lconnect share input|keyboard|mouse|everything on|off confirm\n");
+            return;
+        }
+        res = lconnect_deprecated_resource_from_name(res_word);
+        if (res == 0 || lconnect_set_share(res, on) != 0) {
+            out_append("deprecated lconnect: share failed. Run 'deprecated lconnect input on confirm' first for input resources.\n");
+            return;
+        }
+        out_append("deprecated lconnect: share ");
+        out_append_lconnect_resources(res);
+        out_append(on ? " on\n" : " off\n");
+        return;
+    }
+    if (strcmp(sub, "request") == 0 || strcmp(sub, "req") == 0 ||
+        strcmp(sub, "grant") == 0 || strcmp(sub, "deny") == 0) {
+        ip4_t ip;
+        uint32_t res;
+        int r;
+        if (lconnect_deprecated_read_ip_resource(&args, &ip, &res) != 0 ||
+            !deprecated_read_confirm(&args)) {
+            out_append("Usage: deprecated lconnect request|grant|deny ip input|keyboard|mouse|everything confirm [detail]\n");
+            return;
+        }
+        while (*args == ' ' || *args == '\t') args++;
+        if (strcmp(sub, "grant") == 0) r = lconnect_grant(ip, res, args);
+        else if (strcmp(sub, "deny") == 0) r = lconnect_deny(ip, res, args);
+        else r = lconnect_request(ip, res, args);
+        out_append(r == 0 ? "deprecated lconnect: packet sent and logged.\n" :
+                            "deprecated lconnect: send failed.\n");
+        return;
+    }
+    if (strcmp(sub, "help") == 0) {
+        out_append("Deprecated LardOS Connect commands\n");
+        out_append("  deprecated lconnect input on|off confirm\n");
+        out_append("  deprecated lconnect quiet on|off confirm\n");
+        out_append("  deprecated lconnect share input|keyboard|mouse|everything on|off confirm\n");
+        out_append("  deprecated lconnect request|grant|deny ip input|keyboard|mouse|everything confirm [detail]\n");
+        out_append("These commands are intentionally outside normal help, but not invisible: status/log/audit still show them.\n");
+        return;
+    }
+    out_append("Usage: deprecated lconnect help|status|input|quiet|share|request|grant|deny\n");
+}
+
+static void cmd_deprecated(const char* args)
+{
+    char area[24];
+    if (vcs_read_word(&args, area, sizeof(area)) != 0 || strcmp(area, "help") == 0) {
+        out_append("Deprecated raw-control namespace\n");
+        out_append("  deprecated lconnect help\n");
+        out_append("Deprecated paths are hidden from normal help, require confirm for risky toggles, and remain logged.\n");
+        return;
+    }
+    if (strcmp(area, "lconnect") == 0 || strcmp(area, "connect") == 0 ||
+        strcmp(area, "lardconnect") == 0) {
+        cmd_deprecated_lconnect(args);
+        return;
+    }
+    out_append("deprecated: unknown area. Try deprecated help.\n");
 }
 
 static void cmd_bugeye_status(void)
@@ -10772,6 +10907,7 @@ static void parse_and_run(const char* cmd, const char* args)
         cmd_magic(args);
         return;
     }
+    if (strcmp(cmd, "deprecated") == 0) { cmd_deprecated(args); return; }
     if (strcmp(cmd, "help") == 0 || (cmd[0] == '?' && cmd[1] == '\0')) { cmd_help(args); return; }
     if (strcmp(cmd, "control") == 0) { cmd_control(args); return; }
     if (strcmp(cmd, "values") == 0 || strcmp(cmd, "philosophy") == 0) { cmd_values(args); return; }

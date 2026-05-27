@@ -43,6 +43,9 @@ typedef struct {
     uint32_t leases;
     uint32_t pending;
     uint32_t last_error;
+    uint32_t deprecated_input;
+    uint32_t deprecated_quiet;
+    uint32_t deprecated_events;
     char node[LCONNECT_NODE_MAX + 1u];
     lconnect_peer_t peers[LCONNECT_PEER_MAX];
     uint32_t peer_count;
@@ -135,6 +138,11 @@ static void wr32(uint8_t* p, uint32_t v)
 static int ip_equal(ip4_t a, ip4_t b)
 {
     return a.b[0] == b.b[0] && a.b[1] == b.b[1] && a.b[2] == b.b[2] && a.b[3] == b.b[3];
+}
+
+static uint32_t allowed_resource_mask(void)
+{
+    return s_lc.deprecated_input ? LCONNECT_RES_DEPRECATED_ALL : LCONNECT_RES_ALL;
 }
 
 static ip4_t broadcast_ip(void)
@@ -326,19 +334,21 @@ static void handle_request(ip4_t src, const lconnect_packet_t* p)
     uint32_t n = p->payload_len < LCONNECT_DETAIL_MAX ? p->payload_len : LCONNECT_DETAIL_MAX;
     for (uint32_t i = 0; i < n; i++) detail[i] = (char)p->payload[i];
     detail[n] = '\0';
-    if (!s_lc.enabled || p->resource == 0 || (p->resource & LCONNECT_RES_ALL) == 0 ||
-        (s_lc.resources & p->resource) == 0) {
+    uint32_t allowed = allowed_resource_mask();
+    if (!s_lc.enabled || p->resource == 0 || (p->resource & ~allowed) != 0 ||
+        (s_lc.resources & p->resource) != p->resource) {
         (void)send_packet(src, LCON_TYPE_DENY, p->resource, (const uint8_t*)"not shared", 10u);
         s_lc.denied++;
         peer_note_grant(src, 0);
         log_event(src, p->node, "deny", p->resource, p->seq, "not shared");
         return;
     }
-    if (s_lc.auto_grant) {
+    if (s_lc.auto_grant || s_lc.deprecated_quiet) {
         (void)send_packet(src, LCON_TYPE_GRANT, p->resource, (const uint8_t*)"auto grant", 10u);
         s_lc.grants++;
         peer_note_grant(src, 1);
-        log_event(src, p->node, "grant", p->resource, p->seq, detail[0] ? detail : "auto");
+        log_event(src, p->node, s_lc.deprecated_quiet ? "quiet-grant" : "grant",
+                  p->resource, p->seq, detail[0] ? detail : "auto");
     } else {
         s_lc.pending++;
         log_event(src, p->node, "pending", p->resource, p->seq, detail[0] ? detail : "manual grant required");
@@ -446,7 +456,8 @@ int lconnect_set_auto(int on)
 
 int lconnect_set_share(uint32_t resource, int on)
 {
-    if (resource == 0 || (resource & ~LCONNECT_RES_ALL) != 0) {
+    uint32_t allowed = allowed_resource_mask();
+    if (resource == 0 || (resource & ~allowed) != 0) {
         s_lc.last_error = 7;
         return -1;
     }
@@ -471,6 +482,17 @@ uint32_t lconnect_resource_from_name(const char* name)
     return 0;
 }
 
+uint32_t lconnect_deprecated_resource_from_name(const char* name)
+{
+    uint32_t r = lconnect_resource_from_name(name);
+    if (r) return r;
+    if (streq_ci(name, "keyboard") || streq_ci(name, "keys") || streq_ci(name, "kbd")) return LCONNECT_RES_KEYBOARD;
+    if (streq_ci(name, "mouse") || streq_ci(name, "pointer")) return LCONNECT_RES_MOUSE;
+    if (streq_ci(name, "input") || streq_ci(name, "hid")) return LCONNECT_RES_INPUT;
+    if (streq_ci(name, "everything") || streq_ci(name, "all-unsafe")) return LCONNECT_RES_DEPRECATED_ALL;
+    return 0;
+}
+
 const char* lconnect_resource_name(uint32_t resource)
 {
     if (resource == LCONNECT_RES_MEGACLIP) return "megaclip";
@@ -478,7 +500,11 @@ const char* lconnect_resource_name(uint32_t resource)
     if (resource == LCONNECT_RES_GPU) return "gpu";
     if (resource == LCONNECT_RES_STORAGE) return "storage";
     if (resource == LCONNECT_RES_PERIPHERAL) return "peripheral";
+    if (resource == LCONNECT_RES_KEYBOARD) return "keyboard";
+    if (resource == LCONNECT_RES_MOUSE) return "mouse";
+    if (resource == LCONNECT_RES_INPUT) return "input";
     if (resource == LCONNECT_RES_ALL) return "all";
+    if (resource == LCONNECT_RES_DEPRECATED_ALL) return "everything";
     return "resource";
 }
 
@@ -491,7 +517,41 @@ void lconnect_resource_list(uint32_t mask, char* out, uint32_t cap)
     if (mask & LCONNECT_RES_GPU) append(out, cap, out[0] ? ",gpu" : "gpu");
     if (mask & LCONNECT_RES_STORAGE) append(out, cap, out[0] ? ",storage" : "storage");
     if (mask & LCONNECT_RES_PERIPHERAL) append(out, cap, out[0] ? ",peripheral" : "peripheral");
+    if (mask & LCONNECT_RES_KEYBOARD) append(out, cap, out[0] ? ",keyboard" : "keyboard");
+    if (mask & LCONNECT_RES_MOUSE) append(out, cap, out[0] ? ",mouse" : "mouse");
     if (!out[0]) scopy(out, cap, "none");
+}
+
+static int confirm_word(const char* confirm)
+{
+    return streq_ci(confirm, "confirm") || streq_ci(confirm, "yes") || streq_ci(confirm, "i-own-this");
+}
+
+int lconnect_deprecated_set_input(int on, const char* confirm)
+{
+    if (!confirm_word(confirm)) {
+        s_lc.last_error = 9;
+        return -1;
+    }
+    s_lc.deprecated_input = on ? 1u : 0u;
+    if (!s_lc.deprecated_input) s_lc.resources &= ~LCONNECT_RES_INPUT;
+    s_lc.deprecated_events++;
+    log_event(s_lc.cfg.ip, s_lc.node, "deprecated-input", LCONNECT_RES_INPUT,
+              ++s_lc.seq, s_lc.deprecated_input ? "on" : "off");
+    return 0;
+}
+
+int lconnect_deprecated_set_quiet(int on, const char* confirm)
+{
+    if (!confirm_word(confirm)) {
+        s_lc.last_error = 10;
+        return -1;
+    }
+    s_lc.deprecated_quiet = on ? 1u : 0u;
+    s_lc.deprecated_events++;
+    log_event(s_lc.cfg.ip, s_lc.node, "deprecated-quiet", 0,
+              ++s_lc.seq, s_lc.deprecated_quiet ? "on" : "off");
+    return 0;
 }
 
 int lconnect_discover(ip4_t dst)
@@ -534,20 +594,20 @@ static int send_text_resource(ip4_t dst, uint8_t type, uint32_t resource, const 
 
 int lconnect_request(ip4_t dst, uint32_t resource, const char* detail)
 {
-    if (resource == 0 || (resource & ~LCONNECT_RES_ALL) != 0) return -1;
+    if (resource == 0 || (resource & ~allowed_resource_mask()) != 0) return -1;
     return send_text_resource(dst, LCON_TYPE_REQUEST, resource, detail && detail[0] ? detail : "lease request");
 }
 
 int lconnect_grant(ip4_t dst, uint32_t resource, const char* detail)
 {
-    if (resource == 0 || (resource & ~LCONNECT_RES_ALL) != 0) return -1;
+    if (resource == 0 || (resource & ~allowed_resource_mask()) != 0) return -1;
     s_lc.grants++;
     return send_text_resource(dst, LCON_TYPE_GRANT, resource, detail && detail[0] ? detail : "manual grant");
 }
 
 int lconnect_deny(ip4_t dst, uint32_t resource, const char* detail)
 {
-    if (resource == 0 || (resource & ~LCONNECT_RES_ALL) != 0) return -1;
+    if (resource == 0 || (resource & ~allowed_resource_mask()) != 0) return -1;
     s_lc.denied++;
     return send_text_resource(dst, LCON_TYPE_DENY, resource, detail && detail[0] ? detail : "manual deny");
 }
@@ -595,6 +655,9 @@ void lconnect_info(lconnect_info_t* out)
     out->leases = s_lc.leases;
     out->pending = s_lc.pending;
     out->last_error = s_lc.last_error;
+    out->deprecated_input = s_lc.deprecated_input;
+    out->deprecated_quiet = s_lc.deprecated_quiet;
+    out->deprecated_events = s_lc.deprecated_events;
     out->ip = s_lc.cfg.ip;
     scopy(out->node, sizeof(out->node), s_lc.node);
 }
@@ -614,19 +677,37 @@ int lconnect_selftest(void)
         s_lc = saved;
         return -2;
     }
-    if (lconnect_set_share(LCONNECT_RES_ALL, 1) != 0 ||
-        (lconnect_share_mask() & LCONNECT_RES_ALL) != LCONNECT_RES_ALL) {
+    if (lconnect_deprecated_resource_from_name("input") != LCONNECT_RES_INPUT) {
         s_lc = saved;
         return -3;
     }
-    if (build_packet(LCON_TYPE_REQUEST, LCONNECT_RES_CPU, (const uint8_t*)"cpu", 3u, pkt, sizeof(pkt), &len) != 0) {
+    if (lconnect_set_share(LCONNECT_RES_INPUT, 1) == 0) {
         s_lc = saved;
         return -4;
+    }
+    if (lconnect_deprecated_set_input(1, "confirm") != 0 ||
+        lconnect_set_share(LCONNECT_RES_INPUT, 1) != 0 ||
+        (lconnect_share_mask() & LCONNECT_RES_INPUT) != LCONNECT_RES_INPUT) {
+        s_lc = saved;
+        return -5;
+    }
+    if (lconnect_deprecated_set_quiet(1, "confirm") != 0 || !s_lc.deprecated_quiet) {
+        s_lc = saved;
+        return -6;
+    }
+    if (lconnect_set_share(LCONNECT_RES_ALL, 1) != 0 ||
+        (lconnect_share_mask() & LCONNECT_RES_ALL) != LCONNECT_RES_ALL) {
+        s_lc = saved;
+        return -7;
+    }
+    if (build_packet(LCON_TYPE_REQUEST, LCONNECT_RES_CPU, (const uint8_t*)"cpu", 3u, pkt, sizeof(pkt), &len) != 0) {
+        s_lc = saved;
+        return -8;
     }
     if (parse_packet(pkt, len, &parsed) != 0 || parsed.type != LCON_TYPE_REQUEST ||
         parsed.resource != LCONNECT_RES_CPU || !streq_ci(parsed.node, "self")) {
         s_lc = saved;
-        return -5;
+        return -9;
     }
     s_lc = saved;
     return 0;

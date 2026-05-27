@@ -14,7 +14,11 @@
 #define LCONNECT_RES_GPU        0x00000004u
 #define LCONNECT_RES_STORAGE    0x00000008u
 #define LCONNECT_RES_PERIPHERAL 0x00000010u
+#define LCONNECT_RES_KEYBOARD   0x00000020u
+#define LCONNECT_RES_MOUSE      0x00000040u
+#define LCONNECT_RES_INPUT      (LCONNECT_RES_KEYBOARD | LCONNECT_RES_MOUSE)
 #define LCONNECT_RES_ALL        (LCONNECT_RES_MEGACLIP | LCONNECT_RES_CPU | LCONNECT_RES_GPU | LCONNECT_RES_STORAGE | LCONNECT_RES_PERIPHERAL)
+#define LCONNECT_RES_DEPRECATED_ALL (LCONNECT_RES_ALL | LCONNECT_RES_INPUT)
 
 typedef struct {
     ip4_t ip;
@@ -51,6 +55,9 @@ typedef struct {
     uint32_t leases;
     uint32_t pending;
     uint32_t last_error;
+    uint32_t deprecated_input;
+    uint32_t deprecated_quiet;
+    uint32_t deprecated_events;
     ip4_t ip;
     char node[LCONNECT_NODE_MAX + 1u];
 } lconnect_info_t;
@@ -64,8 +71,11 @@ int lconnect_set_auto(int on);
 int lconnect_set_share(uint32_t resource, int on);
 uint32_t lconnect_share_mask(void);
 uint32_t lconnect_resource_from_name(const char* name);
+uint32_t lconnect_deprecated_resource_from_name(const char* name);
 const char* lconnect_resource_name(uint32_t resource);
 void lconnect_resource_list(uint32_t mask, char* out, uint32_t cap);
+int lconnect_deprecated_set_input(int on, const char* confirm);
+int lconnect_deprecated_set_quiet(int on, const char* confirm);
 int lconnect_discover(ip4_t dst);
 int lconnect_send_clip(ip4_t dst);
 int lconnect_request(ip4_t dst, uint32_t resource, const char* detail);

@@ -243,6 +243,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Media device stores | `os/kernel/mediafs.c`, `os/include/mediafs.h` |
 | Shrine subsystem | `os/kernel/lss.c`, `os/include/lss.h` |
 | Screen diagnostics | `os/kernel/screencheck.c`, `os/include/screencheck.h` |
+| Screen capture | `os/kernel/screencap.c`, `os/include/screencap.h` |
 | LardOS GUI library format | `os/kernel/lguilib.c`, `os/include/lguilib.h` |
 | GUI overlay chrome | `os/kernel/guioverlay.c`, `os/include/guioverlay.h` |
 | VM monitor | `os/kernel/vmmon.c`, `os/include/vmmon.h` |
@@ -316,6 +317,13 @@ diagnostic module. `screencheck status` reports changed samples, tile counts,
 window bounds, and response-view health; `screencheck retro` draws a full-screen
 old boot/storage-style scan so visual glitches can be caught by looking at tile
 tracks, edges, and dot-lane visibility.
+
+`screencap.c` owns user-requested screenshots and short screen recordings. The
+GUI exposes the final visible framebuffer through a small capture API after
+cursor/backbuffer rendering, so `screenshot` writes native `LSHOT` RGB565 files
+and `screenrec` writes native `LREC` luma-frame files without host capture,
+cloud upload, or external codecs. `screencap.lardd` keeps the readable status
+trail.
 
 `v1.57.0b` removes the old opt-in EXGUI and EXEXGUI renderer layers. `v1.58.0a`
 promotes the default GUI path into a desktop shell with a persistent wallpaper,

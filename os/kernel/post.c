@@ -39,6 +39,7 @@
 #include "pci.h"
 #include "rxe.h"
 #include "rxr.h"
+#include "screencap.h"
 #include "screencheck.h"
 #include "string.h"
 #include "syscall.h"
@@ -178,6 +179,9 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
                fs_open_writable("office_sheet.lsheet") != NULL &&
                fs_open_writable("office_deck.lshow") != NULL, emit, user, &pass, &fail);
     post_check("fs: auxkernel report writable", fs_open_writable("auxkernel.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: screen capture writable", fs_open_writable("screen.lshot") != NULL &&
+               fs_open_writable("screenrec.lrec") != NULL &&
+               fs_open_writable("screencap.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);
@@ -238,6 +242,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("gui: render modes", gui_render_effects_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: user wallpaper", gui_wallpaper_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: retro screencheck", screencheck_selftest() == 0, emit, user, &pass, &fail);
+    post_check("gui: screen capture", screencap_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: clickable image glyphs", gui_img_glyph_interaction_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: unicode cursor slot", gui_unicode_cursor_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: desktop interactions", gui_desktop_interaction_selftest() == 0, emit, user, &pass, &fail);

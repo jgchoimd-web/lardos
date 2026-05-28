@@ -33,6 +33,8 @@
 - `gasm file.gasm` - run an in-tree GASM source file from LSH.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
+- `screenshot [file.lshot] [w h]` / `shot ...` / `screencap status|report|test` - capture the visible GUI into a native local `LSHOT` file and keep `screencap.lardd` updated. Defaults: `screen.lshot`, 96x54 RGB565.
+- `screenrec status|start [frames] [w h] [file.lrec]|frame|stop|report|test` - record a short visible-screen sequence into a native local `LREC` luma-frame file. Defaults: `screenrec.lrec`, 8 frames, 64x36.
 - GUI polish was beta-tracked in `v1.36.0b` and promoted in official `v1.40.0a` with the glyph and rough-edge repair track; `v1.58.0a` makes the default GUI a desktop with app icons, a dock, and hideable app windows, `v1.58.1p` hotpatches settings-panel clicks, full-desktop window movement, and fullscreen/restore, `v1.59.0b` adds runtime desktop/dock items, folders, per-app windows, and z-order, `v1.59.0a` promotes that model officially, `v1.60.0a` adds official L-DOS mode, `v1.60.1p` adds `DEL -F` read-only tombstones plus restore, `v1.61.0a` adds user-owned tombstone record deletion, `v1.62.0a` makes `DEL -F` hard-delete from the active read-only filesystem view, `v1.63.0a` adds the official in-OS HDD/SSD installer option, and `v1.63.1p` fixes the VirtualBox black-screen boot memory layout.
 - `glyph demo|list|load|auto|show|move|copy|rename|pixel|clear|live|click|insert|write` - bind BMP pictures to private-use Unicode slots U+E000..U+E0FF, edit assigned slots, render them inline, click them in the GUI, and toggle realtime hover/click rendering.
 - `cursor status|set U+E000|off` - bind the GUI mouse cursor to a user-owned picture Unicode slot.
@@ -108,6 +110,7 @@
 - `paniccapsule show` builds a compact LARDD recovery bundle from panic room, crashlog, BugEye, replay, trust, priority, LFSDoctor, and BootMap state
 - On runtime-ready `panic` or `panic_u64`, PanicRoom first draws the real16 default texture, auto-writes the capsule, and offers crashlog view, capsule rebuild, rollback apply, queued-task drop, and halt keys
 - `lfsdoctor repair` runs the native LPST repair path and rewrites `lfsdoctor.lardd`
+- `screenshot` and `screenrec` store local native capture files (`screen.lshot`, `screenrec.lrec`) plus `screencap.lardd`; they do not use host capture, cloud upload, or external codecs
 
 ## Settings Shell
 

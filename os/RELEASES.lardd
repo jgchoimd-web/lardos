@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.0.7b-mirage
+ITEM Adds user-owned screen capture: screenshot writes compact LSHOT RGB565 snapshots to screen.lshot or a chosen writable file.
+ITEM Adds screen recording: screenrec start/frame/stop writes compact LREC luma frames to screenrec.lrec without external video libraries.
+ITEM Adds screencap.lardd status/report output, help/docs entries, POST writable-file checks, and a GUI capture selftest.
+ITEM The GUI exposes a small capture API after final cursor/backbuffer rendering, so captures reflect the visible screen rather than a hand-built fake view.
+ITEM Keeps capture files local, inspectable, overwriteable, and user-owned; no hidden upload, no host bridge, and no third-party codec dependency.
+ITEM Preserves Mirage codename policy, AuxKernel REAL16, seed/default ownership, RXE/SYSRXE apps, KMO, LiveUpdate, MediaFS, GUI, LardOS Connect, and user-control values without feature loss.
+ITEM Ships as beta because screen recording is a new GUI/file-system surface and should mature before promotion.
+
 SECTION v2.0.6b-mirage
 ITEM Retires the LardOS LTS release model; Tiara support is ended and there is no active LTS line.
 ITEM Changes Tiara/Mirage style names into OS-era subnames instead of long-term-support promises.

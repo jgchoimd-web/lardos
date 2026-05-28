@@ -25,6 +25,7 @@
 #include "sysrxe.h"
 #include "rxe.h"
 #include "io.h"
+#include "screencap.h"
 #include "string.h"
 
 #define LARSH_VIEW_W 160
@@ -6050,6 +6051,7 @@ void gui_render(void)
         screenram_flush_to_target(tgt);
         gui_vblank_mark_frame();
         if (g_have_bb) fb_blit(&g_fb, &g_bb);
+        screencap_after_render();
         g_syscall_target_override = 0;
         return;
     }
@@ -6066,6 +6068,7 @@ void gui_render(void)
         gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
         gui_vblank_mark_frame();
         if (g_have_bb) fb_blit(&g_fb, &g_bb);
+        screencap_after_render();
         g_syscall_target_override = 0;
         return;
     }
@@ -6490,6 +6493,7 @@ void gui_render(void)
     if (g_have_bb) {
         fb_blit(&g_fb, &g_bb);
     }
+    screencap_after_render();
     g_syscall_target_override = 0;
 }
 
@@ -6538,4 +6542,18 @@ uint16_t gui_syscall_get_width(void)
 uint16_t gui_syscall_get_height(void)
 {
     return g_have_fb ? g_fb.h : 0;
+}
+
+int gui_capture_frame_info(uint32_t* width, uint32_t* height)
+{
+    if (!g_have_fb) return -1;
+    if (width) *width = g_fb.w;
+    if (height) *height = g_fb.h;
+    return 0;
+}
+
+uint32_t gui_capture_get_pixel(uint32_t x, uint32_t y)
+{
+    if (!g_have_fb || x >= g_fb.w || y >= g_fb.h) return 0xFF000000u;
+    return fb_getpixel(&g_fb, (uint16_t)x, (uint16_t)y);
 }

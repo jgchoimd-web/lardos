@@ -56,6 +56,7 @@
 #include "io.h"
 #include "pci.h"
 #include "syscall.h"
+#include "screencap.h"
 #include "string.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -2846,7 +2847,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay screenshot screenrec rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -2871,6 +2872,7 @@ static void cmd_help(const char* args)
     out_append("  buddy on|off|joke|next|mood     optional easygoing helper overlay\n");
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
     out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
+    out_append("  screenshot [file] [w h], screenrec start|frame|stop  user-owned screen capture\n");
     out_append("  rollback snap|last|apply        save/restore user-visible settings\n");
     out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
     out_append("  post baseline, bootreplay show, bootmap, oldcheck, devmap boot/POST/device views\n");
@@ -4208,6 +4210,161 @@ static void cmd_screencheck(const char* args)
         return;
     }
     out_append("Usage: screencheck status|retro|test\n");
+}
+
+static void screencap_out_status(void)
+{
+    screencap_info_t info;
+    screencap_info(&info);
+    out_append("ScreenCap framebuffer=");
+    out_append_u32(info.fb_width);
+    out_append("x");
+    out_append_u32(info.fb_height);
+    out_append(" last=");
+    out_append(info.last_file[0] ? info.last_file : "(none)");
+    out_append("\n  screenshots=");
+    out_append_u32(info.shot_count);
+    out_append(" last_shot=");
+    out_append_u32(info.last_shot_width);
+    out_append("x");
+    out_append_u32(info.last_shot_height);
+    out_append(" bytes=");
+    out_append_u32(info.last_shot_bytes);
+    out_append("\n  recording=");
+    out_append(info.rec_active ? "on" : "off");
+    out_append(" frames=");
+    out_append_u32(info.rec_frames);
+    out_append("/");
+    out_append_u32(info.rec_max_frames);
+    out_append(" size=");
+    out_append_u32(info.rec_width);
+    out_append("x");
+    out_append_u32(info.rec_height);
+    out_append(" bytes=");
+    out_append_u32(info.rec_bytes);
+    out_append(" err=");
+    out_append_i32(info.last_error);
+    out_append("\n");
+}
+
+static int screen_is_number_word(const char* s)
+{
+    uint32_t i = 0;
+    if (!s || !s[0]) return 0;
+    while (s[i]) {
+        if (s[i] < '0' || s[i] > '9') return 0;
+        i++;
+    }
+    return 1;
+}
+
+static void cmd_screenshot(const char* args)
+{
+    char word[48];
+    char file[32];
+    uint32_t w = 0;
+    uint32_t h = 0;
+    int r;
+    if (!args) args = "";
+    if (vcs_read_word(&args, word, sizeof(word)) == 0) {
+        if (strcmp(word, "status") == 0 || strcmp(word, "info") == 0) {
+            screencap_out_status();
+            return;
+        }
+        if (strcmp(word, "report") == 0) {
+            r = screencap_report();
+            out_append(r == 0 ? "screencap: screencap.lardd written\n" : "screencap: report failed\n");
+            return;
+        }
+        if (strcmp(word, "test") == 0 || strcmp(word, "selftest") == 0) {
+            out_append(screencap_selftest() == 0 ? "screencap: selftest OK\n" : "screencap: selftest failed\n");
+            return;
+        }
+        if (screen_is_number_word(word)) {
+            const char* p = word;
+            (void)vcs_parse_u32(&p, &w);
+            (void)vcs_parse_u32(&args, &h);
+            file[0] = '\0';
+        } else {
+            uint32_t n = 0;
+            while (word[n] && n + 1u < sizeof(file)) { file[n] = word[n]; n++; }
+            file[n] = '\0';
+            (void)vcs_parse_u32(&args, &w);
+            (void)vcs_parse_u32(&args, &h);
+        }
+    } else {
+        file[0] = '\0';
+    }
+    r = screencap_screenshot(file[0] ? file : SCREENCAP_SHOT_DEFAULT, w, h);
+    if (r == 0) {
+        out_append("screenshot: wrote ");
+        out_append(file[0] ? file : SCREENCAP_SHOT_DEFAULT);
+        out_append(" (LSHOT RGB565 downsample)\n");
+        screencap_out_status();
+    } else {
+        out_append("screenshot: failed ");
+        out_append_i32(r);
+        out_append("\nUsage: screenshot [file.lshot] [w h]\n");
+    }
+}
+
+static void cmd_screenrec(const char* args)
+{
+    char sub[32];
+    uint32_t frames = 0;
+    uint32_t w = 0;
+    uint32_t h = 0;
+    char file[32];
+    int r;
+    file[0] = '\0';
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        screencap_out_status();
+        return;
+    }
+    if (strcmp(sub, "start") == 0 || strcmp(sub, "on") == 0 || strcmp(sub, "record") == 0) {
+        (void)vcs_parse_u32(&args, &frames);
+        (void)vcs_parse_u32(&args, &w);
+        (void)vcs_parse_u32(&args, &h);
+        (void)vcs_read_word(&args, file, sizeof(file));
+        r = screencap_record_start(file[0] ? file : SCREENCAP_REC_DEFAULT, frames, w, h);
+        if (r == 0) {
+            out_append("screenrec: recording to ");
+            out_append(file[0] ? file : SCREENCAP_REC_DEFAULT);
+            out_append("\n");
+            screencap_out_status();
+        } else {
+            out_append("screenrec: start failed ");
+            out_append_i32(r);
+            out_append("\nUsage: screenrec start [frames] [w h] [file.lrec]\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "frame") == 0 || strcmp(sub, "step") == 0) {
+        r = screencap_record_frame();
+        out_append(r >= 0 ? "screenrec: frame captured" : "screenrec: frame failed ");
+        if (r < 0) out_append_i32(r);
+        out_append("\n");
+        screencap_out_status();
+        return;
+    }
+    if (strcmp(sub, "stop") == 0 || strcmp(sub, "off") == 0 || strcmp(sub, "save") == 0) {
+        (void)screencap_record_stop();
+        out_append("screenrec: stopped and header updated\n");
+        screencap_out_status();
+        return;
+    }
+    if (strcmp(sub, "report") == 0) {
+        r = screencap_report();
+        out_append(r == 0 ? "screencap: screencap.lardd written\n" : "screencap: report failed\n");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(screencap_selftest() == 0 ? "screenrec: selftest OK\n" : "screenrec: selftest failed\n");
+        return;
+    }
+    out_append("Usage: screenrec status|start [frames] [w h] [file.lrec]|frame|stop|report|test\n");
 }
 
 static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
@@ -11720,6 +11877,10 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "trust") == 0) { cmd_trust(args); return; }
     if (strcmp(cmd, "bugeye") == 0) { cmd_bugeye(args); return; }
     if (strcmp(cmd, "bugreplay") == 0) { cmd_bugreplay(args); return; }
+    if (strcmp(cmd, "screenshot") == 0 || strcmp(cmd, "shot") == 0 ||
+        strcmp(cmd, "screencap") == 0) { cmd_screenshot(args); return; }
+    if (strcmp(cmd, "screenrec") == 0 || strcmp(cmd, "screenrecord") == 0 ||
+        strcmp(cmd, "recordscreen") == 0) { cmd_screenrec(args); return; }
     if (strcmp(cmd, "oldcheck") == 0) { cmd_oldcheck(args); return; }
     if (strcmp(cmd, "lfsdoctor") == 0) { cmd_lfsdoctor(args); return; }
     if (strcmp(cmd, "cfgprof") == 0) { cmd_cfgprof(args); return; }

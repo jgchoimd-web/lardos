@@ -188,3 +188,7 @@ void gui_syscall_draw_text(uint16_t x, uint16_t y, const char* s, uint32_t fg, u
 void gui_syscall_clear(uint32_t argb);
 uint16_t gui_syscall_get_width(void);
 uint16_t gui_syscall_get_height(void);
+
+/* User-owned capture path for screenshots and screen recordings. */
+int gui_capture_frame_info(uint32_t* width, uint32_t* height);
+uint32_t gui_capture_get_pixel(uint32_t x, uint32_t y);

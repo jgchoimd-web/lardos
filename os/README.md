@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.0.7b-mirage` adds user-owned screen capture. `screenshot [file.lshot] [w h]`
+writes a compact `LSHOT` RGB565 snapshot of the visible GUI, and
+`screenrec start [frames] [w h] [file.lrec]`, `screenrec frame`, and
+`screenrec stop` write a compact `LREC` luma-frame recording. The default files
+are `screen.lshot`, `screenrec.lrec`, and `screencap.lardd`. Capture stays local
+and native: no host bridge, no hidden upload, and no external video codec.
+
 `v2.0.6b-mirage` retires LardOS LTS releases and changes Tiara/Mirage style
 names into OS-era subnames. The current subname is Mirage. `release codename`
 shows the active subname, while the old `release lts` command remains as a
@@ -934,6 +941,9 @@ commands:
 - `release` renders the current release log from `releases.lardd`; `release
   codename` shows the current OS-era subname. `release lts` remains as a
   compatibility command that says LTS support is retired and Tiara has ended.
+- `screenshot [file.lshot] [w h]` captures the current visible screen to a
+  local LSHOT file; `screenrec start|frame|stop|status` records a short LREC
+  frame sequence.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
   assertion checks, stepped loops, repeat loops, and integer math helpers.

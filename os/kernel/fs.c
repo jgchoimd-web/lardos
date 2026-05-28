@@ -200,6 +200,7 @@ static const uint8_t userlaw_init[] =
     "ITEM crash command -> user-owned diagnostic fault triggers must be explicit, visible, and logged.\n"
     "ITEM auxkernel -> emergency containment must be visible, module-independent, and must not damage hardware.\n"
     "ITEM megaclip -> keyboard-first 10-slot clipboard for moving data through the OS.\n"
+    "ITEM screencap -> screenshots and recordings are native, local, inspectable user files, never hidden uploads.\n"
     "ITEM lconnect -> LardOS computers may share resources over a visible LAN protocol; input sharing and quiet grants live only behind deprecated confirm commands and must remain logged.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
@@ -351,6 +352,24 @@ static const uint8_t auxkernel_init[] =
     "END\n";
 static uint8_t ram_auxkernel_buf[AUXKERNEL_CAP];
 static FsWritableFile ram_auxkernel = { "auxkernel.lardd", ram_auxkernel_buf, 0, AUXKERNEL_CAP };
+
+#define SCREENSHOT_CAP 16384u
+static uint8_t ram_screenshot_buf[SCREENSHOT_CAP];
+static FsWritableFile ram_screenshot = { "screen.lshot", ram_screenshot_buf, 0, SCREENSHOT_CAP };
+
+#define SCREENREC_CAP 24576u
+static uint8_t ram_screenrec_buf[SCREENREC_CAP];
+static FsWritableFile ram_screenrec = { "screenrec.lrec", ram_screenrec_buf, 0, SCREENREC_CAP };
+
+#define SCREENCAP_CAP 2048u
+static const uint8_t screencap_init[] =
+    "LARDD 1\n"
+    "TITLE Screen Capture\n"
+    "TEXT No screenshot or screen recording has been captured yet.\n"
+    "TEXT Use screenshot, screenrec start, screenrec frame, screenrec stop, or screencap status.\n"
+    "END\n";
+static uint8_t ram_screencap_buf[SCREENCAP_CAP];
+static FsWritableFile ram_screencap = { "screencap.lardd", ram_screencap_buf, 0, SCREENCAP_CAP };
 
 #define FSDELETE_CAP 2048u
 static const uint8_t fsdelete_init[] =
@@ -529,6 +548,8 @@ static const uint8_t file_lardos_lars[] =
     "li Use rxe show langdemo.rxe and rxe run 1 7 after rxe reload to try app-side C/LardOS language code.\n"
     "li Use kmod history to read kmodtalk.lardd after direct kernel-module messages.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
+    "li Use screenshot [file.lshot] [w h] to capture the visible GUI to a native local LSHOT file.\n"
+    "li Use screenrec start [frames] [w h] [file.lrec], screenrec frame, and screenrec stop to make a compact native LREC screen recording.\n"
     "li Use bugeye scan to catch visible framebuffer/layout bugs and write bugreport.lardd.\n"
     "li Use bugreplay show to review the last BugEye screen-health frames.\n"
     "li Use bugreplay draw to draw the replay frames as a GUI panel.\n"
@@ -697,6 +718,10 @@ static const uint8_t file_lardos_lars[] =
     "cmd rxr list sample.rxr\n"
     "cmd rxr path rxr/rxr_data.txt\n"
     "cmd screencheck retro\n"
+    "cmd screenshot\n"
+    "cmd screencap status\n"
+    "cmd screenrec start 4\n"
+    "cmd screenrec stop\n"
     "cmd bugeye scan\n"
     "cmd bugreplay show\n"
     "cmd bugreplay draw\n"
@@ -2192,7 +2217,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 41u;
+    return 44u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2238,6 +2263,9 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 38) return &ram_office_sheet;
     if (idx == 39) return &ram_office_deck;
     if (idx == 40) return &ram_auxkernel;
+    if (idx == 41) return &ram_screenshot;
+    if (idx == 42) return &ram_screenrec;
+    if (idx == 43) return &ram_screencap;
     return NULL;
 }
 
@@ -2352,6 +2380,12 @@ void fs_init(void)
         ram_auxkernel_buf[i] = auxkernel_init[i];
     }
     ram_auxkernel.size = sizeof(auxkernel_init) - 1;
+    ram_screenshot.size = 0;
+    ram_screenrec.size = 0;
+    for (uint32_t i = 0; i < sizeof(screencap_init) - 1 && i < SCREENCAP_CAP; i++) {
+        ram_screencap_buf[i] = screencap_init[i];
+    }
+    ram_screencap.size = sizeof(screencap_init) - 1;
     for (uint32_t i = 0; i < sizeof(fsdelete_init) - 1 && i < FSDELETE_CAP; i++) {
         ram_fsdelete_buf[i] = fsdelete_init[i];
     }

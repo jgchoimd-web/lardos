@@ -459,33 +459,6 @@ static void make_id_from_name(const char* name, char* out, uint32_t cap)
     if (!out[0]) scopy(out, cap, "user-kmo");
 }
 
-typedef struct {
-    char name[32];
-} kmo_slot_search_t;
-
-static void free_slot_cb(const char* name, uint32_t size, void* user)
-{
-    kmo_slot_search_t* ctx = (kmo_slot_search_t*)user;
-    FsWritableFile* w;
-    kmo_module_t tmp;
-    if (!ctx || ctx->name[0] || !has_suffix_ci(name, ".kmo")) return;
-    w = fs_open_writable(name);
-    if (!w) return;
-    if (size == 0 || parse_kmo(&tmp, name, (const char*)w->data, w->size) != 0) {
-        scopy(ctx->name, sizeof(ctx->name), name);
-    }
-}
-
-static int find_free_slot(char* out, uint32_t cap)
-{
-    kmo_slot_search_t ctx;
-    ctx.name[0] = '\0';
-    fs_list_writable(free_slot_cb, &ctx);
-    if (!ctx.name[0]) return -1;
-    scopy(out, cap, ctx.name);
-    return 0;
-}
-
 static void write_text_lines(char* out, uint32_t cap, const char* key, const char* text)
 {
     uint32_t i = 0;
@@ -540,28 +513,21 @@ static int write_kmo_file(FsWritableFile* w, const kmo_module_t* m)
 static FsWritableFile* prepare_writable_kmo(const char* name, const FsFile* source)
 {
     FsWritableFile* w = fs_open_writable(name);
-    char slot[32];
     if (w) return w;
-    if (!source || !fs_open_readonly(name)) return NULL;
-    if (find_free_slot(slot, sizeof(slot)) != 0) return NULL;
-    if (fs_delete_readonly(name) != 0) return NULL;
-    if (fs_rename_writable(slot, name) != 0) return NULL;
-    return fs_open_writable(name);
+    if (!source) return NULL;
+    return fs_open_or_create_writable(name);
 }
 
 int kmo_create(const char* name, const char* target, const char* default_msg)
 {
     char file[32];
-    char slot[32];
     FsWritableFile* w;
     kmo_module_t m;
     if (normalize_kmo_name(name, file, sizeof(file)) != 0) return -1;
     w = fs_open_writable(file);
-    if ((w && w->size != 0) || fs_open_readonly(file)) return -2;
+    if (w && w->size != 0) return -2;
     if (!w) {
-        if (find_free_slot(slot, sizeof(slot)) != 0) return -3;
-        if (fs_rename_writable(slot, file) != 0) return -4;
-        w = fs_open_writable(file);
+        w = fs_open_or_create_writable(file);
     }
     if (!w) return -5;
     defaults_for(&m, file);
@@ -582,17 +548,14 @@ int kmo_create(const char* name, const char* target, const char* default_msg)
 int kmo_create_command(const char* name, const char* command, const char* target, const char* default_msg)
 {
     char file[32];
-    char slot[32];
     FsWritableFile* w;
     kmo_module_t m;
     if (!valid_command_name(command)) return -1;
     if (normalize_kmo_name(name, file, sizeof(file)) != 0) return -2;
     w = fs_open_writable(file);
-    if ((w && w->size != 0) || fs_open_readonly(file)) return -3;
+    if (w && w->size != 0) return -3;
     if (!w) {
-        if (find_free_slot(slot, sizeof(slot)) != 0) return -4;
-        if (fs_rename_writable(slot, file) != 0) return -5;
-        w = fs_open_writable(file);
+        w = fs_open_or_create_writable(file);
     }
     if (!w) return -6;
     defaults_for(&m, file);
@@ -668,7 +631,7 @@ int kmo_delete(const char* name)
         int r = fs_delete_readonly(file);
         (void)kmo_reload();
         lardkit_trace_event("kmo", "delete-ro", r);
-        lardkit_journal_event("kmo", "deleted read-only KMO");
+        lardkit_journal_event("kmo", "deleted seed/default KMO");
         return r == 0 ? 0 : -2;
     }
     return -3;

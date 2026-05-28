@@ -52,10 +52,18 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.0.3b` removes the last true read-only behavior from built-in files. Default
+files are now seed/default files: the kernel opens user-owned writable overlays
+first, creates overlays for seed names through `write`, `append`, `copy`, GUI
+saves, LiveUpdate, and KMO editing, and hides duplicate seed names in directory
+listings. `DEL -F`, `TOMB`, `RESTORE`, and `BLEED` remain visible user-owned
+delete records, but the language now matches the model: no immutable file is
+above the user.
+
 `v2.0.2b` moves bundled app source out of `kernel/fs.c` and into
 `apps/bundled/`. The build now converts `hello.sysrxe`, `demo_game.rxe`,
 `langdemo.rxe`, `lardwrite.rxe`, `lardsheet.rxe`, and `lardshow.rxe` into
-generated payload includes, while `fs.c` only registers the read-only files.
+generated payload includes, while `fs.c` only registers the seed/default files.
 This keeps default app code in a dedicated, editable app space instead of
 mixing it with filesystem registration code.
 
@@ -219,7 +227,7 @@ bumps no longer require editing the build file and the kernel header separately.
 `v1.87.0b` adds LiveUpdate for runtime file/code changes. `liveupdate file`
 replaces a user-owned file immediately, while `liveupdate apply` / `code`
 reloads matching `.kmo`, `.rxe`, `.sysrxe`, `.drfl`, `.fstwts`, `.ltheme`,
-`.lguilib`, or wallpaper state without rebooting. Built-in read-only targets become
+`.lguilib`, or wallpaper state without rebooting. Built-in seed/default targets become
 user-owned overlays, so the user can update OS-owned files while the original
 path remains recoverable.
 
@@ -251,7 +259,7 @@ outside the file slot.
 
 `v1.83.0b` adds `bleed`, a last-resort visible delete sweep for broken files.
 `bleed dryrun file` previews the routes, and `bleed file` tries writable RAM,
-read-only hard-delete overlay records, and media stores. Magic treats it as raw
+seed/default hard-delete overlay records, and media stores. Magic treats it as raw
 control, so automated prediction needs `magic -f`.
 
 `v1.82.0b` extends FSTWT into a filesystem coexistence layer. `.fstwts` can now
@@ -319,7 +327,7 @@ stores. Quoted path words let users write names with spaces such as
 RXR.
 
 `v1.75.1b` makes RXR paths OS-centered. `rxr/name` is resolved by the kernel
-filesystem layer before read-only open, writable open, create, capacity, and
+filesystem layer before seed/default open, writable open, create, capacity, and
 rename operations, so apps and shell commands use an OS namespace rather than a
 private app-runtime rewrite.
 
@@ -454,13 +462,13 @@ commands:
   compatibility shell. It uses an `L-DOS C:\>` prompt, case-insensitive
   commands, visible `_:`/`C:`/`A:`/`Z:`/`U:`/`R:` mapping to LardOS drives, and logs
   state in `dosmode.lardd`.
-- `DEL -F file` in L-DOS hard-deletes a read-only built-in/LFS file from the
+- `DEL -F file` in L-DOS removes a seed/default built-in/LFS file from the
   active filesystem view through a user-owned `fsdelete.lardd` DELETE record.
   `RESTORE file` / `UNDELETE file` only restores soft `TOMB HIDE` records.
 - `tomb list|show|hide file|drop file|clear` and `DEL -T file` let the user
   inspect, soft-hide, delete, or clear the hard-delete records too.
 - `bleed dryrun file` previews every last-resort deletion route. `bleed file`
-  then tries writable RAM, read-only DELETE records, and media store removal for
+  then tries writable RAM, seed/default DELETE records, and media store removal for
   broken files, reporting each route instead of hiding the danger.
 - `bleed overflow file` first fills writable RAM/media file slots to capacity
   with destructive patterns, then deletes them. It is an explicit dangerous path,
@@ -518,7 +526,7 @@ commands:
   ISO volume IDs, and kernel `LARDOS_VERSION` now use generated build plumbing
   from that one file instead of repeating the version string.
 - `v1.87.0b` adds LiveUpdate runtime file/code apply. It can replace or append
-  user-owned files, overlay read-only built-ins, reload KMO/RXE/SYSRXE/driver/
+  user-owned files, overlay seed/default built-ins, reload KMO/RXE/SYSRXE/driver/
   FSTWT/theme state, and expose future auto-update policy through
   `liveupdate auto on|off`.
 - `v1.86.0b` adds bootmeta growth readiness: stage2 exposes kernel size,
@@ -624,11 +632,11 @@ commands:
 - `v1.63.0a` officially adds the in-OS HDD/SSD installer option with power-on
   `I`, `install status`, `install hdd yes`, and `install ssd yes`.
 - `v1.62.0a` officially makes `DEL -F file` a hard delete from the active
-  read-only filesystem view, while `TOMB HIDE file` keeps the old reversible
+  seed/default filesystem view, while `TOMB HIDE file` keeps the old reversible
   soft tombstone path available.
 - `v1.61.0a` officially adds user-owned tombstone deletion with `TOMB LIST`,
   `TOMB SHOW`, `TOMB DROP file`, `TOMB CLEAR`, and `DEL -T file`.
-- `v1.60.1p` hotpatches L-DOS so `DEL -F file` can force-hide read-only
+- `v1.60.1p` hotpatches L-DOS so `DEL -F file` can force-hide seed/default
   built-in/LFS files through `fsdelete.lardd`, while `RESTORE`/`UNDELETE`
   keeps that power reversible.
 - `v1.60.0a` officially adds L-DOS mode without external DOS code: `DIR`,
@@ -763,7 +771,7 @@ commands:
   `fsdelete.lardd`, `DEL -F`, `RESTORE`, `UNDELETE`, POST, and LUNIT checks.
 - `v1.61.0a` adds tombstone record ownership with `TOMB LIST`, `TOMB SHOW`,
   `TOMB DROP`, `TOMB CLEAR`, `DEL -T`, POST, and LUNIT checks.
-- `v1.62.0a` changes `DEL -F` to hard-delete read-only files from the active
+- `v1.62.0a` changes `DEL -F` to hard-delete seed/default files from the active
   filesystem view, adds `TOMB HIDE` for reversible soft tombstones, and makes
   `TOMB LIST` show soft versus hard records.
 - `lguilib status|show|use|test [file.lguilib]` inspects or applies native

@@ -18,6 +18,7 @@ typedef struct FsWritableFile {
 void fs_init(void);
 int fs_resolve_os_path(const char* path, char* out, uint32_t cap);
 const FsFile* fs_open(const char* name);
+/* Legacy API name: opens built-in/LFS seed defaults after user overlays. */
 const FsFile* fs_open_readonly(const char* name);
 uint32_t fs_read(const FsFile* file, uint32_t offset, uint8_t* buf, uint32_t len);
 void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user);
@@ -29,7 +30,7 @@ const char* fs_readonly_hidden_name(uint32_t index);
 uint32_t fs_readonly_deleted_count(void);
 const char* fs_readonly_deleted_name(uint32_t index);
 
-/* Writable RAM files (notes, temp). Returns NULL if not found. */
+/* User-owned writable files and overlays. Returns NULL if not found. */
 FsWritableFile* fs_open_writable(const char* name);
 FsWritableFile* fs_open_or_create_writable(const char* name);
 int fs_can_create_writable(const char* name);
@@ -39,7 +40,7 @@ int fs_rename_writable(const char* old_name, const char* new_name);
 uint32_t fs_write(FsWritableFile* f, uint32_t offset, const uint8_t* buf, uint32_t len);
 uint32_t fs_append(FsWritableFile* f, const uint8_t* buf, uint32_t len);
 
-/* User-owned delete overlay for read-only built-in/LFS files. */
+/* User-owned delete overlay for seed/default built-in/LFS files. */
 int fs_hide_readonly(const char* name);
 int fs_delete_readonly(const char* name);
 int fs_unhide_readonly(const char* name);

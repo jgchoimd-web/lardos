@@ -258,9 +258,10 @@ int liveupdate_apply_text(const char* name, const char* text, uint32_t flags,
 {
     const char* data = text ? text : "";
     uint32_t len = slen(data);
-    const FsFile* ro;
+    const FsFile* seed;
     FsWritableFile* w;
     int append = (flags & LIVEUPDATE_FLAG_APPEND) != 0;
+    int had_writable;
     int r;
     const char* scope;
     char reload_msg[96];
@@ -278,22 +279,20 @@ int liveupdate_apply_text(const char* name, const char* text, uint32_t flags,
         }
     }
 
-    ro = fs_open_readonly(name);
+    seed = fs_open_readonly(name);
     w = fs_open_writable(name);
-    if (!w && ro) {
-        (void)fs_hide_readonly(name);
-    }
+    had_writable = w ? 1 : 0;
     w = fs_open_or_create_writable(name);
     if (!w) {
         record_result(name, "write", "target cannot become user-owned writable file", -3);
         return -3;
     }
-    if (append && ro && w->size == 0 && ro->data && ro->size) {
-        if (ro->size > w->cap) {
-            record_result(name, "write", "original too large for writable overlay", -4);
+    if (append && !had_writable && seed && seed->data && seed->size) {
+        if (seed->size > w->cap) {
+            record_result(name, "write", "seed/default too large for writable overlay", -4);
             return -4;
         }
-        (void)fs_write(w, 0, ro->data, ro->size);
+        (void)fs_write(w, 0, seed->data, seed->size);
     }
     if (append) {
         if (w->size + len > w->cap) {

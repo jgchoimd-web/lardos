@@ -354,8 +354,8 @@ static FsWritableFile ram_auxkernel = { "auxkernel.lardd", ram_auxkernel_buf, 0,
 #define FSDELETE_CAP 2048u
 static const uint8_t fsdelete_init[] =
     "LARDD 1\n"
-    "TITLE Read-Only Delete Overlay\n"
-    "TEXT DEL -F hard-deletes built-in read-only files from the active filesystem; TOMB owns the records.\n"
+    "TITLE Seed/Default Delete Overlay\n"
+    "TEXT DEL -F removes built-in seed/default files from the active filesystem; TOMB owns the records.\n"
     "SECTION Tombstones\n";
 static uint8_t ram_fsdelete_buf[FSDELETE_CAP];
 static FsWritableFile ram_fsdelete = { "fsdelete.lardd", ram_fsdelete_buf, 0, FSDELETE_CAP };
@@ -500,8 +500,8 @@ static const uint8_t file_lardos_lars[] =
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
     "li Use cfgsh for the settings shell: awake on, ltheme night, wallpaper grid, http 7, boot 4.\n"
     "li Use dos on for L-DOS mode with _:/C:/A:/Z:/U:/R: mapping and DOS-style file commands.\n"
-    "li In L-DOS, DEL -F file hard-deletes read-only built-in files from the active filesystem through fsdelete.lardd, even if that breaks the OS.\n"
-    "li Use bleed dryrun file to preview a last-resort delete sweep, or bleed file to try RAM, read-only hard-delete, and media deletion routes.\n"
+    "li In L-DOS, DEL -F file removes seed/default built-in files from the active filesystem through fsdelete.lardd, even if that breaks the OS.\n"
+    "li Use bleed dryrun file to preview a last-resort delete sweep, or bleed file to try RAM, seed/default hard-delete, and media deletion routes.\n"
     "li Use bleed overflow file when you want a bounded overflow-style wipe of writable/media file slots before deletion.\n"
     "li RESTORE only removes soft TOMB HIDE records; use TOMB DROP file or TOMB CLEAR if you choose to delete hard-delete records too.\n"
     "li Use TOMB LIST, TOMB SHOW, TOMB HIDE file, TOMB DROP file, or TOMB CLEAR when you want to inspect or edit deletion records themselves.\n"
@@ -512,7 +512,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use shrine status, shrine list, shrine verify hello.shrine, and shrine run hello.shrine for the Lard Subsystem for Shrine with BOSL payload validation.\n"
     "li Use glyph demo, glyph auto sample.bmp avatar, glyph move/copy/rename/pixel, glyph live U+E000 on, glyph click U+E000, and glyph insert U+E000 notes.txt to own and edit clickable realtime private-use Unicode picture characters.\n"
     "li The default cursor is the pretty mouse picture at U+E004; use cursor mouse to restore it or cursor set U+E000 to choose another user-owned slot.\n"
-    "li Use dir X: for read-only files, dir R: for RAM, and dir _: for merged storage.\n"
+    "li Use dir X: for seed/default files, dir R: for RAM, and dir _: for merged storage.\n"
     "li Use task list and task set id prio to inspect and change queued task priority.\n"
     "li Priority lev.10 is urgent work the user can grant with task urgent id, task set id 10, or nice 10 cmd.\n"
     "li Use tasktop to see runnable and paused task queues with priority bars.\n"
@@ -567,7 +567,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.59.0b adds runtime desktop/dock items, folders, draggable/reorderable launchers, per-app windows, and z-order.\n"
     "li v1.59.0a officially promotes the runtime desktop/window-manager model without restoring EXGUI/EXEXGUI.\n"
     "li v1.60.0a officially adds L-DOS mode as a native compatibility shell without external DOS code.\n"
-    "li v1.60.1p hotpatches L-DOS DEL -F read-only tombstones plus RESTORE for user-owned reversibility.\n"
+    "li v1.60.1p hotpatches L-DOS DEL -F seed/default tombstones plus RESTORE for user-owned reversibility.\n"
     "li v1.61.0a officially adds user-owned tombstone deletion: TOMB LIST/SHOW/DROP/CLEAR plus DEL -T.\n"
     "li v1.62.0a makes DEL -F a hard delete from the active filesystem while preserving TOMB HIDE for soft tombstones.\n"
     "li v1.63.0a adds the in-OS HDD/SSD installer option using the native stage1/stage2/kernel layout.\n"
@@ -614,7 +614,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.84.1p hotpatches PS/2 mouse batching so pointer motion stays responsive under heavier GUI work.\n"
     "li v1.84.0b adds crash, a raw-control diagnostic command for deliberate PanicRoom and CPU fault testing.\n"
     "li v1.83.1b adds bleed overflow, a bounded in-slot wipe-before-delete option for stubborn broken files.\n"
-    "li v1.83.0b adds bleed, a last-resort visible delete sweep for broken files across RAM, read-only delete overlays, and media stores.\n"
+    "li v1.83.0b adds bleed, a last-resort visible delete sweep for broken files across RAM, seed/default delete overlays, and media stores.\n"
     "li v1.82.0b extends FSTWT with MAIN/SUB filesystem virtualization and coexisting namespaces.\n"
     "li v1.81.0b adds FSTWT live two-way filesystem translation scripts before RXR/vpath fallback.\n"
     "li v1.80.0b adds RenderFX beta display modes: no-AA default, antianti/basic/nonlinear AA, multiplicative brightness, ScreenRAM LSB, and VBlank sync.\n"
@@ -921,11 +921,11 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM dos on -> enter L-DOS mode with an L-DOS C:\\ prompt.\n"
     "ITEM dos off or EXIT -> leave L-DOS mode.\n"
     "ITEM DOS commands are case-insensitive: DIR, TYPE, COPY, DEL, REN, MD, RD, CD, CLS, VER, SET, ECHO, MEM.\n"
-    "ITEM DEL -F file -> hard-delete a read-only built-in or LFS file from the active filesystem using fsdelete.lardd DELETE records.\n"
+    "ITEM DEL -F file -> remove a seed/default built-in or LFS file from the active filesystem using fsdelete.lardd DELETE records.\n"
     "ITEM RESTORE file or UNDELETE file -> remove only a soft TOMB HIDE record; hard deletes remain deleted.\n"
     "ITEM TOMB LIST or TOMB SHOW -> inspect active soft tombstones, hard deletes, or the raw fsdelete.lardd log.\n"
     "ITEM TOMB HIDE file -> create the old reversible soft tombstone without using DEL -F.\n"
-    "ITEM TOMB DROP file or DEL -T file -> delete one soft/hard record and make that read-only file visible.\n"
+    "ITEM TOMB DROP file or DEL -T file -> delete one soft/hard record and make that seed/default file visible.\n"
     "ITEM TOMB CLEAR -> delete every soft/hard record because the user can own even the deletion overlay.\n"
     "ITEM LSH command -> run one native LardOS command while staying in DOS mode.\n"
     "ITEM dos map -> show _:/C:/A:/Z:/U:/R: drive mappings.\n"
@@ -940,7 +940,7 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM _: maps to LardOS _: merged R:/X:/Y:/Z:/A: root.\n"
     "SECTION Philosophy\n"
     "ITEM Directories are virtual navigation labels because LardOS currently keeps the core filesystem flat and visible.\n"
-    "ITEM DEL clears writable RAM file contents; DEL -F hard-deletes read-only embedded files from the active filesystem.\n"
+    "ITEM DEL clears writable RAM file contents; DEL -F removes seed/default embedded files from the active filesystem.\n"
     "ITEM REN moves data into an existing writable slot instead of hiding a mutable filename table.\n"
     "ITEM fsdelete.lardd keeps HIDE, SHOW, and DELETE records so force deletes are inspectable and persisted by sync.\n"
     "ITEM TOMB rewrites fsdelete.lardd on user request, preserving the LardOS rule that visible system state remains user-editable.\n"
@@ -1077,7 +1077,7 @@ static const uint8_t file_fstwt_guide[] =
     "ITEM fstwt sample - print a small starter script.\n"
     "SECTION Ownership\n"
     "ITEM fstwt.fstwts is writable so the user can edit the active mapping policy.\n"
-    "ITEM default.fstwts is read-only reference material and can be loaded again if the user wants the default.\n"
+    "ITEM default.fstwts is seed/default reference material; users can overlay it and load the default again if they want.\n"
     "END\n";
 
 static const uint8_t file_features_lil[] =
@@ -1127,7 +1127,7 @@ static const uint8_t file_rxr_guide[] =
     "SECTION Values\n"
     "ITEM RXR install writes normal user-owned files, then reloads RXE/SYSRXE apps.\n"
     "ITEM LardOS treats rxr/name as an OS filesystem namespace path, for example type rxr/data.txt or open(\"rxr/data.txt\").\n"
-    "ITEM The kernel FS layer resolves rxr/name to the installed target before readonly, writable, create, and rename operations.\n"
+    "ITEM The kernel FS layer resolves rxr/name to the installed target before seed/default, writable, create, and rename operations.\n"
     "ITEM The app code stays inside the .rxe/.sysrxe file and can use LardOS languages or C-style app code.\n"
     "ITEM Undo restores the last RXR snapshot and releases newly created RXR slots when possible.\n"
     "END\n";
@@ -1324,8 +1324,8 @@ static const uint8_t file_kmo_guide[] =
     "SECTION Values\n"
     "ITEM User-created KMO files live in writable RAM/LPST slots.\n"
     "ITEM COMMAND turns a .kmo into a shell command, so new command surfaces no longer require editing the LSH dispatcher.\n"
-    "ITEM Built-in KMO files can be changed by kmo set, which takes ownership by hiding the read-only original and writing a user-owned replacement.\n"
-    "ITEM kmo delete removes a KMO from the active registry; writable slots become empty and read-only samples are hard-deleted from the active filesystem view.\n"
+    "ITEM Built-in KMO files can be changed by kmo set, which writes a user-owned overlay over the seed/default original.\n"
+    "ITEM kmo delete removes a KMO from the active registry; writable slots become empty and seed/default samples are removed from the active filesystem view.\n"
     "ITEM Raw-control KMO is intentionally dangerous. It exists because the user owns the machine, not because it is the safest path.\n"
     "END\n";
 
@@ -1347,8 +1347,8 @@ static const uint8_t file_liveupdate_guide[] =
     "ITEM .sysrxe and .rxe reload app registries and refresh the GUI launchers without rebooting.\n"
     "ITEM .drfl reloads driver descriptors, .fstwts reloads filesystem translation, .ltheme/.lguilib apply display state, and .lwall or wallpaper.lardd reloads the desktop wallpaper.\n"
     "SECTION Ownership\n"
-    "ITEM If a target is a read-only built-in file, LiveUpdate creates a user-owned overlay with the same name.\n"
-    "ITEM The original built-in file is hidden rather than destroyed, so rollback/tombstone tools remain visible.\n"
+    "ITEM If a target is a built-in seed/default file, LiveUpdate creates a user-owned overlay with the same name.\n"
+    "ITEM The original seed/default file stays available underneath the overlay, so rollback/tombstone tools remain visible.\n"
     "ITEM Raw-control KMO and SUM still exist for deliberately dangerous paths; LiveUpdate does not remove them.\n"
     "END\n";
 
@@ -1606,15 +1606,30 @@ static FsFile g_lfs_result;
 static char g_lfs_name[LFS_MAX_NAME];
 static FsFile g_ram_result;
 
+static int fs_name_eq(const char* a, const char* b);
+static uint32_t writable_count(void);
+static FsWritableFile* writable_at(uint32_t idx);
+
 typedef struct {
     void (*cb)(const char* name, uint32_t size, void* user);
     void* user;
 } FsListFilterCtx;
 
+static int fs_writable_name_exists_raw(const char* name)
+{
+    for (uint32_t wi = 0; wi < writable_count(); wi++) {
+        FsWritableFile* w = writable_at(wi);
+        if (w && fs_name_eq(w->name, name)) return 1;
+    }
+    return 0;
+}
+
 static void fs_list_lfs_filter_cb(const char* name, uint32_t size, void* u)
 {
     FsListFilterCtx* ctx = (FsListFilterCtx*)u;
-    if (ctx && ctx->cb && !fs_readonly_hidden(name)) ctx->cb(name, size, ctx->user);
+    if (ctx && ctx->cb && !fs_readonly_hidden(name) && !fs_writable_name_exists_raw(name)) {
+        ctx->cb(name, size, ctx->user);
+    }
 }
 
 static uint32_t lpst_read32(const uint8_t* p)
@@ -2348,8 +2363,6 @@ const FsFile* fs_open(const char* name)
 {
     char resolved[32];
     const char* q = fs_os_name(name, resolved, sizeof(resolved));
-    const FsFile* f = fs_open_readonly(q);
-    if (f) return f;
     for (uint32_t wi = 0; wi < writable_count(); wi++) {
         FsWritableFile* w = writable_at(wi);
         const char* a = w ? w->name : "";
@@ -2361,6 +2374,10 @@ const FsFile* fs_open(const char* name)
             g_ram_result.size = w->size;
             return &g_ram_result;
         }
+    }
+    {
+        const FsFile* f = fs_open_readonly(q);
+        if (f) return f;
     }
     return 0;
 }
@@ -2412,15 +2429,18 @@ uint32_t fs_read(const FsFile* file, uint32_t offset, uint8_t* buf, uint32_t len
 void fs_list(void (*cb)(const char* name, uint32_t size, void* user), void* user)
 {
     if (!cb) return;
-    fs_list_readonly(cb, user);
     fs_list_writable(cb, user);
+    fs_list_readonly(cb, user);
 }
 
 void fs_list_readonly(void (*cb)(const char* name, uint32_t size, void* user), void* user)
 {
     if (!cb) return;
     for (uint32_t i = 0; i < FS_FILE_COUNT; i++) {
-        if (!fs_readonly_hidden(FS_FILES[i].name)) cb(FS_FILES[i].name, FS_FILES[i].size, user);
+        if (!fs_readonly_hidden(FS_FILES[i].name) &&
+            !fs_writable_name_exists_raw(FS_FILES[i].name)) {
+            cb(FS_FILES[i].name, FS_FILES[i].size, user);
+        }
     }
     {
         FsListFilterCtx ctx;
@@ -2681,7 +2701,6 @@ int fs_can_create_writable(const char* name)
     const char* q = fs_os_name(name, resolved, sizeof(resolved));
     if (!fs_valid_user_name(q)) return 0;
     if (fs_open_writable(q)) return 1;
-    if (fs_open_readonly(q)) return 0;
     return fs_find_empty_rxr_slot() ? 1 : 0;
 }
 
@@ -2691,7 +2710,7 @@ uint32_t fs_writable_capacity_for(const char* name)
     const char* q = fs_os_name(name, resolved, sizeof(resolved));
     FsWritableFile* w = fs_open_writable(q);
     if (w) return w->cap;
-    if (!fs_valid_user_name(q) || fs_open_readonly(q)) return 0;
+    if (!fs_valid_user_name(q)) return 0;
     w = fs_find_empty_rxr_slot();
     return w ? w->cap : 0;
 }
@@ -2702,7 +2721,7 @@ FsWritableFile* fs_open_or_create_writable(const char* name)
     const char* q = fs_os_name(name, resolved, sizeof(resolved));
     FsWritableFile* w = fs_open_writable(q);
     if (w) return w;
-    if (!fs_valid_user_name(q) || fs_open_readonly(q)) return NULL;
+    if (!fs_valid_user_name(q)) return NULL;
     w = fs_find_empty_rxr_slot();
     if (!w) return NULL;
     fs_copy_name(w->name, sizeof(w->name), q);
@@ -2722,7 +2741,7 @@ int fs_rename_writable(const char* old_name, const char* new_name)
     w = fs_open_writable(old_q);
     if (!w) return -1;
     if (fs_name_eq(old_q, new_q)) return 0;
-    if (fs_open_writable(new_q) || fs_open_readonly(new_q)) return -3;
+    if (fs_open_writable(new_q)) return -3;
     fs_copy_name(w->name, sizeof(w->name), new_q);
     s_fs_dirty = 1;
     return 0;

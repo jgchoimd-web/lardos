@@ -4125,7 +4125,7 @@ static void gui_delete_file_from_textbox(void)
         return;
     }
     if (fs_delete_readonly(name) == 0) {
-        snprintf(msg, sizeof(msg), "GUI file delete: hard-deleted read-only file %s", name);
+        snprintf(msg, sizeof(msg), "GUI file delete: removed seed/default file %s", name);
         gui_report_line(msg);
         return;
     }
@@ -5270,7 +5270,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
                 }
             } else if (in_rect(g.mx, g.my, btn_x + lfb + 4, btn_y, lfb, btn_h)) {
                 /* Save: write lafaelo_buf to g.tb */
-                FsWritableFile* w = fs_open_writable(g.tb);
+                FsWritableFile* w = fs_open_or_create_writable(g.tb);
                 if (w) fs_write(w, 0, (const uint8_t*)g.lafaelo_buf, g.lafaelo_len);
             } else if (in_rect(g.mx, g.my, btn_x + (lfb + 4) * 2, btn_y, lfb, btn_h)) {
                 /* Run: execute lafaelo_buf via LSH */

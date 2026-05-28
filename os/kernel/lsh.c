@@ -2913,9 +2913,9 @@ static void cmd_control(const char* args)
     out_append("  auxkernel lockdown confirm reason  seal/sync/lock media during emergency containment\n");
     out_append("  auxkernel keydrop confirm reason   discard volatile media keys without hardware damage\n");
     out_append("  values              reread the LardOS user-law values\n");
-    out_append("  tomb list           inspect active user-owned read-only deletion records\n");
+    out_append("  tomb list           inspect active user-owned seed/default deletion records\n");
     out_append("  bleed dryrun file   preview the strongest delete sweep before using bleed file\n");
-    out_append("  bleed file          force-delete broken files across RAM, read-only, and media stores\n");
+    out_append("  bleed file          force-delete broken files across RAM, seed/default, and media stores\n");
     out_append("  bleed overflow file bounded overflow-style wipe, then delete broken files\n");
     out_append("  magic statsu        predict and execute the intended safe command\n");
     out_append("  magic -f bye        force an explicit raw-control prediction\n");
@@ -6862,7 +6862,7 @@ static void cmd_kmo(const char* args)
             out_append(m->raw_control ? " raw-control" : " kmodtalk");
             out_append(" default=");
             out_append(m->default_msg);
-            out_append(m->writable ? " writable" : " readonly");
+            out_append(m->writable ? " writable" : " seed/default");
             out_append("\n");
         }
         return;
@@ -8908,7 +8908,7 @@ static void cmd_rename_file(const char* src_arg, const char* dst_arg)
         lardkit_journal_event("rename", dst_name);
         return;
     }
-    if (r == -1) out_append("ren: writable source not found. Read-only files can be copied or deleted with DEL -F, but not renamed in place.\n");
+    if (r == -1) out_append("ren: writable source not found. Seed/default files can be copied, overlaid, or deleted with DEL -F.\n");
     else if (r == -3) out_append("ren: destination already exists.\n");
     else out_append("ren: bad source/destination name.\n");
 }
@@ -8977,9 +8977,11 @@ static void cmd_write_like(const char* args, int append)
     char name[64];
     char drv;
     FsWritableFile* w;
+    const FsFile* seed = NULL;
     uint32_t len = 0;
     uint32_t wrote;
     int media_r;
+    int had_writable;
     const uint8_t newline = '\n';
 
     if (vcs_read_word(&args, file_arg, sizeof(file_arg)) != 0) {
@@ -9010,17 +9012,29 @@ static void cmd_write_like(const char* args, int append)
         out_append("\n");
         return;
     }
-    w = fs_open_writable(name);
+    had_writable = fs_open_writable(name) ? 1 : 0;
+    if (!had_writable && append) seed = fs_open_readonly(name);
+    w = fs_open_or_create_writable(name);
     if (!w) {
-        if (merged_dst) out_append(append ? "append: _: writes to R:, but target must be a writable RAM file.\n" :
-                                            "write: _: writes to R:, but target must be a writable RAM file.\n");
-        else out_append(append ? "append: target must be a writable RAM file.\n" :
-                                 "write: target must be a writable RAM file.\n");
+        if (merged_dst) out_append(append ? "append: _: writes to R:, but target needs a user-owned file slot.\n" :
+                                            "write: _: writes to R:, but target needs a user-owned file slot.\n");
+        else out_append(append ? "append: target needs a user-owned file slot.\n" :
+                                 "write: target needs a user-owned file slot.\n");
         return;
     }
     while (args[len]) len++;
     if (append) {
         uint32_t need = len + (len ? 1u : 0u);
+        if (!had_writable && seed && seed->data && seed->size) {
+            if (seed->size > w->cap) {
+                out_append("append: seed/default file too large for user overlay.\n");
+                return;
+            }
+            if (fs_write(w, 0, seed->data, seed->size) != seed->size) {
+                out_append("append: could not copy seed/default into user overlay.\n");
+                return;
+            }
+        }
         if (w->size + need > w->cap) {
             out_append("append: not enough space.\n");
             return;
@@ -9244,7 +9258,7 @@ static void dos_help(void)
     out_append("  MD name  RD name  CD [dir|\\|..]  CLS  VER  SET  ECHO text  MEM\n");
     out_append("  EXIT leaves DOS mode; LSH command runs one native LardOS command.\n");
     out_append("  Map: _:=merged, C:=X main, A:=Y floppy, Z:=Z aux, U:=A extra, R:=R RAM.\n");
-    out_append("  DEL -F hard-deletes read-only files from the active FS; TOMB owns the records.\n");
+    out_append("  DEL -F removes seed/default files from the active FS; TOMB owns the records.\n");
     out_append("  Directories are visible virtual labels; LardOS files remain flat and user-owned.\n");
 }
 
@@ -9387,10 +9401,10 @@ static void dos_copy(const char* args)
         dos_log_event("copy-media", dst_name);
         return;
     }
-    dst = fs_open_writable(dst_name);
+    dst = fs_open_or_create_writable(dst_name);
     if (!dst) {
-        out_append(merged_dst ? "COPY: _: writes to R:, but destination must be an existing writable RAM file.\n" :
-                                "COPY: destination must be an existing writable RAM file.\n");
+        out_append(merged_dst ? "COPY: _: writes to R:, but destination needs a user-owned file slot.\n" :
+                                "COPY: destination needs a user-owned file slot.\n");
         return;
     }
     if (size > dst->cap) {
@@ -9476,15 +9490,32 @@ static void dos_delete(const char* args)
         return;
     }
     w = fs_open_writable(name);
-    if (!w) {
+    if (w) {
+        (void)fs_write(w, 0, (const uint8_t*)"", 0);
+        if (force) {
+            int r = fs_delete_readonly(name);
+            out_append("DEL -F: cleared user-owned overlay");
+            if (r >= 0) out_append(" and removed seed/default file");
+            out_append(": ");
+            out_append(name);
+            out_append("\n");
+            dos_log_event("hard-delete", name);
+            return;
+        }
+        out_append("Deleted writable RAM file contents: ");
+        out_append(name);
+        out_append("\n");
+        dos_log_event("delete", name);
+        return;
+    } else {
         int r;
         if (!force) {
-            out_append("DEL: read-only or unknown file; use DEL -F file for a user-owned hard delete.\n");
+            out_append("DEL: seed/default or unknown file; use DEL -F file for a user-owned hard delete.\n");
             return;
         }
         r = fs_delete_readonly(name);
         if (r >= 0) {
-            out_append("DEL -F: read-only file hard-deleted from active filesystem: ");
+            out_append("DEL -F: seed/default file removed from active filesystem: ");
             out_append(name);
             out_append("\nRESTORE will not soft-undo this. Use TOMB DROP ");
             out_append(name);
@@ -9495,11 +9526,6 @@ static void dos_delete(const char* args)
         out_append("DEL -F: file not found or hard-delete table full.\n");
         return;
     }
-    (void)fs_write(w, 0, (const uint8_t*)"", 0);
-    out_append("Deleted writable RAM file contents: ");
-    out_append(name);
-    out_append("\n");
-    dos_log_event("delete", name);
 }
 
 static void bleed_emit_route(const char* label, int ok)
@@ -9561,7 +9587,7 @@ static void bleed_show_routes(int merged_or_any, char drv, int overflow)
     int fs = drive_to_fs(drv);
     if (merged_or_any) {
         out_append(overflow ? "  R: bounded overflow-style RAM wipe, then clear\n" : "  R: writable RAM clear\n");
-        out_append("  X: read-only hard-delete record in fsdelete.lardd\n");
+        out_append("  X: seed/default hard-delete record in fsdelete.lardd\n");
         out_append(overflow ? "  Y:/Z:/A: media overwrite pass, then delete\n" : "  Y:/Z:/A: media store delete\n");
         return;
     }
@@ -9571,7 +9597,7 @@ static void bleed_show_routes(int merged_or_any, char drv, int overflow)
         out_append(overflow ? "  R: bounded overflow-style RAM wipe, then clear\n" : "  R: writable RAM clear\n");
     } else if (fs == 0) {
         out_append(overflow ? "  writable RAM overlay bounded overflow-style wipe, then clear\n" : "  writable RAM overlay clear\n");
-        out_append("  read-only hard-delete record in fsdelete.lardd\n");
+        out_append("  seed/default hard-delete record in fsdelete.lardd\n");
     } else {
         out_append("  invalid drive\n");
     }
@@ -9656,7 +9682,7 @@ static void cmd_bleed(const char* args)
         r = bleed_delete_readonly(name);
         tried++;
         hits += r;
-        bleed_emit_route("X: read-only hard-delete", r);
+        bleed_emit_route("X: seed/default hard-delete", r);
         for (uint32_t i = 0; i < sizeof(media_drives); i++) {
             char label[16];
             label[0] = media_drives[i];
@@ -9691,7 +9717,7 @@ static void cmd_bleed(const char* args)
         r = bleed_delete_readonly(name);
         tried++;
         hits += r;
-        bleed_emit_route("read-only hard-delete", r);
+        bleed_emit_route("seed/default hard-delete", r);
     } else {
         out_append("BLEED: invalid drive.\n");
         return;
@@ -9725,12 +9751,12 @@ static void dos_restore(const char* args)
     }
     r = fs_unhide_readonly(name);
     if (r == 0) {
-        out_append("RESTORE: read-only file visible again: ");
+        out_append("RESTORE: seed/default file visible again: ");
         out_append(name);
         out_append("\n");
         dos_log_event("restore", name);
     } else if (r == -1) {
-        out_append("RESTORE: read-only file not found.\n");
+        out_append("RESTORE: seed/default file not found.\n");
     } else if (r == -2) {
         out_append("RESTORE: file was hard-deleted by DEL -F. Use TOMB DROP ");
         out_append(name);
@@ -9783,7 +9809,7 @@ static void dos_tombstone(const char* args)
         int removed = fs_purge_all_readonly_tombstones();
         out_append("TOMB CLEAR: deleted ");
         out_append_i32(removed);
-        out_append(" deletion/tombstone record(s); all read-only files are visible again.\n");
+        out_append(" deletion/tombstone record(s); all seed/default files are visible again.\n");
         dos_log_event("tomb-clear", "all");
         return;
     }
@@ -9989,7 +10015,7 @@ static void dos_mem(void)
     out_append_u32(generation);
     out_append(", last=");
     out_append_i32(last);
-    out_append("\n  read-only tombstones: ");
+    out_append("\n  seed/default tombstones: ");
     out_append_u32(fs_readonly_hidden_count());
     out_append(", hard-deletes: ");
     out_append_u32(fs_readonly_deleted_count());

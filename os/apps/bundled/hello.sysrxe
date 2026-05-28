@@ -1,0 +1,23 @@
+SYSRXE 1
+ID hello-sysrxe
+NAME SYSRXE Hello
+ICON X
+LAYOUT responsive
+COLOR 0xFF4FC3B3
+INPUT Text:
+BUTTON Echo
+USE APPKIT
+UI PANEL 0 0 190 36 SYSRXE appkit
+UI BUTTON 8 8 72 20 Echo | hello
+UI TOGGLE 276 46 118 22 User-owned | hello
+UI BADGE 120 9 62 18 APPKIT
+UI CUSTOM outline 402 46 96 24 Direct UI | hello
+UI INPUT 0 46 260 24 Text:
+UI OUTPUT 0 84 0 0 Echo output
+DESKTOP 1
+DOCK 1
+TEXT This app was registered from hello.sysrxe, not hand-coded in gui.c.
+TEXT Future simple apps can be new SYSRXE files with their own language runner.
+LANG C
+CODE println("hello-from-sysrxe-c");
+CODE appkit("UI BADGE 342 9 70 18 C RUN");

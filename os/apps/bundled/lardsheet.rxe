@@ -1,0 +1,23 @@
+RXE 1
+ID lardsheet
+NAME LardSheet
+ICON S
+LAYOUT responsive
+COLOR 0xFF81C784
+INPUT Row/Cell:
+BUTTON Run
+USE APPKIT
+UI PANEL 0 0 240 36 LardSheet workbook
+UI INPUT 0 46 360 24 Row text or cell A1 42
+UI BUTTON 370 46 72 24 Run
+UI PROGRESS 0 82 190 18 Sheet | 65
+UI TILE 198 82 92 46 Cells
+UI TILE 298 82 92 46 CSV/Sum
+UI BADGE 250 9 92 18 .lsheet
+UI OUTPUT 0 142 0 0 Sheet output
+DESKTOP 1
+DOCK 1
+TEXT Spreadsheet-style app. Plain text appends a row; commands edit COL, ROW, CELL, and FORMULA records.
+TEXT Try: apples 12, cell A1 42, col Item Value, formula total sum, csv, sum, find text, new.
+LANG LSH
+COMMAND lsheet

@@ -1,0 +1,22 @@
+RXE 1
+ID lang-demo
+NAME RXE Lang Demo
+ICON L
+LAYOUT responsive
+COLOR 0xFF7BC86C
+INPUT Number:
+BUTTON Run
+USE APPKIT
+UI PANEL 0 0 220 36 App languages
+UI BUTTON 8 8 72 20 Run | 7
+UI BADGE 118 9 80 18 C/LIL/etc
+UI INPUT 0 46 220 24 Number:
+UI OUTPUT 0 84 0 0 Language output
+DESKTOP 1
+DOCK 1
+TEXT RXE can run native LardOS languages or the in-kernel C-style app runner from file code.
+LANG C
+CODE int bonus = 35;
+CODE println(input + bonus);
+CODE appkit("UI CUSTOM meter 230 46 110 18 live-code | 42");
+CODE lsh("echo lsh-from-c-app");

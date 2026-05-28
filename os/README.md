@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.0.2b` moves bundled app source out of `kernel/fs.c` and into
+`apps/bundled/`. The build now converts `hello.sysrxe`, `demo_game.rxe`,
+`langdemo.rxe`, `lardwrite.rxe`, `lardsheet.rxe`, and `lardshow.rxe` into
+generated payload includes, while `fs.c` only registers the read-only files.
+This keeps default app code in a dedicated, editable app space instead of
+mixing it with filesystem registration code.
+
 `v2.0.1b` deepens the bundled office apps without turning them into hard-coded
 GUI branches. LardWrite now has title, section, bullet, quote, code, find, and
 stats commands. LardSheet now has columns, rows, cells, visible formulas,

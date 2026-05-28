@@ -56,6 +56,14 @@ RELEASES_INC := $(KERNEL_DIR)/releases_lardd.inc
 VERSION_GEN := $(INCLUDE)/version_gen.h
 BOOT_STAGE1_INC := $(KERNEL_DIR)/boot_stage1.inc
 BOOT_STAGE2_INC := $(KERNEL_DIR)/boot_stage2.inc
+BUNDLED_APP_DIR := apps/bundled
+BUNDLED_HELLO_SYSRXE_INC := $(KERNEL_DIR)/app_hello_sysrxe.inc
+BUNDLED_DEMO_GAME_RXE_INC := $(KERNEL_DIR)/app_demo_game_rxe.inc
+BUNDLED_LANGDEMO_RXE_INC := $(KERNEL_DIR)/app_langdemo_rxe.inc
+BUNDLED_LARDWRITE_RXE_INC := $(KERNEL_DIR)/app_lardwrite_rxe.inc
+BUNDLED_LARDSHEET_RXE_INC := $(KERNEL_DIR)/app_lardsheet_rxe.inc
+BUNDLED_LARDSHOW_RXE_INC := $(KERNEL_DIR)/app_lardshow_rxe.inc
+BUNDLED_APP_INCS := $(BUNDLED_HELLO_SYSRXE_INC) $(BUNDLED_DEMO_GAME_RXE_INC) $(BUNDLED_LANGDEMO_RXE_INC) $(BUNDLED_LARDWRITE_RXE_INC) $(BUNDLED_LARDSHEET_RXE_INC) $(BUNDLED_LARDSHOW_RXE_INC)
 
 STAGE2_SECTORS := 8
 KERNEL_LBA := 9
@@ -213,6 +221,26 @@ $(LAFILLO_INC): $(LAFILLO_BOSX) $(BIN2INC)
 
 $(RELEASES_INC): $(RELEASES_DOC) $(BIN2INC)
 	$(BIN2INC) $(RELEASES_DOC) $@ file_releases_lardd
+
+$(BUNDLED_HELLO_SYSRXE_INC): $(BUNDLED_APP_DIR)/hello.sysrxe $(BIN2INC)
+	$(BIN2INC) $< $@ file_hello_sysrxe
+
+$(BUNDLED_DEMO_GAME_RXE_INC): $(BUNDLED_APP_DIR)/demo_game.rxe $(BIN2INC)
+	$(BIN2INC) $< $@ file_demo_game_rxe
+
+$(BUNDLED_LANGDEMO_RXE_INC): $(BUNDLED_APP_DIR)/langdemo.rxe $(BIN2INC)
+	$(BIN2INC) $< $@ file_langdemo_rxe
+
+$(BUNDLED_LARDWRITE_RXE_INC): $(BUNDLED_APP_DIR)/lardwrite.rxe $(BIN2INC)
+	$(BIN2INC) $< $@ file_lardwrite_rxe
+
+$(BUNDLED_LARDSHEET_RXE_INC): $(BUNDLED_APP_DIR)/lardsheet.rxe $(BIN2INC)
+	$(BIN2INC) $< $@ file_lardsheet_rxe
+
+$(BUNDLED_LARDSHOW_RXE_INC): $(BUNDLED_APP_DIR)/lardshow.rxe $(BIN2INC)
+	$(BIN2INC) $< $@ file_lardshow_rxe
+
+$(KERNEL_DIR)/fs.o: $(BUNDLED_APP_INCS)
 
 $(BOOT_STAGE1_INC): $(BOOT_BIN) $(BIN2INC)
 	$(BIN2INC) $(BOOT_BIN) $@ lardos_boot_stage1
@@ -443,6 +471,6 @@ run-iso: $(ISO_IMAGE)
 
 clean:
 	rm -f $(BOOT_BIN) $(BOOT_ISO_BIN) $(STAGE2_BIN) $(ISO_MBR_BIN) $(KERNEL_ELF) $(KERNEL_EXE) $(RAW_IMAGE) $(ISO_RAW_IMAGE) $(IMG_IMAGE) $(ISO_IMAGE) \
-	      $(KERNEL_DIR)/*.o $(KERNEL_DIR)/lafillo_demo_data.inc $(RELEASES_INC) $(VERSION_GEN) $(BOOT_STAGE1_INC) $(BOOT_STAGE2_INC) \
+	      $(KERNEL_DIR)/*.o $(KERNEL_DIR)/lafillo_demo_data.inc $(RELEASES_INC) $(VERSION_GEN) $(BOOT_STAGE1_INC) $(BOOT_STAGE2_INC) $(BUNDLED_APP_INCS) \
 	      $(LAFILLO_ELF) $(LAFILLO_BOSX) $(LANG_EX)/lafillo_demo.o \
 	      $(MKLDLL) $(MKARDX) $(MKLFS) $(MK_SSAV) $(MKEXE) $(MKIMG) $(MKISO) $(BIN2INC) $(BOSLA) $(SEEDC) $(LIL)

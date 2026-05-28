@@ -6,6 +6,14 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT LTS codenames append after the channel, for example v1.99.0a-tiara. Only one LTS line is active at a time.
 
+SECTION v2.0.2b
+ITEM Adds apps/bundled/ as the dedicated source space for default apps that ship with LardOS.
+ITEM Moves hello.sysrxe, demo_game.rxe, langdemo.rxe, lardwrite.rxe, lardsheet.rxe, and lardshow.rxe source out of kernel/fs.c.
+ITEM Adds Makefile bin2inc rules that generate kernel app payload includes from apps/bundled during the build.
+ITEM Keeps fs.c responsible for read-only file registration only; bundled app behavior now lives in app files.
+ITEM Preserves all bundled apps, office commands, RXE/SYSRXE loading, GUI registration, and writable office data files without feature loss.
+ITEM Ships as beta because it changes source layout and build plumbing.
+
 SECTION v2.0.1b
 ITEM Deepens the bundled office apps while keeping them file-defined RXE programs.
 ITEM LardWrite adds title, section, bullet, quote, code, find, and stats commands for richer LARDD documents.

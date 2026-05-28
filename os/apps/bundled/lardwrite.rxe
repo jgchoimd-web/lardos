@@ -1,0 +1,23 @@
+RXE 1
+ID lardwrite
+NAME LardWrite
+ICON W
+LAYOUT responsive
+COLOR 0xFF5BC0EB
+INPUT Command/Text:
+BUTTON Run
+USE APPKIT
+UI PANEL 0 0 240 36 LardWrite document
+UI INPUT 0 46 360 24 Command or plain text
+UI BUTTON 370 46 72 24 Run
+UI TILE 0 82 118 46 Title/Section
+UI TILE 126 82 118 46 Bullet/Quote
+UI TILE 252 82 118 46 Find/Stats
+UI BADGE 250 9 94 18 .lardd
+UI OUTPUT 0 140 0 0 Document output
+DESKTOP 1
+DOCK 1
+TEXT Word-processor style app. Plain text appends a paragraph; commands edit normal LARDD records in office_doc.lardd.
+TEXT Try: title My Doc, section Plan, bullet item, quote note, code line, find word, stats, new.
+LANG LSH
+COMMAND lword

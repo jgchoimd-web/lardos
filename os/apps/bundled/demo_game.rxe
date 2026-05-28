@@ -1,0 +1,32 @@
+RXE 1
+ID rxe-maze
+NAME RXE Maze
+ICON M
+LAYOUT responsive
+COLOR 0xFF62C370
+TYPE GAME
+GAME maze
+BOARD 16 8
+INPUT Move:
+BUTTON Step
+USE APPKIT
+UI PANEL 0 0 190 36 RXE game controls
+UI BUTTON 8 8 64 20 Step | right
+UI INPUT 0 46 220 24 Move:
+UI STATUS 230 46 150 24 Type W/A/S/D or arrows
+UI PROGRESS 0 76 220 18 Maze | 35
+UI BADGE 230 76 92 18 native RXE
+UI RADAR 330 76 70 30 custom | scan
+UI OUTPUT 0 108 0 0 Game log
+DESKTOP 1
+DOCK 1
+TEXT Native RXE game demo. It is a file-defined normal executable, not a hand-coded app branch.
+TEXT @ is you, G is the exit, # is wall. Arrow keys move in the GUI.
+ROW ################
+ROW #@....#........#
+ROW #.##..#.####...#
+ROW #..#..#....#...#
+ROW #..####.##.#...#
+ROW #........#.....#
+ROW #.######...##G.#
+ROW ################

@@ -1375,163 +1375,17 @@ static const uint8_t file_raw_control_kmo[] =
     "TEXT This sample runs an LSH command directly instead of routing through KModTalk.\n"
     "TEXT Change DEFAULT to sum, peek, poke, asm_, bye, or any other explicit command only if you accept the risk.\n";
 
-static const uint8_t file_hello_sysrxe[] =
-    "SYSRXE 1\n"
-    "ID hello-sysrxe\n"
-    "NAME SYSRXE Hello\n"
-    "ICON X\n"
-    "LAYOUT responsive\n"
-    "COLOR 0xFF4FC3B3\n"
-    "INPUT Text:\n"
-    "BUTTON Echo\n"
-    "USE APPKIT\n"
-    "UI PANEL 0 0 190 36 SYSRXE appkit\n"
-    "UI BUTTON 8 8 72 20 Echo | hello\n"
-    "UI TOGGLE 276 46 118 22 User-owned | hello\n"
-    "UI BADGE 120 9 62 18 APPKIT\n"
-    "UI CUSTOM outline 402 46 96 24 Direct UI | hello\n"
-    "UI INPUT 0 46 260 24 Text:\n"
-    "UI OUTPUT 0 84 0 0 Echo output\n"
-    "DESKTOP 1\n"
-    "DOCK 1\n"
-    "TEXT This app was registered from hello.sysrxe, not hand-coded in gui.c.\n"
-    "TEXT Future simple apps can be new SYSRXE files with their own language runner.\n"
-    "LANG C\n"
-    "CODE println(\"hello-from-sysrxe-c\");\n"
-    "CODE appkit(\"UI BADGE 342 9 70 18 C RUN\");\n";
-
-static const uint8_t file_langdemo_rxe[] =
-    "RXE 1\n"
-    "ID lang-demo\n"
-    "NAME RXE Lang Demo\n"
-    "ICON L\n"
-    "LAYOUT responsive\n"
-    "COLOR 0xFF7BC86C\n"
-    "INPUT Number:\n"
-    "BUTTON Run\n"
-    "USE APPKIT\n"
-    "UI PANEL 0 0 220 36 App languages\n"
-    "UI BUTTON 8 8 72 20 Run | 7\n"
-    "UI BADGE 118 9 80 18 C/LIL/etc\n"
-    "UI INPUT 0 46 220 24 Number:\n"
-    "UI OUTPUT 0 84 0 0 Language output\n"
-    "DESKTOP 1\n"
-    "DOCK 1\n"
-    "TEXT RXE can run native LardOS languages or the in-kernel C-style app runner from file code.\n"
-    "LANG C\n"
-    "CODE int bonus = 35;\n"
-    "CODE println(input + bonus);\n"
-    "CODE appkit(\"UI CUSTOM meter 230 46 110 18 live-code | 42\");\n"
-    "CODE lsh(\"echo lsh-from-c-app\");\n";
-
-static const uint8_t file_demo_game_rxe[] =
-    "RXE 1\n"
-    "ID rxe-maze\n"
-    "NAME RXE Maze\n"
-    "ICON M\n"
-    "LAYOUT responsive\n"
-    "COLOR 0xFF62C370\n"
-    "TYPE GAME\n"
-    "GAME maze\n"
-    "BOARD 16 8\n"
-    "INPUT Move:\n"
-    "BUTTON Step\n"
-    "USE APPKIT\n"
-    "UI PANEL 0 0 190 36 RXE game controls\n"
-    "UI BUTTON 8 8 64 20 Step | right\n"
-    "UI INPUT 0 46 220 24 Move:\n"
-    "UI STATUS 230 46 150 24 Type W/A/S/D or arrows\n"
-    "UI PROGRESS 0 76 220 18 Maze | 35\n"
-    "UI BADGE 230 76 92 18 native RXE\n"
-    "UI RADAR 330 76 70 30 custom | scan\n"
-    "UI OUTPUT 0 108 0 0 Game log\n"
-    "DESKTOP 1\n"
-    "DOCK 1\n"
-    "TEXT Native RXE game demo. It is a file-defined normal executable, not a hand-coded app branch.\n"
-    "TEXT @ is you, G is the exit, # is wall. Arrow keys move in the GUI.\n"
-    "ROW ################\n"
-    "ROW #@....#........#\n"
-    "ROW #.##..#.####...#\n"
-    "ROW #..#..#....#...#\n"
-    "ROW #..####.##.#...#\n"
-    "ROW #........#.....#\n"
-    "ROW #.######...##G.#\n"
-    "ROW ################\n";
-
-static const uint8_t file_lardwrite_rxe[] =
-    "RXE 1\n"
-    "ID lardwrite\n"
-    "NAME LardWrite\n"
-    "ICON W\n"
-    "LAYOUT responsive\n"
-    "COLOR 0xFF5BC0EB\n"
-    "INPUT Command/Text:\n"
-    "BUTTON Run\n"
-    "USE APPKIT\n"
-    "UI PANEL 0 0 240 36 LardWrite document\n"
-    "UI INPUT 0 46 360 24 Command or plain text\n"
-    "UI BUTTON 370 46 72 24 Run\n"
-    "UI TILE 0 82 118 46 Title/Section\n"
-    "UI TILE 126 82 118 46 Bullet/Quote\n"
-    "UI TILE 252 82 118 46 Find/Stats\n"
-    "UI BADGE 250 9 94 18 .lardd\n"
-    "UI OUTPUT 0 140 0 0 Document output\n"
-    "DESKTOP 1\n"
-    "DOCK 1\n"
-    "TEXT Word-processor style app. Plain text appends a paragraph; commands edit normal LARDD records in office_doc.lardd.\n"
-    "TEXT Try: title My Doc, section Plan, bullet item, quote note, code line, find word, stats, new.\n"
-    "LANG LSH\n"
-    "COMMAND lword\n";
-
-static const uint8_t file_lardsheet_rxe[] =
-    "RXE 1\n"
-    "ID lardsheet\n"
-    "NAME LardSheet\n"
-    "ICON S\n"
-    "LAYOUT responsive\n"
-    "COLOR 0xFF81C784\n"
-    "INPUT Row/Cell:\n"
-    "BUTTON Run\n"
-    "USE APPKIT\n"
-    "UI PANEL 0 0 240 36 LardSheet workbook\n"
-    "UI INPUT 0 46 360 24 Row text or cell A1 42\n"
-    "UI BUTTON 370 46 72 24 Run\n"
-    "UI PROGRESS 0 82 190 18 Sheet | 65\n"
-    "UI TILE 198 82 92 46 Cells\n"
-    "UI TILE 298 82 92 46 CSV/Sum\n"
-    "UI BADGE 250 9 92 18 .lsheet\n"
-    "UI OUTPUT 0 142 0 0 Sheet output\n"
-    "DESKTOP 1\n"
-    "DOCK 1\n"
-    "TEXT Spreadsheet-style app. Plain text appends a row; commands edit COL, ROW, CELL, and FORMULA records.\n"
-    "TEXT Try: apples 12, cell A1 42, col Item Value, formula total sum, csv, sum, find text, new.\n"
-    "LANG LSH\n"
-    "COMMAND lsheet\n";
-
-static const uint8_t file_lardshow_rxe[] =
-    "RXE 1\n"
-    "ID lardshow\n"
-    "NAME LardShow\n"
-    "ICON P\n"
-    "LAYOUT responsive\n"
-    "COLOR 0xFFFFD166\n"
-    "INPUT Slide/Command:\n"
-    "BUTTON Run\n"
-    "USE APPKIT\n"
-    "UI PANEL 0 0 250 36 LardShow deck\n"
-    "UI INPUT 0 46 360 24 Title | Body or command\n"
-    "UI BUTTON 370 46 72 24 Run\n"
-    "UI TILE 0 82 108 54 Slide\n"
-    "UI TILE 116 82 108 54 Theme\n"
-    "UI TILE 232 82 108 54 Play\n"
-    "UI BADGE 260 9 84 18 .lshow\n"
-    "UI OUTPUT 0 148 0 0 Deck output\n"
-    "DESKTOP 1\n"
-    "DOCK 1\n"
-    "TEXT Presentation-style app. Plain text adds a slide; commands navigate and edit the native LSHOW deck.\n"
-    "TEXT Try: Title | Body, play, next, prev, slide 2, theme dark, note speaker note, new.\n"
-    "LANG LSH\n"
-    "COMMAND lshow\n";
+/*
+ * Bundled app source lives in apps/bundled/. The build converts those files
+ * into these generated payloads so fs.c registers files without owning app
+ * code.
+ */
+#include "app_hello_sysrxe.inc"
+#include "app_langdemo_rxe.inc"
+#include "app_demo_game_rxe.inc"
+#include "app_lardwrite_rxe.inc"
+#include "app_lardsheet_rxe.inc"
+#include "app_lardshow_rxe.inc"
 
 static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"
@@ -1728,12 +1582,12 @@ static const FsFile FS_FILES[] = {
     { "rxe_guide.lardd", file_rxe_guide, sizeof(file_rxe_guide) - 1 },
     { "kmodtalk_guide.lardd", file_kmodtalk_guide, sizeof(file_kmodtalk_guide) - 1 },
     { "kmo_guide.lardd", file_kmo_guide, sizeof(file_kmo_guide) - 1 },
-    { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) - 1 },
-    { "demo_game.rxe", file_demo_game_rxe, sizeof(file_demo_game_rxe) - 1 },
-    { "langdemo.rxe", file_langdemo_rxe, sizeof(file_langdemo_rxe) - 1 },
-    { "lardwrite.rxe", file_lardwrite_rxe, sizeof(file_lardwrite_rxe) - 1 },
-    { "lardsheet.rxe", file_lardsheet_rxe, sizeof(file_lardsheet_rxe) - 1 },
-    { "lardshow.rxe", file_lardshow_rxe, sizeof(file_lardshow_rxe) - 1 },
+    { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) },
+    { "demo_game.rxe", file_demo_game_rxe, sizeof(file_demo_game_rxe) },
+    { "langdemo.rxe", file_langdemo_rxe, sizeof(file_langdemo_rxe) },
+    { "lardwrite.rxe", file_lardwrite_rxe, sizeof(file_lardwrite_rxe) },
+    { "lardsheet.rxe", file_lardsheet_rxe, sizeof(file_lardsheet_rxe) },
+    { "lardshow.rxe", file_lardshow_rxe, sizeof(file_lardshow_rxe) },
     { "gui_status.kmo", file_gui_status_kmo, sizeof(file_gui_status_kmo) - 1 },
     { "raw_control.kmo", file_raw_control_kmo, sizeof(file_raw_control_kmo) - 1 },
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },

@@ -1,0 +1,23 @@
+RXE 1
+ID lardshow
+NAME LardShow
+ICON P
+LAYOUT responsive
+COLOR 0xFFFFD166
+INPUT Slide/Command:
+BUTTON Run
+USE APPKIT
+UI PANEL 0 0 250 36 LardShow deck
+UI INPUT 0 46 360 24 Title | Body or command
+UI BUTTON 370 46 72 24 Run
+UI TILE 0 82 108 54 Slide
+UI TILE 116 82 108 54 Theme
+UI TILE 232 82 108 54 Play
+UI BADGE 260 9 84 18 .lshow
+UI OUTPUT 0 148 0 0 Deck output
+DESKTOP 1
+DOCK 1
+TEXT Presentation-style app. Plain text adds a slide; commands navigate and edit the native LSHOW deck.
+TEXT Try: Title | Body, play, next, prev, slide 2, theme dark, note speaker note, new.
+LANG LSH
+COMMAND lshow

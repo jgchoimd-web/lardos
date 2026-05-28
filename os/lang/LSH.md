@@ -6,7 +6,8 @@
 
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc. `dir _:` lists the merged top-level drive with prefixes; `dir X:` lists read-only system files; `dir R:` lists every writable RAM file; `dir Y:`/`dir Z:`/`dir A:` list MediaFS device stores.
 - `release policy` - show when to use `a`, `b`, or `p` release suffixes.
-- `release lts` - show the active LTS codename and support rule.
+- `release codename` - show the current OS-era subname, now Mirage.
+- `release lts` - compatibility command that says the old LTS model is retired and Tiara support ended.
 - `lword`/`lwrite`, `lsheet`, `lshow` - edit the bundled native office document,
   workbook, and deck files from the shell. LardWrite supports title/section/
   bullet/quote/code/find/stats; LardSheet supports col/cell/formula/csv/sum;

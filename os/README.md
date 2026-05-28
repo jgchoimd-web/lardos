@@ -52,6 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.0.6b-mirage` retires LardOS LTS releases and changes Tiara/Mirage style
+names into OS-era subnames. The current subname is Mirage. `release codename`
+shows the active subname, while the old `release lts` command remains as a
+compatibility surface that states Tiara support has ended and that no active
+LTS line exists. This changes support naming only; it does not remove user
+ownership, raw control, recovery, native formats, or the `a`/`b`/`p` suffix
+policy.
+
 `v2.0.5b` corrects AuxKernel to a `REAL16` emergency profile. The first
 responder now explicitly enters BIOS 16-bit real mode and returns to long64;
 `auxkernel real16` is the primary probe command. The mistaken `real8` beta
@@ -93,12 +101,10 @@ workbooks, and `lardshow.rxe` for presentation decks. Their editable files are
 keyboard-first commands `lword`/`lwrite`, `lsheet`, and `lshow`. These are
 normal file-defined apps, not new hard-coded GUI branches.
 
-`v1.99.0a-tiara` is the Tiara LTS release. It promotes the v1.99 Connect
-compatibility work to an official `a` build, adds `release lts` plus
-`lts.lardd`, and fixes channel parsing so future LTS codenames such as
-`mirage` do not break the `a`/`b`/`p` policy. LardOS supports one LTS line at a
-time: Tiara is current, and when Mirage ships, Tiara support ends. This is a
-support-policy promotion, not a feature removal.
+`v1.99.0a-tiara` was the Tiara LTS release. `v2.0.6b-mirage` ends that support
+model: Tiara is now historical, Mirage is the current OS-era subname, and LardOS
+does not create new LTS lines. The old `release lts` command and `lts.lardd`
+remain as visible compatibility records so the policy change is not hidden.
 
 `v1.99.0b` adds a Deprecated raw-control namespace for LardOS Connect. Normal
 `lconnect` still defaults to visible, manual, non-input sharing, but
@@ -925,9 +931,9 @@ commands:
   Useful subcommands include `lword title/section/bullet/quote/code/find/stats`,
   `lsheet col/cell/formula/csv/sum/find`, and
   `lshow play/next/prev/slide/theme/note`.
-- `release` renders the current release log from `releases.lardd`; `release lts`
-  shows the active LTS codename, the one-LTS-at-a-time rule, and the next
-  planned LTS name.
+- `release` renders the current release log from `releases.lardd`; `release
+  codename` shows the current OS-era subname. `release lts` remains as a
+  compatibility command that says LTS support is retired and Tiara has ended.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
   assertion checks, stepped loops, repeat loops, and integer math helpers.
@@ -966,8 +972,9 @@ kernel version, add an entry to `os/RELEASES.lardd`, keep the embedded
 `releases.lardd` in sync so LSH can show it with `release`, and run
 `make release` or `make release-all-hardware` so the matching ISO/IMG artifacts
 are available. Inside LSH, `release policy` prints the channel and hardware
-profile rules. LTS releases append a codename after the channel, such as
-`v1.99.0a-tiara`, and `release lts` makes the active support line visible.
+profile rules. Codenames now append after the channel as OS-era subnames, such
+as `v2.0.6b-mirage`; they are not LTS promises. `release codename` shows the
+active subname and `release lts` explains that the old LTS model is retired.
 
 ### Networking And TLS
 

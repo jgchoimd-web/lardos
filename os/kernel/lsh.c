@@ -915,28 +915,30 @@ static void cmd_larddoc(const char* args, const char* usage)
 static void cmd_release(const char* args)
 {
     while (args && (*args == ' ' || *args == '\t')) args++;
-    if (args && (strcmp(args, "lts") == 0 || strcmp(args, "support") == 0)) {
-        out_append("LTS support policy\n");
+    if (args && (strcmp(args, "codename") == 0 || strcmp(args, "subname") == 0 ||
+                 strcmp(args, "name") == 0)) {
+        out_append("Release codename policy\n");
         out_append("  current build: ");
         out_append(LARDOS_VERSION);
-#if LARDOS_LTS_BUILD
-        out_append(" (");
-        out_append(LARDOS_LTS_BUILD_NAME);
-        out_append(" LTS build)\n");
-#else
-        out_append(" (not an LTS build)\n");
-#endif
-#if LARDOS_LTS_ACTIVE
-        out_append("  active LTS line: ");
-        out_append(LARDOS_LTS_NAME);
+        out_append("\n  current codename: ");
+        out_append(lardos_release_codename());
         out_append("\n");
-#else
-        out_append("  active LTS line: none\n");
-#endif
-        out_append("  rule: only one LTS line is active at a time.\n");
-        out_append("  when the next LTS ships, the previous LTS support line ends.\n");
-        out_append("  next planned codename: mirage.\n");
-        out_append("  LTS does not remove raw-control, recovery, native formats, or user ownership.\n");
+        out_append("  rule: codenames are OS-era subnames, not long-term-support promises.\n");
+        out_append("  current era: mirage.\n");
+        out_append("  retired support line: tiara LTS ended when this policy changed.\n");
+        out_append("  example form: vX.Y.Zb-mirage, displayed to users as version + mirage.\n");
+        return;
+    }
+    if (args && (strcmp(args, "lts") == 0 || strcmp(args, "support") == 0)) {
+        out_append("LTS support policy retired\n");
+        out_append("  current build: ");
+        out_append(LARDOS_VERSION);
+        out_append("\n  current codename: ");
+        out_append(lardos_release_codename());
+        out_append("\n  active LTS line: none\n");
+        out_append("  retired line: tiara support is ended.\n");
+        out_append("  new rule: use release codename; subnames mark big OS eras and do not imply LTS.\n");
+        out_append("  user ownership, raw-control visibility, recovery, and native formats remain supported values.\n");
         return;
     }
     if (args && (strcmp(args, "policy") == 0 || strcmp(args, "channel") == 0 || strcmp(args, "channels") == 0)) {
@@ -946,25 +948,24 @@ static void cmd_release(const char* args)
         out_append(" (");
         out_append(lardos_version_channel());
         out_append(")\n");
-        if (LARDOS_LTS_ACTIVE) {
-            out_append("  active LTS line: ");
-            out_append(LARDOS_LTS_NAME);
-            out_append("\n");
-        }
+        out_append("  codename: ");
+        out_append(lardos_release_codename());
+        out_append("\n");
         out_append("  hardware: ");
         out_append(LARDOS_HARDWARE_PROFILE);
         out_append("\n");
         out_append("  a = official: promoted stable builds after boot, POST, GUI, and media checks.\n");
         out_append("  b = beta-experimental: new or risky feature bundles before promotion.\n");
         out_append("  p = hotpatch: narrow emergency fixes for an existing release line.\n");
-        out_append("  LTS codenames append after the channel, for example vX.Y.Za-tiara.\n");
+        out_append("  codenames append after the channel, for example vX.Y.Zb-mirage.\n");
+        out_append("  LTS support names are retired; codenames are now OS-era subnames.\n");
         out_append("  hardware profiles: universal, seabios, ami, vbox, usb, realpc.\n");
         out_append("  artifact names append the hardware profile, for example vX.Y.Zb-ami.\n");
         out_append("  Do not use a just because a feature was added; choose the channel by risk.\n");
         return;
     }
     if (args && args[0]) {
-        out_append("Usage: release [policy|lts]\n");
+        out_append("Usage: release [policy|codename|lts]\n");
         return;
     }
     cmd_larddoc("releases.lardd", "Usage: release");
@@ -2730,6 +2731,8 @@ static void cmd_ver(const char* args)
     out_append(lardos_version_channel());
     out_append(", ");
     out_append(LARDOS_HARDWARE_PROFILE);
+    out_append(", codename ");
+    out_append(lardos_release_codename());
     out_append(")\n");
 }
 
@@ -2843,7 +2846,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -3195,6 +3198,8 @@ static void cmd_status(const char* args)
     out_append(lardos_version_channel());
     out_append(", ");
     out_append(LARDOS_HARDWARE_PROFILE);
+    out_append(", codename ");
+    out_append(lardos_release_codename());
     out_append(")\n");
     if (lardtime_now(&time_now) == 0) {
         out_append("Time: ");

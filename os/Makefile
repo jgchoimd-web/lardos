@@ -26,10 +26,9 @@ BIN2INC   := $(HOST_TOOL_DIR)/bin2inc
 
 VERSION_FILE := VERSION
 RELEASE_BASE_VERSION := $(strip $(shell cat $(VERSION_FILE)))
-VERSION_LTS_NAME := $(strip $(shell printf '%s' '$(RELEASE_BASE_VERSION)' | sed -n 's/^[^-]*-\(.*\)$$/\1/p'))
-ACTIVE_LTS_NAME ?= tiara
-LTS_ACTIVE := $(if $(ACTIVE_LTS_NAME),1,0)
-LTS_BUILD := $(if $(VERSION_LTS_NAME),1,0)
+VERSION_CODENAME_NAME := $(strip $(shell printf '%s' '$(RELEASE_BASE_VERSION)' | sed -n 's/^[^-]*-\(.*\)$$/\1/p'))
+ACTIVE_CODENAME_NAME ?= $(if $(VERSION_CODENAME_NAME),$(VERSION_CODENAME_NAME),mirage)
+CODENAME_ACTIVE := $(if $(ACTIVE_CODENAME_NAME),1,0)
 RELEASE_HW ?= universal
 RELEASE_HW_LIST := universal seabios ami vbox usb realpc
 RELEASE_HW_UPPER := $(shell printf '%s' '$(RELEASE_HW)' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
@@ -98,7 +97,7 @@ LDFLAGS   := -T linker.ld -nostdlib -m elf_x86_64
 all: $(RAW_IMAGE)
 
 $(VERSION_GEN): $(VERSION_FILE)
-	@printf '#pragma once\n#define LARDOS_VERSION "%s"\n#define LARDOS_LTS_NAME "%s"\n#define LARDOS_LTS_ACTIVE %s\n#define LARDOS_LTS_BUILD_NAME "%s"\n#define LARDOS_LTS_BUILD %s\n' "$$(cat $(VERSION_FILE))" "$(ACTIVE_LTS_NAME)" "$(LTS_ACTIVE)" "$(VERSION_LTS_NAME)" "$(LTS_BUILD)" > $@
+	@printf '#pragma once\n#define LARDOS_VERSION "%s"\n#define LARDOS_CODENAME_NAME "%s"\n#define LARDOS_SUBNAME "%s"\n#define LARDOS_CODENAME_ACTIVE %s\n#define LARDOS_LTS_NAME ""\n#define LARDOS_LTS_ACTIVE 0\n#define LARDOS_LTS_BUILD_NAME ""\n#define LARDOS_LTS_BUILD 0\n' "$$(cat $(VERSION_FILE))" "$(ACTIVE_CODENAME_NAME)" "$(ACTIVE_CODENAME_NAME)" "$(CODENAME_ACTIVE)" > $@
 
 $(BOOT_BIN): $(BOOT_DIR)/stage1.s
 	$(NASM) -f bin $(BOOT_META_DEFS) $< -o $@

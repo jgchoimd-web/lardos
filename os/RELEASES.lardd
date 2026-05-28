@@ -4,7 +4,16 @@ TEXT Every feature addition gets a release entry. The running kernel version is 
 TEXT Suffix policy: a=official, b=beta-experimental, p=hotpatch.
 TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox, usb, realpc.
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
-TEXT LTS codenames append after the channel, for example v1.99.0a-tiara. Only one LTS line is active at a time.
+TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
+
+SECTION v2.0.6b-mirage
+ITEM Retires the LardOS LTS release model; Tiara support is ended and there is no active LTS line.
+ITEM Changes Tiara/Mirage style names into OS-era subnames instead of long-term-support promises.
+ITEM Sets Mirage as the current subname and exposes it through generated version metadata, ver/status, release policy, release codename, codename.lardd, and userlaw.lardd.
+ITEM Keeps release lts and lts.lardd as visible compatibility surfaces that explain the LTS retirement instead of hiding the policy change.
+ITEM Keeps a/b/p suffixes and hardware release profiles unchanged; codenames append after the channel, such as v2.0.6b-mirage.
+ITEM Preserves PanicRoom, AuxKernel REAL16, seed/default ownership, RXE/SYSRXE apps, KMO, LiveUpdate, MediaFS, GUI, LardOS Connect, and user-control values without feature loss.
+ITEM Ships as beta because it changes release-support policy language and version metadata.
 
 SECTION v2.0.5b
 ITEM Corrects AuxKernel from the mistaken REAL8 beta wording to a REAL16 emergency profile.
@@ -12,7 +21,7 @@ ITEM auxkernel real16 now runs the primary BIOS 16-bit real-mode first responder
 ITEM Keeps auxkernel real8 as a visible compatibility alias that explains the correction and redirects to REAL16 instead of silently breaking old input.
 ITEM Renames AuxKernel status, auxkernel.lardd report fields, global status, POST labels, and documentation to real16 bridge readiness, probe counts, last result, and marker bytes.
 ITEM Updates the CPU bridge marker to a visible 0xA1/0x16 REAL16 probe signature.
-ITEM Preserves PanicRoom, lockdown, keydrop, seed/default ownership, RXE/SYSRXE apps, KMO, LiveUpdate, MediaFS, GUI, LardOS Connect, and Tiara LTS policy without feature loss.
+ITEM Preserves PanicRoom, lockdown, keydrop, seed/default ownership, RXE/SYSRXE apps, KMO, LiveUpdate, MediaFS, GUI, LardOS Connect, and then-current Tiara LTS policy without feature loss.
 ITEM Ships as beta because it corrects the emergency kernel mode contract introduced in v2.0.4b.
 
 SECTION v2.0.4b
@@ -21,7 +30,7 @@ ITEM Adds a CPU mode bridge request for auxkernel real8 so LardOS can prove the 
 ITEM AuxKernel status, auxkernel.lardd reports, and global status now expose real8 bridge readiness, probe counts, last result, and marker bytes.
 ITEM auxkernel real8 runs the explicit REAL8 probe; PanicRoom, lockdown, keydrop, and POST/selftest also touch the visible REAL8 path.
 ITEM Keeps the safety line intact: no hidden hardware-damage path, no KMO dependency, and user-confirmed containment through lock/sync/key discard.
-ITEM Preserves the v2.0.3b seed/default ownership model, RXE/SYSRXE apps, KMO, LiveUpdate, MediaFS, GUI, LardOS Connect, and Tiara LTS policy without feature loss.
+ITEM Preserves the v2.0.3b seed/default ownership model, RXE/SYSRXE apps, KMO, LiveUpdate, MediaFS, GUI, LardOS Connect, and then-current Tiara LTS policy without feature loss.
 ITEM Ships as beta because it deepens the emergency kernel mode contract.
 
 SECTION v2.0.3b
@@ -30,7 +39,7 @@ ITEM fs_open now checks user-owned writable overlays before built-in/LFS seed de
 ITEM DIR and merged storage listing now hide duplicate seed/default names when a user overlay exists.
 ITEM write, append, copy, GUI saves, LiveUpdate, and KMO editing can create user-owned overlays for seed/default names instead of refusing control.
 ITEM DEL -F, TOMB, RESTORE, and BLEED wording now describes seed/default removal records rather than immutable files.
-ITEM Preserves bundled apps, RXE/SYSRXE, KMO, LiveUpdate, MediaFS, installer, security, GUI, LardOS Connect, and Tiara LTS policy without feature loss.
+ITEM Preserves bundled apps, RXE/SYSRXE, KMO, LiveUpdate, MediaFS, installer, security, GUI, LardOS Connect, and then-current Tiara LTS policy without feature loss.
 ITEM Ships as beta because it changes filesystem ownership semantics while following the LardOS user-control value.
 
 SECTION v2.0.2b

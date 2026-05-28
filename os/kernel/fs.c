@@ -189,7 +189,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Keyboard completeness: mouse workflows should also have keyboard and shortcut routes so the full OS can be driven without a mouse.\n"
     "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
-    "ITEM LTS honesty: only one LTS line is active at a time, and support changes must be visible through release lts.\n"
+    "ITEM Codename honesty: Tiara-style names are OS-era subnames, not LTS promises; support-policy changes must stay visible through release codename and release lts.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
     "SECTION Commands\n"
     "ITEM values -> read this law.\n"
@@ -736,14 +736,16 @@ static const uint8_t file_lardos_lars[] =
     "cmd post\n"
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
+    "cmd lardd codename.lardd\n"
     "cmd lardd lts.lardd\n"
     "cmd lardd office_guide.lardd\n"
     "cmd rxe show lardwrite.rxe\n"
     "cmd rxe show lardsheet.rxe\n"
     "cmd rxe show lardshow.rxe\n"
+    "cmd release codename\n"
     "cmd release lts\n"
     "cmd lardd dosmode_guide.lardd\n"
-    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch. LTS codenames append after the suffix, like v1.99.0a-tiara.\n"
+    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch. Codenames now append after the suffix as OS-era subnames, like v2.0.6b-mirage.\n"
     "end\n";
 
 static const uint8_t file_default_lguilib[] =
@@ -814,15 +816,27 @@ static const uint8_t file_lardd_guide[] =
 
 static const uint8_t file_lts_lardd[] =
     "LARDD 1\n"
-    "TITLE LardOS LTS\n"
-    "TEXT Current LTS: Tiara.\n"
-    "TEXT Active version: v1.99.0a-tiara.\n"
-    "TEXT Only one LTS line is active at a time; when the next LTS ships, the old LTS support line ends.\n"
-    "TEXT Next planned LTS codename: Mirage.\n"
-    "TEXT LTS means long-support promotion, not feature removal or value changes.\n"
+    "TITLE LardOS LTS Retired\n"
+    "TEXT LardOS no longer creates LTS releases.\n"
+    "TEXT Tiara LTS support is ended.\n"
+    "TEXT Mirage is the current OS-era subname, not a long-term-support promise.\n"
+    "TEXT release lts remains as a visible compatibility command that explains the policy change.\n"
     "SECTION Values\n"
     "ITEM User ownership, raw-control visibility, native formats, recovery paths, and keyboard completeness remain part of the supported surface.\n"
     "ITEM Deprecated raw-control paths may exist, but they must remain confirm-gated and auditable.\n"
+    "END\n";
+
+static const uint8_t file_codename_lardd[] =
+    "LARDD 1\n"
+    "TITLE LardOS Codename\n"
+    "TEXT Current codename: Mirage.\n"
+    "TEXT Codenames are OS-era subnames used when the operating system changes shape in a big way.\n"
+    "TEXT They are not LTS promises and do not change the a/b/p release suffix policy.\n"
+    "TEXT Example: v2.0.6b-mirage is a beta build in the Mirage era.\n"
+    "TEXT Tiara LTS support is retired; Tiara remains only as a historical codename.\n"
+    "SECTION Values\n"
+    "ITEM The codename must not hide feature loss, ownership changes, or support-policy changes.\n"
+    "ITEM release codename and release lts keep the policy visible inside the OS.\n"
     "END\n";
 
 static const uint8_t file_office_guide[] =
@@ -1562,6 +1576,7 @@ static const FsFile FS_FILES[] = {
     { "default.lguilib", file_default_lguilib, sizeof(file_default_lguilib) - 1 },
     { "default.ltheme", file_default_ltheme, sizeof(file_default_ltheme) - 1 },
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
+    { "codename.lardd", file_codename_lardd, sizeof(file_codename_lardd) - 1 },
     { "lts.lardd", file_lts_lardd, sizeof(file_lts_lardd) - 1 },
     { "office_guide.lardd", file_office_guide, sizeof(file_office_guide) - 1 },
     { "glyph_guide.lardd", file_glyph_guide, sizeof(file_glyph_guide) - 1 },

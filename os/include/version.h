@@ -6,6 +6,18 @@
 #define LARDOS_VERSION "v0.0.0b"
 #endif
 
+#ifndef LARDOS_CODENAME_NAME
+#define LARDOS_CODENAME_NAME "mirage"
+#endif
+
+#ifndef LARDOS_SUBNAME
+#define LARDOS_SUBNAME LARDOS_CODENAME_NAME
+#endif
+
+#ifndef LARDOS_CODENAME_ACTIVE
+#define LARDOS_CODENAME_ACTIVE 1
+#endif
+
 #ifndef LARDOS_LTS_NAME
 #define LARDOS_LTS_NAME ""
 #endif
@@ -57,4 +69,9 @@ static inline const char* lardos_release_channel_name(void)
     if (suffix == 'b') return "beta-experimental";
     if (suffix == 'p') return "hotpatch";
     return "unknown";
+}
+
+static inline const char* lardos_release_codename(void)
+{
+    return LARDOS_CODENAME_ACTIVE ? LARDOS_CODENAME_NAME : "none";
 }

@@ -523,11 +523,11 @@ same history inside LardOS, and produces versioned boot media with
 `make release-all-hardware`. `release policy` exposes the same rule from the
 shell.
 
-LTS releases are official `a` releases with a codename appended after the
-channel, such as `v1.99.0a-tiara`. LardOS keeps only one active LTS line at a
-time; when the next LTS codename ships, the previous LTS support line ends.
-`release lts` exposes that support state in the shell, including the difference
-between the current build version and the active LTS support line.
+Codenames are now OS-era subnames appended after the channel, such as
+`v2.0.6b-mirage`. They are not LTS promises. LardOS no longer creates active
+LTS lines; Tiara support is retired and Mirage is the current subname.
+`release codename` exposes the current subname, while the legacy
+`release lts` surface remains only to explain that the old support model ended.
 
 Bundled GUI applications that are not core desktop mechanics should be RXE or
 SYSRXE files. The office-style defaults follow this rule: LardWrite,

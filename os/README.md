@@ -52,6 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.0.1b` deepens the bundled office apps without turning them into hard-coded
+GUI branches. LardWrite now has title, section, bullet, quote, code, find, and
+stats commands. LardSheet now has columns, rows, cells, visible formulas,
+CSV-style export, search, sum, and average summaries. LardShow now has title,
+theme, speaker notes, slide listing, play, next/prev, and slide-number
+navigation. The apps remain normal `.rxe` files backed by editable native
+office files.
+
 `v2.0.0b` adds bundled native office-style apps as RXE files: `lardwrite.rxe`
 for word-processor style documents, `lardsheet.rxe` for spreadsheet-style
 workbooks, and `lardshow.rxe` for presentation decks. Their editable files are
@@ -886,6 +894,9 @@ commands:
 - `lword`/`lwrite`, `lsheet`, and `lshow` provide the keyboard path for the
   bundled LardWrite/LardSheet/LardShow office apps. They edit
   `office_doc.lardd`, `office_sheet.lsheet`, and `office_deck.lshow`.
+  Useful subcommands include `lword title/section/bullet/quote/code/find/stats`,
+  `lsheet col/cell/formula/csv/sum/find`, and
+  `lshow play/next/prev/slide/theme/note`.
 - `release` renders the current release log from `releases.lardd`; `release lts`
   shows the active LTS codename, the one-LTS-at-a-time rule, and the next
   planned LTS name.

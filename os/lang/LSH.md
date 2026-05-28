@@ -8,7 +8,9 @@
 - `release policy` - show when to use `a`, `b`, or `p` release suffixes.
 - `release lts` - show the active LTS codename and support rule.
 - `lword`/`lwrite`, `lsheet`, `lshow` - edit the bundled native office document,
-  workbook, and deck files from the shell.
+  workbook, and deck files from the shell. LardWrite supports title/section/
+  bullet/quote/code/find/stats; LardSheet supports col/cell/formula/csv/sum;
+  LardShow supports play/next/prev/slide/theme/note.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `post baseline` / `postbaseline show` - show the saved POST baseline report.
 - `time` / `date` / `lunar` / `dangun` - show LardOS Time ticks, five-digit year dates, native lunar view, and Dangun year.

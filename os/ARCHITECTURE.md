@@ -522,7 +522,9 @@ between the current build version and the active LTS support line.
 Bundled GUI applications that are not core desktop mechanics should be RXE or
 SYSRXE files. The office-style defaults follow this rule: LardWrite,
 LardSheet, and LardShow are normal `.rxe` files backed by writable native data
-files instead of one-off GUI branches.
+files instead of one-off GUI branches. Office functionality grows through
+native commands and records in `.lardd`, `.lsheet`, and `.lshow` files, so new
+editing features do not require a new hard-coded app branch for every button.
 
 Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal

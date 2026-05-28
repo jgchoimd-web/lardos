@@ -974,21 +974,28 @@ static const char office_doc_reset[] =
     "LARDD 1\n"
     "TITLE LardWrite Document\n"
     "SECTION Draft\n"
-    "TEXT Type a line in LardWrite and press Add Line to append it here.\n";
+    "TEXT Type a line in LardWrite and press Run to append it here.\n"
+    "ITEM Commands: title, section, bullet, quote, code, find, stats.\n";
 
 static const char office_sheet_reset[] =
     "LSHEET 1\n"
     "TITLE LardSheet Workbook\n"
     "COL Item Value\n"
-    "ROW sample 42\n";
+    "ROW sample 42\n"
+    "CELL A1 42\n"
+    "CELL B1 8\n";
 
 static const char office_deck_reset[] =
     "LSHOW 1\n"
     "TITLE LardShow Deck\n"
+    "THEME classic\n"
     "SLIDE Welcome | Native LardOS presentation deck.\n"
+    "NOTE Use lshow next, prev, slide N, theme, and note.\n"
     "SLIDE Values | Files stay editable, visible, and local.\n";
 
 static int vcs_read_word(const char** args, char* out, uint32_t cap);
+static int vcs_parse_u32(const char** args, uint32_t* out);
+static uint32_t s_lshow_cursor = 1u;
 
 static int office_line_prefix(const char* p, const char* end, const char* prefix, const char** value)
 {
@@ -1010,6 +1017,66 @@ static int office_reset_writable(const char* name, const char* text)
     return fs_write(w, 0, (const uint8_t*)text, len) == len ? 0 : -2;
 }
 
+static void office_tmp_append_char(char* out, uint32_t cap, uint32_t* n, char ch)
+{
+    if (!out || !n || cap == 0 || *n + 1u >= cap) return;
+    out[(*n)++] = ch;
+    out[*n] = '\0';
+}
+
+static void office_tmp_append_s(char* out, uint32_t cap, uint32_t* n, const char* s)
+{
+    if (!s) return;
+    while (*s) office_tmp_append_char(out, cap, n, *s++);
+}
+
+static void office_tmp_append_span(char* out, uint32_t cap, uint32_t* n,
+                                   const char* p, const char* end)
+{
+    while (p < end) office_tmp_append_char(out, cap, n, *p++);
+}
+
+static int office_set_record(const char* name, const char* key, const char* text)
+{
+    FsWritableFile* w = fs_open_writable(name);
+    char tmp[4096];
+    const char* p;
+    const char* end;
+    uint32_t n = 0;
+    int replaced = 0;
+    if (!w || !key || !text) return -1;
+    while (*text == ' ' || *text == '\t') text++;
+    if (!text[0]) return -2;
+    tmp[0] = '\0';
+    p = (const char*)w->data;
+    end = p + w->size;
+    while (p < end) {
+        const char* le = p;
+        const char* value = NULL;
+        while (le < end && *le != '\n' && *le != '\r') le++;
+        if (!replaced && office_line_prefix(p, le, key, &value)) {
+            office_tmp_append_s(tmp, sizeof(tmp), &n, key);
+            office_tmp_append_char(tmp, sizeof(tmp), &n, ' ');
+            office_tmp_append_s(tmp, sizeof(tmp), &n, text);
+            office_tmp_append_char(tmp, sizeof(tmp), &n, '\n');
+            replaced = 1;
+        } else {
+            office_tmp_append_span(tmp, sizeof(tmp), &n, p, le);
+            office_tmp_append_char(tmp, sizeof(tmp), &n, '\n');
+        }
+        p = le;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+    }
+    if (!replaced) {
+        office_tmp_append_s(tmp, sizeof(tmp), &n, key);
+        office_tmp_append_char(tmp, sizeof(tmp), &n, ' ');
+        office_tmp_append_s(tmp, sizeof(tmp), &n, text);
+        office_tmp_append_char(tmp, sizeof(tmp), &n, '\n');
+    }
+    if (n >= w->cap) return -3;
+    return fs_write(w, 0, (const uint8_t*)tmp, n) == n ? 0 : -4;
+}
+
 static int office_append_record(const char* name, const char* prefix, const char* text)
 {
     FsWritableFile* w = fs_open_writable(name);
@@ -1028,19 +1095,181 @@ static int office_append_record(const char* name, const char* prefix, const char
     return 0;
 }
 
-static void office_render_prefixed_file(const char* name, const char* title,
-                                        const char* row_prefix, const char* row_mark)
+static int office_append_code_record(const char* name, const char* text)
+{
+    FsWritableFile* w = fs_open_writable(name);
+    static const char code_start[] = "CODE\n";
+    static const char code_end[] = "ENDCODE\n";
+    uint32_t tlen = 0;
+    const uint8_t nl = '\n';
+    if (!w || !text) return -1;
+    while (*text == ' ' || *text == '\t') text++;
+    if (!text[0]) return -2;
+    while (text[tlen]) tlen++;
+    if (w->size + sizeof(code_start) - 1u + tlen + 1u + sizeof(code_end) - 1u > w->cap) return -3;
+    if (fs_append(w, (const uint8_t*)code_start, sizeof(code_start) - 1u) != sizeof(code_start) - 1u) return -4;
+    if (fs_append(w, (const uint8_t*)text, tlen) != tlen) return -5;
+    if (fs_append(w, &nl, 1u) != 1u) return -6;
+    if (fs_append(w, (const uint8_t*)code_end, sizeof(code_end) - 1u) != sizeof(code_end) - 1u) return -7;
+    return 0;
+}
+
+static int office_contains_range(const char* p, const char* end, const char* needle)
+{
+    uint32_t nl = 0;
+    if (!needle || !needle[0]) return 0;
+    while (needle[nl]) nl++;
+    while (p < end) {
+        uint32_t i = 0;
+        while (i < nl && p + i < end && ascii_lower_char(p[i]) == ascii_lower_char(needle[i])) i++;
+        if (i == nl) return 1;
+        p++;
+    }
+    return 0;
+}
+
+static uint32_t office_count_words(const char* p, const char* end)
+{
+    uint32_t words = 0;
+    int in_word = 0;
+    while (p < end) {
+        int word = ((*p >= '0' && *p <= '9') || (*p >= 'A' && *p <= 'Z') ||
+                    (*p >= 'a' && *p <= 'z') || *p == '_' || *p == '-');
+        if (word && !in_word) words++;
+        in_word = word;
+        p++;
+    }
+    return words;
+}
+
+static void office_render_lword_stats(void)
+{
+    const FsFile* f = fs_open("office_doc.lardd");
+    const char* p;
+    const char* end;
+    uint32_t sections = 0;
+    uint32_t paragraphs = 0;
+    uint32_t items = 0;
+    uint32_t quotes = 0;
+    uint32_t code = 0;
+    uint32_t words = 0;
+    if (!f || !f->data) {
+        out_append("LardWrite: document not found.\n");
+        return;
+    }
+    p = (const char*)f->data;
+    end = p + f->size;
+    while (p < end) {
+        const char* le = p;
+        const char* value = NULL;
+        while (le < end && *le != '\n' && *le != '\r') le++;
+        if (office_line_prefix(p, le, "SECTION", &value)) sections++;
+        else if (office_line_prefix(p, le, "TEXT", &value)) paragraphs++;
+        else if (office_line_prefix(p, le, "ITEM", &value)) items++;
+        else if (office_line_prefix(p, le, "QUOTE", &value)) quotes++;
+        else if (office_line_prefix(p, le, "CODE", &value)) code++;
+        if (value) words += office_count_words(value, le);
+        p = le;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+    }
+    out_append("LardWrite stats\n");
+    out_append("  sections: "); out_append_u32(sections); out_append("\n");
+    out_append("  paragraphs: "); out_append_u32(paragraphs); out_append("\n");
+    out_append("  bullets: "); out_append_u32(items); out_append("\n");
+    out_append("  quotes: "); out_append_u32(quotes); out_append("\n");
+    out_append("  code blocks: "); out_append_u32(code); out_append("\n");
+    out_append("  words: "); out_append_u32(words); out_append("\n");
+}
+
+static void office_find_records(const char* name, const char* title, const char* needle)
 {
     const FsFile* f = fs_open(name);
     const char* p;
     const char* end;
-    uint32_t rows = 0;
-    if (!f || !f->data) {
-        out_append("office: file not found.\n");
+    uint32_t hits = 0;
+    if (!f || !f->data || !needle || !needle[0]) {
+        out_append("office find: file or search text missing.\n");
         return;
     }
     out_append(title);
+    out_append(" find: ");
+    out_append(needle);
     out_append("\n");
+    p = (const char*)f->data;
+    end = p + f->size;
+    while (p < end) {
+        const char* le = p;
+        while (le < end && *le != '\n' && *le != '\r') le++;
+        if (office_contains_range(p, le, needle)) {
+            hits++;
+            out_append("  ");
+            out_append_u32(hits);
+            out_append(": ");
+            while (p < le) out_append_char(*p++);
+            out_append("\n");
+        }
+        p = le;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+    }
+    if (!hits) out_append("  no matches\n");
+}
+
+static int32_t office_parse_i32_at(const char* p, const char* end, int* ok)
+{
+    int neg = 0;
+    int32_t v = 0;
+    if (ok) *ok = 0;
+    while (p < end && (*p == ' ' || *p == '\t')) p++;
+    if (p < end && *p == '-') { neg = 1; p++; }
+    if (p >= end || *p < '0' || *p > '9') return 0;
+    while (p < end && *p >= '0' && *p <= '9') {
+        v = (int32_t)(v * 10 + (*p - '0'));
+        p++;
+    }
+    if (ok) *ok = 1;
+    return neg ? -v : v;
+}
+
+static void office_sheet_sum_value(const char* p, const char* end, int32_t* sum, uint32_t* count)
+{
+    const char* start = p;
+    while (p < end) {
+        if ((*p == '-' && p + 1 < end && p[1] >= '0' && p[1] <= '9') ||
+            (*p >= '0' && *p <= '9')) {
+            int left_ok = p == start ||
+                          !((p[-1] >= '0' && p[-1] <= '9') ||
+                            (p[-1] >= 'A' && p[-1] <= 'Z') ||
+                            (p[-1] >= 'a' && p[-1] <= 'z') ||
+                            p[-1] == '_');
+            int ok = 0;
+            int32_t v;
+            v = office_parse_i32_at(p, end, &ok);
+            if (ok && left_ok) {
+                *sum += v;
+                (*count)++;
+            }
+            while (p < end && (*p == '-' || (*p >= '0' && *p <= '9'))) p++;
+        } else {
+            p++;
+        }
+    }
+}
+
+static void office_render_sheet(void)
+{
+    const FsFile* f = fs_open("office_sheet.lsheet");
+    const char* p;
+    const char* end;
+    uint32_t rows = 0;
+    uint32_t cells = 0;
+    uint32_t formulas = 0;
+    int32_t sum = 0;
+    uint32_t count = 0;
+    if (!f || !f->data) {
+        out_append("LardSheet: workbook not found.\n");
+        return;
+    }
+    out_append("LardSheet workbook\n");
     p = (const char*)f->data;
     end = p + f->size;
     while (p < end) {
@@ -1055,10 +1284,24 @@ static void office_render_prefixed_file(const char* name, const char* title,
             out_append("columns: ");
             while (value < le) out_append_char(*value++);
             out_append("\n");
-        } else if (office_line_prefix(p, le, row_prefix, &value)) {
+        } else if (office_line_prefix(p, le, "ROW", &value)) {
             rows++;
-            out_append(row_mark);
+            out_append("row ");
             out_append_u32(rows);
+            out_append(": ");
+            office_sheet_sum_value(value, le, &sum, &count);
+            while (value < le) out_append_char(*value++);
+            out_append("\n");
+        } else if (office_line_prefix(p, le, "CELL", &value)) {
+            cells++;
+            out_append("cell ");
+            while (value < le) out_append_char(*value++);
+            out_append("\n");
+            office_sheet_sum_value(value, le, &sum, &count);
+        } else if (office_line_prefix(p, le, "FORMULA", &value)) {
+            formulas++;
+            out_append("formula ");
+            out_append_u32(formulas);
             out_append(": ");
             while (value < le) out_append_char(*value++);
             out_append("\n");
@@ -1066,79 +1309,336 @@ static void office_render_prefixed_file(const char* name, const char* title,
         p = le;
         while (p < end && (*p == '\n' || *p == '\r')) p++;
     }
-    if (!rows) out_append("(empty)\n");
+    out_append("numbers: ");
+    out_append_u32(count);
+    out_append("  sum: ");
+    out_append_i32(sum);
+    if (count) {
+        out_append("  avg: ");
+        out_append_i32(sum / (int32_t)count);
+    }
+    out_append("\n");
+}
+
+static void office_sheet_csv(void)
+{
+    const FsFile* f = fs_open("office_sheet.lsheet");
+    const char* p;
+    const char* end;
+    if (!f || !f->data) {
+        out_append("LardSheet: workbook not found.\n");
+        return;
+    }
+    out_append("LardSheet CSV view\n");
+    p = (const char*)f->data;
+    end = p + f->size;
+    while (p < end) {
+        const char* le = p;
+        const char* value = NULL;
+        while (le < end && *le != '\n' && *le != '\r') le++;
+        if (office_line_prefix(p, le, "COL", &value) ||
+            office_line_prefix(p, le, "ROW", &value) ||
+            office_line_prefix(p, le, "CELL", &value)) {
+            while (value < le) {
+                out_append_char(*value == ' ' || *value == '\t' ? ',' : *value);
+                value++;
+            }
+            out_append("\n");
+        }
+        p = le;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+    }
+}
+
+static uint32_t office_count_records(const char* name, const char* prefix)
+{
+    const FsFile* f = fs_open(name);
+    const char* p;
+    const char* end;
+    uint32_t count = 0;
+    if (!f || !f->data) return 0;
+    p = (const char*)f->data;
+    end = p + f->size;
+    while (p < end) {
+        const char* le = p;
+        while (le < end && *le != '\n' && *le != '\r') le++;
+        if (office_line_prefix(p, le, prefix, NULL)) count++;
+        p = le;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+    }
+    return count;
+}
+
+static void office_render_deck(uint32_t wanted)
+{
+    const FsFile* f = fs_open("office_deck.lshow");
+    const char* p;
+    const char* end;
+    uint32_t slide = 0;
+    uint32_t total;
+    if (!f || !f->data) {
+        out_append("LardShow: deck not found.\n");
+        return;
+    }
+    total = office_count_records("office_deck.lshow", "SLIDE");
+    if (wanted > total && total > 0) wanted = total;
+    out_append("LardShow deck");
+    if (wanted) {
+        out_append(" slide ");
+        out_append_u32(wanted);
+        out_append("/");
+        out_append_u32(total);
+    }
+    out_append("\n");
+    p = (const char*)f->data;
+    end = p + f->size;
+    while (p < end) {
+        const char* le = p;
+        const char* value = NULL;
+        while (le < end && *le != '\n' && *le != '\r') le++;
+        if (office_line_prefix(p, le, "TITLE", &value)) {
+            out_append("title: ");
+            while (value < le) out_append_char(*value++);
+            out_append("\n");
+        } else if (office_line_prefix(p, le, "THEME", &value)) {
+            out_append("theme: ");
+            while (value < le) out_append_char(*value++);
+            out_append("\n");
+        } else if (office_line_prefix(p, le, "SLIDE", &value)) {
+            slide++;
+            if (wanted == 0 || wanted == slide) {
+                const char* body = value;
+                while (body < le && *body != '|') body++;
+                out_append(wanted ? "\n[" : "slide ");
+                out_append_u32(slide);
+                out_append(wanted ? "] " : ": ");
+                while (value < body) out_append_char(*value++);
+                if (body < le && *body == '|') {
+                    body++;
+                    while (body < le && (*body == ' ' || *body == '\t')) body++;
+                    out_append(wanted ? "\n" : " - ");
+                    while (body < le) out_append_char(*body++);
+                }
+                out_append("\n");
+            }
+        } else if (office_line_prefix(p, le, "NOTE", &value) && (wanted == 0 || wanted == slide)) {
+            out_append("note: ");
+            while (value < le) out_append_char(*value++);
+            out_append("\n");
+        }
+        p = le;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+    }
+    if (!total) out_append("(empty deck)\n");
 }
 
 static void cmd_lword(const char* args)
 {
     char sub[16];
+    const char* original = args;
     if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
         strcmp(sub, "show") == 0 || strcmp(sub, "open") == 0 || strcmp(sub, "view") == 0) {
-        cmd_larddoc("office_doc.lardd", "Usage: lword show|add text|new");
+        cmd_larddoc("office_doc.lardd", "Usage: lword show|add|title|section|bullet|quote|code|find|stats|new");
+        return;
+    }
+    if (strcmp(sub, "title") == 0 || strcmp(sub, "name") == 0) {
+        out_append(office_set_record("office_doc.lardd", "TITLE", args) == 0 ?
+                   "LardWrite: title updated.\n" : "LardWrite: title failed.\n");
+        cmd_larddoc("office_doc.lardd", "Usage: lword title text");
+        return;
+    }
+    if (strcmp(sub, "section") == 0 || strcmp(sub, "heading") == 0 || strcmp(sub, "h1") == 0) {
+        int r = office_append_record("office_doc.lardd", "SECTION ", args);
+        out_append(r == 0 ? "LardWrite: section added.\n" : "LardWrite: section failed.\n");
+        cmd_larddoc("office_doc.lardd", "Usage: lword section text");
+        return;
+    }
+    if (strcmp(sub, "bullet") == 0 || strcmp(sub, "item") == 0 || strcmp(sub, "list") == 0) {
+        int r = office_append_record("office_doc.lardd", "ITEM ", args);
+        out_append(r == 0 ? "LardWrite: bullet added.\n" : "LardWrite: bullet failed.\n");
+        cmd_larddoc("office_doc.lardd", "Usage: lword bullet text");
+        return;
+    }
+    if (strcmp(sub, "quote") == 0) {
+        int r = office_append_record("office_doc.lardd", "QUOTE ", args);
+        out_append(r == 0 ? "LardWrite: quote added.\n" : "LardWrite: quote failed.\n");
+        cmd_larddoc("office_doc.lardd", "Usage: lword quote text");
+        return;
+    }
+    if (strcmp(sub, "code") == 0) {
+        int r = office_append_code_record("office_doc.lardd", args);
+        out_append(r == 0 ? "LardWrite: code line added.\n" : "LardWrite: code failed.\n");
+        cmd_larddoc("office_doc.lardd", "Usage: lword code text");
+        return;
+    }
+    if (strcmp(sub, "stats") == 0 || strcmp(sub, "count") == 0) {
+        office_render_lword_stats();
+        return;
+    }
+    if (strcmp(sub, "find") == 0 || strcmp(sub, "search") == 0) {
+        office_find_records("office_doc.lardd", "LardWrite", args);
         return;
     }
     if (strcmp(sub, "add") == 0 || strcmp(sub, "line") == 0 || strcmp(sub, "write") == 0) {
         int r = office_append_record("office_doc.lardd", "TEXT ", args);
         if (r == 0) out_append("LardWrite: added line to office_doc.lardd.\n");
         else out_append("LardWrite: add failed; type a line after lword add.\n");
-        cmd_larddoc("office_doc.lardd", "Usage: lword show|add text|new");
+        cmd_larddoc("office_doc.lardd", "Usage: lword add text");
         return;
     }
     if (strcmp(sub, "new") == 0 || strcmp(sub, "reset") == 0 || strcmp(sub, "clear") == 0) {
         out_append(office_reset_writable("office_doc.lardd", office_doc_reset) == 0 ?
                    "LardWrite: new document ready.\n" : "LardWrite: reset failed.\n");
-        cmd_larddoc("office_doc.lardd", "Usage: lword show|add text|new");
+        cmd_larddoc("office_doc.lardd", "Usage: lword new");
         return;
     }
-    out_append("Usage: lword show|add text|new\n");
+    if (original && original[0]) {
+        int r = office_append_record("office_doc.lardd", "TEXT ", original);
+        out_append(r == 0 ? "LardWrite: added plain text line.\n" : "LardWrite: add failed.\n");
+        cmd_larddoc("office_doc.lardd", "Usage: lword plain text");
+        return;
+    }
+    out_append("Usage: lword show|add|title|section|bullet|quote|code|find|stats|new\n");
 }
 
 static void cmd_lsheet(const char* args)
 {
     char sub[16];
+    const char* original = args;
     if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
         strcmp(sub, "show") == 0 || strcmp(sub, "open") == 0 || strcmp(sub, "view") == 0) {
-        office_render_prefixed_file("office_sheet.lsheet", "LardSheet workbook", "ROW", "row ");
+        office_render_sheet();
+        return;
+    }
+    if (strcmp(sub, "title") == 0 || strcmp(sub, "name") == 0) {
+        out_append(office_set_record("office_sheet.lsheet", "TITLE", args) == 0 ?
+                   "LardSheet: title updated.\n" : "LardSheet: title failed.\n");
+        office_render_sheet();
+        return;
+    }
+    if (strcmp(sub, "col") == 0 || strcmp(sub, "columns") == 0) {
+        out_append(office_set_record("office_sheet.lsheet", "COL", args) == 0 ?
+                   "LardSheet: columns updated.\n" : "LardSheet: columns failed.\n");
+        office_render_sheet();
+        return;
+    }
+    if (strcmp(sub, "cell") == 0) {
+        int r = office_append_record("office_sheet.lsheet", "CELL ", args);
+        out_append(r == 0 ? "LardSheet: cell added.\n" : "LardSheet: cell failed; use lsheet cell A1 42.\n");
+        office_render_sheet();
+        return;
+    }
+    if (strcmp(sub, "formula") == 0 || strcmp(sub, "fx") == 0) {
+        int r = office_append_record("office_sheet.lsheet", "FORMULA ", args);
+        out_append(r == 0 ? "LardSheet: formula recorded.\n" : "LardSheet: formula failed.\n");
+        office_render_sheet();
+        return;
+    }
+    if (strcmp(sub, "csv") == 0 || strcmp(sub, "export") == 0) {
+        office_sheet_csv();
+        return;
+    }
+    if (strcmp(sub, "total") == 0 || strcmp(sub, "sum") == 0 ||
+        strcmp(sub, "avg") == 0 || strcmp(sub, "calc") == 0) {
+        office_render_sheet();
+        return;
+    }
+    if (strcmp(sub, "find") == 0 || strcmp(sub, "search") == 0) {
+        office_find_records("office_sheet.lsheet", "LardSheet", args);
         return;
     }
     if (strcmp(sub, "add") == 0 || strcmp(sub, "row") == 0) {
         int r = office_append_record("office_sheet.lsheet", "ROW ", args);
         if (r == 0) out_append("LardSheet: added row to office_sheet.lsheet.\n");
         else out_append("LardSheet: add failed; use lsheet add label value.\n");
-        office_render_prefixed_file("office_sheet.lsheet", "LardSheet workbook", "ROW", "row ");
+        office_render_sheet();
         return;
     }
     if (strcmp(sub, "new") == 0 || strcmp(sub, "reset") == 0 || strcmp(sub, "clear") == 0) {
         out_append(office_reset_writable("office_sheet.lsheet", office_sheet_reset) == 0 ?
                    "LardSheet: new workbook ready.\n" : "LardSheet: reset failed.\n");
-        office_render_prefixed_file("office_sheet.lsheet", "LardSheet workbook", "ROW", "row ");
+        office_render_sheet();
         return;
     }
-    out_append("Usage: lsheet show|add label value|new\n");
+    if (original && original[0]) {
+        int r = office_append_record("office_sheet.lsheet", "ROW ", original);
+        out_append(r == 0 ? "LardSheet: added plain row.\n" : "LardSheet: add failed.\n");
+        office_render_sheet();
+        return;
+    }
+    out_append("Usage: lsheet show|add|cell|formula|col|csv|sum|find|new\n");
 }
 
 static void cmd_lshow(const char* args)
 {
     char sub[16];
+    const char* original = args;
     if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
         strcmp(sub, "show") == 0 || strcmp(sub, "open") == 0 || strcmp(sub, "view") == 0) {
-        office_render_prefixed_file("office_deck.lshow", "LardShow deck", "SLIDE", "slide ");
+        office_render_deck(0u);
+        return;
+    }
+    if (strcmp(sub, "title") == 0 || strcmp(sub, "name") == 0) {
+        out_append(office_set_record("office_deck.lshow", "TITLE", args) == 0 ?
+                   "LardShow: title updated.\n" : "LardShow: title failed.\n");
+        office_render_deck(0u);
+        return;
+    }
+    if (strcmp(sub, "theme") == 0) {
+        out_append(office_set_record("office_deck.lshow", "THEME", args) == 0 ?
+                   "LardShow: theme updated.\n" : "LardShow: theme failed.\n");
+        office_render_deck(0u);
+        return;
+    }
+    if (strcmp(sub, "note") == 0 || strcmp(sub, "notes") == 0) {
+        int r = office_append_record("office_deck.lshow", "NOTE ", args);
+        out_append(r == 0 ? "LardShow: note added.\n" : "LardShow: note failed.\n");
+        office_render_deck(0u);
+        return;
+    }
+    if (strcmp(sub, "play") == 0 || strcmp(sub, "present") == 0) {
+        if (s_lshow_cursor == 0) s_lshow_cursor = 1u;
+        office_render_deck(s_lshow_cursor);
+        return;
+    }
+    if (strcmp(sub, "next") == 0) {
+        uint32_t total = office_count_records("office_deck.lshow", "SLIDE");
+        if (s_lshow_cursor < total) s_lshow_cursor++;
+        office_render_deck(s_lshow_cursor);
+        return;
+    }
+    if (strcmp(sub, "prev") == 0 || strcmp(sub, "previous") == 0) {
+        if (s_lshow_cursor > 1u) s_lshow_cursor--;
+        office_render_deck(s_lshow_cursor);
+        return;
+    }
+    if (strcmp(sub, "slide") == 0 || strcmp(sub, "goto") == 0) {
+        uint32_t n = 0;
+        if (vcs_parse_u32(&args, &n) == 0 && n > 0) s_lshow_cursor = n;
+        office_render_deck(s_lshow_cursor);
         return;
     }
     if (strcmp(sub, "add") == 0 || strcmp(sub, "slide") == 0) {
         int r = office_append_record("office_deck.lshow", "SLIDE ", args);
         if (r == 0) out_append("LardShow: added slide to office_deck.lshow.\n");
         else out_append("LardShow: add failed; use lshow add title | body.\n");
-        office_render_prefixed_file("office_deck.lshow", "LardShow deck", "SLIDE", "slide ");
+        office_render_deck(0u);
         return;
     }
     if (strcmp(sub, "new") == 0 || strcmp(sub, "reset") == 0 || strcmp(sub, "clear") == 0) {
         out_append(office_reset_writable("office_deck.lshow", office_deck_reset) == 0 ?
                    "LardShow: new deck ready.\n" : "LardShow: reset failed.\n");
-        office_render_prefixed_file("office_deck.lshow", "LardShow deck", "SLIDE", "slide ");
+        s_lshow_cursor = 1u;
+        office_render_deck(0u);
         return;
     }
-    out_append("Usage: lshow show|add title | body|new\n");
+    if (original && original[0]) {
+        int r = office_append_record("office_deck.lshow", "SLIDE ", original);
+        out_append(r == 0 ? "LardShow: added plain slide.\n" : "LardShow: add failed.\n");
+        office_render_deck(0u);
+        return;
+    }
+    out_append("Usage: lshow show|add|play|next|prev|slide N|theme|note|new\n");
 }
 
 static void lar_list_lsh_cb(const lar_entry_t* entry, void* user)
@@ -2329,7 +2829,9 @@ static void cmd_help(const char* args)
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
-    out_append("  lword/lsheet/lshow show|add|new   native office-style apps and files\n");
+    out_append("  lword show|add|title|section|bullet|quote|code|find|stats|new  document app\n");
+    out_append("  lsheet show|add|cell|formula|col|csv|sum|find|new  spreadsheet app\n");
+    out_append("  lshow show|add|play|next|prev|slide N|theme|note|new  presentation app\n");
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
     out_append("  kmo list|create|command|raw|set|delete|show|run  .kmo kernel modules and file-defined shell commands\n");
     out_append("  liveupdate status|apply|file|append|from|reload|auto|test  runtime file/code updates\n");

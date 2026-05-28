@@ -313,7 +313,8 @@ static const uint8_t office_doc_init[] =
     "LARDD 1\n"
     "TITLE LardWrite Document\n"
     "SECTION Draft\n"
-    "TEXT Type a line in LardWrite and press Add Line to append it here.\n";
+    "TEXT Type a line in LardWrite and press Run to append it here.\n"
+    "ITEM Commands: title, section, bullet, quote, code, find, stats.\n";
 static uint8_t ram_office_doc_buf[OFFICE_DOC_CAP];
 static FsWritableFile ram_office_doc = { "office_doc.lardd", ram_office_doc_buf, 0, OFFICE_DOC_CAP };
 
@@ -322,7 +323,9 @@ static const uint8_t office_sheet_init[] =
     "LSHEET 1\n"
     "TITLE LardSheet Workbook\n"
     "COL Item Value\n"
-    "ROW sample 42\n";
+    "ROW sample 42\n"
+    "CELL A1 42\n"
+    "CELL B1 8\n";
 static uint8_t ram_office_sheet_buf[OFFICE_SHEET_CAP];
 static FsWritableFile ram_office_sheet = { "office_sheet.lsheet", ram_office_sheet_buf, 0, OFFICE_SHEET_CAP };
 
@@ -330,7 +333,9 @@ static FsWritableFile ram_office_sheet = { "office_sheet.lsheet", ram_office_she
 static const uint8_t office_deck_init[] =
     "LSHOW 1\n"
     "TITLE LardShow Deck\n"
+    "THEME classic\n"
     "SLIDE Welcome | Native LardOS presentation deck.\n"
+    "NOTE Use lshow next, prev, slide N, theme, and note.\n"
     "SLIDE Values | Files stay editable, visible, and local.\n";
 static uint8_t ram_office_deck_buf[OFFICE_DECK_CAP];
 static FsWritableFile ram_office_deck = { "office_deck.lshow", ram_office_deck_buf, 0, OFFICE_DECK_CAP };
@@ -821,14 +826,15 @@ static const uint8_t file_office_guide[] =
     "LARDD 1\n"
     "TITLE LardOS Office Apps\n"
     "TEXT LardOS includes three native office-style RXE apps without external office libraries.\n"
+    "TEXT The apps stay file-defined RXE programs; the OS supplies reusable native formats and commands.\n"
     "SECTION Apps\n"
-    "ITEM LardWrite opens lardwrite.rxe and appends document lines into office_doc.lardd.\n"
-    "ITEM LardSheet opens lardsheet.rxe and appends simple rows into office_sheet.lsheet.\n"
-    "ITEM LardShow opens lardshow.rxe and appends slide records into office_deck.lshow.\n"
+    "ITEM LardWrite opens lardwrite.rxe and edits TITLE, SECTION, TEXT, ITEM, QUOTE, and CODE records in office_doc.lardd.\n"
+    "ITEM LardSheet opens lardsheet.rxe and edits COL, ROW, CELL, and FORMULA records in office_sheet.lsheet.\n"
+    "ITEM LardShow opens lardshow.rxe and edits TITLE, THEME, SLIDE, and NOTE records in office_deck.lshow.\n"
     "SECTION Shell\n"
-    "ITEM lword show | add text | new\n"
-    "ITEM lsheet show | add label value | new\n"
-    "ITEM lshow show | add slide text | new\n"
+    "ITEM lword show | add text | title text | section text | bullet text | quote text | code text | find text | stats | new\n"
+    "ITEM lsheet show | add label value | cell A1 42 | formula total sum | col name value | csv | sum | find text | new\n"
+    "ITEM lshow show | add title | body | play | next | prev | slide N | theme name | note text | new\n"
     "TEXT These are starter replacements for word processor, spreadsheet, and presentation workflows while keeping files native and user-editable.\n"
     "END\n";
 
@@ -1459,20 +1465,23 @@ static const uint8_t file_lardwrite_rxe[] =
     "ICON W\n"
     "LAYOUT responsive\n"
     "COLOR 0xFF5BC0EB\n"
-    "INPUT Line:\n"
-    "BUTTON Add Line\n"
+    "INPUT Command/Text:\n"
+    "BUTTON Run\n"
     "USE APPKIT\n"
     "UI PANEL 0 0 240 36 LardWrite document\n"
-    "UI INPUT 0 46 360 24 Line:\n"
-    "UI BUTTON 370 46 88 24 Add Line\n"
+    "UI INPUT 0 46 360 24 Command or plain text\n"
+    "UI BUTTON 370 46 72 24 Run\n"
+    "UI TILE 0 82 118 46 Title/Section\n"
+    "UI TILE 126 82 118 46 Bullet/Quote\n"
+    "UI TILE 252 82 118 46 Find/Stats\n"
     "UI BADGE 250 9 94 18 .lardd\n"
-    "UI OUTPUT 0 84 0 0 Document output\n"
+    "UI OUTPUT 0 140 0 0 Document output\n"
     "DESKTOP 1\n"
     "DOCK 1\n"
-    "TEXT Word-processor style starter app. It writes normal LARDD lines into office_doc.lardd.\n"
-    "TEXT Shell path: lword show, lword add text, lword new.\n"
+    "TEXT Word-processor style app. Plain text appends a paragraph; commands edit normal LARDD records in office_doc.lardd.\n"
+    "TEXT Try: title My Doc, section Plan, bullet item, quote note, code line, find word, stats, new.\n"
     "LANG LSH\n"
-    "COMMAND lword add\n";
+    "COMMAND lword\n";
 
 static const uint8_t file_lardsheet_rxe[] =
     "RXE 1\n"
@@ -1481,21 +1490,23 @@ static const uint8_t file_lardsheet_rxe[] =
     "ICON S\n"
     "LAYOUT responsive\n"
     "COLOR 0xFF81C784\n"
-    "INPUT Row:\n"
-    "BUTTON Add Row\n"
+    "INPUT Row/Cell:\n"
+    "BUTTON Run\n"
     "USE APPKIT\n"
     "UI PANEL 0 0 240 36 LardSheet workbook\n"
-    "UI INPUT 0 46 360 24 Row: label value\n"
-    "UI BUTTON 370 46 84 24 Add Row\n"
-    "UI PROGRESS 0 80 190 18 Sheet | 55\n"
+    "UI INPUT 0 46 360 24 Row text or cell A1 42\n"
+    "UI BUTTON 370 46 72 24 Run\n"
+    "UI PROGRESS 0 82 190 18 Sheet | 65\n"
+    "UI TILE 198 82 92 46 Cells\n"
+    "UI TILE 298 82 92 46 CSV/Sum\n"
     "UI BADGE 250 9 92 18 .lsheet\n"
-    "UI OUTPUT 0 110 0 0 Sheet output\n"
+    "UI OUTPUT 0 142 0 0 Sheet output\n"
     "DESKTOP 1\n"
     "DOCK 1\n"
-    "TEXT Spreadsheet-style starter app. Type something like apples 12 and press Add Row.\n"
-    "TEXT Shell path: lsheet show, lsheet add label value, lsheet new.\n"
+    "TEXT Spreadsheet-style app. Plain text appends a row; commands edit COL, ROW, CELL, and FORMULA records.\n"
+    "TEXT Try: apples 12, cell A1 42, col Item Value, formula total sum, csv, sum, find text, new.\n"
     "LANG LSH\n"
-    "COMMAND lsheet add\n";
+    "COMMAND lsheet\n";
 
 static const uint8_t file_lardshow_rxe[] =
     "RXE 1\n"
@@ -1504,22 +1515,23 @@ static const uint8_t file_lardshow_rxe[] =
     "ICON P\n"
     "LAYOUT responsive\n"
     "COLOR 0xFFFFD166\n"
-    "INPUT Slide:\n"
-    "BUTTON Add Slide\n"
+    "INPUT Slide/Command:\n"
+    "BUTTON Run\n"
     "USE APPKIT\n"
     "UI PANEL 0 0 250 36 LardShow deck\n"
-    "UI INPUT 0 46 360 24 Slide text\n"
-    "UI BUTTON 370 46 96 24 Add Slide\n"
-    "UI TILE 0 82 120 54 Title\n"
-    "UI TILE 128 82 120 54 Body\n"
+    "UI INPUT 0 46 360 24 Title | Body or command\n"
+    "UI BUTTON 370 46 72 24 Run\n"
+    "UI TILE 0 82 108 54 Slide\n"
+    "UI TILE 116 82 108 54 Theme\n"
+    "UI TILE 232 82 108 54 Play\n"
     "UI BADGE 260 9 84 18 .lshow\n"
     "UI OUTPUT 0 148 0 0 Deck output\n"
     "DESKTOP 1\n"
     "DOCK 1\n"
-    "TEXT Presentation-style starter app. Each added line becomes a slide in office_deck.lshow.\n"
-    "TEXT Shell path: lshow show, lshow add slide text, lshow new.\n"
+    "TEXT Presentation-style app. Plain text adds a slide; commands navigate and edit the native LSHOW deck.\n"
+    "TEXT Try: Title | Body, play, next, prev, slide 2, theme dark, note speaker note, new.\n"
     "LANG LSH\n"
-    "COMMAND lshow add\n";
+    "COMMAND lshow\n";
 
 static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"

@@ -6,6 +6,16 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT LTS codenames append after the channel, for example v1.99.0a-tiara. Only one LTS line is active at a time.
 
+SECTION v2.0.1b
+ITEM Deepens the bundled office apps while keeping them file-defined RXE programs.
+ITEM LardWrite adds title, section, bullet, quote, code, find, and stats commands for richer LARDD documents.
+ITEM LardSheet adds column editing, cell records, visible formula records, CSV-style export, search, sum, and average summaries.
+ITEM LardShow adds deck title/theme editing, speaker notes, play mode, next/prev, and slide-number navigation.
+ITEM Updates the RXE APPKIT surfaces so one Run input can execute plain text or office subcommands.
+ITEM Keeps office_doc.lardd, office_sheet.lsheet, and office_deck.lshow user-owned writable files.
+ITEM Preserves the Tiara active LTS support line and all existing RXE/SYSRXE, GUI, driver, connect, security, recovery, and raw-control surfaces.
+ITEM Ships as beta because it expands a new default app family.
+
 SECTION v2.0.0b
 ITEM Adds bundled native office-style RXE apps: LardWrite, LardSheet, and LardShow.
 ITEM Adds lardwrite.rxe, lardsheet.rxe, and lardshow.rxe as file-defined normal RXE apps rather than hand-coded GUI branches.

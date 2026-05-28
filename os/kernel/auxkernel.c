@@ -97,11 +97,11 @@ void auxkernel_init(void)
     s_aux.initialized = 1;
     s_aux.active = 0;
     s_aux.module_independent = 1;
-    s_aux.real8_profile = 1;
-    s_aux.real8_bridge_ready = cpu_mode_bridge_ready() ? 1u : 0u;
-    s_aux.real8_probe_count = 0;
-    s_aux.last_real8_ok = 0;
-    s_aux.last_real8_marker = 0;
+    s_aux.real16_profile = 1;
+    s_aux.real16_bridge_ready = cpu_mode_bridge_ready() ? 1u : 0u;
+    s_aux.real16_probe_count = 0;
+    s_aux.last_real16_ok = 0;
+    s_aux.last_real16_marker = 0;
     s_aux.panicroom_entries = 0;
     s_aux.lockdowns = 0;
     s_aux.key_discards = 0;
@@ -115,30 +115,30 @@ void auxkernel_init(void)
 
 void auxkernel_enter_panicroom(const char* reason)
 {
-    (void)auxkernel_real8_probe();
+    (void)auxkernel_real16_probe();
     s_aux.panicroom_entries++;
     aux_record(AUXK_ACTION_PANICROOM, reason ? reason : "panicroom", 0);
 }
 
-int auxkernel_real8_probe(void)
+int auxkernel_real16_probe(void)
 {
     cpu_mode_info_t mode;
     int r;
     if (!s_aux.initialized) auxkernel_init();
-    r = cpu_mode_auxkernel_real8_probe();
+    r = cpu_mode_auxkernel_real16_probe();
     cpu_mode_info(&mode);
-    s_aux.real8_bridge_ready = mode.bridge_ready ? 1u : 0u;
-    s_aux.real8_probe_count = mode.auxkernel_real8_count;
-    s_aux.last_real8_ok = (r == 0 && mode.last_auxkernel_real8_ok) ? 1u : 0u;
-    s_aux.last_real8_marker = mode.last_auxkernel_real8_marker;
-    return s_aux.last_real8_ok ? 0 : -1;
+    s_aux.real16_bridge_ready = mode.bridge_ready ? 1u : 0u;
+    s_aux.real16_probe_count = mode.auxkernel_real16_count;
+    s_aux.last_real16_ok = (r == 0 && mode.last_auxkernel_real16_ok) ? 1u : 0u;
+    s_aux.last_real16_marker = mode.last_auxkernel_real16_marker;
+    return s_aux.last_real16_ok ? 0 : -1;
 }
 
 int auxkernel_lockdown(const char* reason)
 {
     int result;
     if (!s_aux.initialized) auxkernel_init();
-    (void)auxkernel_real8_probe();
+    (void)auxkernel_real16_probe();
     lardsec_enable(1);
     result = aux_sync_media();
     if (lardsec_lock() != 0) result = -2;
@@ -171,17 +171,17 @@ int auxkernel_report(void)
 
     aux_append(buf, sizeof(buf), &pos, "LARDD 1\nTITLE AuxKernel Emergency Microkernel\n");
     aux_append(buf, sizeof(buf), &pos, "TEXT Small built-in emergency kernel path. It does not need KMO modules.\n");
-    aux_append(buf, sizeof(buf), &pos, "TEXT REAL8 means an 8-bit byte-discipline first responder running inside BIOS real mode.\n");
+    aux_append(buf, sizeof(buf), &pos, "TEXT REAL16 means the emergency first responder runs inside BIOS 16-bit real mode.\n");
     aux_append(buf, sizeof(buf), &pos, "TEXT Hardware-damaging self-destruct is not implemented; containment uses lock, sync, and key discard.\n");
     aux_append(buf, sizeof(buf), &pos, "SECTION State\n");
     aux_append(buf, sizeof(buf), &pos, "ITEM initialized "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.initialized); aux_append(buf, sizeof(buf), &pos, "\n");
     aux_append(buf, sizeof(buf), &pos, "ITEM active "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.active); aux_append(buf, sizeof(buf), &pos, "\n");
     aux_append(buf, sizeof(buf), &pos, "ITEM module_independent "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.module_independent); aux_append(buf, sizeof(buf), &pos, "\n");
-    aux_append(buf, sizeof(buf), &pos, "ITEM real8_profile "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.real8_profile); aux_append(buf, sizeof(buf), &pos, "\n");
-    aux_append(buf, sizeof(buf), &pos, "ITEM real8_bridge_ready "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.real8_bridge_ready); aux_append(buf, sizeof(buf), &pos, "\n");
-    aux_append(buf, sizeof(buf), &pos, "ITEM real8_probe_count "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.real8_probe_count); aux_append(buf, sizeof(buf), &pos, "\n");
-    aux_append(buf, sizeof(buf), &pos, "ITEM last_real8_ok "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.last_real8_ok); aux_append(buf, sizeof(buf), &pos, "\n");
-    aux_append(buf, sizeof(buf), &pos, "ITEM last_real8_marker "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.last_real8_marker); aux_append(buf, sizeof(buf), &pos, "\n");
+    aux_append(buf, sizeof(buf), &pos, "ITEM real16_profile "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.real16_profile); aux_append(buf, sizeof(buf), &pos, "\n");
+    aux_append(buf, sizeof(buf), &pos, "ITEM real16_bridge_ready "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.real16_bridge_ready); aux_append(buf, sizeof(buf), &pos, "\n");
+    aux_append(buf, sizeof(buf), &pos, "ITEM real16_probe_count "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.real16_probe_count); aux_append(buf, sizeof(buf), &pos, "\n");
+    aux_append(buf, sizeof(buf), &pos, "ITEM last_real16_ok "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.last_real16_ok); aux_append(buf, sizeof(buf), &pos, "\n");
+    aux_append(buf, sizeof(buf), &pos, "ITEM last_real16_marker "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.last_real16_marker); aux_append(buf, sizeof(buf), &pos, "\n");
     aux_append(buf, sizeof(buf), &pos, "ITEM panicroom_entries "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.panicroom_entries); aux_append(buf, sizeof(buf), &pos, "\n");
     aux_append(buf, sizeof(buf), &pos, "ITEM lockdowns "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.lockdowns); aux_append(buf, sizeof(buf), &pos, "\n");
     aux_append(buf, sizeof(buf), &pos, "ITEM key_discards "); aux_append_u32(buf, sizeof(buf), &pos, s_aux.key_discards); aux_append(buf, sizeof(buf), &pos, "\n");
@@ -209,14 +209,14 @@ int auxkernel_selftest(void)
     auxkernel_info(&before);
     if (!before.initialized) return -1;
     if (!before.module_independent) return -2;
-    if (!before.real8_profile) return -3;
+    if (!before.real16_profile) return -3;
     if (!fs_open_writable("auxkernel.lardd")) return -4;
-    if (auxkernel_real8_probe() != 0) return -5;
+    if (auxkernel_real16_probe() != 0) return -5;
     auxkernel_info(&after);
     if (after.lockdowns != before.lockdowns || after.key_discards != before.key_discards ||
         after.panicroom_entries != before.panicroom_entries || after.reports != before.reports) {
         return -6;
     }
-    if (!after.last_real8_ok || after.real8_probe_count < before.real8_probe_count + 1u) return -7;
+    if (!after.last_real16_ok || after.real16_probe_count < before.real16_probe_count + 1u) return -7;
     return 0;
 }

@@ -202,7 +202,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("web: HTTP method builder", net_http_selftest() == 0, emit, user, &pass, &fail);
     post_check("web: HTTPS TLS surface", lard_tls_selftest() == 0, emit, user, &pass, &fail);
     post_check("security: lardlocker seal/ecc", lardsec_selftest() == 0, emit, user, &pass, &fail);
-    post_check("security: auxkernel REAL8 microkernel", auxkernel_selftest() == 0, emit, user, &pass, &fail);
+    post_check("security: auxkernel REAL16 microkernel", auxkernel_selftest() == 0, emit, user, &pass, &fail);
     post_check("ui: megaclip slots", megaclip_selftest() == 0, emit, user, &pass, &fail);
     post_check("net: lardos connect control", lconnect_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);

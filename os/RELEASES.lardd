@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT LTS codenames append after the channel, for example v1.99.0a-tiara. Only one LTS line is active at a time.
 
+SECTION v2.0.5b
+ITEM Corrects AuxKernel from the mistaken REAL8 beta wording to a REAL16 emergency profile.
+ITEM auxkernel real16 now runs the primary BIOS 16-bit real-mode first responder probe and returns to long64.
+ITEM Keeps auxkernel real8 as a visible compatibility alias that explains the correction and redirects to REAL16 instead of silently breaking old input.
+ITEM Renames AuxKernel status, auxkernel.lardd report fields, global status, POST labels, and documentation to real16 bridge readiness, probe counts, last result, and marker bytes.
+ITEM Updates the CPU bridge marker to a visible 0xA1/0x16 REAL16 probe signature.
+ITEM Preserves PanicRoom, lockdown, keydrop, seed/default ownership, RXE/SYSRXE apps, KMO, LiveUpdate, MediaFS, GUI, LardOS Connect, and Tiara LTS policy without feature loss.
+ITEM Ships as beta because it corrects the emergency kernel mode contract introduced in v2.0.4b.
+
 SECTION v2.0.4b
 ITEM Pins AuxKernel to a REAL8 profile: an 8-bit byte-discipline first responder executed inside BIOS real mode.
 ITEM Adds a CPU mode bridge request for auxkernel real8 so LardOS can prove the emergency path reaches real mode and returns to long64.

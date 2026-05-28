@@ -52,12 +52,16 @@ set in one pass:
 make release-all-hardware
 ```
 
-`v2.0.4b` pins AuxKernel to a `REAL8` emergency profile. On x86 this means an
-8-bit byte-discipline first responder running inside BIOS real mode, because
-there is no separate literal 8-bit CPU real mode. `auxkernel real8` now runs
-that bridge probe, and AuxKernel status/reports/POST show bridge readiness,
-probe count, last result, and marker bytes while keeping the no-hidden-hardware-
-damage safety line intact.
+`v2.0.5b` corrects AuxKernel to a `REAL16` emergency profile. The first
+responder now explicitly enters BIOS 16-bit real mode and returns to long64;
+`auxkernel real16` is the primary probe command. The mistaken `real8` beta
+command remains as a visible compatibility alias that says what happened and
+runs the same REAL16 path, so no user script silently loses control.
+
+`v2.0.4b` introduced the AuxKernel real-mode bridge probe and status/report
+markers. `v2.0.5b` supersedes its mistaken REAL8 wording while keeping the
+bridge, PanicRoom containment, lockdown, keydrop, and no-hidden-hardware-damage
+safety line intact.
 
 `v2.0.3b` removes the last true read-only behavior from built-in files. Default
 files are now seed/default files: the kernel opens user-owned writable overlays
@@ -132,10 +136,10 @@ LSEC sealed headers. Storage ECC remains on by default, RAM ECC is explicit, and
 
 `v1.95.0a` adds AuxKernel, a tiny built-in emergency microkernel path for
 PanicRoom bridging, media lockdown, visible `auxkernel.lardd` reports, and
-user-confirmed volatile key discard. `v2.0.4b` defines it as `REAL8`: an
-8-bit byte-discipline first responder inside BIOS real mode. It is compiled
-into the kernel and does not need KMO modules, KModTalk, app launchers, or the
-normal GUI. Use `auxkernel status`, `auxkernel real8`, `auxkernel report`,
+user-confirmed volatile key discard. `v2.0.5b` defines it as `REAL16`: a BIOS
+16-bit real-mode first responder. It is compiled into the kernel and does not
+need KMO modules, KModTalk, app launchers, or the normal GUI. Use
+`auxkernel status`, `auxkernel real16`, `auxkernel report`,
 `auxkernel lockdown confirm reason`, or
 `auxkernel keydrop confirm reason`; `selfdestruct confirm reason` is a raw-control
 alias for key discard only. LardOS does not implement fan, thermal, overheating,
@@ -452,8 +456,8 @@ commands:
   and `deprecated lconnect share input on confirm` expose the older/raw Connect
   edge cases behind an explicit deprecated namespace. They are not in normal
   help, but they are not invisible: status and logs show them.
-- `auxkernel status|real8|report|lockdown confirm|keydrop confirm` exposes the
-  tiny built-in REAL8 emergency microkernel path. It works without KMO modules
+- `auxkernel status|real16|report|lockdown confirm|keydrop confirm` exposes the
+  tiny built-in REAL16 emergency microkernel path. It works without KMO modules
   and uses visible containment instead of fan, thermal, or hardware-damaging behavior.
 - `dir _:` opens the merged top-level drive. It lists `R:` RAM files, `X:`
   built-in/LFS files, and `Y:`/`Z:`/`A:` media stores together; `_:` reads

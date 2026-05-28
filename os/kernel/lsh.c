@@ -345,7 +345,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
-    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
@@ -917,14 +917,21 @@ static void cmd_release(const char* args)
     while (args && (*args == ' ' || *args == '\t')) args++;
     if (args && (strcmp(args, "lts") == 0 || strcmp(args, "support") == 0)) {
         out_append("LTS support policy\n");
-        out_append("  current: ");
+        out_append("  current build: ");
         out_append(LARDOS_VERSION);
-#if LARDOS_LTS_ACTIVE
+#if LARDOS_LTS_BUILD
         out_append(" (");
-        out_append(LARDOS_LTS_NAME);
-        out_append(")\n");
+        out_append(LARDOS_LTS_BUILD_NAME);
+        out_append(" LTS build)\n");
 #else
-        out_append(" (no active LTS codename)\n");
+        out_append(" (not an LTS build)\n");
+#endif
+#if LARDOS_LTS_ACTIVE
+        out_append("  active LTS line: ");
+        out_append(LARDOS_LTS_NAME);
+        out_append("\n");
+#else
+        out_append("  active LTS line: none\n");
 #endif
         out_append("  rule: only one LTS line is active at a time.\n");
         out_append("  when the next LTS ships, the previous LTS support line ends.\n");
@@ -940,7 +947,7 @@ static void cmd_release(const char* args)
         out_append(lardos_version_channel());
         out_append(")\n");
         if (LARDOS_LTS_ACTIVE) {
-            out_append("  LTS codename: ");
+            out_append("  active LTS line: ");
             out_append(LARDOS_LTS_NAME);
             out_append("\n");
         }
@@ -961,6 +968,177 @@ static void cmd_release(const char* args)
         return;
     }
     cmd_larddoc("releases.lardd", "Usage: release");
+}
+
+static const char office_doc_reset[] =
+    "LARDD 1\n"
+    "TITLE LardWrite Document\n"
+    "SECTION Draft\n"
+    "TEXT Type a line in LardWrite and press Add Line to append it here.\n";
+
+static const char office_sheet_reset[] =
+    "LSHEET 1\n"
+    "TITLE LardSheet Workbook\n"
+    "COL Item Value\n"
+    "ROW sample 42\n";
+
+static const char office_deck_reset[] =
+    "LSHOW 1\n"
+    "TITLE LardShow Deck\n"
+    "SLIDE Welcome | Native LardOS presentation deck.\n"
+    "SLIDE Values | Files stay editable, visible, and local.\n";
+
+static int vcs_read_word(const char** args, char* out, uint32_t cap);
+
+static int office_line_prefix(const char* p, const char* end, const char* prefix, const char** value)
+{
+    while (p < end && (*p == ' ' || *p == '\t')) p++;
+    while (p < end && *prefix && *p == *prefix) { p++; prefix++; }
+    if (*prefix) return 0;
+    if (p < end && *p != ' ' && *p != '\t' && *p != ':') return 0;
+    while (p < end && (*p == ' ' || *p == '\t' || *p == ':')) p++;
+    if (value) *value = p;
+    return 1;
+}
+
+static int office_reset_writable(const char* name, const char* text)
+{
+    FsWritableFile* w = fs_open_writable(name);
+    uint32_t len = 0;
+    if (!w || !text) return -1;
+    while (text[len]) len++;
+    return fs_write(w, 0, (const uint8_t*)text, len) == len ? 0 : -2;
+}
+
+static int office_append_record(const char* name, const char* prefix, const char* text)
+{
+    FsWritableFile* w = fs_open_writable(name);
+    uint32_t plen = 0;
+    uint32_t tlen = 0;
+    const uint8_t nl = '\n';
+    if (!w || !prefix || !text) return -1;
+    while (*text == ' ' || *text == '\t') text++;
+    if (!text[0]) return -2;
+    while (prefix[plen]) plen++;
+    while (text[tlen]) tlen++;
+    if (w->size + plen + tlen + 1u > w->cap) return -3;
+    if (fs_append(w, (const uint8_t*)prefix, plen) != plen) return -4;
+    if (fs_append(w, (const uint8_t*)text, tlen) != tlen) return -5;
+    if (fs_append(w, &nl, 1u) != 1u) return -6;
+    return 0;
+}
+
+static void office_render_prefixed_file(const char* name, const char* title,
+                                        const char* row_prefix, const char* row_mark)
+{
+    const FsFile* f = fs_open(name);
+    const char* p;
+    const char* end;
+    uint32_t rows = 0;
+    if (!f || !f->data) {
+        out_append("office: file not found.\n");
+        return;
+    }
+    out_append(title);
+    out_append("\n");
+    p = (const char*)f->data;
+    end = p + f->size;
+    while (p < end) {
+        const char* le = p;
+        const char* value = NULL;
+        while (le < end && *le != '\n' && *le != '\r') le++;
+        if (office_line_prefix(p, le, "TITLE", &value)) {
+            out_append("title: ");
+            while (value < le) out_append_char(*value++);
+            out_append("\n");
+        } else if (office_line_prefix(p, le, "COL", &value)) {
+            out_append("columns: ");
+            while (value < le) out_append_char(*value++);
+            out_append("\n");
+        } else if (office_line_prefix(p, le, row_prefix, &value)) {
+            rows++;
+            out_append(row_mark);
+            out_append_u32(rows);
+            out_append(": ");
+            while (value < le) out_append_char(*value++);
+            out_append("\n");
+        }
+        p = le;
+        while (p < end && (*p == '\n' || *p == '\r')) p++;
+    }
+    if (!rows) out_append("(empty)\n");
+}
+
+static void cmd_lword(const char* args)
+{
+    char sub[16];
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "open") == 0 || strcmp(sub, "view") == 0) {
+        cmd_larddoc("office_doc.lardd", "Usage: lword show|add text|new");
+        return;
+    }
+    if (strcmp(sub, "add") == 0 || strcmp(sub, "line") == 0 || strcmp(sub, "write") == 0) {
+        int r = office_append_record("office_doc.lardd", "TEXT ", args);
+        if (r == 0) out_append("LardWrite: added line to office_doc.lardd.\n");
+        else out_append("LardWrite: add failed; type a line after lword add.\n");
+        cmd_larddoc("office_doc.lardd", "Usage: lword show|add text|new");
+        return;
+    }
+    if (strcmp(sub, "new") == 0 || strcmp(sub, "reset") == 0 || strcmp(sub, "clear") == 0) {
+        out_append(office_reset_writable("office_doc.lardd", office_doc_reset) == 0 ?
+                   "LardWrite: new document ready.\n" : "LardWrite: reset failed.\n");
+        cmd_larddoc("office_doc.lardd", "Usage: lword show|add text|new");
+        return;
+    }
+    out_append("Usage: lword show|add text|new\n");
+}
+
+static void cmd_lsheet(const char* args)
+{
+    char sub[16];
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "open") == 0 || strcmp(sub, "view") == 0) {
+        office_render_prefixed_file("office_sheet.lsheet", "LardSheet workbook", "ROW", "row ");
+        return;
+    }
+    if (strcmp(sub, "add") == 0 || strcmp(sub, "row") == 0) {
+        int r = office_append_record("office_sheet.lsheet", "ROW ", args);
+        if (r == 0) out_append("LardSheet: added row to office_sheet.lsheet.\n");
+        else out_append("LardSheet: add failed; use lsheet add label value.\n");
+        office_render_prefixed_file("office_sheet.lsheet", "LardSheet workbook", "ROW", "row ");
+        return;
+    }
+    if (strcmp(sub, "new") == 0 || strcmp(sub, "reset") == 0 || strcmp(sub, "clear") == 0) {
+        out_append(office_reset_writable("office_sheet.lsheet", office_sheet_reset) == 0 ?
+                   "LardSheet: new workbook ready.\n" : "LardSheet: reset failed.\n");
+        office_render_prefixed_file("office_sheet.lsheet", "LardSheet workbook", "ROW", "row ");
+        return;
+    }
+    out_append("Usage: lsheet show|add label value|new\n");
+}
+
+static void cmd_lshow(const char* args)
+{
+    char sub[16];
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "show") == 0 || strcmp(sub, "open") == 0 || strcmp(sub, "view") == 0) {
+        office_render_prefixed_file("office_deck.lshow", "LardShow deck", "SLIDE", "slide ");
+        return;
+    }
+    if (strcmp(sub, "add") == 0 || strcmp(sub, "slide") == 0) {
+        int r = office_append_record("office_deck.lshow", "SLIDE ", args);
+        if (r == 0) out_append("LardShow: added slide to office_deck.lshow.\n");
+        else out_append("LardShow: add failed; use lshow add title | body.\n");
+        office_render_prefixed_file("office_deck.lshow", "LardShow deck", "SLIDE", "slide ");
+        return;
+    }
+    if (strcmp(sub, "new") == 0 || strcmp(sub, "reset") == 0 || strcmp(sub, "clear") == 0) {
+        out_append(office_reset_writable("office_deck.lshow", office_deck_reset) == 0 ?
+                   "LardShow: new deck ready.\n" : "LardShow: reset failed.\n");
+        office_render_prefixed_file("office_deck.lshow", "LardShow deck", "SLIDE", "slide ");
+        return;
+    }
+    out_append("Usage: lshow show|add title | body|new\n");
 }
 
 static void lar_list_lsh_cb(const lar_entry_t* entry, void* user)
@@ -2137,7 +2315,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|lts] ver bye byebye restart post baseline selftest magic mode vm shrine sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
@@ -2151,6 +2329,7 @@ static void cmd_help(const char* args)
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
+    out_append("  lword/lsheet/lshow show|add|new   native office-style apps and files\n");
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
     out_append("  kmo list|create|command|raw|set|delete|show|run  .kmo kernel modules and file-defined shell commands\n");
     out_append("  liveupdate status|apply|file|append|from|reload|auto|test  runtime file/code updates\n");
@@ -10984,6 +11163,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
     if (strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) { cmd_prio(args); return; }
     if (strcmp(cmd, "release") == 0 || strcmp(cmd, "releases") == 0) { cmd_release(args); return; }
+    if (strcmp(cmd, "lword") == 0 || strcmp(cmd, "lwrite") == 0) { cmd_lword(args); return; }
+    if (strcmp(cmd, "lsheet") == 0) { cmd_lsheet(args); return; }
+    if (strcmp(cmd, "lshow") == 0) { cmd_lshow(args); return; }
     if (strcmp(cmd, "peek") == 0) { cmd_peek(args); return; }
     if (strcmp(cmd, "poke") == 0) { cmd_poke(args); return; }
     if (strcmp(cmd, "lars") == 0) { cmd_larddoc(args, "Usage: lars [drive:]file.lars"); return; }

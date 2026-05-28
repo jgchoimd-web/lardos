@@ -6,6 +6,16 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT LTS codenames append after the channel, for example v1.99.0a-tiara. Only one LTS line is active at a time.
 
+SECTION v2.0.0b
+ITEM Adds bundled native office-style RXE apps: LardWrite, LardSheet, and LardShow.
+ITEM Adds lardwrite.rxe, lardsheet.rxe, and lardshow.rxe as file-defined normal RXE apps rather than hand-coded GUI branches.
+ITEM Adds writable user-owned office files: office_doc.lardd, office_sheet.lsheet, and office_deck.lshow.
+ITEM Adds lword/lwrite, lsheet, and lshow shell commands for keyboard-first document, workbook, and deck workflows.
+ITEM Adds office_guide.lardd, POST coverage, and LUNIT file/command checks for the bundled office surface.
+ITEM Keeps Tiara as the active LTS support line while this build ships as beta; release lts now distinguishes current build codename from active LTS support codename.
+ITEM Preserves RXE/SYSRXE file ownership, app extensibility, GUI, MegaClipboard, LardOS Connect, OSLink, LardSec, AuxKernel, WebStack, FSTWT, and user-control values without feature loss.
+ITEM Ships as beta because it adds a new bundled app family and native office file surfaces.
+
 SECTION v1.99.0a-tiara
 ITEM Official LTS release named Tiara, promoting the v1.99 Connect raw-control compatibility track after build, media, POST policy, and boot-smoke checks.
 ITEM Adds release lts and lts.lardd so the active LTS codename and one-LTS-at-a-time rule are visible inside LardOS.

@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.0.0b` adds bundled native office-style apps as RXE files: `lardwrite.rxe`
+for word-processor style documents, `lardsheet.rxe` for spreadsheet-style
+workbooks, and `lardshow.rxe` for presentation decks. Their editable files are
+`office_doc.lardd`, `office_sheet.lsheet`, and `office_deck.lshow`, with
+keyboard-first commands `lword`/`lwrite`, `lsheet`, and `lshow`. These are
+normal file-defined apps, not new hard-coded GUI branches.
+
 `v1.99.0a-tiara` is the Tiara LTS release. It promotes the v1.99 Connect
 compatibility work to an official `a` build, adds `release lts` plus
 `lts.lardd`, and fixes channel parsing so future LTS codenames such as
@@ -876,6 +883,9 @@ commands:
   The built-in `sample.rxr` installs a normal `.rxe` app and reads its required
   `rxr_data.txt` dependency through the OS-owned `rxr/rxr_data.txt` namespace,
   keeping app source independent from the installed drive/path.
+- `lword`/`lwrite`, `lsheet`, and `lshow` provide the keyboard path for the
+  bundled LardWrite/LardSheet/LardShow office apps. They edit
+  `office_doc.lardd`, `office_sheet.lsheet`, and `office_deck.lshow`.
 - `release` renders the current release log from `releases.lardd`; `release lts`
   shows the active LTS codename, the one-LTS-at-a-time rule, and the next
   planned LTS name.

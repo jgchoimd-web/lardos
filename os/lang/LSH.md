@@ -7,6 +7,8 @@
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc. `dir _:` lists the merged top-level drive with prefixes; `dir X:` lists read-only system files; `dir R:` lists every writable RAM file; `dir Y:`/`dir Z:`/`dir A:` list MediaFS device stores.
 - `release policy` - show when to use `a`, `b`, or `p` release suffixes.
 - `release lts` - show the active LTS codename and support rule.
+- `lword`/`lwrite`, `lsheet`, `lshow` - edit the bundled native office document,
+  workbook, and deck files from the shell.
 - `post` / `selftest` - rerun the Power-On Self-Test diagnostics.
 - `post baseline` / `postbaseline show` - show the saved POST baseline report.
 - `time` / `date` / `lunar` / `dangun` - show LardOS Time ticks, five-digit year dates, native lunar view, and Dangun year.

@@ -127,6 +127,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: hello.txt", fs_open("hello.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: lardos.lars", fs_open("lardos.lars") != NULL, emit, user, &pass, &fail);
     post_check("fs: lardd guide", fs_open("lardd_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: office guide", fs_open("office_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: lardtime guide", fs_open("lardtime_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: releases", fs_open("releases.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: features.lil", fs_open("features.lil") != NULL, emit, user, &pass, &fail);
@@ -141,6 +142,9 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: kmo guide", fs_open("kmo_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: hello sysrxe", fs_open("hello.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: demo rxe game", fs_open("demo_game.rxe") != NULL, emit, user, &pass, &fail);
+    post_check("fs: office rxe apps", fs_open("lardwrite.rxe") != NULL &&
+               fs_open("lardsheet.rxe") != NULL && fs_open("lardshow.rxe") != NULL,
+               emit, user, &pass, &fail);
     post_check("fs: gui status kmo", fs_open("gui_status.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: raw control kmo", fs_open("raw_control.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode guide", fs_open("dosmode_guide.lardd") != NULL, emit, user, &pass, &fail);
@@ -170,6 +174,9 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: security policy writable", fs_open_writable("security.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: megaclip guide writable", fs_open_writable("megaclip.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: lconnect guide writable", fs_open_writable("lconnect.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: office docs writable", fs_open_writable("office_doc.lardd") != NULL &&
+               fs_open_writable("office_sheet.lsheet") != NULL &&
+               fs_open_writable("office_deck.lshow") != NULL, emit, user, &pass, &fail);
     post_check("fs: auxkernel report writable", fs_open_writable("auxkernel.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);

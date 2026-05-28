@@ -308,6 +308,33 @@ static const uint8_t lconnect_init_doc[] =
 static uint8_t ram_lconnect_buf[LCONNECT_CAP];
 static FsWritableFile ram_lconnect = { "lconnect.lardd", ram_lconnect_buf, 0, LCONNECT_CAP };
 
+#define OFFICE_DOC_CAP 4096u
+static const uint8_t office_doc_init[] =
+    "LARDD 1\n"
+    "TITLE LardWrite Document\n"
+    "SECTION Draft\n"
+    "TEXT Type a line in LardWrite and press Add Line to append it here.\n";
+static uint8_t ram_office_doc_buf[OFFICE_DOC_CAP];
+static FsWritableFile ram_office_doc = { "office_doc.lardd", ram_office_doc_buf, 0, OFFICE_DOC_CAP };
+
+#define OFFICE_SHEET_CAP 4096u
+static const uint8_t office_sheet_init[] =
+    "LSHEET 1\n"
+    "TITLE LardSheet Workbook\n"
+    "COL Item Value\n"
+    "ROW sample 42\n";
+static uint8_t ram_office_sheet_buf[OFFICE_SHEET_CAP];
+static FsWritableFile ram_office_sheet = { "office_sheet.lsheet", ram_office_sheet_buf, 0, OFFICE_SHEET_CAP };
+
+#define OFFICE_DECK_CAP 4096u
+static const uint8_t office_deck_init[] =
+    "LSHOW 1\n"
+    "TITLE LardShow Deck\n"
+    "SLIDE Welcome | Native LardOS presentation deck.\n"
+    "SLIDE Values | Files stay editable, visible, and local.\n";
+static uint8_t ram_office_deck_buf[OFFICE_DECK_CAP];
+static FsWritableFile ram_office_deck = { "office_deck.lshow", ram_office_deck_buf, 0, OFFICE_DECK_CAP };
+
 #define AUXKERNEL_CAP 1024u
 static const uint8_t auxkernel_init[] =
     "LARDD 1\n"
@@ -702,6 +729,10 @@ static const uint8_t file_lardos_lars[] =
     "cmd lil features.lil\n"
     "cmd lardd lardd_guide.lardd\n"
     "cmd lardd lts.lardd\n"
+    "cmd lardd office_guide.lardd\n"
+    "cmd rxe show lardwrite.rxe\n"
+    "cmd rxe show lardsheet.rxe\n"
+    "cmd rxe show lardshow.rxe\n"
     "cmd release lts\n"
     "cmd lardd dosmode_guide.lardd\n"
     "note Release suffixes: a=official, b=beta-experimental, p=hotpatch. LTS codenames append after the suffix, like v1.99.0a-tiara.\n"
@@ -784,6 +815,21 @@ static const uint8_t file_lts_lardd[] =
     "SECTION Values\n"
     "ITEM User ownership, raw-control visibility, native formats, recovery paths, and keyboard completeness remain part of the supported surface.\n"
     "ITEM Deprecated raw-control paths may exist, but they must remain confirm-gated and auditable.\n"
+    "END\n";
+
+static const uint8_t file_office_guide[] =
+    "LARDD 1\n"
+    "TITLE LardOS Office Apps\n"
+    "TEXT LardOS includes three native office-style RXE apps without external office libraries.\n"
+    "SECTION Apps\n"
+    "ITEM LardWrite opens lardwrite.rxe and appends document lines into office_doc.lardd.\n"
+    "ITEM LardSheet opens lardsheet.rxe and appends simple rows into office_sheet.lsheet.\n"
+    "ITEM LardShow opens lardshow.rxe and appends slide records into office_deck.lshow.\n"
+    "SECTION Shell\n"
+    "ITEM lword show | add text | new\n"
+    "ITEM lsheet show | add label value | new\n"
+    "ITEM lshow show | add slide text | new\n"
+    "TEXT These are starter replacements for word processor, spreadsheet, and presentation workflows while keeping files native and user-editable.\n"
     "END\n";
 
 static const uint8_t file_glyph_guide[] =
@@ -1406,6 +1452,75 @@ static const uint8_t file_demo_game_rxe[] =
     "ROW #.######...##G.#\n"
     "ROW ################\n";
 
+static const uint8_t file_lardwrite_rxe[] =
+    "RXE 1\n"
+    "ID lardwrite\n"
+    "NAME LardWrite\n"
+    "ICON W\n"
+    "LAYOUT responsive\n"
+    "COLOR 0xFF5BC0EB\n"
+    "INPUT Line:\n"
+    "BUTTON Add Line\n"
+    "USE APPKIT\n"
+    "UI PANEL 0 0 240 36 LardWrite document\n"
+    "UI INPUT 0 46 360 24 Line:\n"
+    "UI BUTTON 370 46 88 24 Add Line\n"
+    "UI BADGE 250 9 94 18 .lardd\n"
+    "UI OUTPUT 0 84 0 0 Document output\n"
+    "DESKTOP 1\n"
+    "DOCK 1\n"
+    "TEXT Word-processor style starter app. It writes normal LARDD lines into office_doc.lardd.\n"
+    "TEXT Shell path: lword show, lword add text, lword new.\n"
+    "LANG LSH\n"
+    "COMMAND lword add\n";
+
+static const uint8_t file_lardsheet_rxe[] =
+    "RXE 1\n"
+    "ID lardsheet\n"
+    "NAME LardSheet\n"
+    "ICON S\n"
+    "LAYOUT responsive\n"
+    "COLOR 0xFF81C784\n"
+    "INPUT Row:\n"
+    "BUTTON Add Row\n"
+    "USE APPKIT\n"
+    "UI PANEL 0 0 240 36 LardSheet workbook\n"
+    "UI INPUT 0 46 360 24 Row: label value\n"
+    "UI BUTTON 370 46 84 24 Add Row\n"
+    "UI PROGRESS 0 80 190 18 Sheet | 55\n"
+    "UI BADGE 250 9 92 18 .lsheet\n"
+    "UI OUTPUT 0 110 0 0 Sheet output\n"
+    "DESKTOP 1\n"
+    "DOCK 1\n"
+    "TEXT Spreadsheet-style starter app. Type something like apples 12 and press Add Row.\n"
+    "TEXT Shell path: lsheet show, lsheet add label value, lsheet new.\n"
+    "LANG LSH\n"
+    "COMMAND lsheet add\n";
+
+static const uint8_t file_lardshow_rxe[] =
+    "RXE 1\n"
+    "ID lardshow\n"
+    "NAME LardShow\n"
+    "ICON P\n"
+    "LAYOUT responsive\n"
+    "COLOR 0xFFFFD166\n"
+    "INPUT Slide:\n"
+    "BUTTON Add Slide\n"
+    "USE APPKIT\n"
+    "UI PANEL 0 0 250 36 LardShow deck\n"
+    "UI INPUT 0 46 360 24 Slide text\n"
+    "UI BUTTON 370 46 96 24 Add Slide\n"
+    "UI TILE 0 82 120 54 Title\n"
+    "UI TILE 128 82 120 54 Body\n"
+    "UI BADGE 260 9 84 18 .lshow\n"
+    "UI OUTPUT 0 148 0 0 Deck output\n"
+    "DESKTOP 1\n"
+    "DOCK 1\n"
+    "TEXT Presentation-style starter app. Each added line becomes a slide in office_deck.lshow.\n"
+    "TEXT Shell path: lshow show, lshow add slide text, lshow new.\n"
+    "LANG LSH\n"
+    "COMMAND lshow add\n";
+
 static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"
     "CHECK file lardos.lars\n"
@@ -1470,15 +1585,22 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command kmod\n"
     "CHECK command kmo\n"
     "CHECK command liveupdate\n"
+    "CHECK command lword\n"
+    "CHECK command lsheet\n"
+    "CHECK command lshow\n"
     "CHECK file sysrxe_guide.lardd\n"
     "CHECK file rxe_guide.lardd\n"
     "CHECK file rxr_guide.lardd\n"
+    "CHECK file office_guide.lardd\n"
     "CHECK file sample.rxr\n"
     "CHECK file kmodtalk_guide.lardd\n"
     "CHECK file kmo_guide.lardd\n"
     "CHECK file hello.sysrxe\n"
     "CHECK file langdemo.rxe\n"
     "CHECK file demo_game.rxe\n"
+    "CHECK file lardwrite.rxe\n"
+    "CHECK file lardsheet.rxe\n"
+    "CHECK file lardshow.rxe\n"
     "CHECK file gui_status.kmo\n"
     "CHECK file raw_control.kmo\n"
     "CHECK writable userapp.sysrxe\n"
@@ -1487,6 +1609,9 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable displayfix.spfx\n"
     "CHECK writable security.lardd\n"
     "CHECK writable lconnect.lardd\n"
+    "CHECK writable office_doc.lardd\n"
+    "CHECK writable office_sheet.lsheet\n"
+    "CHECK writable office_deck.lshow\n"
     "CHECK writable auxkernel.lardd\n"
     "END\n";
 
@@ -1569,6 +1694,7 @@ static const FsFile FS_FILES[] = {
     { "default.ltheme", file_default_ltheme, sizeof(file_default_ltheme) - 1 },
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
     { "lts.lardd", file_lts_lardd, sizeof(file_lts_lardd) - 1 },
+    { "office_guide.lardd", file_office_guide, sizeof(file_office_guide) - 1 },
     { "glyph_guide.lardd", file_glyph_guide, sizeof(file_glyph_guide) - 1 },
     { "lardtime_guide.lardd", file_lardtime_guide, sizeof(file_lardtime_guide) - 1 },
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
@@ -1593,6 +1719,9 @@ static const FsFile FS_FILES[] = {
     { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) - 1 },
     { "demo_game.rxe", file_demo_game_rxe, sizeof(file_demo_game_rxe) - 1 },
     { "langdemo.rxe", file_langdemo_rxe, sizeof(file_langdemo_rxe) - 1 },
+    { "lardwrite.rxe", file_lardwrite_rxe, sizeof(file_lardwrite_rxe) - 1 },
+    { "lardsheet.rxe", file_lardsheet_rxe, sizeof(file_lardsheet_rxe) - 1 },
+    { "lardshow.rxe", file_lardshow_rxe, sizeof(file_lardshow_rxe) - 1 },
     { "gui_status.kmo", file_gui_status_kmo, sizeof(file_gui_status_kmo) - 1 },
     { "raw_control.kmo", file_raw_control_kmo, sizeof(file_raw_control_kmo) - 1 },
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
@@ -2164,7 +2293,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 38u;
+    return 41u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2206,7 +2335,10 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 34) return &ram_security;
     if (idx == 35) return &ram_megaclip;
     if (idx == 36) return &ram_lconnect;
-    if (idx == 37) return &ram_auxkernel;
+    if (idx == 37) return &ram_office_doc;
+    if (idx == 38) return &ram_office_sheet;
+    if (idx == 39) return &ram_office_deck;
+    if (idx == 40) return &ram_auxkernel;
     return NULL;
 }
 
@@ -2305,6 +2437,18 @@ void fs_init(void)
         ram_lconnect_buf[i] = lconnect_init_doc[i];
     }
     ram_lconnect.size = sizeof(lconnect_init_doc) - 1;
+    for (uint32_t i = 0; i < sizeof(office_doc_init) - 1 && i < OFFICE_DOC_CAP; i++) {
+        ram_office_doc_buf[i] = office_doc_init[i];
+    }
+    ram_office_doc.size = sizeof(office_doc_init) - 1;
+    for (uint32_t i = 0; i < sizeof(office_sheet_init) - 1 && i < OFFICE_SHEET_CAP; i++) {
+        ram_office_sheet_buf[i] = office_sheet_init[i];
+    }
+    ram_office_sheet.size = sizeof(office_sheet_init) - 1;
+    for (uint32_t i = 0; i < sizeof(office_deck_init) - 1 && i < OFFICE_DECK_CAP; i++) {
+        ram_office_deck_buf[i] = office_deck_init[i];
+    }
+    ram_office_deck.size = sizeof(office_deck_init) - 1;
     for (uint32_t i = 0; i < sizeof(auxkernel_init) - 1 && i < AUXKERNEL_CAP; i++) {
         ram_auxkernel_buf[i] = auxkernel_init[i];
     }

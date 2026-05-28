@@ -516,7 +516,13 @@ shell.
 LTS releases are official `a` releases with a codename appended after the
 channel, such as `v1.99.0a-tiara`. LardOS keeps only one active LTS line at a
 time; when the next LTS codename ships, the previous LTS support line ends.
-`release lts` exposes that support state in the shell.
+`release lts` exposes that support state in the shell, including the difference
+between the current build version and the active LTS support line.
+
+Bundled GUI applications that are not core desktop mechanics should be RXE or
+SYSRXE files. The office-style defaults follow this rule: LardWrite,
+LardSheet, and LardShow are normal `.rxe` files backed by writable native data
+files instead of one-off GUI branches.
 
 Release artifacts are generated without external ISO tooling. `scripts/mkimg.c`
 builds the raw BIOS image, and `scripts/mkiso.c` wraps that image in a minimal

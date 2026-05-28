@@ -14,6 +14,14 @@
 #define LARDOS_LTS_ACTIVE 0
 #endif
 
+#ifndef LARDOS_LTS_BUILD_NAME
+#define LARDOS_LTS_BUILD_NAME ""
+#endif
+
+#ifndef LARDOS_LTS_BUILD
+#define LARDOS_LTS_BUILD 0
+#endif
+
 #ifndef LARDOS_HARDWARE_PROFILE
 #define LARDOS_HARDWARE_PROFILE "universal"
 #endif

@@ -409,6 +409,15 @@ Runtime-ready panic paths append an entry, enter the real16 PanicRoom texture
 window, write `paniccapsule.lardd`, and halt only after the user chooses the halt key; LSH exposes the same log through
 `crashlog show`, `crashlog clear`, and `crashlog test`.
 
+`auxkernel.c` owns the emergency microkernel path. It does not depend on KMO,
+KModTalk, app launchers, or the normal GUI. From `v2.0.4b`, AuxKernel declares
+a `REAL8` profile: the CPU bridge enters BIOS real mode and runs a byte-sized
+first responder probe before returning to long64. x86 has real16 rather than a
+literal 8-bit CPU mode, so the contract is an 8-bit register/data discipline
+inside real mode, with visible marker bytes in status and `auxkernel.lardd`.
+The emergency controls remain user-confirmed containment actions: lock/sync
+media and discard volatile keys, not hidden hardware damage.
+
 `lardtime.c` owns the user-visible time model. RTC Unix seconds remain an
 internal compatibility input for hardware-facing code such as TLS validation,
 but `SYS_GET_TIME`, LSH `time`, LIL `time`, and BOSL `time` expose LardOS Time

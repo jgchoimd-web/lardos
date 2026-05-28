@@ -15,8 +15,10 @@ section .text
 
 GLOBAL cpu_mode_enter_real_probe_asm
 GLOBAL cpu_mode_enter_panicroom_texture_asm
+GLOBAL cpu_mode_enter_auxkernel_real8_asm
 GLOBAL cpu_mode_trampoline_start
 GLOBAL cpu_mode_trampoline_end
+GLOBAL cpu_mode_real8_marker
 
 cpu_mode_enter_real_probe_asm:
     mov rax, MODE_TRAMPOLINE_PA
@@ -26,6 +28,13 @@ cpu_mode_enter_real_probe_asm:
 cpu_mode_enter_panicroom_texture_asm:
     mov rdx, MODE_TRAMPOLINE_PA + mode_request - cpu_mode_trampoline_start
     mov dword [rdx], 1
+    mov rax, MODE_TRAMPOLINE_PA
+    call rax
+    ret
+
+cpu_mode_enter_auxkernel_real8_asm:
+    mov rdx, MODE_TRAMPOLINE_PA + mode_request - cpu_mode_trampoline_start
+    mov dword [rdx], 2
     mov rax, MODE_TRAMPOLINE_PA
     call rax
     ret
@@ -112,6 +121,10 @@ mode_real16:
     call mode_real16_panic_texture
     mov word [MODE_TRAMPOLINE_PA + mode_panic_marker - cpu_mode_trampoline_start], 0x5052
 .skip_panic_texture:
+    cmp dword [MODE_TRAMPOLINE_PA + mode_request - cpu_mode_trampoline_start], 2
+    jne .skip_auxkernel_real8
+    call mode_auxkernel_real8_probe
+.skip_auxkernel_real8:
 
     mov eax, cr0
     or eax, 1
@@ -215,6 +228,32 @@ mode_real16_write_string:
 .done:
     ret
 
+mode_auxkernel_real8_probe:
+    push ax
+    push bx
+    push cx
+
+    mov byte [MODE_TRAMPOLINE_PA + cpu_mode_real8_marker - cpu_mode_trampoline_start], 0xA8
+    mov byte [MODE_TRAMPOLINE_PA + cpu_mode_real8_marker + 1 - cpu_mode_trampoline_start], 0x08
+    mov byte [MODE_TRAMPOLINE_PA + cpu_mode_real8_marker + 2 - cpu_mode_trampoline_start], 0x00
+    mov byte [MODE_TRAMPOLINE_PA + cpu_mode_real8_marker + 3 - cpu_mode_trampoline_start], 0x00
+    xor al, al
+    mov bl, 0x11
+    mov cl, 8
+.real8_mix:
+    add al, bl
+    xor al, cl
+    inc bl
+    dec cl
+    jnz .real8_mix
+    mov byte [MODE_TRAMPOLINE_PA + cpu_mode_real8_marker + 2 - cpu_mode_trampoline_start], al
+    mov byte [MODE_TRAMPOLINE_PA + cpu_mode_real8_marker + 3 - cpu_mode_trampoline_start], 0x01
+
+    pop cx
+    pop bx
+    pop ax
+    ret
+
 BITS 32
 mode_pm32_from_real:
     mov ax, SEL_KDATA
@@ -283,6 +322,7 @@ mode_result:         dd 0
 mode_real_marker:    dw 0
 mode_panic_marker:   dw 0
 mode_request:        dd 0
+cpu_mode_real8_marker: db 0, 0, 0, 0
 texture_badge0:      db '   /====\   ', 0
 texture_badge1:      db '  / LPR  \  ', 0
 texture_badge2:      db '  \ REAL /  ', 0

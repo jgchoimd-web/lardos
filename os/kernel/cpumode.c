@@ -19,8 +19,10 @@ enum {
 
 extern uint8_t cpu_mode_trampoline_start[];
 extern uint8_t cpu_mode_trampoline_end[];
+extern uint8_t cpu_mode_real8_marker[];
 extern int cpu_mode_enter_real_probe_asm(void);
 extern int cpu_mode_enter_panicroom_texture_asm(void);
+extern int cpu_mode_enter_auxkernel_real8_asm(void);
 
 static uint32_t s_bridge_ready;
 static uint32_t s_trampoline_size;
@@ -28,6 +30,9 @@ static uint32_t s_roundtrip_count;
 static uint32_t s_last_roundtrip_ok;
 static uint32_t s_panicroom_texture_count;
 static uint32_t s_last_panicroom_texture_ok;
+static uint32_t s_auxkernel_real8_count;
+static uint32_t s_last_auxkernel_real8_ok;
+static uint32_t s_last_auxkernel_real8_marker;
 static uint32_t s_last_error;
 
 static uint64_t read_efer(void)
@@ -57,6 +62,8 @@ void cpu_mode_init(void)
     s_trampoline_size = (uint32_t)len;
     s_last_roundtrip_ok = 0;
     s_last_panicroom_texture_ok = 0;
+    s_last_auxkernel_real8_ok = 0;
+    s_last_auxkernel_real8_marker = 0;
 
     if (!mmu_protection_is_ready()) {
         s_last_error = CPU_MODE_ERR_MMU_NOT_READY;
@@ -137,6 +144,48 @@ int cpu_mode_panicroom_texture(void)
     return 0;
 }
 
+int cpu_mode_auxkernel_real8_probe(void)
+{
+    int r;
+    uint32_t marker_off;
+    volatile uint8_t* marker;
+    if (!s_bridge_ready) {
+        s_last_error = CPU_MODE_ERR_BRIDGE_NOT_READY;
+        s_last_auxkernel_real8_ok = 0;
+        return -1;
+    }
+
+    marker_off = (uint32_t)(cpu_mode_real8_marker - cpu_mode_trampoline_start);
+    marker = (volatile uint8_t*)(uintptr_t)(CPU_MODE_TRAMPOLINE_PA + marker_off);
+    marker[0] = 0;
+    marker[1] = 0;
+    marker[2] = 0;
+    marker[3] = 0;
+
+    r = cpu_mode_enter_auxkernel_real8_asm();
+    s_roundtrip_count++;
+    s_auxkernel_real8_count++;
+    s_last_auxkernel_real8_marker = ((uint32_t)marker[0]) |
+                                    ((uint32_t)marker[1] << 8) |
+                                    ((uint32_t)marker[2] << 16) |
+                                    ((uint32_t)marker[3] << 24);
+    if (r != 1 || marker[0] != 0xA8u || marker[1] != 0x08u || marker[3] != 0x01u) {
+        s_last_error = CPU_MODE_ERR_ROUNDTRIP_FAILED;
+        s_last_auxkernel_real8_ok = 0;
+        return -1;
+    }
+    if (!cpu_mode_long_mode_active()) {
+        s_last_error = CPU_MODE_ERR_NOT_LONG_AFTER_RETURN;
+        s_last_auxkernel_real8_ok = 0;
+        return -1;
+    }
+
+    s_last_error = CPU_MODE_ERR_NONE;
+    s_last_roundtrip_ok = 1;
+    s_last_auxkernel_real8_ok = 1;
+    return 0;
+}
+
 void cpu_mode_info(cpu_mode_info_t* out)
 {
     if (!out) return;
@@ -148,5 +197,8 @@ void cpu_mode_info(cpu_mode_info_t* out)
     out->last_roundtrip_ok = s_last_roundtrip_ok;
     out->panicroom_texture_count = s_panicroom_texture_count;
     out->last_panicroom_texture_ok = s_last_panicroom_texture_ok;
+    out->auxkernel_real8_count = s_auxkernel_real8_count;
+    out->last_auxkernel_real8_ok = s_last_auxkernel_real8_ok;
+    out->last_auxkernel_real8_marker = s_last_auxkernel_real8_marker;
     out->last_error = s_last_error;
 }

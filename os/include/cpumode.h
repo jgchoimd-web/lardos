@@ -14,6 +14,9 @@ typedef struct {
     uint32_t last_roundtrip_ok;
     uint32_t panicroom_texture_count;
     uint32_t last_panicroom_texture_ok;
+    uint32_t auxkernel_real8_count;
+    uint32_t last_auxkernel_real8_ok;
+    uint32_t last_auxkernel_real8_marker;
     uint32_t last_error;
 } cpu_mode_info_t;
 
@@ -22,5 +25,6 @@ int cpu_mode_bridge_ready(void);
 int cpu_mode_long_mode_active(void);
 int cpu_mode_roundtrip_probe(void);
 int cpu_mode_panicroom_texture(void);
+int cpu_mode_auxkernel_real8_probe(void);
 void cpu_mode_info(cpu_mode_info_t* out);
 const char* cpu_mode_current_name(void);

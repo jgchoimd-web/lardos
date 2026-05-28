@@ -2307,6 +2307,16 @@ static void cmd_auxkernel_status(void)
     out_append(info.active ? "yes" : "no");
     out_append(" module_independent=");
     out_append(info.module_independent ? "yes" : "no");
+    out_append(" real8=");
+    out_append(info.real8_profile ? "yes" : "no");
+    out_append(" bridge=");
+    out_append(info.real8_bridge_ready ? "ready" : "no");
+    out_append("\n  real8_probes=");
+    out_append_u32(info.real8_probe_count);
+    out_append(" last=");
+    out_append(info.last_real8_ok ? "ok" : "none");
+    out_append(" marker=");
+    out_append_hex32(info.last_real8_marker);
     out_append("\n  panicroom=");
     out_append_u32(info.panicroom_entries);
     out_append(" lockdowns=");
@@ -2325,7 +2335,8 @@ static void cmd_auxkernel_status(void)
     out_append_i32(info.last_result);
     out_append("\n  reason=");
     out_append(info.last_reason);
-    out_append("\n  safety: no fan/thermal/hardware-damage path; use lockdown or keydrop for containment.\n");
+    out_append("\n  safety: x86 has real16, so REAL8 is a byte-discipline aux path inside BIOS real mode.\n");
+    out_append("  safety: no fan/thermal/hardware-damage path; use lockdown or keydrop for containment.\n");
 }
 
 static int auxkernel_confirm(const char* args)
@@ -2358,9 +2369,17 @@ static void cmd_auxkernel(const char* args)
         return;
     }
     if (strcmp(sub, "help") == 0 || strcmp(sub, "guide") == 0 || strcmp(sub, "?") == 0) {
-        out_append("Usage: auxkernel status|report|panicroom|lockdown confirm [reason]|keydrop confirm [reason]|test\n");
+        out_append("Usage: auxkernel status|real8|report|panicroom|lockdown confirm [reason]|keydrop confirm [reason]|test\n");
         out_append("AuxKernel is a tiny built-in emergency path independent of KMO modules.\n");
+        out_append("REAL8 is the 8-bit byte-discipline first responder executed inside BIOS real mode.\n");
         out_append("It refuses hardware-damaging self-destruct; emergency containment locks media and can discard volatile keys.\n");
+        return;
+    }
+    if (strcmp(sub, "real8") == 0 || strcmp(sub, "probe") == 0 || strcmp(sub, "byte") == 0) {
+        out_append(auxkernel_real8_probe() == 0 ?
+                   "auxkernel: REAL8 real-mode byte path OK.\n" :
+                   "auxkernel: REAL8 path failed or bridge unavailable.\n");
+        cmd_auxkernel_status();
         return;
     }
     if (strcmp(sub, "report") == 0 || strcmp(sub, "capsule") == 0) {
@@ -2403,7 +2422,7 @@ static void cmd_auxkernel(const char* args)
         out_append(auxkernel_selftest() == 0 ? "auxkernel: selftest OK\n" : "auxkernel: selftest failed\n");
         return;
     }
-    out_append("Usage: auxkernel status|report|panicroom|lockdown confirm [reason]|keydrop confirm [reason]|test\n");
+    out_append("Usage: auxkernel status|real8|report|panicroom|lockdown confirm [reason]|keydrop confirm [reason]|test\n");
 }
 
 static void cmd_auxkernel_selfdestruct_alias(const char* args)
@@ -2825,7 +2844,7 @@ static void cmd_help(const char* args)
     out_append("  install status|preview|hdd yes|ssd yes  install LardOS to ATA HDD/SSD\n");
     out_append("  media list|format Z|sync all|write Z file text  drives X/Y/Z/A/R/_\n");
     out_append("  secure status|key|on|off|seal|lock|unlock KEY|ecc on|off|ram on|storage on  user-owned disk sealing\n");
-    out_append("  auxkernel status|report|lockdown confirm|keydrop confirm  tiny emergency kernel path\n");
+    out_append("  auxkernel status|real8|report|lockdown confirm|keydrop confirm  tiny REAL8 emergency kernel path\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
@@ -2909,7 +2928,8 @@ static void cmd_control(const char* args)
     out_append("  media write Z note.txt hello  save data to the auxiliary media store\n");
     out_append("  secure key         show the user-owned LardLocker-style recovery key\n");
     out_append("  secure seal        write encrypted-at-rest MDFS stores with ECC and scrubbed slack\n");
-    out_append("  auxkernel status   inspect the KMO-independent emergency microkernel path\n");
+    out_append("  auxkernel status   inspect the KMO-independent REAL8 emergency microkernel path\n");
+    out_append("  auxkernel real8    run the 8-bit byte-discipline real-mode first responder probe\n");
     out_append("  auxkernel lockdown confirm reason  seal/sync/lock media during emergency containment\n");
     out_append("  auxkernel keydrop confirm reason   discard volatile media keys without hardware damage\n");
     out_append("  values              reread the LardOS user-law values\n");
@@ -3265,6 +3285,8 @@ static void cmd_status(const char* args)
     auxkernel_info(&aux);
     out_append("AuxKernel: ");
     out_append(aux.active ? "active" : "standby");
+    out_append(", real8=");
+    out_append(aux.last_real8_ok ? "ok" : (aux.real8_bridge_ready ? "ready" : "no"));
     out_append(", panicroom=");
     out_append_u32(aux.panicroom_entries);
     out_append(", lockdowns=");

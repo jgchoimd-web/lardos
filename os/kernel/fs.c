@@ -340,11 +340,12 @@ static const uint8_t office_deck_init[] =
 static uint8_t ram_office_deck_buf[OFFICE_DECK_CAP];
 static FsWritableFile ram_office_deck = { "office_deck.lshow", ram_office_deck_buf, 0, OFFICE_DECK_CAP };
 
-#define AUXKERNEL_CAP 1024u
+#define AUXKERNEL_CAP 1536u
 static const uint8_t auxkernel_init[] =
     "LARDD 1\n"
     "TITLE AuxKernel Emergency Microkernel\n"
     "TEXT Built-in emergency control path that does not require KMO modules.\n"
+    "TEXT REAL8 is an 8-bit byte-discipline first responder that runs inside BIOS real mode.\n"
     "TEXT It supports PanicRoom bridging, media lockdown, reports, and user-confirmed key discard.\n"
     "TEXT It does not implement fan, thermal, or hardware-damaging self-destruct behavior.\n"
     "END\n";
@@ -479,7 +480,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use restart or reboot to sync RAM files and request a firmware/VM restart.\n"
     "li Use install status for the HDD/SSD installer preview, or install hdd yes / install ssd yes to write LardOS to the ATA target disk.\n"
     "li Use media list, media format Z, dir Z:, type Z:note.txt, and dir _: for merged storage.\n"
-    "li Use auxkernel status, auxkernel lockdown confirm, or auxkernel keydrop confirm for the KMO-independent emergency microkernel path.\n"
+    "li Use auxkernel status, auxkernel real8, auxkernel lockdown confirm, or auxkernel keydrop confirm for the KMO-independent REAL8 emergency microkernel path.\n"
     "li Use fstwt status, fstwt fs, fstwt main name, fstwt use file.fstwts, fstwt to path, and fstwt from file to translate or virtualize file-system names.\n"
     "li Run mode probe to enter a controlled real16 window and return to long64.\n"
     "li Run mode guard to verify the bridge restores long64 after a real16 window.\n"
@@ -593,6 +594,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.72.0a officially promotes KMO shell-command bindings without feature loss or philosophy changes.\n"
     "li v1.93.0b adds SPFX subpixel display-defect filter scripts through renderfx subpx and writable displayfix.spfx.\n"
     "li v1.95.0a adds AuxKernel, a tiny KMO-independent emergency microkernel path for PanicRoom bridge, lockdown, reports, and keydrop containment.\n"
+    "li v2.0.4b pins AuxKernel to a REAL8 profile: an 8-bit byte-discipline first responder inside BIOS real mode.\n"
     "li v1.96.0b adds software ECC placement controls: secure ecc ram on/off and secure ecc storage on/off.\n"
     "li v1.97.0b adds MegaClipboard: 10 slots, stack/single/order modes, commands, and Ctrl+Y/Ctrl+P/Ctrl+Space slot pull shortcuts.\n"
     "li v1.94.0a officially promotes LardSec/LardLocker media sealing and keeps POST selftests from changing user-visible security counters.\n"

@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT LTS codenames append after the channel, for example v1.99.0a-tiara. Only one LTS line is active at a time.
 
+SECTION v2.0.4b
+ITEM Pins AuxKernel to a REAL8 profile: an 8-bit byte-discipline first responder executed inside BIOS real mode.
+ITEM Adds a CPU mode bridge request for auxkernel real8 so LardOS can prove the emergency path reaches real mode and returns to long64.
+ITEM AuxKernel status, auxkernel.lardd reports, and global status now expose real8 bridge readiness, probe counts, last result, and marker bytes.
+ITEM auxkernel real8 runs the explicit REAL8 probe; PanicRoom, lockdown, keydrop, and POST/selftest also touch the visible REAL8 path.
+ITEM Keeps the safety line intact: no hidden hardware-damage path, no KMO dependency, and user-confirmed containment through lock/sync/key discard.
+ITEM Preserves the v2.0.3b seed/default ownership model, RXE/SYSRXE apps, KMO, LiveUpdate, MediaFS, GUI, LardOS Connect, and Tiara LTS policy without feature loss.
+ITEM Ships as beta because it deepens the emergency kernel mode contract.
+
 SECTION v2.0.3b
 ITEM Replaces true read-only built-in behavior with user-overridable seed/default file behavior.
 ITEM fs_open now checks user-owned writable overlays before built-in/LFS seed defaults, so the user's file wins.

@@ -526,12 +526,14 @@ include assertions, `when`/`unless`, `repeat` with the `it` index, stepped
 
 LAR archives are native `LAR1` files. Method `0` remains the original stored
 member format, while method `1` stores a password-protected member payload with
-a local salt, CRC check, and in-tree password-derived keyed stream. This is a
-real payload lock: the stored member bytes are transformed, and POST rejects the
-implementation if the plaintext payload is still visible in the archive body.
-`lar list` stays metadata only, and `extract archive member password` or
-`lar extract archive member password` requires the user-supplied password before
-bytes are written to `lar_extract.txt`.
+public `LP1` metadata, public salt, payload CRC, payload length, and an in-tree
+password-derived keyed stream. The password text and password-derived verifier
+are not stored in the archive. This is a real payload lock: the stored member
+bytes are transformed, and POST rejects the implementation if the plaintext
+payload or password text is still visible in the archive body. `lar list` stays
+metadata only, and `extract archive member password` or `lar extract archive
+member password` requires the user-supplied password before bytes are written
+to `lar_extract.txt`.
 
 Release suffix policy is deliberately small and visible: `a` is official, `b`
 is beta/experimental, and `p` is hotpatch. New feature bundles do not

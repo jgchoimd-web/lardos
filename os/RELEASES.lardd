@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.2.1b-mirage
+ITEM Tightens LAR method 1 so the stored salt is public metadata only and no longer mixes in a password hash.
+ITEM Adds selftest checks that the password text is not stored in the archive, that same-file archives with different passwords keep the same public salt, and that their ciphertext differs.
+ITEM Keeps existing password-protected LAR extraction commands and method 0 archives compatible.
+ITEM Documents that LAR stores LP1 metadata, public salt, payload CRC, length, and ciphertext, not the password or a password-derived stored verifier.
+ITEM Ships as beta because it corrects the new archive-protection metadata surface.
+
 SECTION v2.2.0b-mirage
 ITEM Changes the built-in LFS volume to LFS v2, a record-stream format with unbounded varuint file counts, offsets, sizes, and extent chains.
 ITEM Keeps legacy LFS v1 readable so existing built-in/LFS seed files do not disappear.

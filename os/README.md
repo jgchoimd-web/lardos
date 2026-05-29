@@ -52,6 +52,12 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.2.1b-mirage` tightens LAR method 1 metadata. Password-protected `.lar`
+members store `LP1` metadata, public salt, payload CRC, payload length, and
+ciphertext. They do not store the password text, and the public salt no longer
+mixes in a password hash or password-derived verifier. The password is used at
+extract time to derive the keyed stream that transforms the payload bytes.
+
 `v2.2.0b-mirage` moves the built-in LFS volume to LFS v2. Legacy LFS v1 stays
 readable, but v2 replaces fixed `u16` file counts and `u32` offsets/sizes with
 record-stream metadata, unbounded varuint numbers, and extent chains. Physical
@@ -64,9 +70,9 @@ itself no longer encodes a petabyte/exabyte-style structural ceiling. Use
 `extract archive.lar member password`, `lar extract archive.lar member password`,
 or `larx archive.lar member password` before their contents are written to
 `lar_extract.txt`. `lar pass out.lar member sourcefile password` creates a
-single-member protected archive using only in-tree code. Method 1 encrypts the
-member payload with a password-derived keyed stream; the password is not just a
-metadata marker.
+single-member protected archive using only in-tree code. Method 1 transforms
+the member payload with a password-derived keyed stream; the password is not
+stored as archive metadata.
 
 `v2.0.7b-mirage` adds user-owned screen capture. `screenshot [file.lshot] [w h]`
 writes a compact `LSHOT` RGB565 snapshot of the visible GUI, and

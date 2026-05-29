@@ -125,6 +125,16 @@ static int lar_contains_bytes(const uint8_t* data, uint32_t len,
     return 0;
 }
 
+static uint32_t lar_public_salt(const uint8_t* name, uint8_t name_len,
+                                uint32_t payload_len, uint32_t crc)
+{
+    uint32_t salt = crc ^ hash_fnv1a(name, name_len) ^ payload_len ^ 0x4C415250u;
+    salt ^= salt << 13;
+    salt ^= salt >> 17;
+    salt ^= salt << 5;
+    return salt ? salt : 0x4C415250u;
+}
+
 static int name_eq(const uint8_t* entry_name, uint8_t entry_len, const char* name)
 {
     uint8_t i = 0;
@@ -285,8 +295,7 @@ int lar_create_single(uint8_t* out, uint32_t* out_len, const char* member,
         for (uint32_t i = 0; i < payload_len; i++) out[data_off + i] = payload[i];
     } else {
         crc = hash_crc32(payload, payload_len);
-        salt = crc ^ hash_fnv1a_str(password) ^ hash_fnv1a((const uint8_t*)member, name_len) ^
-               payload_len ^ 0x4C415250u;
+        salt = lar_public_salt((const uint8_t*)member, name_len, payload_len, crc);
         out[data_off + 0] = LAR_PASS_MAGIC0;
         out[data_off + 1] = LAR_PASS_MAGIC1;
         out[data_off + 2] = LAR_PASS_MAGIC2;
@@ -307,15 +316,32 @@ int lar_selftest(void)
 {
     static const uint8_t msg[] = "secret lar payload";
     uint8_t archive[128];
+    uint8_t archive_other[128];
     uint8_t plain[32];
     uint32_t archive_len = sizeof(archive);
+    uint32_t archive_other_len = sizeof(archive_other);
     uint32_t plain_len;
+    uint32_t payload_off;
+    uint32_t payload_other_off;
+    uint8_t cipher_diff = 0;
     int r;
 
     r = lar_create_single(archive, &archive_len, "secret.txt", msg, sizeof(msg) - 1u, "open");
     if (r != 0) return -1;
     if (lar_list(archive, archive_len, NULL, NULL) != 0) return -2;
     if (lar_contains_bytes(archive, archive_len, msg, sizeof(msg) - 1u)) return -7;
+    if (lar_contains_bytes(archive, archive_len, (const uint8_t*)"open", 4u)) return -8;
+    if (lar_create_single(archive_other, &archive_other_len, "secret.txt", msg, sizeof(msg) - 1u, "other") != 0) return -9;
+    payload_off = rd32(archive + 12);
+    payload_other_off = rd32(archive_other + 12);
+    if (rd32(archive + payload_off + 4) != rd32(archive_other + payload_other_off + 4)) return -10;
+    for (uint32_t i = 0; i < sizeof(msg) - 1u; i++) {
+        if (archive[payload_off + LAR_PASS_OVERHEAD + i] !=
+            archive_other[payload_other_off + LAR_PASS_OVERHEAD + i]) {
+            cipher_diff = 1;
+        }
+    }
+    if (!cipher_diff) return -11;
     plain_len = sizeof(plain);
     if (lar_extract_password(archive, archive_len, "secret.txt", "bad", plain, &plain_len) != -13) return -3;
     plain_len = sizeof(plain);

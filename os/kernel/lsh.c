@@ -2972,7 +2972,7 @@ static void cmd_help(const char* args)
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  wallpaper status|color|pattern|bmp|use|reload|reset  user-owned desktop wallpaper\n");
     out_append("  megaclip status|list|mode|push|file|pull|write  10-slot keyboard-first clipboard\n");
-    out_append("  pinclip list|set slot text|pull|write|clear  fixed shortcut clipboard slots\n");
+    out_append("  pinclip list|set slot text|from fixed [slot]|pull|write|clear  fixed shortcut clipboard slots\n");
     out_append("  lconnect on|direct|discover|share|syncclip|request|grant|deny  LAN resource sharing except keyboard/mouse\n");
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
@@ -9002,6 +9002,30 @@ static void megaclip_print_pins(void)
     }
 }
 
+static void pinclip_set_from_history(uint32_t pin_slot, int have_history_slot, uint32_t history_slot)
+{
+    megaclip_item_t item;
+    int r = have_history_slot ? megaclip_pull(history_slot, &item) : megaclip_pull_latest(&item);
+    if (r != 0) {
+        out_append("pinclip: MegaClipboard source slot empty.\n");
+        return;
+    }
+    if (megaclip_pin_set(pin_slot, item.kind, item.label, item.data, item.size) != 0) {
+        out_append("pinclip: fixed slot save failed.\n");
+        return;
+    }
+    out_append("pinclip: MegaClipboard ");
+    if (have_history_slot) {
+        out_append("slot ");
+        out_append_u32(megaclip_slot_number(history_slot));
+    } else {
+        out_append("latest");
+    }
+    out_append(" pinned to fixed slot ");
+    out_append_u32(megaclip_slot_number(pin_slot));
+    out_append(".\n");
+}
+
 static void megaclip_write_item(const megaclip_item_t* item, const char* dst_arg)
 {
     char dst_name[64];
@@ -9124,6 +9148,26 @@ static void cmd_megaclip(const char* args)
             return;
         }
         megaclip_print_item(slot, &item);
+        return;
+    }
+    if (strcmp(sub, "pinfrom") == 0 || strcmp(sub, "fixfrom") == 0 ||
+        strcmp(sub, "keep") == 0 || strcmp(sub, "remember") == 0) {
+        char pin_word[16];
+        char src_word[16];
+        uint32_t pin_slot;
+        uint32_t src_slot = 0;
+        int have_src;
+        if (vcs_read_word(&args, pin_word, sizeof(pin_word)) != 0 ||
+            megaclip_parse_slot_word(pin_word, &pin_slot) != 0) {
+            out_append("Usage: megaclip pinfrom fixed-slot [megaclip-slot]\n");
+            return;
+        }
+        have_src = vcs_read_word(&args, src_word, sizeof(src_word)) == 0;
+        if (have_src && megaclip_parse_slot_word(src_word, &src_slot) != 0) {
+            out_append("Usage: megaclip pinfrom fixed-slot [megaclip-slot]\n");
+            return;
+        }
+        pinclip_set_from_history(pin_slot, have_src, src_slot);
         return;
     }
     if (strcmp(sub, "unpin") == 0 || strcmp(sub, "pinclear") == 0 || strcmp(sub, "fixedclear") == 0) {
@@ -9255,7 +9299,7 @@ static void cmd_megaclip(const char* args)
         out_append(megaclip_selftest() == 0 ? "megaclip: selftest OK\n" : "megaclip: selftest failed\n");
         return;
     }
-    out_append("Usage: megaclip status|list|pins|mode stack|single|order|push text|file path|pull [slot]|write [slot] file|pin slot text|pinpull slot|pinwrite slot file|unpin slot|pinreload|clear|test\n");
+    out_append("Usage: megaclip status|list|pins|mode stack|single|order|push text|file path|pull [slot]|write [slot] file|pin slot text|pinfrom fixed [slot]|pinpull slot|pinwrite slot file|unpin slot|pinreload|clear|test\n");
 }
 
 static void cmd_pinclip(const char* args)
@@ -9304,6 +9348,27 @@ static void cmd_pinclip(const char* args)
         megaclip_print_item(slot, &item);
         return;
     }
+    if (strcmp(sub, "from") == 0 || strcmp(sub, "keep") == 0 ||
+        strcmp(sub, "savefrom") == 0 || strcmp(sub, "pinfrom") == 0 ||
+        strcmp(sub, "remember") == 0) {
+        char pin_word[16];
+        char src_word[16];
+        uint32_t pin_slot;
+        uint32_t src_slot = 0;
+        int have_src;
+        if (vcs_read_word(&args, pin_word, sizeof(pin_word)) != 0 ||
+            megaclip_parse_slot_word(pin_word, &pin_slot) != 0) {
+            out_append("Usage: pinclip from fixed-slot [megaclip-slot]\n");
+            return;
+        }
+        have_src = vcs_read_word(&args, src_word, sizeof(src_word)) == 0;
+        if (have_src && megaclip_parse_slot_word(src_word, &src_slot) != 0) {
+            out_append("Usage: pinclip from fixed-slot [megaclip-slot]\n");
+            return;
+        }
+        pinclip_set_from_history(pin_slot, have_src, src_slot);
+        return;
+    }
     if (strcmp(sub, "write") == 0 || strcmp(sub, "save") == 0) {
         char slot_word[16];
         char file_word[64];
@@ -9340,7 +9405,7 @@ static void cmd_pinclip(const char* args)
         out_append(megaclip_selftest() == 0 ? "pinclip: selftest OK\n" : "pinclip: selftest failed\n");
         return;
     }
-    out_append("Usage: pinclip list|set slot text|pull slot|write slot file|clear slot|reload|test\n");
+    out_append("Usage: pinclip list|set slot text|from fixed-slot [megaclip-slot]|pull slot|write slot file|clear slot|reload|test\n");
 }
 
 static const char* lsh_skip_spaces(const char* s)
@@ -11533,7 +11598,7 @@ static void cfgsh_help(void)
     out_append("  sum on|off         ring-0 full-control mode\n");
     out_append("  secure ecc ram|storage on|off  software ECC placement\n");
     out_append("  megaclip stack|single|order  clipboard slot mode\n");
-    out_append("  pinclip list|set 1 text      fixed clipboard shortcut slots\n");
+    out_append("  pinclip list|set 1 text|from 1 [2]  fixed clipboard shortcut slots\n");
     out_append("  lconnect on|off|auto|manual  LAN resource sharing control\n");
     out_append("  sync               persist writable settings/files\n");
 }

@@ -17,6 +17,7 @@ static uint32_t s_pin_pulls;
 
 #define MEGACLIP_DOC_CAP 8192u
 static char s_doc_buf[MEGACLIP_DOC_CAP];
+static uint8_t s_pin_load_buf[MEGACLIP_DATA_MAX];
 
 static uint32_t slen(const char* s)
 {
@@ -99,6 +100,39 @@ static void doc_append_clean_data(char* dst, uint32_t cap, uint32_t* pos,
         if (ch == '\n' || ch == '\r') ch = ' ';
         if (ch < ' ' || ch > '~') ch = '.';
         doc_append_char(dst, cap, pos, ch);
+    }
+}
+
+static int pin_data_plain_safe(const uint8_t* data, uint32_t size)
+{
+    for (uint32_t i = 0; i < size; i++) {
+        uint8_t ch = data ? data[i] : 0;
+        if (ch < ' ' || ch > '~') return 0;
+    }
+    return 1;
+}
+
+static char hex_digit(uint8_t v)
+{
+    v &= 0xFu;
+    return v < 10u ? (char)('0' + v) : (char)('A' + (v - 10u));
+}
+
+static int hex_value(uint8_t ch)
+{
+    if (ch >= '0' && ch <= '9') return (int)(ch - '0');
+    if (ch >= 'A' && ch <= 'F') return (int)(ch - 'A' + 10);
+    if (ch >= 'a' && ch <= 'f') return (int)(ch - 'a' + 10);
+    return -1;
+}
+
+static void doc_append_hex_data(char* dst, uint32_t cap, uint32_t* pos,
+                                const uint8_t* data, uint32_t size)
+{
+    for (uint32_t i = 0; i < size && *pos + 2u < cap; i++) {
+        uint8_t b = data ? data[i] : 0;
+        doc_append_char(dst, cap, pos, hex_digit((uint8_t)(b >> 4)));
+        doc_append_char(dst, cap, pos, hex_digit(b));
     }
 }
 
@@ -270,11 +304,17 @@ static void load_pin_line(const uint8_t* data, uint32_t start, uint32_t end)
     uint32_t n = 0;
     uint32_t slot;
     uint32_t digits = 0;
+    uint32_t plen = 0;
+    int is_hex = 0;
     char kind[MEGACLIP_KIND_MAX + 1u];
     char label[MEGACLIP_LABEL_MAX + 1u];
-    if (line_prefix_len(data, start, end, "ITEM PIN ", &p) ||
-        line_prefix_len(data, start, end, "PIN ", &p)) {
-        p = start + p;
+    if (line_prefix_len(data, start, end, "ITEM PINHEX ", &plen) ||
+        line_prefix_len(data, start, end, "PINHEX ", &plen)) {
+        p = start + plen;
+        is_hex = 1;
+    } else if (line_prefix_len(data, start, end, "ITEM PIN ", &plen) ||
+               line_prefix_len(data, start, end, "PIN ", &plen)) {
+        p = start + plen;
     } else {
         return;
     }
@@ -292,6 +332,26 @@ static void load_pin_line(const uint8_t* data, uint32_t start, uint32_t end)
     if (p + 1u < end && data[p] == ':' && data[p + 1u] == ':') p += 2u;
     p = line_skip_spaces(data, p, end);
     while (end > p && (data[end - 1u] == '\r' || data[end - 1u] == ' ' || data[end - 1u] == '\t')) end--;
+    if (is_hex) {
+        uint32_t out_n = 0;
+        int hi = -1;
+        while (p < end && out_n < MEGACLIP_DATA_MAX) {
+            if (data[p] == ' ' || data[p] == '\t') {
+                p++;
+                continue;
+            }
+            int v = hex_value(data[p++]);
+            if (v < 0) return;
+            if (hi < 0) hi = v;
+            else {
+                s_pin_load_buf[out_n++] = (uint8_t)((hi << 4) | v);
+                hi = -1;
+            }
+        }
+        if (hi >= 0) return;
+        assign_pin_raw(slot, kind[0] ? kind : "blob", label[0] ? label : "fixed", s_pin_load_buf, out_n);
+        return;
+    }
     assign_pin_raw(slot, kind[0] ? kind : "text", label[0] ? label : "fixed", data + p, end - p);
 }
 
@@ -325,18 +385,22 @@ static int megaclip_save_pins_doc(void)
     doc_append(s_doc_buf, sizeof(s_doc_buf), &pos,
                "TEXT Ctrl+Space then P then 1..9/0 pulls fixed slots that do not move when copying.\n");
     doc_append(s_doc_buf, sizeof(s_doc_buf), &pos,
-               "TEXT Commands: megaclip status|list|mode|push|file|pull|write|clear and pinclip list|set|pull|write|clear|reload.\n");
+               "TEXT Commands: megaclip status|list|mode|push|file|pull|write|clear and pinclip list|set|from|pull|write|clear|reload.\n");
+    doc_append(s_doc_buf, sizeof(s_doc_buf), &pos,
+               "TEXT PIN stores printable fixed data; PINHEX stores exact fixed bytes for file/blob clips.\n");
     doc_append(s_doc_buf, sizeof(s_doc_buf), &pos, "SECTION Fixed Slots\n");
     for (uint32_t i = 0; i < MEGACLIP_PIN_SLOTS; i++) {
         if (!s_pins[i].used) continue;
-        doc_append(s_doc_buf, sizeof(s_doc_buf), &pos, "ITEM PIN ");
+        int plain = pin_data_plain_safe(s_pins[i].data, s_pins[i].size);
+        doc_append(s_doc_buf, sizeof(s_doc_buf), &pos, plain ? "ITEM PIN " : "ITEM PINHEX ");
         doc_append_u32(s_doc_buf, sizeof(s_doc_buf), &pos, pin_slot_number(i));
         doc_append_char(s_doc_buf, sizeof(s_doc_buf), &pos, ' ');
         doc_append(s_doc_buf, sizeof(s_doc_buf), &pos, s_pins[i].kind);
         doc_append_char(s_doc_buf, sizeof(s_doc_buf), &pos, ' ');
         doc_append(s_doc_buf, sizeof(s_doc_buf), &pos, s_pins[i].label);
         doc_append(s_doc_buf, sizeof(s_doc_buf), &pos, " :: ");
-        doc_append_clean_data(s_doc_buf, sizeof(s_doc_buf), &pos, s_pins[i].data, s_pins[i].size);
+        if (plain) doc_append_clean_data(s_doc_buf, sizeof(s_doc_buf), &pos, s_pins[i].data, s_pins[i].size);
+        else doc_append_hex_data(s_doc_buf, sizeof(s_doc_buf), &pos, s_pins[i].data, s_pins[i].size);
         doc_append_char(s_doc_buf, sizeof(s_doc_buf), &pos, '\n');
     }
     doc_append(s_doc_buf, sizeof(s_doc_buf), &pos, "END\n");
@@ -558,6 +622,13 @@ int megaclip_selftest(void)
     if (ok && (item.size != 5u || item.data[0] != 'o')) ok = 0;
     clear_slot(&s_pins[0]);
     if (ok && megaclip_pin_pull(0, &item) == 0) ok = 0;
+    {
+        static const uint8_t hex_line[] = "ITEM PINHEX 3 blob bin :: 0001FF";
+        load_pin_line(hex_line, 0, sizeof(hex_line) - 1u);
+        if (ok && megaclip_pin_pull(2, &item) != 0) ok = 0;
+        if (ok && (item.size != 3u || item.data[0] != 0u ||
+                   item.data[1] != 1u || item.data[2] != 0xFFu)) ok = 0;
+    }
     for (uint32_t i = 0; i < MEGACLIP_SLOTS; i++) s_slots[i] = old_slots[i];
     for (uint32_t i = 0; i < MEGACLIP_PIN_SLOTS; i++) s_pins[i] = old_pins[i];
     s_mode = old_mode;

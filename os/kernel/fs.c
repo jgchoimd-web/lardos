@@ -294,7 +294,8 @@ static const uint8_t megaclip_init_doc[] =
     "TEXT Ctrl+Y copies the active editor/response/item, Ctrl+P pastes latest, Ctrl+Space then 1..9/0 pulls a slot.\n"
     "TEXT PinClip fixed slots do not move when copying. Ctrl+Space then P then 1..9/0 pulls a fixed slot.\n"
     "TEXT Commands: megaclip status, list, mode stack/single/order, push text, file path, pull slot, write slot file.\n"
-    "TEXT Commands: pinclip list, set slot text, pull slot, write slot file, clear slot, reload.\n"
+    "TEXT Commands: pinclip list, set slot text, from fixed-slot [megaclip-slot], pull slot, write slot file, clear slot, reload.\n"
+    "TEXT PIN lines store printable fixed data; PINHEX lines store exact bytes for file/blob clips.\n"
     "SECTION Fixed Slots\n"
     "END\n";
 static uint8_t ram_megaclip_buf[MEGACLIP_CAP];
@@ -515,7 +516,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use renderfx subpx use displayfix.spfx to apply per-region R/G/B subpixel defect correction from an editable script.\n"
     "li Use wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, or wallpaper bmp sample.bmp to set the desktop background from user-owned state.\n"
     "li Use Ctrl+Y, Ctrl+P, Ctrl+Space then 1..9/0, or megaclip status/list/mode/push/file/pull/write for the 10-slot MegaClipboard.\n"
-    "li Use pinclip set/list/pull/write/clear and Ctrl+Space then P then 1..9/0 for fixed clipboard shortcuts.\n"
+    "li Use pinclip set/list/from/pull/write/clear and Ctrl+Space then P then 1..9/0 for fixed clipboard shortcuts.\n"
     "li Use lconnect on, lconnect direct, lconnect discover, and lconnect share all on to share non-input resources with another LardOS machine over LAN.\n"
     "li Use secure key, secure seal, secure lock, secure ecc ram on, secure ecc storage on, and secure unlock KEY for optional user-owned encrypted-at-rest media stores with software ECC.\n"
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
@@ -630,6 +631,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.96.0b adds software ECC placement controls: secure ecc ram on/off and secure ecc storage on/off.\n"
     "li v1.97.0b adds MegaClipboard: 10 slots, stack/single/order modes, commands, and Ctrl+Y/Ctrl+P/Ctrl+Space slot pull shortcuts.\n"
     "li v2.4.0b adds PinClip fixed clipboard shortcuts on top of MegaClipboard without removing history behavior.\n"
+    "li v2.4.1b lets pinclip from fixed [history] freeze useful MegaClipboard history into fixed slots.\n"
     "li v1.94.0a officially promotes LardSec/LardLocker media sealing and keeps POST selftests from changing user-visible security counters.\n"
     "li v1.94.0b adds optional LardSec/LardLocker at-rest media sealing with visible recovery keys and ECC.\n"
     "li v1.92.1a officially promotes the native WebStack method/TLS line without feature loss or value changes.\n"

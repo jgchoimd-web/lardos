@@ -52,6 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.4.1b-mirage` lets PinClip freeze existing MegaClipboard history into fixed
+slots. `pinclip from 1` pins the latest MegaClipboard entry into fixed slot 1,
+and `pinclip from 1 4` pins MegaClipboard slot 4 into fixed slot 1. The same
+path is available as `megaclip pinfrom 1 [4]`. Exact file/blob clips are kept
+with visible `PINHEX` lines in `megaclip.lardd`. `megaclip clear` still clears
+only moving history; fixed slots remain user-editable through
+`pinclip set/clear/reload`.
+
 `v2.4.0b-mirage` adds PinClip, a fixed clipboard layer on top of
 MegaClipboard. `pinclip set 1 text` assigns a stable shortcut slot,
 `pinclip list|pull|write|clear|reload` manages those slots, and the GUI uses
@@ -499,10 +507,12 @@ commands:
 - `megaclip status|list|mode stack|single|order|push text|file path|pull slot|write slot file`
   manages the ten-slot MegaClipboard. The same system is available from the GUI
   with `Ctrl+Y`, `Ctrl+P`, and `Ctrl+Space` then `1..9`/`0`.
-- `pinclip list|set slot text|pull slot|write slot file|clear slot|reload`
+- `pinclip list|set slot text|from fixed-slot [megaclip-slot]|pull slot|write slot file|clear slot|reload`
   manages fixed clipboard shortcuts for text, commands, paths, and other
   frequent snippets. These slots stay still when MegaClipboard history moves,
-  and the GUI pastes them with `Ctrl+Space`, then `P`, then `1..9`/`0`.
+  `from` copies the latest or chosen MegaClipboard entry into a fixed slot,
+  preserving exact bytes with `PINHEX` when needed, and the GUI pastes them with
+  `Ctrl+Space`, then `P`, then `1..9`/`0`.
 - `lconnect status|on|off|direct IP [MASK]|discover [IP]|share all on|mode manual|auto|syncclip IP|request IP resource|grant IP resource|deny IP resource|log`
   controls LardOS Connect, the LAN resource-sharing layer for LardOS machines.
   It shares MegaClipboard, CPU, GPU, storage, and peripheral leases only when the

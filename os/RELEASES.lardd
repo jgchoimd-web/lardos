@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.4.1b-mirage
+ITEM Adds pinclip from fixed-slot [megaclip-slot] so useful MegaClipboard history can be frozen into stable PinClip shortcuts.
+ITEM Adds megaclip pinfrom/fixfrom/keep/remember fixed-slot [megaclip-slot] aliases for the same user flow.
+ITEM Omitting the source slot pins the latest MegaClipboard item; providing 1..9/0 pins that visible history slot.
+ITEM Adds PINHEX fixed-slot persistence so file/blob clips copied from MegaClipboard keep exact bytes across reloads instead of being flattened to text.
+ITEM megaclip clear still clears moving history only; fixed slots remain editable, creatable, reloadable, writable, and deletable through PinClip commands.
+ITEM Preserves PinClip fixed-slot persistence, MegaClipboard history modes, GUI shortcuts, LardOS Connect, RXE/SYSRXE, LFS/LAR, and user-control values without feature loss.
+ITEM Ships as beta because this extends the new clipboard shortcut workflow.
+
 SECTION v2.4.0b-mirage
 ITEM Adds PinClip fixed clipboard shortcuts on top of MegaClipboard, with ten user-owned slots that do not move when normal clipboard history changes.
 ITEM Adds pinclip/fixedclip/pclip commands for list, set, pull, write, clear, reload, and selftest.

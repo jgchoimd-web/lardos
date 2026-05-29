@@ -52,6 +52,12 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.0.9b-mirage` adds password-protected native `.lar` entries. Existing
+`LAR1` method-0 stored archives remain readable, while method-1 members require
+`lar extract archive.lar member password` before their contents are written to
+`lar_extract.txt`. `lar pass out.lar member sourcefile password` creates a
+single-member protected archive using only in-tree code.
+
 `v2.0.7b-mirage` adds user-owned screen capture. `screenshot [file.lshot] [w h]`
 writes a compact `LSHOT` RGB565 snapshot of the visible GUI, and
 `screenrec start [frames] [w h] [file.lrec]`, `screenrec frame`, and
@@ -333,7 +339,7 @@ drives remain directly addressable, and `_:` writes still route visibly to `R:`.
 `v1.77.0b` adds `_:` as a merged top-level drive over `R:`/`X:`/`Y:`/`Z:`/`A:`.
 `dir _:` shows every visible store with drive prefixes, and common read
 commands such as `type`, `copy`, `doc`, `lars`, `lardd`, `lafillo`, `larls`,
-`larx`, `vcsadd`, and L-DOS `DIR`/`TYPE`/`COPY` can read through it. Writes to
+`larx`, `lar pass`, `vcsadd`, and L-DOS `DIR`/`TYPE`/`COPY` can read through it. Writes to
 `_:` route visibly to `R:` writable RAM slots so the OS never hides the actual
 writable surface.
 
@@ -954,6 +960,10 @@ commands:
 - `write file text`, `append file text`, and `copy src dst` edit writable RAM
   files such as `notes.txt`, `bugreport.lardd`, `lafillo_saved.txt`,
   `lar_extract.txt`, and `vcs_restore.txt`.
+- `lar list archive.lar`, `lar extract archive.lar member [password]`, and
+  `lar pass out.lar member sourcefile password` handle native `.lar` archives.
+  Existing stored LAR entries remain readable, while method-1 entries are
+  password-protected with an in-tree keyed stream and CRC check.
 - `sync` / `fssave` persists writable RAM files to the LPST dual-bank store.
 - `sum` enters ring-0 mode; `peek addr [len]`, `poke addr value [8|16|32]`,
   and `asm_` expose raw memory and I/O controls.

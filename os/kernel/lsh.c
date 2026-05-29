@@ -354,7 +354,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 }, { "fstwt", 1 }, { "fstwts", 1 }, { "vpath", 1 }, { "pathmap", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
-    { "lafillo", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
+    { "lafillo", 1 }, { "lar", 1 }, { "larpass", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
     { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
     { "lcnt", 1 }, { "container", 1 },
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
@@ -1652,7 +1652,27 @@ static void lar_list_lsh_cb(const lar_entry_t* entry, void* user)
     for (uint32_t i = 0; i < entry->name_len; i++) out_append_char(entry->name[i]);
     out_append("  ");
     out_append_u32(entry->unpacked_size);
-    out_append(entry->method == LAR_METHOD_STORE ? " bytes stored\n" : " bytes unsupported\n");
+    if (entry->method == LAR_METHOD_STORE) out_append(" bytes stored\n");
+    else if (entry->method == LAR_METHOD_PASS_STORE) out_append(" bytes password-protected\n");
+    else out_append(" bytes unsupported\n");
+}
+
+static void lar_read_token(const char** args, char* out, uint32_t cap)
+{
+    uint32_t i = 0;
+    const char* p = args && *args ? *args : "";
+    if (!out || cap == 0) return;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p == '"' || *p == '\'') {
+        char quote = *p++;
+        while (*p && *p != quote && i + 1u < cap) out[i++] = *p++;
+        if (*p == quote) p++;
+    } else {
+        while (*p && *p != ' ' && *p != '\t' && i + 1u < cap) out[i++] = *p++;
+    }
+    out[i] = '\0';
+    while (*p == ' ' || *p == '\t') p++;
+    if (args) *args = p;
 }
 
 static void cmd_larls(const char* args)
@@ -1686,14 +1706,12 @@ static void cmd_larx(const char* args)
 {
     char archive_arg[64];
     char member[64];
-    uint32_t ai = 0;
+    char password[64];
     uint32_t mi = 0;
-    while (*args == ' ' || *args == '\t') args++;
-    while (*args && *args != ' ' && *args != '\t' && ai + 1 < sizeof(archive_arg)) archive_arg[ai++] = *args++;
-    archive_arg[ai] = '\0';
-    while (*args == ' ' || *args == '\t') args++;
-    while (*args && *args != ' ' && *args != '\t' && mi + 1 < sizeof(member)) member[mi++] = *args++;
-    member[mi] = '\0';
+    if (!args) args = "";
+    lar_read_token(&args, archive_arg, sizeof(archive_arg));
+    lar_read_token(&args, member, sizeof(member));
+    lar_read_token(&args, password, sizeof(password));
 
     if (!archive_arg[0]) {
         const char* def_member = "hello.txt";
@@ -1706,7 +1724,7 @@ static void cmd_larx(const char* args)
         archive_arg[0] = '\0';
     }
     if (!archive_arg[0]) {
-        ai = 0;
+        uint32_t ai = 0;
         const char* def_archive = "bundle.lar";
         while (def_archive[ai] && ai + 1 < sizeof(archive_arg)) { archive_arg[ai] = def_archive[ai]; ai++; }
         archive_arg[ai] = '\0';
@@ -1724,9 +1742,11 @@ static void cmd_larx(const char* args)
     }
 
     uint32_t out_len = out->cap > 0 ? out->cap - 1 : 0;
-    int r = lar_extract(data, size, member, out->data, &out_len);
+    int r = lar_extract_password(data, size, member, password[0] ? password : NULL, out->data, &out_len);
     if (r != 0) {
-        out_append("larx: extract failed.\n");
+        if (r == -12) out_append("larx: password required.\n");
+        else if (r == -13) out_append("larx: password rejected.\n");
+        else out_append("larx: extract failed.\n");
         return;
     }
     out->size = out_len;
@@ -1735,6 +1755,71 @@ static void cmd_larx(const char* args)
     out_append("Extracted ");
     out_append(member);
     out_append(" -> lar_extract.txt\n");
+}
+
+static void cmd_larpass(const char* args)
+{
+    char out_archive[64];
+    char member[64];
+    char src_arg[64];
+    char password[64];
+    char src_name[64];
+    char src_drv;
+    const uint8_t* src = NULL;
+    uint32_t src_size = 0;
+    FsWritableFile* out;
+    uint32_t out_len;
+    int r;
+    if (!args) args = "";
+    lar_read_token(&args, out_archive, sizeof(out_archive));
+    lar_read_token(&args, member, sizeof(member));
+    lar_read_token(&args, src_arg, sizeof(src_arg));
+    lar_read_token(&args, password, sizeof(password));
+    if (!out_archive[0] || !member[0] || !src_arg[0] || !password[0]) {
+        out_append("Usage: larpass out.lar member sourcefile password\n");
+        return;
+    }
+    resolve_path(src_arg, &src_drv, src_name, sizeof(src_name));
+    if (lsh_read_drive_data(src_drv, src_name, &src, &src_size, NULL) != 0 || !src) {
+        out_append("larpass: source file not found.\n");
+        return;
+    }
+    out = fs_open_or_create_writable(out_archive);
+    if (!out) {
+        out_append("larpass: cannot create writable archive.\n");
+        return;
+    }
+    out_len = out->cap;
+    r = lar_create_single(out->data, &out_len, member, src, src_size, password);
+    if (r != 0) {
+        out_append("larpass: create failed ");
+        out_append_i32(r);
+        out_append(". Try a shorter file/member name or a larger writable slot.\n");
+        return;
+    }
+    out->size = out_len;
+    fs_mark_dirty();
+    out_append("larpass: wrote password-protected ");
+    out_append(out_archive);
+    out_append(" member ");
+    out_append(member);
+    out_append("\n");
+}
+
+static void cmd_lar(const char* args)
+{
+    char sub[24];
+    if (!args) args = "";
+    lar_read_token(&args, sub, sizeof(sub));
+    if (!sub[0] || strcmp(sub, "help") == 0) {
+        out_append("Usage: lar list [archive] | lar extract [archive] [member] [password] | lar pass out.lar member source password\n");
+        out_append("Aliases: larls, larx, larpass. Method 1 members are password-protected native LAR entries.\n");
+        return;
+    }
+    if (strcmp(sub, "list") == 0 || strcmp(sub, "ls") == 0) { cmd_larls(args); return; }
+    if (strcmp(sub, "extract") == 0 || strcmp(sub, "x") == 0) { cmd_larx(args); return; }
+    if (strcmp(sub, "pass") == 0 || strcmp(sub, "lock") == 0 || strcmp(sub, "protect") == 0) { cmd_larpass(args); return; }
+    out_append("Usage: lar list|extract|pass\n");
 }
 
 static int vcs_read_word(const char** args, char* out, uint32_t cap)
@@ -2849,9 +2934,10 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay screenshot screenrec rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay screenshot screenrec rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
+    out_append("  lar list archive.lar; lar extract archive.lar member [password]; lar pass out.lar member source password\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
     out_append("  vpath path|test       resolve folder/inside/path through the OS file namespace\n");
     out_append("  fstwt status|fs|main|use file.fstwts|to path|from file  FS translator/VM\n");
@@ -2898,7 +2984,7 @@ static void cmd_help(const char* args)
     out_append("  write file text  append file text  copy src dst  ren src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z: A: R: _:\n");
     out_append("  shrine status|list|info|verify|run|test [file.shrine]\n");
-    out_append("  lafillo file  larls archive  larx archive member  larsh file\n");
+    out_append("  lafillo file  lar list archive  lar extract archive member [password]  lar pass out.lar member source password  larsh file\n");
     out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM\n");
     out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
@@ -11935,6 +12021,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'd' && cmd[1] == 'i' && cmd[2] == 'r' && cmd[3] == '\0') { cmd_dir(args); return; }
     if (cmd[0] == 't' && cmd[1] == 'y' && cmd[2] == 'p' && cmd[3] == 'e' && cmd[4] == '\0') { cmd_type(args); return; }
     if (strncmp(cmd, "lafillo", 7) == 0 && (cmd[7] == '\0' || cmd[7] == ' ' || cmd[7] == '\t')) { cmd_lafillo(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == '\0') { cmd_lar(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 'p' && cmd[4] == 'a' && cmd[5] == 's' && cmd[6] == 's' && cmd[7] == '\0') { cmd_larpass(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 'l' && cmd[4] == 's' && cmd[5] == '\0') { cmd_larls(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 'x' && cmd[4] == '\0') { cmd_larx(args); return; }
     if (strcmp(cmd, "media") == 0 || strcmp(cmd, "mediafs") == 0 || strcmp(cmd, "devstore") == 0) { cmd_media(args); return; }

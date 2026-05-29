@@ -1506,7 +1506,7 @@ int lardkit_userlaw_reset(void)
         "ITEM Reversibility: settings, packages, and risky changes should have rollback, history, or capsule trails.\n"
         "ITEM Repair over halt: panic room, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
         "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
-        "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, LFS, and picture Unicode keep the system's surface its own.\n"
+        "ITEM Native expression: LARS, LARDD, LAR archives, LGUILIB, LTHEME, LPACK, LFS, and picture Unicode keep the system's surface its own.\n"
         "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; version numbers are vcycle.feature.patch where patch is one digit and carries after 9.\n"
         "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink paths.\n"
         "SECTION Commands\n"

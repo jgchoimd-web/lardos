@@ -4653,7 +4653,9 @@ static void gui_lar_list_cb(const lar_entry_t* entry, void* user)
     gui_resp_append_n(entry->name, entry->name_len);
     gui_resp_append("  ");
     gui_resp_append_u32(entry->unpacked_size);
-    gui_resp_append(entry->method == LAR_METHOD_STORE ? " bytes stored\n" : " bytes unsupported\n");
+    if (entry->method == LAR_METHOD_STORE) gui_resp_append(" bytes stored\n");
+    else if (entry->method == LAR_METHOD_PASS_STORE) gui_resp_append(" bytes password-protected\n");
+    else gui_resp_append(" bytes unsupported\n");
 }
 
 static void gui_lar_show_bundle(void)

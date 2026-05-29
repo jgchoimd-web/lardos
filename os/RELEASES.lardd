@@ -6,6 +6,16 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.0.9b-mirage
+ITEM Adds password-protected .lar members through native LAR method 1 while preserving existing method 0 stored archives.
+ITEM Adds lar pass out.lar member sourcefile password / larpass to create a single-member password-protected archive in a writable user file.
+ITEM Extends lar extract / larx so protected members require the user-supplied password and reject wrong passwords before writing lar_extract.txt.
+ITEM lar list and GUI LAR listing now show password-protected members without exposing their contents.
+ITEM Adds an in-tree keyed stream, salt, and CRC check with no external compression or crypto library dependency.
+ITEM Adds POST coverage, LUNIT command checks, README/architecture/LSH docs, LARS control-room examples, and userlaw native-format wording.
+ITEM Preserves old bundle.lar, larls, larx, LARSH, RXE/SYSRXE, KMO, MediaFS, screen capture, Mirage naming, and user-control values without feature loss.
+ITEM Ships as beta because this adds a new archive protection method and shell write path.
+
 SECTION v2.0.8b-mirage
 ITEM Codifies the visible version-number contract: v<large-cycle>.<feature-or-change>.<patch-or-code-change><channel>-<subname>.
 ITEM The third number is one digit only, 0 through 9; when it would pass 9, the carry moves into the feature/change number even for a small code edit.

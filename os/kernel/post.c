@@ -224,6 +224,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("liveupdate: runtime file/code apply", liveupdate_selftest() == 0, emit, user, &pass, &fail);
     post_check("imgglyph: user-editable Unicode slots", img_glyph_selftest() == 0, emit, user, &pass, &fail);
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
+    post_check("lar: password-protected entries", lar_selftest() == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);
     post_check("version: suffix policy", post_version_suffix_known(), emit, user, &pass, &fail);
     post_check("version: triplet carry policy", lardos_release_triplet_policy_ok(LARDOS_VERSION), emit, user, &pass, &fail);

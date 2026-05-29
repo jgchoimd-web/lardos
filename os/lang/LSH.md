@@ -59,6 +59,7 @@
 - `larsview open|reload|back|actions file` / `larsapp open|form|run` / `notes show|add|clear` - native document/app browser state and notes synced between `notes.lardd` and GUI `notes.txt`.
 - `kmo list|reload|show|run|create|command|raw|set|delete` - manage native `.kmo` kernel module files; `COMMAND name`, `SHELL name`, or `BIND name` turns a KMO into a direct shell command without editing LSH, normal KMO routes through visible KModTalk targets, while `kmo raw file.kmo command`, `RAW 1`, or `TARGET raw` explicitly enables direct risky LSH/raw-control execution.
 - `lunit run tests.lunit` - run small native feature tests.
+- `lar list [archive.lar]`, `lar extract [archive.lar] [member] [password]`, and `lar pass out.lar member sourcefile password` - inspect, extract, or create native LAR archives with optional method-1 password-protected entries. `larls`, `larx`, and `larpass` remain aliases.
 - `lguilib status|show|use|test [file.lguilib]` - inspect or apply native GUI library themes.
 - `awake on|off|status|test` - control the default-off Awakening fast-boot mode.
 - `oslink status|bus|emit|ping|send|exec|recv|peers` - local/remote OSLink messages and safe remote commands.

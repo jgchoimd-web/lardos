@@ -237,6 +237,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | Awakening boot mode | `os/kernel/awake.c`, `os/include/awake.h` |
 | Crash log | `os/kernel/crashlog.c`, `os/include/crashlog.h` |
 | User-control suite | `os/kernel/lardkit.c`, `os/include/lardkit.h` |
+| LAR archives | `os/kernel/lar.c`, `os/include/lar.h` |
 | LardPack packages | `os/kernel/lpack.c`, `os/include/lpack.h` |
 | RXR app bundles | `os/kernel/rxr.c`, `os/include/rxr.h` |
 | HDD/SSD installer | `os/kernel/installer.c`, `os/include/installer.h` |
@@ -512,6 +513,12 @@ LIL is available in both the kernel and the host toolchain. Its control forms
 include assertions, `when`/`unless`, `repeat` with the `it` index, stepped
 `for` loops, and integer helpers such as `clamp`, `between`, `within`, `pow`,
 `gcd`, and `lcm`.
+
+LAR archives are native `LAR1` files. Method `0` remains the original stored
+member format, while method `1` stores a password-protected member payload with
+a local salt, CRC check, and in-tree keyed stream. `lar list` stays metadata
+only, and `lar extract archive member password` requires the user-supplied
+password before bytes are written to `lar_extract.txt`.
 
 Release suffix policy is deliberately small and visible: `a` is official, `b`
 is beta/experimental, and `p` is hotpatch. New feature bundles do not

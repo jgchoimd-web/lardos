@@ -6,6 +6,14 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.5.0b-mirage
+ITEM Adds native LREC video wallpaper support through wallpaper lrec file.lrec and cfg wallpaper lrec file.lrec.
+ITEM Reuses the existing user-owned LardOS screen recording format instead of adding an external codec or host-video dependency.
+ITEM Scales grayscale LREC frames across the desktop as live wallpaper while wallpaper.lardd stores MODE lrec and FILE visibly for user editing.
+ITEM Extends wallpaper status, rollback restore, config reload, and POST/selftest coverage to the LREC path.
+ITEM Preserves color, grid, stripes, checker, BMP wallpaper, screenrec, screenshots, PinClip/MegaClipboard, RXE/SYSRXE, LFS/LAR, and user-control values without feature loss.
+ITEM Ships as beta because this adds a live-rendering wallpaper mode.
+
 SECTION v2.4.1b-mirage
 ITEM Adds pinclip from fixed-slot [megaclip-slot] so useful MegaClipboard history can be frozen into stable PinClip shortcuts.
 ITEM Adds megaclip pinfrom/fixfrom/keep/remember fixed-slot [megaclip-slot] aliases for the same user flow.

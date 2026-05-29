@@ -191,6 +191,10 @@ static int g_have_fb;
 static uint32_t g_bg;
 #define GUI_WALLPAPER_BMP_MAX_W 128u
 #define GUI_WALLPAPER_BMP_MAX_H 128u
+#define GUI_WALLPAPER_LREC_MAX_W 160u
+#define GUI_WALLPAPER_LREC_MAX_H 120u
+#define GUI_WALLPAPER_LREC_HEADER_SIZE 32u
+#define GUI_WALLPAPER_LREC_FORMAT_LUMA8 1u
 #define GUI_WALLPAPER_CFG_MAX 512u
 static uint32_t g_wallpaper_mode = GUI_WALLPAPER_GRID;
 static uint32_t g_wallpaper_color1 = 0xFF10151Eu;
@@ -199,6 +203,14 @@ static char g_wallpaper_name[GUI_WALLPAPER_NAME_MAX + 1u] = "grid";
 static char g_wallpaper_file[GUI_WALLPAPER_NAME_MAX + 1u];
 static uint32_t g_wallpaper_bmp_w;
 static uint32_t g_wallpaper_bmp_h;
+static const uint8_t* g_wallpaper_lrec_data;
+static uint32_t g_wallpaper_lrec_size;
+static uint32_t g_wallpaper_lrec_header_size;
+static uint32_t g_wallpaper_lrec_w;
+static uint32_t g_wallpaper_lrec_h;
+static uint32_t g_wallpaper_lrec_frames;
+static uint32_t g_wallpaper_lrec_frame_bytes;
+static uint32_t g_wallpaper_lrec_frame;
 static uint32_t g_wallpaper_last_error;
 static uint32_t g_wallpaper_pixels[GUI_WALLPAPER_BMP_MAX_W * GUI_WALLPAPER_BMP_MAX_H];
 static char g_wallpaper_cfg_buf[GUI_WALLPAPER_CFG_MAX];
@@ -1117,6 +1129,7 @@ static const char* gui_wallpaper_mode_name(uint32_t mode)
     if (mode == GUI_WALLPAPER_STRIPES) return "stripes";
     if (mode == GUI_WALLPAPER_CHECKER) return "checker";
     if (mode == GUI_WALLPAPER_BMP) return "bmp";
+    if (mode == GUI_WALLPAPER_LREC) return "lrec";
     return "unknown";
 }
 
@@ -1144,6 +1157,12 @@ static int gui_wallpaper_parse_mode(const char* name, uint32_t* out)
     if (gui_streq_ci(name, "bmp") || gui_streq_ci(name, "image") ||
         gui_streq_ci(name, "file")) {
         *out = GUI_WALLPAPER_BMP;
+        return 0;
+    }
+    if (gui_streq_ci(name, "lrec") || gui_streq_ci(name, "video") ||
+        gui_streq_ci(name, "movie") || gui_streq_ci(name, "recording") ||
+        gui_streq_ci(name, "anim") || gui_streq_ci(name, "animation")) {
+        *out = GUI_WALLPAPER_LREC;
         return 0;
     }
     return -1;
@@ -1205,6 +1224,68 @@ static int gui_wallpaper_load_bmp_pixels(const char* file)
     return 0;
 }
 
+static uint32_t gui_wallpaper_rd16(const uint8_t* p, uint32_t off)
+{
+    return (uint32_t)p[off] | ((uint32_t)p[off + 1u] << 8);
+}
+
+static uint32_t gui_wallpaper_rd32(const uint8_t* p, uint32_t off)
+{
+    return (uint32_t)p[off] |
+           ((uint32_t)p[off + 1u] << 8) |
+           ((uint32_t)p[off + 2u] << 16) |
+           ((uint32_t)p[off + 3u] << 24);
+}
+
+static int gui_wallpaper_load_lrec_data(const char* file, const uint8_t* data, uint32_t size)
+{
+    uint32_t header_size;
+    uint32_t out_w;
+    uint32_t out_h;
+    uint32_t frames;
+    uint32_t format;
+    uint32_t frame_bytes;
+    uint32_t total;
+    uint32_t need;
+    if (!data || size < GUI_WALLPAPER_LREC_HEADER_SIZE) return -1;
+    if (data[0] != 'L' || data[1] != 'R' || data[2] != 'E' || data[3] != 'C') return -2;
+    if (gui_wallpaper_rd16(data, 4u) != 1u) return -3;
+    header_size = gui_wallpaper_rd16(data, 6u);
+    out_w = gui_wallpaper_rd16(data, 12u);
+    out_h = gui_wallpaper_rd16(data, 14u);
+    frames = gui_wallpaper_rd16(data, 18u);
+    format = gui_wallpaper_rd16(data, 20u);
+    frame_bytes = gui_wallpaper_rd16(data, 22u);
+    total = gui_wallpaper_rd32(data, 24u);
+    if (header_size < GUI_WALLPAPER_LREC_HEADER_SIZE || header_size > size) return -4;
+    if (out_w == 0 || out_h == 0 ||
+        out_w > GUI_WALLPAPER_LREC_MAX_W || out_h > GUI_WALLPAPER_LREC_MAX_H) {
+        return -5;
+    }
+    if (format != GUI_WALLPAPER_LREC_FORMAT_LUMA8) return -6;
+    if (frames == 0 || frame_bytes != out_w * out_h) return -7;
+    need = header_size + frame_bytes * frames;
+    if (need < header_size || need > size) return -8;
+    if (total != 0 && (total < need || total > size)) return -9;
+    g_wallpaper_lrec_data = data;
+    g_wallpaper_lrec_size = size;
+    g_wallpaper_lrec_header_size = header_size;
+    g_wallpaper_lrec_w = out_w;
+    g_wallpaper_lrec_h = out_h;
+    g_wallpaper_lrec_frames = frames;
+    g_wallpaper_lrec_frame_bytes = frame_bytes;
+    g_wallpaper_lrec_frame = 0;
+    gui_wallpaper_copy(g_wallpaper_file, sizeof(g_wallpaper_file), file);
+    return 0;
+}
+
+static int gui_wallpaper_load_lrec_pixels(const char* file)
+{
+    const FsFile* f = fs_open(file);
+    if (!f || !f->data || f->size < GUI_WALLPAPER_LREC_HEADER_SIZE) return -1;
+    return gui_wallpaper_load_lrec_data(file, f->data, f->size);
+}
+
 static int gui_wallpaper_write_config(void)
 {
     FsWritableFile* w = fs_open_or_create_writable("wallpaper.lardd");
@@ -1234,9 +1315,34 @@ static int gui_wallpaper_set_state(uint32_t mode, const char* name, const char* 
             return r;
         }
         gui_wallpaper_copy(g_wallpaper_name, sizeof(g_wallpaper_name), "bmp");
+        g_wallpaper_lrec_data = NULL;
+        g_wallpaper_lrec_size = 0;
+        g_wallpaper_lrec_header_size = 0;
+        g_wallpaper_lrec_w = 0;
+        g_wallpaper_lrec_h = 0;
+        g_wallpaper_lrec_frames = 0;
+        g_wallpaper_lrec_frame_bytes = 0;
+        g_wallpaper_lrec_frame = 0;
+    } else if (mode == GUI_WALLPAPER_LREC) {
+        r = gui_wallpaper_load_lrec_pixels(file && file[0] ? file : "screenrec.lrec");
+        if (r != 0) {
+            g_wallpaper_last_error = (uint32_t)(-r);
+            return r;
+        }
+        g_wallpaper_bmp_w = 0;
+        g_wallpaper_bmp_h = 0;
+        gui_wallpaper_copy(g_wallpaper_name, sizeof(g_wallpaper_name), "lrec");
     } else {
         g_wallpaper_bmp_w = 0;
         g_wallpaper_bmp_h = 0;
+        g_wallpaper_lrec_data = NULL;
+        g_wallpaper_lrec_size = 0;
+        g_wallpaper_lrec_header_size = 0;
+        g_wallpaper_lrec_w = 0;
+        g_wallpaper_lrec_h = 0;
+        g_wallpaper_lrec_frames = 0;
+        g_wallpaper_lrec_frame_bytes = 0;
+        g_wallpaper_lrec_frame = 0;
         g_wallpaper_file[0] = '\0';
         gui_wallpaper_copy(g_wallpaper_name, sizeof(g_wallpaper_name),
                            name && name[0] ? name : gui_wallpaper_mode_name(mode));
@@ -1264,7 +1370,8 @@ int gui_wallpaper_set_color(uint32_t argb)
 int gui_wallpaper_set_pattern(const char* pattern, uint32_t color1, uint32_t color2)
 {
     uint32_t mode;
-    if (gui_wallpaper_parse_mode(pattern, &mode) != 0 || mode == GUI_WALLPAPER_BMP) {
+    if (gui_wallpaper_parse_mode(pattern, &mode) != 0 ||
+        mode == GUI_WALLPAPER_BMP || mode == GUI_WALLPAPER_LREC) {
         g_wallpaper_last_error = 10u;
         return -1;
     }
@@ -1274,6 +1381,12 @@ int gui_wallpaper_set_pattern(const char* pattern, uint32_t color1, uint32_t col
 int gui_wallpaper_set_bmp(const char* file)
 {
     return gui_wallpaper_set_state(GUI_WALLPAPER_BMP, "bmp", file,
+                                   g_wallpaper_color1, g_wallpaper_color2, 1);
+}
+
+int gui_wallpaper_set_lrec(const char* file)
+{
+    return gui_wallpaper_set_state(GUI_WALLPAPER_LREC, "lrec", file,
                                    g_wallpaper_color1, g_wallpaper_color2, 1);
 }
 
@@ -1316,7 +1429,8 @@ static int gui_wallpaper_parse_config_text(const char* text, uint32_t len, int p
             (void)gui_wallpaper_parse_mode(val, &mode);
         } else if (gui_streq_ci(key, "PATTERN") || gui_streq_ci(key, "STYLE")) {
             uint32_t parsed;
-            if (gui_wallpaper_parse_mode(val, &parsed) == 0 && parsed != GUI_WALLPAPER_BMP) {
+            if (gui_wallpaper_parse_mode(val, &parsed) == 0 &&
+                parsed != GUI_WALLPAPER_BMP && parsed != GUI_WALLPAPER_LREC) {
                 mode = parsed;
                 gui_wallpaper_copy(pattern, sizeof(pattern), val);
             }
@@ -1324,10 +1438,21 @@ static int gui_wallpaper_parse_config_text(const char* text, uint32_t len, int p
             (void)gui_wallpaper_parse_color(val, &c1);
         } else if (gui_streq_ci(key, "COLOR2") || gui_streq_ci(key, "ACCENT") || gui_streq_ci(key, "LINE")) {
             (void)gui_wallpaper_parse_color(val, &c2);
-        } else if (gui_streq_ci(key, "FILE") || gui_streq_ci(key, "BMP") || gui_streq_ci(key, "IMAGE")) {
+        } else if (gui_streq_ci(key, "BMP") || gui_streq_ci(key, "IMAGE")) {
             if (val[0]) {
                 gui_wallpaper_copy(file, sizeof(file), val);
                 mode = GUI_WALLPAPER_BMP;
+            }
+        } else if (gui_streq_ci(key, "LREC") || gui_streq_ci(key, "VIDEO") ||
+                   gui_streq_ci(key, "MOVIE") || gui_streq_ci(key, "RECORDING")) {
+            if (val[0]) {
+                gui_wallpaper_copy(file, sizeof(file), val);
+                mode = GUI_WALLPAPER_LREC;
+            }
+        } else if (gui_streq_ci(key, "FILE")) {
+            if (val[0]) {
+                gui_wallpaper_copy(file, sizeof(file), val);
+                if (mode != GUI_WALLPAPER_LREC) mode = GUI_WALLPAPER_BMP;
             }
         }
         while (*p && *p != '\n') p++;
@@ -1368,11 +1493,24 @@ void gui_wallpaper_info(gui_wallpaper_info_t* out)
     out->color2 = g_wallpaper_color2;
     out->bmp_w = g_wallpaper_bmp_w;
     out->bmp_h = g_wallpaper_bmp_h;
+    out->video_w = g_wallpaper_lrec_w;
+    out->video_h = g_wallpaper_lrec_h;
+    out->video_frames = g_wallpaper_lrec_frames;
+    out->video_frame = g_wallpaper_lrec_frame;
     out->last_error = g_wallpaper_last_error;
 }
 
 int gui_wallpaper_selftest(void)
 {
+    static const uint8_t mini_lrec[] = {
+        'L','R','E','C',
+        1,0, 32,0,
+        2,0, 2,0, 2,0, 2,0,
+        2,0, 2,0, 1,0, 4,0,
+        40,0,0,0, 0,0,0,0,
+        0,64,128,255,
+        255,128,64,0
+    };
     gui_wallpaper_info_t before;
     int ok = 0;
     gui_wallpaper_info(&before);
@@ -1383,6 +1521,13 @@ int gui_wallpaper_selftest(void)
         if (after.mode != GUI_WALLPAPER_CHECKER || after.color1 != 0xFF111111u ||
             after.color2 != 0xFF222222u) ok = -2;
     }
+    if (ok == 0) {
+        if (gui_wallpaper_load_lrec_data("selftest.lrec", mini_lrec, sizeof(mini_lrec)) != 0) ok = -3;
+        else if (g_wallpaper_lrec_w != 2u || g_wallpaper_lrec_h != 2u ||
+                 g_wallpaper_lrec_frames != 2u || g_wallpaper_lrec_frame_bytes != 4u) {
+            ok = -4;
+        }
+    }
     (void)gui_wallpaper_set_state(before.mode, before.name, before.file,
                                   before.color1, before.color2, 1);
     return ok;
@@ -1392,6 +1537,25 @@ static void gui_draw_wallpaper(const fb_t* tgt)
 {
     int sw = (int)tgt->w;
     int sh = (int)tgt->h;
+    if (g_wallpaper_mode == GUI_WALLPAPER_LREC && g_wallpaper_lrec_data &&
+        g_wallpaper_lrec_w && g_wallpaper_lrec_h && g_wallpaper_lrec_frames &&
+        g_wallpaper_lrec_frame_bytes) {
+        uint32_t frame_idx = (g.glyph_tick / 6u) % g_wallpaper_lrec_frames;
+        const uint8_t* frame = g_wallpaper_lrec_data + g_wallpaper_lrec_header_size +
+                               frame_idx * g_wallpaper_lrec_frame_bytes;
+        g_wallpaper_lrec_frame = frame_idx;
+        for (int y = 0; y < sh; y++) {
+            uint32_t sy = ((uint32_t)y * g_wallpaper_lrec_h) / (uint32_t)sh;
+            for (int x = 0; x < sw; x++) {
+                uint32_t sx = ((uint32_t)x * g_wallpaper_lrec_w) / (uint32_t)sw;
+                uint8_t luma = frame[sy * g_wallpaper_lrec_w + sx];
+                uint32_t c = 0xFF000000u | ((uint32_t)luma << 16) |
+                             ((uint32_t)luma << 8) | (uint32_t)luma;
+                fb_putpixel(tgt, (uint16_t)x, (uint16_t)y, c);
+            }
+        }
+        return;
+    }
     if (g_wallpaper_mode == GUI_WALLPAPER_BMP && g_wallpaper_bmp_w && g_wallpaper_bmp_h) {
         for (int y = 0; y < sh; y++) {
             uint32_t sy = (uint32_t)y % g_wallpaper_bmp_h;

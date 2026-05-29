@@ -628,6 +628,8 @@ int lardkit_rollback_apply(void)
     s_lardkit.active_theme = s_lardkit.rollback.theme;
     if (s_lardkit.rollback.wallpaper_mode == GUI_WALLPAPER_BMP) {
         (void)gui_wallpaper_set_bmp(s_lardkit.rollback.wallpaper_file);
+    } else if (s_lardkit.rollback.wallpaper_mode == GUI_WALLPAPER_LREC) {
+        (void)gui_wallpaper_set_lrec(s_lardkit.rollback.wallpaper_file);
     } else if (s_lardkit.rollback.wallpaper_mode == GUI_WALLPAPER_PLAIN) {
         (void)gui_wallpaper_set_color(s_lardkit.rollback.wallpaper_color1);
     } else {

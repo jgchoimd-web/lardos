@@ -2970,7 +2970,7 @@ static void cmd_help(const char* args)
     out_append("  webstack status|methods|tls|guide|demo|selftest for native LARS/HTTP/HTTPS support\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
-    out_append("  wallpaper status|color|pattern|bmp|use|reload|reset  user-owned desktop wallpaper\n");
+    out_append("  wallpaper status|color|pattern|bmp|lrec|use|reload|reset  user-owned desktop wallpaper\n");
     out_append("  megaclip status|list|mode|push|file|pull|write  10-slot keyboard-first clipboard\n");
     out_append("  pinclip list|set slot text|from fixed [slot]|pull|write|clear  fixed shortcut clipboard slots\n");
     out_append("  lconnect on|direct|discover|share|syncclip|request|grant|deny  LAN resource sharing except keyboard/mouse\n");
@@ -3082,6 +3082,7 @@ static void cmd_control(const char* args)
     out_append("  panic capsule       write a recovery capsule to paniccapsule.lardd\n");
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
     out_append("  wallpaper bmp sample.bmp       tile a user-chosen BMP as the desktop background\n");
+    out_append("  wallpaper lrec screenrec.lrec  use a native LREC recording as live wallpaper\n");
     out_append("  glyph live U+E000 on            enable realtime hover/click rendering for a picture glyph\n");
     out_append("  glyph pixel U+E000 0 0 ff00ff  edit an assigned Unicode picture slot in-place\n");
     out_append("  cursor mouse      restore the pretty mouse at U+E004 as the default Unicode cursor\n");
@@ -4156,6 +4157,18 @@ static void cmd_wallpaper_status(void)
         out_append("x");
         out_append_u32(info.bmp_h);
     }
+    if (info.mode == GUI_WALLPAPER_LREC) {
+        out_append("\n  file=");
+        out_append(info.file[0] ? info.file : "(none)");
+        out_append(" video=");
+        out_append_u32(info.video_w);
+        out_append("x");
+        out_append_u32(info.video_h);
+        out_append(" frames=");
+        out_append_u32(info.video_frames);
+        out_append(" current=");
+        out_append_u32(info.video_frame);
+    }
     out_append(" last_error=");
     out_append_u32(info.last_error);
     out_append("\n  config=wallpaper.lardd (run sync to persist)\n");
@@ -4228,6 +4241,19 @@ static void cmd_wallpaper(const char* args)
         else out_append("wallpaper: BMP not found, unsupported, or larger than 128x128.\n");
         return;
     }
+    if (strcmp(sub, "lrec") == 0 || strcmp(sub, "video") == 0 ||
+        strcmp(sub, "movie") == 0 || strcmp(sub, "recording") == 0 ||
+        strcmp(sub, "anim") == 0) {
+        char file[32];
+        (void)lardkit_snapshot("wallpaper");
+        if (vcs_read_word(&args, file, sizeof(file)) != 0) {
+            out_append("Usage: wallpaper lrec file.lrec\n");
+            return;
+        }
+        if (gui_wallpaper_set_lrec(file) == 0) cmd_wallpaper_changed("lrec");
+        else out_append("wallpaper: LREC not found, unsupported, empty, or larger than 160x120.\n");
+        return;
+    }
     if (strcmp(sub, "use") == 0 || strcmp(sub, "load") == 0) {
         char file[32];
         (void)lardkit_snapshot("wallpaper");
@@ -4258,7 +4284,7 @@ static void cmd_wallpaper(const char* args)
         out_append(gui_wallpaper_selftest() == 0 ? "wallpaper: selftest OK\n" : "wallpaper: selftest failed\n");
         return;
     }
-    out_append("Usage: wallpaper status|color 0xRRGGBB|pattern grid|stripes|checker [c1] [c2]|bmp file.bmp|use file|reload|reset|save|test\n");
+    out_append("Usage: wallpaper status|color 0xRRGGBB|pattern grid|stripes|checker [c1] [c2]|bmp file.bmp|lrec file.lrec|use file|reload|reset|save|test\n");
 }
 
 static void screencheck_report(const screencheck_info_t* info)
@@ -11582,7 +11608,7 @@ static void cfgsh_help(void)
     out_append("  buddy on|off|mood  roaming easygoing assistant\n");
     out_append("  bugeye on|off      visual bug monitor\n");
     out_append("  ltheme name        classic|contrast|night|amber\n");
-    out_append("  wallpaper color|grid|stripes|checker|bmp  desktop background\n");
+    out_append("  wallpaper color|grid|stripes|checker|bmp|lrec  desktop background\n");
     out_append("  rollback snap|apply settings snapshot restore\n");
     out_append("  sram on|off        screen scratch RAM\n");
     out_append("  aa 0..3            none|antianti|basic|nonlinear render filter\n");
@@ -11770,6 +11796,10 @@ static int cfgsh_apply(const char* setting, const char* args)
             cmd_wallpaper(cmdline);
         } else if (strcmp(value, "bmp") == 0 || strcmp(value, "image") == 0) {
             snprintf(cmdline, sizeof(cmdline), "bmp %s", rest);
+            cmd_wallpaper(cmdline);
+        } else if (strcmp(value, "lrec") == 0 || strcmp(value, "video") == 0 ||
+                   strcmp(value, "movie") == 0 || strcmp(value, "recording") == 0) {
+            snprintf(cmdline, sizeof(cmdline), "lrec %s", rest);
             cmd_wallpaper(cmdline);
         } else if (strcmp(value, "reset") == 0 || strcmp(value, "reload") == 0 || strcmp(value, "save") == 0) {
             cmd_wallpaper(value);

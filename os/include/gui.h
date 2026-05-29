@@ -47,6 +47,7 @@ void gui_reload_sysrxe_apps(void);
 #define GUI_WALLPAPER_STRIPES 2
 #define GUI_WALLPAPER_CHECKER 3
 #define GUI_WALLPAPER_BMP 4
+#define GUI_WALLPAPER_LREC 5
 #define GUI_WALLPAPER_NAME_MAX 31u
 #define GUI_SUBPX_SCRIPT_NAME_MAX 31u
 
@@ -74,6 +75,10 @@ typedef struct {
     uint32_t color2;
     uint32_t bmp_w;
     uint32_t bmp_h;
+    uint32_t video_w;
+    uint32_t video_h;
+    uint32_t video_frames;
+    uint32_t video_frame;
     uint32_t last_error;
 } gui_wallpaper_info_t;
 
@@ -108,6 +113,7 @@ int gui_subpx_filter_selftest(void);
 int gui_wallpaper_set_color(uint32_t argb);
 int gui_wallpaper_set_pattern(const char* pattern, uint32_t color1, uint32_t color2);
 int gui_wallpaper_set_bmp(const char* file);
+int gui_wallpaper_set_lrec(const char* file);
 int gui_wallpaper_load_config_file(const char* file);
 int gui_wallpaper_reload(void);
 int gui_wallpaper_reset(void);

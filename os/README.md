@@ -52,6 +52,12 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.5.0b-mirage` lets the desktop wallpaper use LardOS' own native video
+recording format. `wallpaper lrec screenrec.lrec` scales a local `LREC`
+luma-frame recording across the desktop as live wallpaper, while
+`wallpaper.lardd`, `cfg wallpaper lrec ...`, rollback, POST/LUNIT checks, BMP
+wallpaper, generated patterns, and user-editable wallpaper state remain intact.
+
 `v2.4.1b-mirage` lets PinClip freeze existing MegaClipboard history into fixed
 slots. `pinclip from 1` pins the latest MegaClipboard entry into fixed slot 1,
 and `pinclip from 1 4` pins MegaClipboard slot 4 into fixed slot 1. The same
@@ -900,10 +906,11 @@ commands:
 - `ltheme list|show|use name` selects native shell theme presets or parses
   `.ltheme` files such as `default.ltheme`; `ltheme preview file.ltheme` draws
   a small preview panel before applying.
-- `wallpaper status|color|pattern|bmp|use|reload|reset` lets the user set the
-  desktop background directly. The active config lives in writable
-  `wallpaper.lardd`, and BMP wallpaper tiles are loaded through the native BMP
-  decoder without external libraries.
+- `wallpaper status|color|pattern|bmp|lrec|use|reload|reset` lets the user set
+  the desktop background directly. The active config lives in writable
+  `wallpaper.lardd`, BMP wallpaper tiles are loaded through the native BMP
+  decoder, and `wallpaper lrec screenrec.lrec` uses the native LREC video
+  recording format as a live wallpaper without external codecs.
 - `time`, `date`, `lunar`, and `dangun` show LardOS Time ticks, five-digit
   years, Dangun year, and the native lunar calendar view.
 - `glyph move U+E000 U+E010`, `glyph copy U+E000 U+E011`,
@@ -997,7 +1004,8 @@ commands:
   compatibility command that says LTS support is retired and Tiara has ended.
 - `screenshot [file.lshot] [w h]` captures the current visible screen to a
   local LSHOT file; `screenrec start|frame|stop|status` records a short LREC
-  frame sequence.
+  frame sequence that can also be selected as live wallpaper with
+  `wallpaper lrec file.lrec`.
 - `lars file`, `lardd file`, and `doc file` render native LardOS documents.
 - `lil file` runs native LIL scripts such as `features.lil`; LIL now has
   assertion checks, stepped loops, repeat loops, and integer math helpers.

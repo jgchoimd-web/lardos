@@ -189,7 +189,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Repair over halt: panic room, auxkernel, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
     "ITEM Keyboard completeness: mouse workflows should also have keyboard and shortcut routes so the full OS can be driven without a mouse.\n"
-    "ITEM Native expression: LARS, LARDD, LAR archives, LGUILIB, LDI images, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
+    "ITEM Native expression: LARS, LARDD, LAR archives, LGUILIB, LDI images, LTHEME, LSND vector sound, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; version numbers are vcycle.feature.patch where patch is one digit and carries after 9.\n"
     "ITEM Codename honesty: Tiara-style names are OS-era subnames, not LTS promises; support-policy changes must stay visible through release codename and release lts.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
@@ -203,6 +203,7 @@ static const uint8_t userlaw_init[] =
     "ITEM auxkernel -> emergency containment must be visible, module-independent, and must not damage hardware.\n"
     "ITEM megaclip and pinclip -> keyboard-first clipboard history plus fixed user-owned shortcut slots for moving data through the OS.\n"
     "ITEM screencap -> screenshots and recordings are native, local, inspectable user files, never hidden uploads.\n"
+    "ITEM sound -> boot sounds and effects are native LSND vector files with visible sound.lardd toggles.\n"
     "ITEM lconnect -> LardOS computers may share resources over a visible LAN protocol; input sharing and quiet grants live only behind deprecated confirm commands and must remain logged.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
@@ -377,6 +378,29 @@ static const uint8_t screencap_init[] =
 static uint8_t ram_screencap_buf[SCREENCAP_CAP];
 static FsWritableFile ram_screencap = { "screencap.lardd", ram_screencap_buf, 0, SCREENCAP_CAP };
 
+#define SOUND_CFG_CAP 512u
+static const uint8_t sound_cfg_init[] =
+    "LARDD 1\n"
+    "TITLE LardOS Sound\n"
+    "SOUND on\n"
+    "BOOT on\n"
+    "FX on\n"
+    "BOOTFILE boot.lsnd\n"
+    "END\n";
+static uint8_t ram_sound_cfg_buf[SOUND_CFG_CAP];
+static FsWritableFile ram_sound_cfg = { "sound.lardd", ram_sound_cfg_buf, 0, SOUND_CFG_CAP };
+
+#define USERSOUND_CAP 1024u
+static const uint8_t usersound_init[] =
+    "LSND 1\n"
+    "TITLE User Vector Sound\n"
+    "NOTE 440 80\n"
+    "REST 40\n"
+    "SWEEP 520 760 180 6\n"
+    "END\n";
+static uint8_t ram_usersound_buf[USERSOUND_CAP];
+static FsWritableFile ram_usersound = { "usersound.lsnd", ram_usersound_buf, 0, USERSOUND_CAP };
+
 #define FSDELETE_CAP 2048u
 static const uint8_t fsdelete_init[] =
     "LARDD 1\n"
@@ -515,6 +539,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use renderfx aa none/antianti/basic/nonlinear, renderfx brightness, renderfx resize stretch/live, renderfx lsb, renderfx vblank, and renderfx subpx for user-owned display filtering.\n"
     "li Use renderfx subpx use displayfix.spfx to apply per-region R/G/B subpixel defect correction from an editable script.\n"
     "li Use wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, wallpaper bmp sample.bmp, or wallpaper lrec screenrec.lrec to set the desktop background from user-owned state.\n"
+    "li Use sound status, sound on/off, sound boot on/off, sound fx on/off, sound play boot.lsnd, and sound new file.lsnd for native vector LSND sounds.\n"
     "li Use Ctrl+Y, Ctrl+P, Ctrl+Space then 1..9/0, or megaclip status/list/mode/push/file/pull/write for the 10-slot MegaClipboard.\n"
     "li Use pinclip set/list/from/pull/write/clear and Ctrl+Space then P then 1..9/0 for fixed clipboard shortcuts.\n"
     "li Use lconnect on, lconnect direct, lconnect discover, and lconnect share all on to share non-input resources with another LardOS machine over LAN.\n"
@@ -527,7 +552,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use liveupdate apply hot.kmo KMO 1\\nID hot\\nCOMMAND hot\\nTARGET boot\\nDEFAULT status\\n to change file-owned code while LardOS is running.\n"
     "li Use ren old.txt new.txt, rename selected NewName, or the desktop Rename button to rename files, apps, and folders.\n"
     "li EXGUI and EXEXGUI were removed so the default GUI can become the single polished desktop surface.\n"
-    "li Use cfgsh for the settings shell: awake on, ltheme night, wallpaper grid, http 7, boot 4.\n"
+    "li Use cfgsh for the settings shell: awake on, ltheme night, wallpaper grid, sound off, http 7, boot 4.\n"
     "li Use dos on for L-DOS mode with _:/C:/A:/Z:/U:/R: mapping and DOS-style file commands.\n"
     "li In L-DOS, DEL -F file removes seed/default built-in files from the active filesystem through fsdelete.lardd, even if that breaks the OS.\n"
     "li Use bleed dryrun file to preview a last-resort delete sweep, or bleed file to try RAM, seed/default hard-delete, and media deletion routes.\n"
@@ -638,6 +663,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.92.1p makes HTTPS visible with webstack tls, LardTLS info, and POST/selftest TLS checks while preserving all v1.92 methods.\n"
     "li v1.92.0b expands HTTP/HTTPS to GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS without external web libraries.\n"
     "li v1.91.1p hotpatches GUI resize hit-testing so only the visible bottom-right grip starts window resizing.\n"
+    "li v2.6.0b adds native LSND vector sound files plus boot/effect sound toggles through sound.lardd.\n"
     "li v2.5.0b adds native LREC video wallpaper through wallpaper lrec file.lrec while preserving BMP, pattern, and editable wallpaper.lardd state.\n"
     "li v1.91.0a officially promotes user-owned desktop wallpaper settings without feature loss or value changes.\n"
     "li v1.91.0b adds user-owned desktop wallpaper settings through wallpaper.lardd, wallpaper color/pattern/bmp, cfgsh, rollback, and LiveUpdate reload paths.\n"
@@ -1514,6 +1540,8 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable userlaw.lardd\n"
     "CHECK writable glyphmap.lardd\n"
     "CHECK writable wallpaper.lardd\n"
+    "CHECK writable sound.lardd\n"
+    "CHECK writable usersound.lsnd\n"
     "CHECK writable megaclip.lardd\n"
     "CHECK command megaclip\n"
     "CHECK command pinclip\n"
@@ -1522,6 +1550,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command lconnect\n"
     "CHECK command glyph\n"
     "CHECK command wallpaper\n"
+    "CHECK command sound\n"
     "CHECK command cursor\n"
     "CHECK command vm\n"
     "CHECK command gasm\n"
@@ -1593,6 +1622,10 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file lardshow.rxe\n"
     "CHECK file gui_status.kmo\n"
     "CHECK file raw_control.kmo\n"
+    "CHECK file lsound_guide.lardd\n"
+    "CHECK file boot.lsnd\n"
+    "CHECK file ok.lsnd\n"
+    "CHECK file error.lsnd\n"
     "CHECK writable userapp.sysrxe\n"
     "CHECK writable kmodtalk.lardd\n"
     "CHECK writable user0.kmo\n"
@@ -1675,6 +1708,68 @@ static const uint8_t file_hello_shrine[65] = {
     0x02, 0x00,0x00,0x00,0x00, 0x20, 0xFF
 };
 
+static const uint8_t file_lsound_guide[] =
+    "LARDD 1\n"
+    "TITLE LardOS Sound Guide\n"
+    "TEXT LSND is the native vector sound recording format for LardOS.\n"
+    "TEXT It stores sound as editable tone events instead of opaque PCM samples or external codecs.\n"
+    "SECTION Commands\n"
+    "ITEM sound status\n"
+    "ITEM sound on | sound off\n"
+    "ITEM sound boot on | sound boot off\n"
+    "ITEM sound fx on | sound fx off\n"
+    "ITEM sound play boot.lsnd\n"
+    "ITEM sound effect ok | click | error\n"
+    "ITEM sound new mytone.lsnd\n"
+    "SECTION LSND\n"
+    "ITEM LSND 1\n"
+    "ITEM NOTE frequency duration_ms\n"
+    "ITEM REST duration_ms\n"
+    "ITEM SWEEP start_frequency end_frequency duration_ms steps\n"
+    "ITEM END\n"
+    "TEXT The active policy lives in writable sound.lardd, and boot/effect .lsnd files can be overwritten by the user.\n"
+    "END\n";
+
+static const uint8_t file_boot_lsnd[] =
+    "LSND 1\n"
+    "TITLE LardOS Boot Sound\n"
+    "NOTE 392 70\n"
+    "REST 25\n"
+    "NOTE 523 70\n"
+    "REST 25\n"
+    "SWEEP 660 880 180 6\n"
+    "END\n";
+
+static const uint8_t file_click_lsnd[] =
+    "LSND 1\n"
+    "TITLE Click\n"
+    "NOTE 720 28\n"
+    "END\n";
+
+static const uint8_t file_ok_lsnd[] =
+    "LSND 1\n"
+    "TITLE OK\n"
+    "NOTE 523 45\n"
+    "REST 20\n"
+    "NOTE 784 70\n"
+    "END\n";
+
+static const uint8_t file_error_lsnd[] =
+    "LSND 1\n"
+    "TITLE Error\n"
+    "NOTE 220 80\n"
+    "REST 20\n"
+    "NOTE 165 120\n"
+    "END\n";
+
+static const uint8_t file_notify_lsnd[] =
+    "LSND 1\n"
+    "TITLE Notify\n"
+    "SWEEP 700 930 90 4\n"
+    "REST 25\n"
+    "NOTE 930 45\n"
+    "END\n";
+
 static const FsFile FS_FILES[] = {
     { "hello.shrine",  file_hello_shrine,  sizeof(file_hello_shrine) },
     { "hello.txt",     file_hello_txt,     sizeof(file_hello_txt) - 1 },
@@ -1732,6 +1827,12 @@ static const FsFile FS_FILES[] = {
     { "tests.lunit",   file_tests_lunit,   sizeof(file_tests_lunit) - 1 },
     { "bundle.lar",    file_bundle_lar,    sizeof(file_bundle_lar) },
     { "sample.bmp",    file_sample_bmp,    sizeof(file_sample_bmp) },
+    { "lsound_guide.lardd", file_lsound_guide, sizeof(file_lsound_guide) - 1 },
+    { "boot.lsnd",     file_boot_lsnd,     sizeof(file_boot_lsnd) - 1 },
+    { "click.lsnd",    file_click_lsnd,    sizeof(file_click_lsnd) - 1 },
+    { "ok.lsnd",       file_ok_lsnd,       sizeof(file_ok_lsnd) - 1 },
+    { "error.lsnd",    file_error_lsnd,    sizeof(file_error_lsnd) - 1 },
+    { "notify.lsnd",   file_notify_lsnd,   sizeof(file_notify_lsnd) - 1 },
     { "rtl8139.drfl",  file_rtl8139_drfl,  sizeof(file_rtl8139_drfl) - 1 },
     { "piix3ide.drfl", file_piix3ide_drfl, sizeof(file_piix3ide_drfl) - 1 },
 #include "fs_ldll_entries.inc"
@@ -2362,6 +2463,8 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 41) return &ram_screenshot;
     if (idx == 42) return &ram_screenrec;
     if (idx == 43) return &ram_screencap;
+    if (idx == 44) return &ram_sound_cfg;
+    if (idx == 45) return &ram_usersound;
     return NULL;
 }
 
@@ -2482,6 +2585,14 @@ void fs_init(void)
         ram_screencap_buf[i] = screencap_init[i];
     }
     ram_screencap.size = sizeof(screencap_init) - 1;
+    for (uint32_t i = 0; i < sizeof(sound_cfg_init) - 1 && i < SOUND_CFG_CAP; i++) {
+        ram_sound_cfg_buf[i] = sound_cfg_init[i];
+    }
+    ram_sound_cfg.size = sizeof(sound_cfg_init) - 1;
+    for (uint32_t i = 0; i < sizeof(usersound_init) - 1 && i < USERSOUND_CAP; i++) {
+        ram_usersound_buf[i] = usersound_init[i];
+    }
+    ram_usersound.size = sizeof(usersound_init) - 1;
     for (uint32_t i = 0; i < sizeof(fsdelete_init) - 1 && i < FSDELETE_CAP; i++) {
         ram_fsdelete_buf[i] = fsdelete_init[i];
     }

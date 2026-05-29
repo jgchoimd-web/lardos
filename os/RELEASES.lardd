@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.6.0b-mirage
+ITEM Adds LSND, a native editable vector sound recording file format for LardOS.
+ITEM Adds a PC-speaker sound layer for boot sounds and short OS effect sounds without external samples, codecs, or runtime libraries.
+ITEM Adds sound status, sound on/off, sound boot on/off, sound fx on/off, sound play file.lsnd, sound fx ok/click/error/notify, and sound new file.lsnd.
+ITEM Stores the active sound policy in writable sound.lardd, with boot/effect seed files kept as visible .lsnd files that the user can inspect and override.
+ITEM Adds POST/selftest coverage for native LSND files, writable sound state, and the LSND parser.
+ITEM Preserves LREC wallpaper, screen capture, GUI, RXE/SYSRXE, LFS/LAR, PinClip/MegaClipboard, LardOS Connect, and user-control values without feature loss.
+ITEM Ships as beta because this adds a new low-level sound surface.
+
 SECTION v2.5.0b-mirage
 ITEM Adds native LREC video wallpaper support through wallpaper lrec file.lrec and cfg wallpaper lrec file.lrec.
 ITEM Reuses the existing user-owned LardOS screen recording format instead of adding an external codec or host-video dependency.

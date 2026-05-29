@@ -21,6 +21,7 @@
 #include "lardsec.h"
 #include "lardkit.h"
 #include "lardtime.h"
+#include "lsound.h"
 #include "lconnect.h"
 #include "lcontainer.h"
 #include "lil.h"
@@ -188,6 +189,11 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: screen capture writable", fs_open_writable("screen.lshot") != NULL &&
                fs_open_writable("screenrec.lrec") != NULL &&
                fs_open_writable("screencap.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: native sound files", fs_open("lsound_guide.lardd") != NULL &&
+               fs_open("boot.lsnd") != NULL && fs_open("ok.lsnd") != NULL &&
+               fs_open("error.lsnd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: sound config writable", fs_open_writable("sound.lardd") != NULL &&
+               fs_open_writable("usersound.lsnd") != NULL, emit, user, &pass, &fail);
     post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);
@@ -253,6 +259,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("gui: user wallpaper", gui_wallpaper_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: retro screencheck", screencheck_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: screen capture", screencap_selftest() == 0, emit, user, &pass, &fail);
+    post_check("sound: vector LSND parser", lsound_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: clickable image glyphs", gui_img_glyph_interaction_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: unicode cursor slot", gui_unicode_cursor_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: desktop interactions", gui_desktop_interaction_selftest() == 0, emit, user, &pass, &fail);

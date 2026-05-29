@@ -345,6 +345,12 @@ and `screenrec` writes native `LREC` luma-frame files without host capture,
 cloud upload, or external codecs. `screencap.lardd` keeps the readable status
 trail.
 
+`lsound.c` owns the native sound path. `LSND` files are editable vector sound
+recordings made of tone, rest, and sweep events; the active boot/effect policy
+lives in writable `sound.lardd`. Playback uses the in-tree PC speaker/PIT path,
+so boot sounds and short effects do not depend on external sample libraries,
+host audio bridges, or opaque codecs.
+
 `v1.57.0b` removes the old opt-in EXGUI and EXEXGUI renderer layers. `v1.58.0a`
 promotes the default GUI path into a desktop shell with a persistent wallpaper,
 top bar, desktop launchers, bottom dock, and hideable app window. LGUILIB/LTHEME

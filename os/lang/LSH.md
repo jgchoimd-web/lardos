@@ -38,6 +38,7 @@
 - `screenshot [file.lshot] [w h]` / `shot ...` / `screencap status|report|test` - capture the visible GUI into a native local `LSHOT` file and keep `screencap.lardd` updated. Defaults: `screen.lshot`, 96x54 RGB565.
 - `screenrec status|start [frames] [w h] [file.lrec]|frame|stop|report|test` - record a short visible-screen sequence into a native local `LREC` luma-frame file. Defaults: `screenrec.lrec`, 8 frames, 64x36.
 - `wallpaper status|color|pattern|bmp|lrec|use|reload|reset` - choose a user-owned desktop background. `wallpaper lrec screenrec.lrec` uses a native LREC recording as live wallpaper; the visible config stays in `wallpaper.lardd`.
+- `sound status|on|off|boot|fx|play|new` - manage native `LSND` vector sound files, boot sound, and short PC-speaker effect sounds. The visible policy lives in `sound.lardd`.
 - GUI polish was beta-tracked in `v1.36.0b` and promoted in official `v1.40.0a` with the glyph and rough-edge repair track; `v1.58.0a` makes the default GUI a desktop with app icons, a dock, and hideable app windows, `v1.58.1p` hotpatches settings-panel clicks, full-desktop window movement, and fullscreen/restore, `v1.59.0b` adds runtime desktop/dock items, folders, per-app windows, and z-order, `v1.59.0a` promotes that model officially, `v1.60.0a` adds official L-DOS mode, `v1.60.1p` adds `DEL -F` read-only tombstones plus restore, `v1.61.0a` adds user-owned tombstone record deletion, `v1.62.0a` makes `DEL -F` hard-delete from the active read-only filesystem view, `v1.63.0a` adds the official in-OS HDD/SSD installer option, and `v1.63.1p` fixes the VirtualBox black-screen boot memory layout.
 - `glyph demo|list|load|auto|show|move|copy|rename|pixel|clear|live|click|insert|write` - bind BMP pictures to private-use Unicode slots U+E000..U+E0FF, edit assigned slots, render them inline, click them in the GUI, and toggle realtime hover/click rendering.
 - `cursor status|set U+E000|off` - bind the GUI mouse cursor to a user-owned picture Unicode slot.
@@ -115,11 +116,12 @@
 - On runtime-ready `panic` or `panic_u64`, PanicRoom first draws the real16 default texture, auto-writes the capsule, and offers crashlog view, capsule rebuild, rollback apply, queued-task drop, and halt keys
 - `lfsdoctor repair` runs the native LPST repair path and rewrites `lfsdoctor.lardd`
 - `screenshot` and `screenrec` store local native capture files (`screen.lshot`, `screenrec.lrec`) plus `screencap.lardd`; they do not use host capture, cloud upload, or external codecs
+- `sound` stores local native vector audio as editable `LSND` events plus `sound.lardd`; it does not hide samples in external codecs or require host audio plumbing
 
 ## Settings Shell
 
 - `cfgsh` enters the settings-focused `CFG#` prompt; `exitcfg` leaves it
-- Inside `CFG#`, use `setting value`: `awake on`, `ltheme night`, `http 3`, `boot 4`, `priority 10`
+- Inside `CFG#`, use `setting value`: `awake on`, `ltheme night`, `sound off`, `http 3`, `boot 4`, `priority 10`
 - `buddy on` / `buddy off`, `bugeye on`, `ltheme night`, and `rollback snap|apply` can also be changed from `CFG#`
 - Outside `CFG#`, use `cfg setting value` for one-shot changes
 - Number maps: http 1=GET 2=POST 3=HEAD; boot 1=normal 2=safe 3=netoff 4=dev 5=awakening

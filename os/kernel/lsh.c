@@ -58,6 +58,7 @@
 #include "pci.h"
 #include "syscall.h"
 #include "screencap.h"
+#include "lsound.h"
 #include "string.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -348,7 +349,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "pinclip", 1 }, { "fixedclip", 1 }, { "pclip", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
@@ -2936,7 +2937,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -2963,6 +2964,7 @@ static void cmd_help(const char* args)
     out_append("  bugeye on|off|scan              visual bug monitor; writes bugreport.lardd\n");
     out_append("  bugreplay status|last|show|draw replay last BugEye screen-health frames\n");
     out_append("  screenshot [file] [w h], screenrec start|frame|stop  user-owned screen capture\n");
+    out_append("  sound status|on|off|boot|fx|play|new  native vector LSND sound and effects\n");
     out_append("  rollback snap|last|apply        save/restore user-visible settings\n");
     out_append("  trust list|history|allow|deny   user-owned permission policy map\n");
     out_append("  post baseline, bootreplay show, bootmap, oldcheck, devmap boot/POST/device views\n");
@@ -2971,6 +2973,7 @@ static void cmd_help(const char* args)
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  wallpaper status|color|pattern|bmp|lrec|use|reload|reset  user-owned desktop wallpaper\n");
+    out_append("  sound boot on|off, sound fx ok, sound play file.lsnd  native vector sound\n");
     out_append("  megaclip status|list|mode|push|file|pull|write  10-slot keyboard-first clipboard\n");
     out_append("  pinclip list|set slot text|from fixed [slot]|pull|write|clear  fixed shortcut clipboard slots\n");
     out_append("  lconnect on|direct|discover|share|syncclip|request|grant|deny  LAN resource sharing except keyboard/mouse\n");
@@ -3083,6 +3086,7 @@ static void cmd_control(const char* args)
     out_append("  ltheme preview default.ltheme draw a theme preview before applying\n");
     out_append("  wallpaper bmp sample.bmp       tile a user-chosen BMP as the desktop background\n");
     out_append("  wallpaper lrec screenrec.lrec  use a native LREC recording as live wallpaper\n");
+    out_append("  sound play boot.lsnd           play a native vector LSND sound file\n");
     out_append("  glyph live U+E000 on            enable realtime hover/click rendering for a picture glyph\n");
     out_append("  glyph pixel U+E000 0 0 ff00ff  edit an assigned Unicode picture slot in-place\n");
     out_append("  cursor mouse      restore the pretty mouse at U+E004 as the default Unicode cursor\n");
@@ -4487,6 +4491,134 @@ static void cmd_screenrec(const char* args)
         return;
     }
     out_append("Usage: screenrec status|start [frames] [w h] [file.lrec]|frame|stop|report|test\n");
+}
+
+static void cmd_sound_status(void)
+{
+    lsound_info_t info;
+    lsound_info(&info);
+    out_append("LardOS Sound\n  sound=");
+    out_append(info.enabled ? "on" : "off");
+    out_append(" boot=");
+    out_append(info.boot_enabled ? "on" : "off");
+    out_append(" fx=");
+    out_append(info.fx_enabled ? "on" : "off");
+    out_append("\n  boot_file=");
+    out_append(info.boot_file[0] ? info.boot_file : "(none)");
+    out_append(" last_file=");
+    out_append(info.last_file[0] ? info.last_file : "(none)");
+    out_append("\n  events=");
+    out_append_u32(info.events);
+    out_append(" notes=");
+    out_append_u32(info.notes);
+    out_append(" rests=");
+    out_append_u32(info.rests);
+    out_append(" sweeps=");
+    out_append_u32(info.sweeps);
+    out_append(" last_error=");
+    out_append_u32(info.last_error);
+    out_append("\n  config=sound.lardd, format=LSND vector sound\n");
+}
+
+static void cmd_sound(const char* args)
+{
+    char sub[32];
+    int on;
+    int r;
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0 ||
+        strcmp(sub, "show") == 0) {
+        cmd_sound_status();
+        return;
+    }
+    if (cfgsh_bool_value(sub, &on) == 0) {
+        r = lsound_set_enabled(on);
+        out_append(r == 0 ? "sound: main toggle updated\n" : "sound: toggle failed\n");
+        cmd_sound_status();
+        return;
+    }
+    if (strcmp(sub, "boot") == 0 || strcmp(sub, "startup") == 0) {
+        char val[32];
+        if (vcs_read_word(&args, val, sizeof(val)) != 0) {
+            out_append("Usage: sound boot on|off|file file.lsnd|play\n");
+            return;
+        }
+        if (cfgsh_bool_value(val, &on) == 0) {
+            r = lsound_set_boot_enabled(on);
+            out_append(r == 0 ? "sound: boot toggle updated\n" : "sound: boot toggle failed\n");
+            cmd_sound_status();
+            return;
+        }
+        if (strcmp(val, "file") == 0 || strcmp(val, "use") == 0) {
+            char file[32];
+            if (vcs_read_word(&args, file, sizeof(file)) != 0) {
+                out_append("Usage: sound boot file file.lsnd\n");
+                return;
+            }
+            r = lsound_set_boot_file(file);
+            out_append(r == 0 ? "sound: boot file updated\n" : "sound: boot file failed\n");
+            cmd_sound_status();
+            return;
+        }
+        if (strcmp(val, "play") == 0 || strcmp(val, "test") == 0) {
+            r = lsound_boot();
+            out_append(r >= 0 ? "sound: boot sound played or skipped\n" : "sound: boot sound failed\n");
+            cmd_sound_status();
+            return;
+        }
+        out_append("Usage: sound boot on|off|file file.lsnd|play\n");
+        return;
+    }
+    if (strcmp(sub, "fx") == 0 || strcmp(sub, "effects") == 0 || strcmp(sub, "effect") == 0) {
+        char val[32];
+        if (vcs_read_word(&args, val, sizeof(val)) != 0) {
+            out_append("Usage: sound fx on|off|ok|click|error|notify\n");
+            return;
+        }
+        if (cfgsh_bool_value(val, &on) == 0) {
+            r = lsound_set_fx_enabled(on);
+            out_append(r == 0 ? "sound: effects toggle updated\n" : "sound: effects toggle failed\n");
+            cmd_sound_status();
+            return;
+        }
+        r = lsound_play_effect(val);
+        out_append(r >= 0 ? "sound: effect played or skipped\n" : "sound: effect failed\n");
+        cmd_sound_status();
+        return;
+    }
+    if (strcmp(sub, "play") == 0 || strcmp(sub, "run") == 0) {
+        char file[32];
+        if (vcs_read_word(&args, file, sizeof(file)) != 0) {
+            out_append("Usage: sound play file.lsnd\n");
+            return;
+        }
+        r = lsound_play_file(file);
+        out_append(r == 0 ? "sound: played LSND\n" : (r > 0 ? "sound: disabled/skipped\n" : "sound: play failed\n"));
+        cmd_sound_status();
+        return;
+    }
+    if (strcmp(sub, "new") == 0 || strcmp(sub, "template") == 0 || strcmp(sub, "record") == 0) {
+        char file[32];
+        if (vcs_read_word(&args, file, sizeof(file)) != 0) {
+            out_append("Usage: sound new file.lsnd\n");
+            return;
+        }
+        r = lsound_write_template(file);
+        out_append(r == 0 ? "sound: wrote editable LSND template\n" : "sound: template failed\n");
+        return;
+    }
+    if (strcmp(sub, "reload") == 0 || strcmp(sub, "use") == 0) {
+        r = lsound_reload();
+        out_append(r == 0 ? "sound: reloaded sound.lardd\n" : "sound: reload failed\n");
+        cmd_sound_status();
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lsound_selftest() == 0 ? "sound: selftest OK\n" : "sound: selftest failed\n");
+        return;
+    }
+    out_append("Usage: sound status|on|off|boot on/off/file/play|fx on/off/name|play file.lsnd|new file.lsnd|reload|test\n");
 }
 
 static int lsh_parse_ip4_arg(const char** args, ip4_t* out)
@@ -11609,6 +11741,7 @@ static void cfgsh_help(void)
     out_append("  bugeye on|off      visual bug monitor\n");
     out_append("  ltheme name        classic|contrast|night|amber\n");
     out_append("  wallpaper color|grid|stripes|checker|bmp|lrec  desktop background\n");
+    out_append("  sound on|off, sound boot on|off, sound fx on|off  PC speaker effects\n");
     out_append("  rollback snap|apply settings snapshot restore\n");
     out_append("  sram on|off        screen scratch RAM\n");
     out_append("  aa 0..3            none|antianti|basic|nonlinear render filter\n");
@@ -11807,6 +11940,33 @@ static int cfgsh_apply(const char* setting, const char* args)
             snprintf(cmdline, sizeof(cmdline), "pattern %s %s", value, rest);
             cmd_wallpaper(cmdline);
         }
+        return 1;
+    }
+    if (strcmp(setting, "sound") == 0 || strcmp(setting, "audio") == 0 || strcmp(setting, "lsound") == 0) {
+        char cmdline[96];
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_sound_status(); return 1; }
+        if (strcmp(value, "boot") == 0 || strcmp(value, "startup") == 0 ||
+            strcmp(value, "fx") == 0 || strcmp(value, "effects") == 0 ||
+            strcmp(value, "play") == 0 || strcmp(value, "new") == 0) {
+            snprintf(cmdline, sizeof(cmdline), "%s %s", value, rest);
+            cmd_sound(cmdline);
+        } else {
+            cmd_sound(value);
+        }
+        return 1;
+    }
+    if (strcmp(setting, "bootsound") == 0 || strcmp(setting, "boot-sound") == 0) {
+        char cmdline[64];
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_sound_status(); return 1; }
+        snprintf(cmdline, sizeof(cmdline), "boot %s", value);
+        cmd_sound(cmdline);
+        return 1;
+    }
+    if (strcmp(setting, "sfx") == 0 || strcmp(setting, "effects") == 0) {
+        char cmdline[64];
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_sound_status(); return 1; }
+        snprintf(cmdline, sizeof(cmdline), "fx %s", value);
+        cmd_sound(cmdline);
         return 1;
     }
     if (strcmp(setting, "rollback") == 0 || strcmp(setting, "undo") == 0) {
@@ -12238,6 +12398,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
     if (strcmp(cmd, "wallpaper") == 0 || strcmp(cmd, "wall") == 0) { cmd_wallpaper(args); return; }
+    if (strcmp(cmd, "sound") == 0 || strcmp(cmd, "lsound") == 0 ||
+        strcmp(cmd, "sfx") == 0 || strcmp(cmd, "audio") == 0) { cmd_sound(args); return; }
     if (strcmp(cmd, "megaclip") == 0 || strcmp(cmd, "mclip") == 0 ||
         strcmp(cmd, "clip") == 0 || strcmp(cmd, "clipboard") == 0) { cmd_megaclip(args); return; }
     if (strcmp(cmd, "pinclip") == 0 || strcmp(cmd, "fixedclip") == 0 ||

@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.6.0b-mirage` adds `LSND`, a native editable vector sound recording
+format for boot sounds and short OS effects. `sound status`, `sound on|off`,
+`sound boot on|off`, `sound fx on|off`, `sound play file.lsnd`, and
+`sound new file.lsnd` control the PC-speaker sound layer. The active policy
+lives in writable `sound.lardd`, bundled effects are normal `.lsnd` files, and
+the feature stays local with no external sample library or codec.
+
 `v2.5.0b-mirage` lets the desktop wallpaper use LardOS' own native video
 recording format. `wallpaper lrec screenrec.lrec` scales a local `LREC`
 luma-frame recording across the desktop as live wallpaper, while
@@ -911,6 +918,10 @@ commands:
   `wallpaper.lardd`, BMP wallpaper tiles are loaded through the native BMP
   decoder, and `wallpaper lrec screenrec.lrec` uses the native LREC video
   recording format as a live wallpaper without external codecs.
+- `sound status|on|off|boot|fx|play|new` controls native vector sound. `LSND`
+  files store editable tone/rest/sweep events, `sound.lardd` exposes the boot
+  and effect toggles, and the default boot/click/ok/error/notify effects are
+  local `.lsnd` files rendered through the PC speaker path.
 - `time`, `date`, `lunar`, and `dangun` show LardOS Time ticks, five-digit
   years, Dangun year, and the native lunar calendar view.
 - `glyph move U+E000 U+E010`, `glyph copy U+E000 U+E011`,

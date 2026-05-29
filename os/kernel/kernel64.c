@@ -42,6 +42,7 @@
 #include "lconnect.h"
 #include "auxkernel.h"
 #include "mediafs.h"
+#include "lsound.h"
 #include "version.h"
 
 static volatile uint16_t* const VGA = (volatile uint16_t*)0xB8000;
@@ -615,6 +616,7 @@ void kmain(void)
     /* Custom language demos: BOSL (bytecode) + LIL (s-expr interpreter). */
     mem_init();
     fs_init();
+    lsound_init();
     lardsec_init();
     megaclip_init();
     mediafs_init();
@@ -623,6 +625,7 @@ void kmain(void)
     crashlog_init();
     bootprof_load();
     lsh_init();
+    (void)lsound_boot();
     s_boot_awakening_mode = bootprof_awakening_mode();
     awake_enable(s_boot_awakening_mode, 3u);
     if (bootprof_dev_mode()) taskprio_set_default(7);

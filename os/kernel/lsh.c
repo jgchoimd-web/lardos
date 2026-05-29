@@ -354,7 +354,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "lpack", 1 }, { "lpackls", 1 }, { "lpackinstall", 1 }, { "lpackverify", 1 }, { "lpackundo", 1 },
     { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 }, { "fstwt", 1 }, { "fstwts", 1 }, { "vpath", 1 }, { "pathmap", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
-    { "lafillo", 1 }, { "lar", 1 }, { "larpass", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
+    { "lafillo", 1 }, { "lar", 1 }, { "extract", 1 }, { "larpass", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
     { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
     { "lcnt", 1 }, { "container", 1 },
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
@@ -2934,10 +2934,10 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay screenshot screenrec rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip lconnect buddy bugeye bugreplay screenshot screenrec rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
-    out_append("  lar list archive.lar; lar extract archive.lar member [password]; lar pass out.lar member source password\n");
+    out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
     out_append("  rxr info|list|verify|install file.rxr; rxr path rxr/file; rxr undo last\n");
     out_append("  vpath path|test       resolve folder/inside/path through the OS file namespace\n");
     out_append("  fstwt status|fs|main|use file.fstwts|to path|from file  FS translator/VM\n");
@@ -2984,7 +2984,7 @@ static void cmd_help(const char* args)
     out_append("  write file text  append file text  copy src dst  ren src dst\n");
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z: A: R: _:\n");
     out_append("  shrine status|list|info|verify|run|test [file.shrine]\n");
-    out_append("  lafillo file  lar list archive  lar extract archive member [password]  lar pass out.lar member source password  larsh file\n");
+    out_append("  lafillo file  lar list archive  extract archive member [password]  lar pass out.lar member source password  larsh file\n");
     out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM\n");
     out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
@@ -12022,6 +12022,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 't' && cmd[1] == 'y' && cmd[2] == 'p' && cmd[3] == 'e' && cmd[4] == '\0') { cmd_type(args); return; }
     if (strncmp(cmd, "lafillo", 7) == 0 && (cmd[7] == '\0' || cmd[7] == ' ' || cmd[7] == '\t')) { cmd_lafillo(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == '\0') { cmd_lar(args); return; }
+    if (strcmp(cmd, "extract") == 0) { cmd_larx(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 'p' && cmd[4] == 'a' && cmd[5] == 's' && cmd[6] == 's' && cmd[7] == '\0') { cmd_larpass(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 'l' && cmd[4] == 's' && cmd[5] == '\0') { cmd_larls(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 'x' && cmd[4] == '\0') { cmd_larx(args); return; }

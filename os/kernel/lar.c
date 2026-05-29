@@ -113,6 +113,18 @@ static int lar_valid_member_name(const char* member, uint8_t* out_len)
     return 1;
 }
 
+static int lar_contains_bytes(const uint8_t* data, uint32_t len,
+                              const uint8_t* needle, uint32_t needle_len)
+{
+    if (!data || !needle || needle_len == 0 || needle_len > len) return 0;
+    for (uint32_t i = 0; i <= len - needle_len; i++) {
+        uint32_t j = 0;
+        while (j < needle_len && data[i + j] == needle[j]) j++;
+        if (j == needle_len) return 1;
+    }
+    return 0;
+}
+
 static int name_eq(const uint8_t* entry_name, uint8_t entry_len, const char* name)
 {
     uint8_t i = 0;
@@ -303,6 +315,7 @@ int lar_selftest(void)
     r = lar_create_single(archive, &archive_len, "secret.txt", msg, sizeof(msg) - 1u, "open");
     if (r != 0) return -1;
     if (lar_list(archive, archive_len, NULL, NULL) != 0) return -2;
+    if (lar_contains_bytes(archive, archive_len, msg, sizeof(msg) - 1u)) return -7;
     plain_len = sizeof(plain);
     if (lar_extract_password(archive, archive_len, "secret.txt", "bad", plain, &plain_len) != -13) return -3;
     plain_len = sizeof(plain);

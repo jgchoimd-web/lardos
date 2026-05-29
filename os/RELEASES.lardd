@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.1.0b-mirage
+ITEM Adds extract archive.lar member password as a first-class shell alias for password-protected LAR extraction.
+ITEM Strengthens the LAR POST/selftest so protected archives fail if the original plaintext payload still appears in the archive bytes.
+ITEM Documents that LAR method 1 is an actual keyed-stream payload lock, not a metadata-only password marker.
+ITEM Keeps lar extract, larx, larpass, existing method 0 archives, and method 1 protected archives compatible with v2.0.9b.
+ITEM Ships as beta because it tightens the new archive protection path and command surface.
+
 SECTION v2.0.9b-mirage
 ITEM Adds password-protected .lar members through native LAR method 1 while preserving existing method 0 stored archives.
 ITEM Adds lar pass out.lar member sourcefile password / larpass to create a single-member password-protected archive in a writable user file.

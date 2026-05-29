@@ -52,11 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
-`v2.0.9b-mirage` adds password-protected native `.lar` entries. Existing
+`v2.1.0b-mirage` tightens password-protected native `.lar` entries. Existing
 `LAR1` method-0 stored archives remain readable, while method-1 members require
-`lar extract archive.lar member password` before their contents are written to
+`extract archive.lar member password`, `lar extract archive.lar member password`,
+or `larx archive.lar member password` before their contents are written to
 `lar_extract.txt`. `lar pass out.lar member sourcefile password` creates a
-single-member protected archive using only in-tree code.
+single-member protected archive using only in-tree code. Method 1 encrypts the
+member payload with a password-derived keyed stream; the password is not just a
+metadata marker.
 
 `v2.0.7b-mirage` adds user-owned screen capture. `screenshot [file.lshot] [w h]`
 writes a compact `LSHOT` RGB565 snapshot of the visible GUI, and
@@ -960,10 +963,12 @@ commands:
 - `write file text`, `append file text`, and `copy src dst` edit writable RAM
   files such as `notes.txt`, `bugreport.lardd`, `lafillo_saved.txt`,
   `lar_extract.txt`, and `vcs_restore.txt`.
-- `lar list archive.lar`, `lar extract archive.lar member [password]`, and
-  `lar pass out.lar member sourcefile password` handle native `.lar` archives.
-  Existing stored LAR entries remain readable, while method-1 entries are
-  password-protected with an in-tree keyed stream and CRC check.
+- `lar list archive.lar`, `extract archive.lar member [password]`,
+  `lar extract archive.lar member [password]`, and `lar pass out.lar member
+  sourcefile password` handle native `.lar` archives. Existing stored LAR
+  entries remain readable, while method-1 entries encrypt the payload with an
+  in-tree password-derived keyed stream and reject wrong passwords with a CRC
+  check before writing output.
 - `sync` / `fssave` persists writable RAM files to the LPST dual-bank store.
 - `sum` enters ring-0 mode; `peek addr [len]`, `poke addr value [8|16|32]`,
   and `asm_` expose raw memory and I/O controls.

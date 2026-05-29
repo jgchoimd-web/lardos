@@ -278,6 +278,16 @@ LSH and L-DOS route `dir`, `type`, `write`, `append`, `copy`, and delete-style
 file commands through the same path, so device files are not hard-coded app
 branches.
 
+`lfs.c` accepts both legacy LFS v1 and current LFS v2. V1 remains readable for
+compatibility, but v2 is the preferred on-disk structure: it is a record stream
+whose file count, name lengths, offsets, sizes, and extent counts are encoded
+as continuation varuints rather than fixed 32-bit or 64-bit integers. That means
+the format has no baked-in maximum file size or maximum disk capacity; metadata
+can grow as long as the volume can store more varuint bytes and extent records.
+The current in-kernel open API still exposes only files that are present inside
+the mounted image window, so hardware and memory stay honest while the format
+does not impose a ZFS-like structural ceiling.
+
 `_:` is a special merged top-level drive, not another physical disk. LSH lists
 `R:` RAM, `X:` seed/default built-in/LFS files, and the `Y:`/`Z:`/`A:` media stores together
 with prefixes when the user runs `dir _:`. Read paths search user RAM first,

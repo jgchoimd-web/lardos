@@ -6,6 +6,14 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.2.0b-mirage
+ITEM Changes the built-in LFS volume to LFS v2, a record-stream format with unbounded varuint file counts, offsets, sizes, and extent chains.
+ITEM Keeps legacy LFS v1 readable so existing built-in/LFS seed files do not disappear.
+ITEM Adds LFS parser support for metadata numbers larger than the current mounted image window without converting them into fixed u32/u64 disk ceilings.
+ITEM Adds lfsdoctor layout and POST selftest coverage for the v2 unbounded-varuint structure, including a huge out-of-window extent entry.
+ITEM Documents that runtime hardware and mounted memory are finite, but the LFS disk format no longer bakes in a petabyte/exabyte-style structural maximum.
+ITEM Ships as beta because this changes the native filesystem layout while preserving existing user-visible files.
+
 SECTION v2.1.0b-mirage
 ITEM Adds extract archive.lar member password as a first-class shell alias for password-protected LAR extraction.
 ITEM Strengthens the LAR POST/selftest so protected archives fail if the original plaintext payload still appears in the archive bytes.

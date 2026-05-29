@@ -24,6 +24,7 @@
 #include "lconnect.h"
 #include "lcontainer.h"
 #include "lil.h"
+#include "lfs.h"
 #include "lguilib.h"
 #include "lassist.h"
 #include "liveupdate.h"
@@ -155,6 +156,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: webdemo lars", fs_open("webdemo.lars") != NULL, emit, user, &pass, &fail);
     post_check("fs: fstwt guide", fs_open("fstwt_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: liveupdate guide", fs_open("liveupdate_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: lfs v2 seed file", fs_open("lfs_info.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: default fstwt", fs_open("default.fstwts") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: bugreport writable", fs_open_writable("bugreport.lardd") != NULL, emit, user, &pass, &fail);
@@ -216,6 +218,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fstwt: virtual filesystem table", fstwt_fs_count() >= 2u, emit, user, &pass, &fail);
     post_check("fs: virtual path namespace", fs_path_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: rxr namespace open", fs_open("rxr/notes.txt") != NULL, emit, user, &pass, &fail);
+    post_check("fs: lfs unbounded layout", lfs_selftest() == 0, emit, user, &pass, &fail);
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);
     post_check("sysrxe: file app parser", sysrxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxe: normal executable parser", rxe_selftest() == 0, emit, user, &pass, &fail);

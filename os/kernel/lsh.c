@@ -16,6 +16,7 @@
 #include "lafillo.h"
 #include "lard_doc.h"
 #include "lil.h"
+#include "lfs.h"
 #include "lar.h"
 #include "lss.h"
 #include "lvcs.h"
@@ -3072,6 +3073,7 @@ static void cmd_control(const char* args)
     out_append("  devmap draw         draw PCI/storage/network device map\n");
     out_append("  oldcheck draw       draw the retro storage check map\n");
     out_append("  lfsdoctor scan      diagnose writable files and LPST persistence state\n");
+    out_append("  lfsdoctor layout    show LFS v2 unbounded varuint/extent structure\n");
     out_append("  crash dryrun panic  preview a deliberate OS crash trigger without executing it\n");
     out_append("  crash panic reason  enter PanicRoom through the normal panic path\n");
     out_append("  panicroom texture   draw the real16 LPR default texture\n");
@@ -6433,7 +6435,12 @@ static void cmd_lfsdoctor(const char* args)
         cmd_larddoc("lfsdoctor.lardd", "Usage: lfsdoctor show");
         return;
     }
-    out_append("Usage: lfsdoctor status|scan|repair|show\n");
+    if (strcmp(sub, "layout") == 0 || strcmp(sub, "format") == 0) {
+        out_append("LFS layout: v1 legacy fixed fields still readable; v2 current record stream uses unbounded varuint file counts, offsets, sizes, and extent chains.\n");
+        out_append(lfs_selftest() == 0 ? "LFS layout selftest: OK\n" : "LFS layout selftest: failed\n");
+        return;
+    }
+    out_append("Usage: lfsdoctor status|scan|repair|show|layout\n");
 }
 
 static void cmd_trace(const char* args)

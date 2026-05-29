@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.2.0b-mirage` moves the built-in LFS volume to LFS v2. Legacy LFS v1 stays
+readable, but v2 replaces fixed `u16` file counts and `u32` offsets/sizes with
+record-stream metadata, unbounded varuint numbers, and extent chains. Physical
+hardware and the currently mounted image are still finite, but the disk format
+itself no longer encodes a petabyte/exabyte-style structural ceiling. Use
+`lfsdoctor layout` to see the active structure and run the selftest.
+
 `v2.1.0b-mirage` tightens password-protected native `.lar` entries. Existing
 `LAR1` method-0 stored archives remain readable, while method-1 members require
 `extract archive.lar member password`, `lar extract archive.lar member password`,
@@ -841,8 +848,10 @@ commands:
 - `trust list|allow|deny|history` exposes a user-owned permission policy map for
   core subjects such as shell, GUI, OSLink, packages, and SUM, and audits each
   permission change.
-- `lfsdoctor scan|repair|show` writes `lfsdoctor.lardd` with filesystem and
-  LPST persistence health, then lets the user trigger the in-kernel repair path.
+- `lfsdoctor scan|repair|show|layout` writes `lfsdoctor.lardd` with filesystem
+  and LPST persistence health, then lets the user trigger the in-kernel repair
+  path. `lfsdoctor layout` reports the LFS v2 unbounded-varuint/extent
+  structure.
 - `panic capsule` or `paniccapsule show` writes `paniccapsule.lardd`, a small
   recovery bundle that joins panic-room, crashlog, BugEye, Trust, LFSDoctor,
   priority, and BootMap state. Runtime-ready `panic` and `panic_u64` paths now

@@ -49,7 +49,7 @@
 - `journal show|add|clear` - automatic `.lardd` OS journal.
 - `rollback snap|last|apply` - settings snapshot and restore.
 - `trust list|allow|deny|history` - user-owned permission policy map and audit log.
-- `lfsdoctor scan|repair|show` - filesystem and LPST persistence health report.
+- `lfsdoctor scan|repair|show|layout` - filesystem and LPST persistence health report, plus the LFS v2 unbounded-varuint/extent layout check.
 - `panic capsule` / `paniccapsule show` - write and view a recovery bundle report; runtime-ready kernel panic paths enter a real16-backed PanicRoom texture screen before halt.
 - `panicroom texture` - enter the real16 bridge and draw the default LPR PanicRoom texture.
 - `bootmap` / `bootreplay show` / `post baseline` / `postbaseline show` / `devmap draw` / `oldcheck draw` / `awakemon` - boot, POST, device, storage, and Awakening views.

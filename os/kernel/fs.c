@@ -10,14 +10,16 @@
 
 /* Hybrid: built-in table + LFS volume + writable RAM files. */
 
-/* LFS volume: "lfs_info.txt" = "LFS (Lard File System) - custom format.\n" */
-static const uint8_t lfs_volume[73] = {
-    'L','F','S',0, 1, 0,0,0,  /* magic, version */
-    1, 0,                      /* file_count = 1 */
-    12, 'l','f','s','_','i','n','f','o','.','t','x','t',  /* name_len, name */
-    0x1F,0x00,0x00,0x00,       /* offset = 31 */
-    0x2A,0x00,0x00,0x00,       /* size = 42 */
-    /* data at offset 31 */
+/* LFS v2 volume: "lfs_info.txt" uses varuint extents, not fixed u32 limits. */
+static const uint8_t lfs_volume[68] = {
+    'L','F','S',0, 2, 0,0,0,   /* magic, version */
+    1,                         /* file record */
+    12, 'l','f','s','_','i','n','f','o','.','t','x','t',
+    1,                         /* one extent */
+    0x1A,                      /* offset = 26 */
+    0x2A,                      /* size = 42 */
+    0,                         /* end records */
+    /* data at offset 26 */
     'L','F','S',' ','(','L','a','r','d',' ','F','i','l','e',' ','S','y','s','t','e','m',')',
     ' ','-',' ','c','u','s','t','o','m',' ','f','o','r','m','a','t','.','\n'
 };

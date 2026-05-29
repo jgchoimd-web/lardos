@@ -58,6 +58,7 @@ typedef struct sysrxe_app {
     char id[24];
     char name[24];
     char icon[4];
+    char icon_asset[32];
     char layout[16];
     int resize_policy;
     int layout_w;

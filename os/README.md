@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.3.0b-mirage` adds native editable app icon assets. LDI now has an `LDI2`
+text form that mixes vector commands (`RECT`, `LINE`) with palette bitmap
+rows (`PAL`/`BITS`), and RXE/SYSRXE apps can use `ICONASSET file.ldi` while
+keeping old `ICON X` text fallbacks. The window frame, corners, and resize grip
+remain dynamic core GUI drawing, because they depend on live window size and
+input hit-testing rather than fixed artwork.
+
 `v2.2.1b-mirage` tightens LAR method 1 metadata. Password-protected `.lar`
 members store `LP1` metadata, public salt, payload CRC, payload length, and
 ciphertext. They do not store the password text, and the public salt no longer
@@ -424,6 +431,8 @@ Doc address bar. LardOS-authored local documents use two in-tree formats:
 - `LARDD` (`.lardd`) replaces Markdown for project notes and guides.
 - `LGUILIB` (`.lguilib`) stores native GUI library/theme records for the
   overlay chrome.
+- `LDI` (`.ldi`) stores native image assets. `LDI2` files can mix vector
+  commands and palette bitmap rows for editable app icons.
 - `LTHEME` (`.ltheme`) stores compact native shell theme presets.
 - `RXR` (`.rxr`) stores an app bundle: one RXE/SYSRXE executable plus required
   files. LardOS exposes installed bundle files through the OS path namespace

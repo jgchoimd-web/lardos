@@ -98,6 +98,7 @@ flowchart TB
     TLS["lard_tls native TLS"]
     GUI["gui / screenram / lafillo / lsh"]
     LGUILIB["lguilib GUI library format"]
+    LDI["ldi hybrid image assets"]
     VM["BOSL GASM LIL LML OSVM"]
     VMMon["vmmon budgets + counters"]
 
@@ -122,6 +123,7 @@ flowchart TB
     Net --> TLS
     Kmain --> GUI
     GUI --> LGUILIB
+    GUI --> LDI
     GUI --> ScreenCheck
     GUI --> TaskPrio
     BootProf --> Awake
@@ -322,6 +324,13 @@ theme is consumed by `guioverlay.c`, so the drawn chrome can change while the
 default GUI behavior stays in place. `default.lguilib` is
 embedded in the filesystem and LSH exposes `lguilib show`, `lguilib use`, and
 `lguilib test`.
+
+`ldi.c` owns the native image decoder. Legacy `LDIM` files remain raw bitmap
+images, while `LDI2` files are editable text assets that combine vector records
+with palette bitmap rows. The desktop and dock can render `ICONASSET file.ldi`
+from RXE/SYSRXE apps, while dynamic core chrome such as window corners and the
+resize grip remains in `gui.c` because it depends on live geometry and
+hit-testing.
 
 `screencheck.c` wraps the GUI POST framebuffer/layout probe in a user-facing
 diagnostic module. `screencheck status` reports changed samples, tile counts,

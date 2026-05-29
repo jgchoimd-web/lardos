@@ -4,6 +4,7 @@
 #include "bootinfo.h"
 #include "fs.h"
 #include "bmp.h"
+#include "ldi.h"
 #include "img_glyph.h"
 #include "ssav.h"
 #include "unicode.h"
@@ -80,28 +81,29 @@ typedef struct {
     int app;
     const char* name;
     const char* icon;
+    const char* icon_asset;
     uint32_t color;
 } gui_launcher_t;
 
 static const gui_launcher_t s_desktop_launchers[] = {
-    { 0, "Docs",  "D", 0xFF2E8FBAu },
-    { 7, "Shell", ">", 0xFF3AA66Fu },
-    { 2, "Notes", "N", 0xFFE3A447u },
-    { 3, "Pix",   "P", 0xFFC86DD7u },
-    { 4, "Pak",   "K", 0xFF6F8BDCu },
-    { 9, "Edit",  "E", 0xFFE06A6Au },
+    { 0, "Docs",  "D", "icon_doc.ldi", 0xFF2E8FBAu },
+    { 7, "Shell", ">", "icon_shell.ldi", 0xFF3AA66Fu },
+    { 2, "Notes", "N", "icon_note.ldi", 0xFFE3A447u },
+    { 3, "Pix",   "P", "icon_pix.ldi", 0xFFC86DD7u },
+    { 4, "Pak",   "K", "icon_pak.ldi", 0xFF6F8BDCu },
+    { 9, "Edit",  "E", "icon_edit.ldi", 0xFFE06A6Au },
 };
 
 static const gui_launcher_t s_dock_launchers[] = {
-    { 0, "Doc",  "D", 0xFF2E8FBAu },
-    { 7, "LSH",  ">", 0xFF3AA66Fu },
-    { 2, "Note", "N", 0xFFE3A447u },
-    { 3, "Pix",  "P", 0xFFC86DD7u },
-    { 4, "Pak",  "K", 0xFF6F8BDCu },
-    { 1, "Calc", "=", 0xFF48A9A6u },
-    { 8, "Play", "R", 0xFF8BC34Au },
-    { 5, "User", "U", 0xFFB88746u },
-    { 9, "Edit", "E", 0xFFE06A6Au },
+    { 0, "Doc",  "D", "icon_doc.ldi", 0xFF2E8FBAu },
+    { 7, "LSH",  ">", "icon_shell.ldi", 0xFF3AA66Fu },
+    { 2, "Note", "N", "icon_note.ldi", 0xFFE3A447u },
+    { 3, "Pix",  "P", "icon_pix.ldi", 0xFFC86DD7u },
+    { 4, "Pak",  "K", "icon_pak.ldi", 0xFF6F8BDCu },
+    { 1, "Calc", "=", "icon_calc.ldi", 0xFF48A9A6u },
+    { 8, "Play", "R", "icon_play.ldi", 0xFF8BC34Au },
+    { 5, "User", "U", "icon_user.ldi", 0xFFB88746u },
+    { 9, "Edit", "E", "icon_edit.ldi", 0xFFE06A6Au },
 };
 
 typedef struct {
@@ -114,6 +116,7 @@ typedef struct {
     int h;
     char name[24];
     char icon[4];
+    char icon_asset[32];
     uint32_t color;
 } gui_item_t;
 
@@ -199,6 +202,9 @@ static uint32_t g_wallpaper_bmp_h;
 static uint32_t g_wallpaper_last_error;
 static uint32_t g_wallpaper_pixels[GUI_WALLPAPER_BMP_MAX_W * GUI_WALLPAPER_BMP_MAX_H];
 static char g_wallpaper_cfg_buf[GUI_WALLPAPER_CFG_MAX];
+#define GUI_LDI_ICON_MAX_W 32u
+#define GUI_LDI_ICON_MAX_H 32u
+static uint32_t g_ldi_icon_pixels[GUI_LDI_ICON_MAX_W * GUI_LDI_ICON_MAX_H];
 
 // Simple backbuffer (assumes <= 1024x768x32).
 static uint32_t g_backbuf[1024u * 768u];
@@ -1033,6 +1039,24 @@ static void fb_draw_image_scaled(const fb_t* f, int x, int y, const uint32_t* pi
                         fb_putpixel(f, (uint16_t)dx, (uint16_t)dy, argb);
                     }
                 }
+            }
+        }
+    }
+}
+
+static void fb_draw_image_fit(const fb_t* f, int x, int y, int dw, int dh,
+                              const uint32_t* pixels, uint16_t sw, uint16_t sh)
+{
+    if (!f || !pixels || dw <= 0 || dh <= 0 || sw == 0 || sh == 0) return;
+    for (int yy = 0; yy < dh; yy++) {
+        uint32_t sy = (uint32_t)((uint64_t)yy * sh / (uint32_t)dh);
+        for (int xx = 0; xx < dw; xx++) {
+            uint32_t sx = (uint32_t)((uint64_t)xx * sw / (uint32_t)dw);
+            uint32_t argb = pixels[sy * sw + sx];
+            int dx = x + xx;
+            int dy = y + yy;
+            if ((argb >> 24) != 0 && dx >= 0 && dy >= 0 && dx < (int)f->w && dy < (int)f->h) {
+                fb_putpixel(f, (uint16_t)dx, (uint16_t)dy, argb);
             }
         }
     }
@@ -3058,6 +3082,7 @@ static void gui_item_from_app(gui_item_t* item, int app, int x, int y)
         item->h = 62;
         gui_copy_text(item->name, sizeof(item->name), sx->name);
         gui_copy_text(item->icon, sizeof(item->icon), sx->icon);
+        gui_copy_text(item->icon_asset, sizeof(item->icon_asset), sx->icon_asset);
         item->color = sx->color;
         return;
     }
@@ -3072,6 +3097,7 @@ static void gui_item_from_app(gui_item_t* item, int app, int x, int y)
         item->h = 62;
         gui_copy_text(item->name, sizeof(item->name), rx->name);
         gui_copy_text(item->icon, sizeof(item->icon), rx->icon);
+        gui_copy_text(item->icon_asset, sizeof(item->icon_asset), rx->icon_asset);
         item->color = rx->color;
         return;
     }
@@ -3085,6 +3111,7 @@ static void gui_item_from_app(gui_item_t* item, int app, int x, int y)
     item->h = 62;
     gui_copy_text(item->name, sizeof(item->name), l->name);
     gui_copy_text(item->icon, sizeof(item->icon), l->icon);
+    gui_copy_text(item->icon_asset, sizeof(item->icon_asset), l->icon_asset);
     item->color = l->color;
 }
 
@@ -3108,6 +3135,7 @@ static void gui_item_from_folder(gui_item_t* item, int x, int y)
     item->h = 62;
     gui_copy_text(item->name, sizeof(item->name), name);
     gui_copy_text(item->icon, sizeof(item->icon), "F");
+    gui_copy_text(item->icon_asset, sizeof(item->icon_asset), "icon_folder.ldi");
     item->color = 0xFFD7B45Au;
     g_folder_count++;
 }
@@ -3441,6 +3469,26 @@ static void gui_draw_top_button(const fb_t* tgt, int x, const char* label, int w
     fb_draw_text(tgt, (uint16_t)(x + 6), 9, label, 0xFFFFFFFFu, bg);
 }
 
+static int gui_draw_ldi_icon_asset(const fb_t* tgt, const char* name,
+                                   int x, int y, int size)
+{
+    const FsFile* f;
+    ldi_result_t meta = { 0, 0, 0, 0 };
+    ldi_result_t img = { g_ldi_icon_pixels, 0, 0, 0 };
+    int pad;
+    if (!name || !name[0] || size <= 0) return 0;
+    f = fs_open(name);
+    if (!f || !f->data || f->size == 0) return 0;
+    if (ldi_decode(f->data, f->size, &meta) != 0) return 0;
+    if (meta.w == 0 || meta.h == 0 ||
+        meta.w > GUI_LDI_ICON_MAX_W || meta.h > GUI_LDI_ICON_MAX_H) return 0;
+    if (ldi_decode(f->data, f->size, &img) != 0) return 0;
+    pad = size > 28 ? 4 : 2;
+    fb_draw_image_fit(tgt, x + pad, y + pad, size - pad * 2, size - pad * 2,
+                      g_ldi_icon_pixels, (uint16_t)img.w, (uint16_t)img.h);
+    return 1;
+}
+
 static void gui_draw_launcher(const fb_t* tgt, const gui_item_t* item, int x, int y,
                               int w, int h, int active, int label)
 {
@@ -3458,8 +3506,10 @@ static void gui_draw_launcher(const fb_t* tgt, const gui_item_t* item, int x, in
     fb_fill_rect(tgt, (uint16_t)(x + w - 1), (uint16_t)y, 1, (uint16_t)h, 0xFF080B0Fu);
     fb_fill_rect(tgt, (uint16_t)ix, (uint16_t)iy, (uint16_t)icon, (uint16_t)icon, color);
     fb_fill_rect(tgt, (uint16_t)ix, (uint16_t)iy, (uint16_t)icon, 2, 0xFFFFFFFFu);
-    fb_draw_text(tgt, (uint16_t)(ix + icon / 2 - 4), (uint16_t)(iy + icon / 2 - 3),
-                 item ? item->icon : "?", 0xFFFFFFFFu, color);
+    if (!gui_draw_ldi_icon_asset(tgt, item ? item->icon_asset : NULL, ix, iy, icon)) {
+        fb_draw_text(tgt, (uint16_t)(ix + icon / 2 - 4), (uint16_t)(iy + icon / 2 - 3),
+                     item ? item->icon : "?", 0xFFFFFFFFu, color);
+    }
     if (label) {
         fb_draw_text(tgt, (uint16_t)(x + 6), (uint16_t)(y + h - 13),
                      item ? item->name : "Item", 0xFFFFFFFFu, bg);
@@ -4215,6 +4265,7 @@ int gui_desktop_interaction_selftest(void)
     g.item_drag_moved = 0;
 
     gui_item_from_app(&probe, 0, 32, 48);
+    if (strcmp(probe.icon_asset, "icon_doc.ldi") != 0) ok = 0;
     dock_idx = gui_dock_add_or_move_item(&probe, (int)g_fb.w / 2);
     if (dock_idx < 0 || dock_idx >= g_dock_item_count) ok = 0;
 

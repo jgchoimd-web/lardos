@@ -181,7 +181,7 @@ $(KERNEL_DIR)/installer.o: $(KERNEL_DIR)/installer.c $(BOOT_STAGE1_INC) $(BOOT_S
 $(KERNEL_DIR)/larsh.o: $(KERNEL_DIR)/larsh.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/lardsec.h $(INCLUDE)/auxkernel.h $(INCLUDE)/megaclip.h $(INCLUDE)/lconnect.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/lard_tls.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
+$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/lardsec.h $(INCLUDE)/auxkernel.h $(INCLUDE)/megaclip.h $(INCLUDE)/lconnect.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/lard_tls.h $(INCLUDE)/ldi.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/kmo.o: $(KERNEL_DIR)/kmo.c $(INCLUDE)/kmo.h $(INCLUDE)/fs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardkit.h
@@ -345,7 +345,7 @@ $(KERNEL_DIR)/rtl8139.o: $(KERNEL_DIR)/rtl8139.c
 $(KERNEL_DIR)/net.o: $(KERNEL_DIR)/net.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/gui.o: $(KERNEL_DIR)/gui.c $(INCLUDE)/bootinfo.h $(INCLUDE)/gui.h $(INCLUDE)/megaclip.h $(INCLUDE)/version.h $(VERSION_GEN)
+$(KERNEL_DIR)/gui.o: $(KERNEL_DIR)/gui.c $(INCLUDE)/bootinfo.h $(INCLUDE)/gui.h $(INCLUDE)/ldi.h $(INCLUDE)/megaclip.h $(INCLUDE)/version.h $(VERSION_GEN)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/ps2.o: $(KERNEL_DIR)/ps2.c $(INCLUDE)/ps2.h

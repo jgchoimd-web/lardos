@@ -6,6 +6,14 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.3.0b-mirage
+ITEM Extends LDI with an editable LDI2 text image format that mixes vector commands with palette bitmap rows.
+ITEM Adds RXE/SYSRXE ICONASSET file.ldi support so apps can own real image icons while old ICON text fallbacks still work.
+ITEM Ships native LDI icon assets for bundled desktop, dock, RXE, SYSRXE, folder, and office-style apps.
+ITEM Keeps window corners and resize handles in the dynamic GUI renderer because they are core size/hit-test UI, not replaceable fixed artwork.
+ITEM Preserves RXE/SYSRXE, APPKIT, window resizing, dock/desktop, glyphs, LGUILIB, wallpaper, LAR/LFS, and LardOS user-control values without feature loss.
+ITEM Ships as beta because this adds a new native image asset surface.
+
 SECTION v2.2.1b-mirage
 ITEM Tightens LAR method 1 so the stored salt is public metadata only and no longer mixes in a password hash.
 ITEM Adds selftest checks that the password text is not stored in the archive, that same-file archives with different passwords keep the same public salt, and that their ciphertext differs.

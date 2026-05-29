@@ -448,6 +448,7 @@ static void defaults_for(sysrxe_app_t* app, const char* file)
     copy_text(app->id, sizeof(app->id), file ? file : "sysrxe");
     copy_text(app->name, sizeof(app->name), "SYSRXE App");
     copy_text(app->icon, sizeof(app->icon), "X");
+    copy_text(app->icon_asset, sizeof(app->icon_asset), "");
     copy_text(app->layout, sizeof(app->layout), "auto");
     app->resize_policy = SYSRXE_RESIZE_REFLOW;
     app->layout_w = 0;
@@ -555,7 +556,16 @@ static int parse_line(sysrxe_app_t* app, const char* src)
     if (starts_key(src, "SYSRXE") || starts_key(src, "RXE")) return 0;
     if ((v = value_after_key(src, "ID")) != NULL) { copy_text(app->id, sizeof(app->id), v); return 0; }
     if ((v = value_after_key(src, "NAME")) != NULL) { copy_text(app->name, sizeof(app->name), v); return 0; }
-    if ((v = value_after_key(src, "ICON")) != NULL) { copy_text(app->icon, sizeof(app->icon), v); return 0; }
+    if ((v = value_after_key(src, "ICONASSET")) != NULL || (v = value_after_key(src, "ICONFILE")) != NULL ||
+        (v = value_after_key(src, "APPICON")) != NULL) {
+        copy_text(app->icon_asset, sizeof(app->icon_asset), v);
+        return 0;
+    }
+    if ((v = value_after_key(src, "ICON")) != NULL) {
+        if (has_suffix_ci(v, ".ldi")) copy_text(app->icon_asset, sizeof(app->icon_asset), v);
+        else copy_text(app->icon, sizeof(app->icon), v);
+        return 0;
+    }
     if ((v = value_after_key(src, "LAYOUT")) != NULL || (v = value_after_key(src, "SURFACE")) != NULL) { copy_text(app->layout, sizeof(app->layout), v); return 0; }
     if ((v = value_after_key(src, "RESIZE")) != NULL || (v = value_after_key(src, "LAYOUTRESIZE")) != NULL ||
         (v = value_after_key(src, "REFLOW")) != NULL) {
@@ -1403,8 +1413,9 @@ int sysrxe_format_home(int app, char* out, uint32_t out_cap)
         return 0;
     }
     snprintf(out, out_cap,
-             "SYSRXE app: %s\nfile: %s\nlayout: %s\nresize: %s %ux%u\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
-             a->name, a->file, a->layout, resize_policy_name(a->resize_policy),
+             "SYSRXE app: %s\nfile: %s\nicon asset: %s\nlayout: %s\nresize: %s %ux%u\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
+             a->name, a->file, a->icon_asset[0] ? a->icon_asset : "(text icon)",
+             a->layout, resize_policy_name(a->resize_policy),
              (uint32_t)a->layout_w, (uint32_t)a->layout_h,
              lang_name(a->lang), a->ui_count, a->body,
              a->command[0] ? "\nCommand: " : "",
@@ -1421,8 +1432,9 @@ int rxe_format_home(int app, char* out, uint32_t out_cap)
         return 0;
     }
     snprintf(out, out_cap,
-             "RXE executable: %s\nfile: %s\nlayout: %s\nresize: %s %ux%u\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
-             a->name, a->file, a->layout, resize_policy_name(a->resize_policy),
+             "RXE executable: %s\nfile: %s\nicon asset: %s\nlayout: %s\nresize: %s %ux%u\nlanguage: %s\nui widgets: %u\n\n%s%s%s",
+             a->name, a->file, a->icon_asset[0] ? a->icon_asset : "(text icon)",
+             a->layout, resize_policy_name(a->resize_policy),
              (uint32_t)a->layout_w, (uint32_t)a->layout_h,
              lang_name(a->lang), a->ui_count, a->body,
              a->command[0] ? "\nCommand: " : "",
@@ -1485,6 +1497,7 @@ int sysrxe_selftest(void)
         "ID test\n"
         "NAME Test App\n"
         "ICON T\n"
+        "ICONASSET icon_test.ldi\n"
         "LAYOUT responsive\n"
         "RESIZE fixed\n"
         "LAYOUTSIZE 500x260\n"
@@ -1532,6 +1545,7 @@ int sysrxe_selftest(void)
     if (parse_sysrxe(&app, "test.sysrxe", sample, sizeof(sample) - 1) != 0) return -1;
     if (strcmp(app.name, "Test App") != 0) return -2;
     if (strcmp(app.icon, "T") != 0) return -3;
+    if (strcmp(app.icon_asset, "icon_test.ldi") != 0) return -38;
     if (app.color != 0xFF123456u) return -4;
     if (strcmp(app.layout, "responsive") != 0) return -5;
     if (app.resize_policy != SYSRXE_RESIZE_FIXED || app.layout_w != 500 || app.layout_h != 260) return -35;

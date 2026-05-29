@@ -2,6 +2,7 @@ RXE 1
 ID rxe-maze
 NAME RXE Maze
 ICON M
+ICONASSET icon_play.ldi
 LAYOUT responsive
 COLOR 0xFF62C370
 TYPE GAME

@@ -189,7 +189,7 @@ static const uint8_t userlaw_init[] =
     "ITEM Repair over halt: panic room, auxkernel, lfsdoctor, bugeye, post, and bootmap exist so the user can recover.\n"
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
     "ITEM Keyboard completeness: mouse workflows should also have keyboard and shortcut routes so the full OS can be driven without a mouse.\n"
-    "ITEM Native expression: LARS, LARDD, LAR archives, LGUILIB, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
+    "ITEM Native expression: LARS, LARDD, LAR archives, LGUILIB, LDI images, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
     "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; version numbers are vcycle.feature.patch where patch is one digit and carries after 9.\n"
     "ITEM Codename honesty: Tiara-style names are OS-era subnames, not LTS promises; support-policy changes must stay visible through release codename and release lts.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
@@ -388,6 +388,7 @@ static const uint8_t userapp_sysrxe_init[] =
     "ID userapp\n"
     "NAME User SYSRXE\n"
     "ICON U\n"
+    "ICONASSET icon_sysrxe.ldi\n"
     "LAYOUT responsive\n"
     "COLOR 0xFF5DB7A6\n"
     "INPUT Say:\n"
@@ -402,7 +403,7 @@ static const uint8_t userapp_sysrxe_init[] =
     "DESKTOP 1\n"
     "DOCK 0\n"
     "TEXT This writable app proves that new apps can be edited as files.\n"
-    "TEXT Open userapp.sysrxe in Edit, change NAME/TEXT/COMMAND, then run sysrxe reload.\n"
+    "TEXT Open userapp.sysrxe in Edit, change NAME/TEXT/COMMAND/ICONASSET, then run sysrxe reload.\n"
     "COMMAND echo user-sysrxe\n";
 static uint8_t ram_userapp_sysrxe_buf[USERAPP_SYSRXE_CAP];
 static FsWritableFile ram_userapp_sysrxe = { "userapp.sysrxe", ram_userapp_sysrxe_buf, 0, USERAPP_SYSRXE_CAP };
@@ -488,6 +489,7 @@ static const uint8_t file_lardos_lars[] =
     "p The Doc tab can switch HTTP requests between GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS; POST/PUT/PATCH read the address as URL|body.\n"
     "link Web Stack Guide | webstack_guide.lardd\n"
     "link FSTWT Guide | fstwt_guide.lardd\n"
+    "link LDI Icon Guide | ldi_guide.lardd\n"
     "link Web Demo LARS | webdemo.lars\n"
     "fetch Example HEAD target | https://example.com/\n"
     "section Full-control starts\n"
@@ -529,6 +531,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use TOMB LIST, TOMB SHOW, TOMB HIDE file, TOMB DROP file, or TOMB CLEAR when you want to inspect or edit deletion records themselves.\n"
     "li Use buddy on for Lard Buddy, the optional roaming assistant with tips and loose jokes.\n"
     "li Use lguilib show default.lguilib or lguilib use default.lguilib to inspect/apply GUI library themes.\n"
+    "li Use ICONASSET file.ldi in RXE/SYSRXE apps to give them editable native image icons; ICON X still works as the fallback.\n"
     "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
     "li Use vm status, vm limits, and vm selftest to monitor BOSL, LIL, GASM, Lafillo VM, and OSVM under common step budgets.\n"
     "li Use shrine status, shrine list, shrine verify hello.shrine, and shrine run hello.shrine for the Lard Subsystem for Shrine with BOSL payload validation.\n"
@@ -813,6 +816,60 @@ static const uint8_t file_default_lguilib[] =
     "WIDGET status badge\n"
     "WIDGET responsive flow\n"
     "WIDGET smartgrid placement\n"
+    "END\n";
+
+static const uint8_t file_icon_doc_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 3 1 10 14 0xFF1F6D99\nRECT 5 3 7 10 0xFF52D7F5\nLINE 4 5 11 5 0xFFFFFFFF\nLINE 4 8 11 8 0xFFFFFFFF\nPAL W 0xFFFFFFFF\nBITS 6 10 4 2\nWWWW\nW..W\nEND\n";
+
+static const uint8_t file_icon_shell_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 2 3 12 10 0xFF101619\nRECT 3 4 10 8 0xFF1E6B52\nLINE 5 6 8 8 0xFFFFFFFF\nLINE 5 10 11 10 0xFFFFFFFF\nPAL G 0xFF67F0A0\nBITS 4 6 3 5\nG..\n.G.\n..G\n.G.\nG..\nEND\n";
+
+static const uint8_t file_icon_note_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 3 2 10 12 0xFFE3A447\nRECT 5 4 7 8 0xFFFFE06A\nLINE 5 6 11 6 0xFF573B17\nLINE 5 9 10 9 0xFF573B17\nPAL D 0xFF573B17\nBITS 10 11 3 3\nD..\nDD.\nDDD\nEND\n";
+
+static const uint8_t file_icon_pix_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 2 3 12 10 0xFF6B3EA0\nRECT 4 5 8 6 0xFFC86DD7\nLINE 4 11 7 8 0xFFFFFFFF\nLINE 7 8 10 11 0xFFFFFFFF\nPAL Y 0xFFFFD166\nBITS 10 5 3 3\n.Y.\nYYY\n.Y.\nEND\n";
+
+static const uint8_t file_icon_pak_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 3 4 10 9 0xFF3858A8\nRECT 5 2 6 3 0xFF6F8BDC\nLINE 4 6 12 6 0xFFCFE3FF\nPAL P 0xFFCFE3FF\nBITS 6 8 4 3\nPPPP\nP..P\nPPPP\nEND\n";
+
+static const uint8_t file_icon_edit_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 3 11 10 2 0xFFE06A6A\nLINE 4 11 11 4 0xFFFFD166\nLINE 5 12 12 5 0xFFFFFFFF\nPAL R 0xFFE06A6A\nBITS 10 3 3 3\nRRR\n.RR\n..R\nEND\n";
+
+static const uint8_t file_icon_calc_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 3 2 10 12 0xFF1D5B5A\nRECT 5 4 6 2 0xFF9DEAE4\nLINE 5 8 11 8 0xFFFFFFFF\nLINE 8 6 8 12 0xFFFFFFFF\nPAL C 0xFF48A9A6\nBITS 5 10 6 3\nC.C.C.\n.C.C.C\nC.C.C.\nEND\n";
+
+static const uint8_t file_icon_play_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 2 2 12 12 0xFF365D21\nLINE 6 4 11 8 0xFFFFFFFF\nLINE 11 8 6 12 0xFFFFFFFF\nLINE 6 4 6 12 0xFFFFFFFF\nPAL G 0xFF8BC34A\nBITS 7 5 4 7\nG...\nGG..\nGGG.\nGGGG\nGGG.\nGG..\nG...\nEND\n";
+
+static const uint8_t file_icon_user_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 3 10 10 4 0xFFB88746\nRECT 6 3 4 4 0xFFFFD166\nLINE 5 8 10 8 0xFFFFFFFF\nPAL U 0xFFFFD166\nBITS 5 4 6 8\n.UU..\nUUUU.\n.UU..\n.UUU.\nUUUUU\nUUUUU\nU...U\nU...U\nEND\n";
+
+static const uint8_t file_icon_folder_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 2 5 12 8 0xFFD7B45A\nRECT 3 3 5 3 0xFFFFE06A\nLINE 3 7 13 7 0xFFFFFFFF\nPAL F 0xFFFFD166\nBITS 4 9 8 3\nFFFFFFFF\nF......F\nFFFFFFFF\nEND\n";
+
+static const uint8_t file_icon_rxe_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 2 2 12 12 0xFF2C7A4A\nRECT 4 4 8 8 0xFF62C370\nLINE 5 6 10 10 0xFFFFFFFF\nLINE 10 6 5 10 0xFFFFFFFF\nPAL X 0xFFFFFFFF\nBITS 6 5 4 6\nX..X\n.XX.\n.XX.\n.XX.\nX..X\nXXXX\nEND\n";
+
+static const uint8_t file_icon_sysrxe_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 2 2 12 12 0xFF2A706D\nRECT 4 4 8 8 0xFF5DB7A6\nLINE 4 7 11 7 0xFFFFFFFF\nLINE 7 4 7 11 0xFFFFFFFF\nPAL S 0xFF9DEAE4\nBITS 5 5 6 6\nSSSSSS\nS....S\nSSSS..\n....SS\nS....S\nSSSSSS\nEND\n";
+
+static const uint8_t file_icon_office_ldi[] =
+    "LDI2\nSIZE 16 16\nCLEAR 0x00000000\nRECT 3 1 10 14 0xFF315A7A\nRECT 5 3 7 10 0xFF5BC0EB\nLINE 5 6 11 6 0xFFFFFFFF\nLINE 5 9 11 9 0xFFFFFFFF\nPAL O 0xFFFFFFFF\nBITS 5 11 6 2\nOOOOOO\nO....O\nEND\n";
+
+static const uint8_t file_ldi_guide[] =
+    "LARDD 1\n"
+    "TITLE LDI Image Format\n"
+    "TEXT LDI2 is LardOS' editable hybrid image asset format for app icons and non-core artwork.\n"
+    "TEXT Core window chrome such as corners and resize handles stays dynamic in the GUI renderer because it depends on live window size and input hit tests.\n"
+    "SECTION Syntax\n"
+    "ITEM LDI2\n"
+    "ITEM SIZE width height\n"
+    "ITEM CLEAR 0xAARRGGBB\n"
+    "ITEM RECT x y w h 0xAARRGGBB\n"
+    "ITEM LINE x0 y0 x1 y1 0xAARRGGBB\n"
+    "ITEM PAL A 0xAARRGGBB then BITS x y w h followed by palette rows.\n"
+    "ITEM RXE/SYSRXE apps use ICONASSET file.ldi, while old ICON X still works.\n"
     "END\n";
 
 static const uint8_t file_default_ltheme[] =
@@ -1189,6 +1246,7 @@ static const uint8_t file_sample_rxr[] =
     "ID rxr-app\n"
     "NAME RXR App\n"
     "ICON R\n"
+    "ICONASSET icon_rxe.ldi\n"
     "LAYOUT responsive\n"
     "COLOR 0xFF74C7A2\n"
     "INPUT Number:\n"
@@ -1220,7 +1278,8 @@ static const uint8_t file_sysrxe_guide[] =
     "ITEM SYSRXE 1\n"
     "ITEM ID app-id\n"
     "ITEM NAME App title\n"
-    "ITEM ICON one-to-three chars\n"
+    "ITEM ICON one-to-three chars, or ICON file.ldi for an image icon\n"
+    "ITEM ICONASSET file.ldi sets the editable LDI2 app icon while keeping ICON as text fallback\n"
     "ITEM LAYOUT auto, panel, document, terminal, game, editor, package, responsive, smart, flow, smartui, or autofit\n"
     "ITEM RESIZE reflow is the default; RESIZE fixed/freeze/no-reflow keeps APPKIT layout from recalculating when the window size changes.\n"
     "ITEM LAYOUTSIZE width height, BASESIZE, or DESIGNSIZE chooses the fixed design canvas for RESIZE fixed.\n"
@@ -1272,7 +1331,8 @@ static const uint8_t file_rxe_guide[] =
     "ITEM RXE 1\n"
     "ITEM ID app-id\n"
     "ITEM NAME App title\n"
-    "ITEM ICON one-to-three chars\n"
+    "ITEM ICON one-to-three chars, or ICON file.ldi for an image icon\n"
+    "ITEM ICONASSET file.ldi sets the editable LDI2 app icon while keeping ICON as text fallback\n"
     "ITEM LAYOUT auto, panel, document, terminal, game, editor, package, responsive, smart, flow, smartui, or autofit\n"
     "ITEM RESIZE reflow is the default; RESIZE fixed/freeze/no-reflow keeps APPKIT layout from recalculating when the window size changes.\n"
     "ITEM LAYOUTSIZE width height, BASESIZE, or DESIGNSIZE chooses the fixed design canvas for RESIZE fixed.\n"
@@ -1439,6 +1499,8 @@ static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"
     "CHECK file lardos.lars\n"
     "CHECK file lardtime_guide.lardd\n"
+    "CHECK file ldi_guide.lardd\n"
+    "CHECK file icon_doc.ldi\n"
     "CHECK file default.ltheme\n"
     "CHECK writable journal.lardd\n"
     "CHECK writable userlaw.lardd\n"
@@ -1608,6 +1670,20 @@ static const FsFile FS_FILES[] = {
     { "readme.txt",    file_readme_txt,    sizeof(file_readme_txt) - 1 },
     { "lardos.lars",   file_lardos_lars,   sizeof(file_lardos_lars) - 1 },
     { "default.lguilib", file_default_lguilib, sizeof(file_default_lguilib) - 1 },
+    { "icon_doc.ldi", file_icon_doc_ldi, sizeof(file_icon_doc_ldi) - 1 },
+    { "icon_shell.ldi", file_icon_shell_ldi, sizeof(file_icon_shell_ldi) - 1 },
+    { "icon_note.ldi", file_icon_note_ldi, sizeof(file_icon_note_ldi) - 1 },
+    { "icon_pix.ldi", file_icon_pix_ldi, sizeof(file_icon_pix_ldi) - 1 },
+    { "icon_pak.ldi", file_icon_pak_ldi, sizeof(file_icon_pak_ldi) - 1 },
+    { "icon_edit.ldi", file_icon_edit_ldi, sizeof(file_icon_edit_ldi) - 1 },
+    { "icon_calc.ldi", file_icon_calc_ldi, sizeof(file_icon_calc_ldi) - 1 },
+    { "icon_play.ldi", file_icon_play_ldi, sizeof(file_icon_play_ldi) - 1 },
+    { "icon_user.ldi", file_icon_user_ldi, sizeof(file_icon_user_ldi) - 1 },
+    { "icon_folder.ldi", file_icon_folder_ldi, sizeof(file_icon_folder_ldi) - 1 },
+    { "icon_rxe.ldi", file_icon_rxe_ldi, sizeof(file_icon_rxe_ldi) - 1 },
+    { "icon_sysrxe.ldi", file_icon_sysrxe_ldi, sizeof(file_icon_sysrxe_ldi) - 1 },
+    { "icon_office.ldi", file_icon_office_ldi, sizeof(file_icon_office_ldi) - 1 },
+    { "ldi_guide.lardd", file_ldi_guide, sizeof(file_ldi_guide) - 1 },
     { "default.ltheme", file_default_ltheme, sizeof(file_default_ltheme) - 1 },
     { "lardd_guide.lardd", file_lardd_guide, sizeof(file_lardd_guide) - 1 },
     { "codename.lardd", file_codename_lardd, sizeof(file_codename_lardd) - 1 },

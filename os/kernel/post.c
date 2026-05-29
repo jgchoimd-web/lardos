@@ -26,6 +26,7 @@
 #include "lil.h"
 #include "lfs.h"
 #include "lguilib.h"
+#include "ldi.h"
 #include "lassist.h"
 #include "liveupdate.h"
 #include "lpack.h"
@@ -135,6 +136,9 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: features.lil", fs_open("features.lil") != NULL, emit, user, &pass, &fail);
     post_check("fs: hello.shrine", fs_open("hello.shrine") != NULL, emit, user, &pass, &fail);
     post_check("fs: default.lguilib", fs_open("default.lguilib") != NULL, emit, user, &pass, &fail);
+    post_check("fs: ldi icon assets", fs_open("icon_doc.ldi") != NULL &&
+               fs_open("icon_shell.ldi") != NULL && fs_open("icon_rxe.ldi") != NULL,
+               emit, user, &pass, &fail);
     post_check("fs: default.ltheme", fs_open("default.ltheme") != NULL, emit, user, &pass, &fail);
     post_check("fs: sysrxe guide", fs_open("sysrxe_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: rxe guide", fs_open("rxe_guide.lardd") != NULL, emit, user, &pass, &fail);
@@ -220,6 +224,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: rxr namespace open", fs_open("rxr/notes.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: lfs unbounded layout", lfs_selftest() == 0, emit, user, &pass, &fail);
     post_check("lguilib: gui library parser", lguilib_selftest() == 0, emit, user, &pass, &fail);
+    post_check("ldi: hybrid image parser", ldi_selftest() == 0, emit, user, &pass, &fail);
     post_check("sysrxe: file app parser", sysrxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxe: normal executable parser", rxe_selftest() == 0, emit, user, &pass, &fail);
     post_check("kmodtalk: direct module channel", kmodtalk_selftest() == 0, emit, user, &pass, &fail);

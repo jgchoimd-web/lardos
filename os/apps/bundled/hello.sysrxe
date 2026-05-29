@@ -2,6 +2,7 @@ SYSRXE 1
 ID hello-sysrxe
 NAME SYSRXE Hello
 ICON X
+ICONASSET icon_sysrxe.ldi
 LAYOUT responsive
 COLOR 0xFF4FC3B3
 INPUT Text:

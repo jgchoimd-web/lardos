@@ -2,6 +2,7 @@ RXE 1
 ID lardshow
 NAME LardShow
 ICON P
+ICONASSET icon_office.ldi
 LAYOUT responsive
 COLOR 0xFFFFD166
 INPUT Slide/Command:

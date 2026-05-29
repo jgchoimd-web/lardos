@@ -11,6 +11,8 @@ Rules:
 
 - `.rxe` is a normal executable app.
 - `.sysrxe` is a system executable app.
+- `ICONASSET file.ldi` points at a native editable LDI2 image icon; `ICON X`
+  remains the short text fallback.
 - Keep bundled app source out of `kernel/fs.c`; `fs.c` should only register the
   generated file payload.
 - User-owned writable app templates may still live in writable filesystem

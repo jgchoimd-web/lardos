@@ -2,6 +2,7 @@ RXE 1
 ID lardsheet
 NAME LardSheet
 ICON S
+ICONASSET icon_office.ldi
 LAYOUT responsive
 COLOR 0xFF81C784
 INPUT Row/Cell:

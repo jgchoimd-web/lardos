@@ -2,6 +2,7 @@ RXE 1
 ID lang-demo
 NAME RXE Lang Demo
 ICON L
+ICONASSET icon_rxe.ldi
 LAYOUT responsive
 COLOR 0xFF7BC86C
 INPUT Number:

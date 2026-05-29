@@ -2,6 +2,7 @@ RXE 1
 ID lardwrite
 NAME LardWrite
 ICON W
+ICONASSET icon_office.ldi
 LAYOUT responsive
 COLOR 0xFF5BC0EB
 INPUT Command/Text:

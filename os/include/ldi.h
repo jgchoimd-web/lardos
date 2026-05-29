@@ -1,6 +1,7 @@
 /*
  * LDI - LardOS Image format
- * Magic "LDIM", raw BGR/BGRA pixel data.
+ * v1: binary "LDIM", raw BGR/BGRA pixel data.
+ * v2: text "LDI2", hybrid vector + palette bitmap commands.
  */
 #pragma once
 
@@ -17,3 +18,4 @@ typedef struct {
 
 /* Decode LDI. Returns 0 on success. If pixels is NULL, only fills w/h/bpp. */
 int ldi_decode(const uint8_t* data, uint32_t len, ldi_result_t* out);
+int ldi_selftest(void);

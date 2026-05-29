@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.0.8b-mirage
+ITEM Codifies the visible version-number contract: v<large-cycle>.<feature-or-change>.<patch-or-code-change><channel>-<subname>.
+ITEM The third number is one digit only, 0 through 9; when it would pass 9, the carry moves into the feature/change number even for a small code edit.
+ITEM release policy now prints the triplet/carry rule inside LardOS so users do not have to remember it from outside notes.
+ITEM POST now checks the active kernel version against the one-digit patch/carry rule so malformed future versions are caught visibly.
+ITEM Updates README, architecture notes, LSH docs, userlaw.lardd seed text, and the LARS control room note.
+ITEM Preserves Mirage subname policy, a/b/p channel policy, hardware-profile releases, screen capture, GUI, RXE/SYSRXE, KMO, MediaFS, LiveUpdate, LardOS Connect, and user-control values without feature loss.
+ITEM Ships as beta because this changes release-policy plumbing and POST validation.
+
 SECTION v2.0.7b-mirage
 ITEM Adds user-owned screen capture: screenshot writes compact LSHOT RGB565 snapshots to screen.lshot or a chosen writable file.
 ITEM Adds screen recording: screenrec start/frame/stop writes compact LREC luma frames to screenrec.lrec without external video libraries.

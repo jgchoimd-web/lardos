@@ -958,6 +958,8 @@ static void cmd_release(const char* args)
         out_append("  a = official: promoted stable builds after boot, POST, GUI, and media checks.\n");
         out_append("  b = beta-experimental: new or risky feature bundles before promotion.\n");
         out_append("  p = hotpatch: narrow emergency fixes for an existing release line.\n");
+        out_append("  number form: v<cycle>.<feature/change>.<patch/code-change><channel>-<subname>.\n");
+        out_append("  third number is one digit only: 0..9; after 9, carry into the feature/change number even for small code edits.\n");
         out_append("  codenames append after the channel, for example vX.Y.Zb-mirage.\n");
         out_append("  LTS support names are retired; codenames are now OS-era subnames.\n");
         out_append("  hardware profiles: universal, seabios, ami, vbox, usb, realpc.\n");

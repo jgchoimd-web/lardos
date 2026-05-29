@@ -6,6 +6,7 @@
 
 - `dir` `type` `ver` `echo` `cls` `bosl` `cd` `X:` etc. `dir _:` lists the merged top-level drive with prefixes; `dir X:` lists read-only system files; `dir R:` lists every writable RAM file; `dir Y:`/`dir Z:`/`dir A:` list MediaFS device stores.
 - `release policy` - show when to use `a`, `b`, or `p` release suffixes.
+- Release numbers use `v<cycle>.<feature/change>.<patch/code-change><channel>-<subname>`; the third number is one digit only, so after 9 it carries into the middle number.
 - `release codename` - show the current OS-era subname, now Mirage.
 - `release lts` - compatibility command that says the old LTS model is retired and Tiara support ended.
 - `lword`/`lwrite`, `lsheet`, `lshow` - edit the bundled native office document,

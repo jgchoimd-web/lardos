@@ -966,6 +966,12 @@ fixes. Hardware profiles are separate from the suffix: `universal` is the
 default, while `seabios`, `ami`, `vbox`, `usb`, and `realpc` identify the target
 environment for profile-specific release media.
 
+Version numbers follow `v<large-cycle>.<feature-or-change>.<patch-or-code-change><channel>-<subname>`.
+Any code or policy change bumps the third number, but that third number is a
+single digit from 0 to 9. If it would become 10, the carry moves into the middle
+feature/change number even when the edit is small. The channel suffix still
+records the release risk: `a`, `b`, or `p`.
+
 During boot, LardOS offers `P` for Power-On Self-Test and `M` for a focused CPU
 Mode Bridge Test. POST checks CPU mode, the real/long roundtrip bridge, heap
 allocation, native filesystem content, LARS/LARDD rendering, LAR archives, DRFL
@@ -978,7 +984,7 @@ regressions as well as code errors. POST also checks the LGUILIB parser, GUI
 overlay chrome, and Awakening background loader tracker.
 
 Each feature addition gets a release: choose `a`, `b`, or `p` by risk, bump the
-kernel version, add an entry to `os/RELEASES.lardd`, keep the embedded
+kernel version using the one-digit patch carry rule, add an entry to `os/RELEASES.lardd`, keep the embedded
 `releases.lardd` in sync so LSH can show it with `release`, and run
 `make release` or `make release-all-hardware` so the matching ISO/IMG artifacts
 are available. Inside LSH, `release policy` prints the channel and hardware

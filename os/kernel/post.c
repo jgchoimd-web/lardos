@@ -226,6 +226,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lar: bundle directory", bundle && lar_list(bundle->data, bundle->size, NULL, NULL) == 0, emit, user, &pass, &fail);
     post_check("drfl: descriptors", drfl_list(NULL, NULL) >= 2u, emit, user, &pass, &fail);
     post_check("version: suffix policy", post_version_suffix_known(), emit, user, &pass, &fail);
+    post_check("version: triplet carry policy", lardos_release_triplet_policy_ok(LARDOS_VERSION), emit, user, &pass, &fail);
     post_check("time: lardos time calendar", lardtime_selftest() == 0, emit, user, &pass, &fail);
     post_check("vm: monitor budgets", vmmon_selftest() == 0, emit, user, &pass, &fail);
     post_check("shrine: subsystem wrapper", lss_selftest() == 0, emit, user, &pass, &fail);

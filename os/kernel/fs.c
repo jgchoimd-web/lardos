@@ -188,7 +188,7 @@ static const uint8_t userlaw_init[] =
     "ITEM User-grantable power: the user may grant priority lev.10 and enter SUM/raw control knowingly.\n"
     "ITEM Keyboard completeness: mouse workflows should also have keyboard and shortcut routes so the full OS can be driven without a mouse.\n"
     "ITEM Native expression: LARS, LARDD, LGUILIB, LTHEME, LPACK, RXR, SYSRXE, RXE, KMO command modules, LFS, and picture Unicode keep the system's surface its own.\n"
-    "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; hardware profiles name the target.\n"
+    "ITEM Honest releases: a is official, b is beta-experimental, p is hotpatch; version numbers are vcycle.feature.patch where patch is one digit and carries after 9.\n"
     "ITEM Codename honesty: Tiara-style names are OS-era subnames, not LTS promises; support-policy changes must stay visible through release codename and release lts.\n"
     "ITEM Communication: OS modules, processes, and other systems should communicate through visible OSLink and KModTalk paths.\n"
     "SECTION Commands\n"
@@ -770,7 +770,7 @@ static const uint8_t file_lardos_lars[] =
     "cmd release codename\n"
     "cmd release lts\n"
     "cmd lardd dosmode_guide.lardd\n"
-    "note Release suffixes: a=official, b=beta-experimental, p=hotpatch. Codenames now append after the suffix as OS-era subnames, like v2.0.6b-mirage.\n"
+    "note Release form: v<cycle>.<feature/change>.<patch/code-change><channel>-<subname>; patch is one digit 0..9 and carries into the middle number after 9.\n"
     "end\n";
 
 static const uint8_t file_default_lguilib[] =

@@ -522,6 +522,11 @@ profiles are a second release axis, not a replacement for the suffix:
 environment while the base version still says whether the build is official,
 beta, or a hotpatch.
 
+The version triplet is `v<large-cycle>.<feature-or-change>.<patch-or-code-change>`.
+The third number is intentionally one digit only. Any code or policy edit bumps
+it, and if it would pass 9, the carry moves into the feature/change number even
+when the edit is not itself a new feature.
+
 Feature work is released as it lands. A feature release chooses the channel by
 risk, updates the kernel version, records the change in `os/RELEASES.lardd`,
 embeds the matching `releases.lardd` file so the `release` command shows the

@@ -71,6 +71,23 @@ static inline const char* lardos_release_channel_name(void)
     return "unknown";
 }
 
+static inline int lardos_release_triplet_policy_ok(const char* version)
+{
+    unsigned int i = 0;
+    unsigned int digits = 0;
+    if (!version || version[0] != 'v') return 0;
+    i = 1u;
+    while (version[i] >= '0' && version[i] <= '9') { i++; digits++; }
+    if (digits == 0 || version[i++] != '.') return 0;
+    digits = 0;
+    while (version[i] >= '0' && version[i] <= '9') { i++; digits++; }
+    if (digits == 0 || version[i++] != '.') return 0;
+    if (version[i] < '0' || version[i] > '9') return 0;
+    i++;
+    if (version[i] >= '0' && version[i] <= '9') return 0;
+    return lardos_release_channel_char(version[i]);
+}
+
 static inline const char* lardos_release_codename(void)
 {
     return LARDOS_CODENAME_ACTIVE ? LARDOS_CODENAME_NAME : "none";

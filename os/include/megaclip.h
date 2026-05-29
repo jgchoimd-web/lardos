@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #define MEGACLIP_SLOTS 10u
+#define MEGACLIP_PIN_SLOTS 10u
 #define MEGACLIP_KIND_MAX 15u
 #define MEGACLIP_LABEL_MAX 47u
 #define MEGACLIP_DATA_MAX 2048u
@@ -29,6 +30,9 @@ typedef struct {
     uint32_t pulls;
     uint32_t dropped;
     uint32_t last_error;
+    uint32_t pin_count;
+    uint32_t pin_sets;
+    uint32_t pin_pulls;
 } megaclip_status_t;
 
 void megaclip_init(void);
@@ -41,5 +45,11 @@ int megaclip_pull(uint32_t view_index, megaclip_item_t* out);
 int megaclip_pull_latest(megaclip_item_t* out);
 uint32_t megaclip_count(void);
 void megaclip_clear(void);
+int megaclip_pin_set(uint32_t slot, const char* kind, const char* label, const uint8_t* data, uint32_t size);
+int megaclip_pin_set_text(uint32_t slot, const char* label, const char* text);
+int megaclip_pin_pull(uint32_t slot, megaclip_item_t* out);
+int megaclip_pin_clear(uint32_t slot);
+uint32_t megaclip_pin_count(void);
+int megaclip_pin_reload(void);
 void megaclip_status(megaclip_status_t* out);
 int megaclip_selftest(void);

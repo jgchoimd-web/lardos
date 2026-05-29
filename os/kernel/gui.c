@@ -5629,6 +5629,20 @@ static void gui_megaclip_paste_index(uint32_t index)
     gui_megaclip_feedback("pasted selected slot");
 }
 
+static void gui_megaclip_paste_pin(uint32_t index)
+{
+    megaclip_item_t item;
+    if (megaclip_pin_pull(index, &item) != 0) {
+        gui_megaclip_feedback("fixed slot empty");
+        return;
+    }
+    if (gui_megaclip_insert(&item) != 0) {
+        gui_megaclip_feedback("focus an input/editor before fixed paste");
+        return;
+    }
+    gui_megaclip_feedback("pasted fixed slot");
+}
+
 static void gui_megaclip_paste_latest(void)
 {
     megaclip_item_t item;
@@ -5653,10 +5667,17 @@ void gui_handle_key(char ch)
     if (!g_have_fb) return;
     if (!g.win_visible) return;
     if (g.megaclip_pull_wait) {
+        if (g.megaclip_pull_wait == 1 && (ch == 'p' || ch == 'P')) {
+            g.megaclip_pull_wait = 2;
+            gui_megaclip_feedback("fixed pull armed; press 1..9 or 0");
+            return;
+        }
         if (ch >= '0' && ch <= '9') {
             uint32_t slot = ch == '0' ? 9u : (uint32_t)(ch - '1');
+            int fixed = g.megaclip_pull_wait == 2;
             g.megaclip_pull_wait = 0;
-            gui_megaclip_paste_index(slot);
+            if (fixed) gui_megaclip_paste_pin(slot);
+            else gui_megaclip_paste_index(slot);
             return;
         }
         g.megaclip_pull_wait = 0;
@@ -5771,7 +5792,7 @@ void gui_handle_key_nav(int kind)
     }
     if (kind == PS2K_CTRL_SPACE) {
         g.megaclip_pull_wait = 1;
-        gui_megaclip_feedback("stack pull armed; press 1..9 or 0");
+        gui_megaclip_feedback("stack pull armed; press 1..9 or 0, or P for fixed");
         return;
     }
     if (kind == PS2K_F10) {

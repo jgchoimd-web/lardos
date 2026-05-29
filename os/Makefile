@@ -124,7 +124,7 @@ $(KERNEL_DIR)/rtc.o: $(KERNEL_DIR)/rtc.c $(INCLUDE)/rtc.h
 $(KERNEL_DIR)/lardtime.o: $(KERNEL_DIR)/lardtime.c $(INCLUDE)/lardtime.h $(INCLUDE)/rtc.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/megaclip.o: $(KERNEL_DIR)/megaclip.c $(INCLUDE)/megaclip.h
+$(KERNEL_DIR)/megaclip.o: $(KERNEL_DIR)/megaclip.c $(INCLUDE)/megaclip.h $(INCLUDE)/fs.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/lconnect.o: $(KERNEL_DIR)/lconnect.c $(INCLUDE)/lconnect.h $(INCLUDE)/net.h $(INCLUDE)/megaclip.h $(INCLUDE)/lardkit.h

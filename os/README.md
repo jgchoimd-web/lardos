@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.4.0b-mirage` adds PinClip, a fixed clipboard layer on top of
+MegaClipboard. `pinclip set 1 text` assigns a stable shortcut slot,
+`pinclip list|pull|write|clear|reload` manages those slots, and the GUI uses
+`Ctrl+Space`, then `P`, then `1..9` or `0` to paste fixed entries. Normal
+MegaClipboard history, stack/single/order modes, and `Ctrl+Y`/`Ctrl+P` are
+unchanged.
+
 `v2.3.0b-mirage` adds native editable app icon assets. LDI now has an `LDI2`
 text form that mixes vector commands (`RECT`, `LINE`) with palette bitmap
 rows (`PAL`/`BITS`), and RXE/SYSRXE apps can use `ICONASSET file.ldi` while
@@ -492,6 +499,10 @@ commands:
 - `megaclip status|list|mode stack|single|order|push text|file path|pull slot|write slot file`
   manages the ten-slot MegaClipboard. The same system is available from the GUI
   with `Ctrl+Y`, `Ctrl+P`, and `Ctrl+Space` then `1..9`/`0`.
+- `pinclip list|set slot text|pull slot|write slot file|clear slot|reload`
+  manages fixed clipboard shortcuts for text, commands, paths, and other
+  frequent snippets. These slots stay still when MegaClipboard history moves,
+  and the GUI pastes them with `Ctrl+Space`, then `P`, then `1..9`/`0`.
 - `lconnect status|on|off|direct IP [MASK]|discover [IP]|share all on|mode manual|auto|syncclip IP|request IP resource|grant IP resource|deny IP resource|log`
   controls LardOS Connect, the LAN resource-sharing layer for LardOS machines.
   It shares MegaClipboard, CPU, GPU, storage, and peripheral leases only when the

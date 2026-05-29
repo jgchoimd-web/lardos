@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.4.0b-mirage
+ITEM Adds PinClip fixed clipboard shortcuts on top of MegaClipboard, with ten user-owned slots that do not move when normal clipboard history changes.
+ITEM Adds pinclip/fixedclip/pclip commands for list, set, pull, write, clear, reload, and selftest.
+ITEM Adds megaclip pin, pinpull, pinwrite, unpin, pins, and pinreload subcommands for users who want one clipboard command surface.
+ITEM Adds GUI shortcut routing: Ctrl+Space then 1..9/0 still pulls MegaClipboard history, while Ctrl+Space then P then 1..9/0 pulls fixed slots.
+ITEM Stores fixed slot lines visibly in writable megaclip.lardd, and pinclip reload lets user edits become live OS behavior.
+ITEM Preserves MegaClipboard history modes, app icons, LDI assets, RXE/SYSRXE, GUI, LardOS Connect, LardSec, LFS/LAR, and user-control values without feature loss.
+ITEM Ships as beta because this extends keyboard-shortcut clipboard behavior and editable clipboard persistence.
+
 SECTION v2.3.0b-mirage
 ITEM Extends LDI with an editable LDI2 text image format that mixes vector commands with palette bitmap rows.
 ITEM Adds RXE/SYSRXE ICONASSET file.ldi support so apps can own real image icons while old ICON text fallbacks still work.

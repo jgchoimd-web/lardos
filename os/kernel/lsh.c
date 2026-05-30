@@ -349,7 +349,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "hc", 1 }, { "holyc", 1 }, { "lardhc", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "monitor", 1 }, { "monitors", 1 }, { "display", 1 }, { "multimon", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "pinclip", 1 }, { "fixedclip", 1 }, { "pclip", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
@@ -2937,7 +2937,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -2956,6 +2956,7 @@ static void cmd_help(const char* args)
     out_append("  lword show|add|title|section|bullet|quote|code|find|stats|new  document app\n");
     out_append("  lsheet show|add|cell|formula|col|csv|sum|find|new  spreadsheet app\n");
     out_append("  lshow show|add|play|next|prev|slide N|theme|note|new  presentation app\n");
+    out_append("  monitor status|count N|layout hstack|vstack|grid|mirror|active N|move N  multi-monitor desktop\n");
     out_append("  kmod list|module message|history  direct user-to-kernel-module talk\n");
     out_append("  kmo list|create|command|raw|set|delete|show|run  .kmo kernel modules and file-defined shell commands\n");
     out_append("  liveupdate status|apply|file|append|from|reload|auto|test  runtime file/code updates\n");
@@ -3021,6 +3022,7 @@ static void cmd_control(const char* args)
     out_append("  LardOS Connect can share MegaClipboard, CPU, GPU, storage, and peripherals over LAN; keyboard/mouse stay local.\n");
     out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
     out_append("  Code runs through LSH, HC, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
+    out_append("  Monitor layout lives in editable monitors.lardd; extra outputs are virtualized visibly when hardware only exposes one framebuffer.\n");
     out_append("  DOS mode visibly maps _:/C:/A:/Z:/U:/R: onto LardOS drives.\n");
     out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
     out_append("  Values: visible power, editable state, local formats, explainable automation, repair over halt.\n");
@@ -3906,6 +3908,176 @@ static int render_parse_aa(const char* value, int* out)
         *out = GUI_AA_NONLINEAR; return 0;
     }
     return -1;
+}
+
+static int monitor_parse_layout_arg(const char* value, uint32_t* out)
+{
+    if (!value || !out) return -1;
+    if (ascii_streq_ci(value, "single") || ascii_streq_ci(value, "one") ||
+        strcmp(value, "1") == 0 || ascii_streq_ci(value, "off") ||
+        ascii_streq_ci(value, "main")) {
+        *out = GUI_MONITOR_LAYOUT_SINGLE;
+        return 0;
+    }
+    if (ascii_streq_ci(value, "hstack") || ascii_streq_ci(value, "horizontal") ||
+        ascii_streq_ci(value, "side") || ascii_streq_ci(value, "row") ||
+        ascii_streq_ci(value, "left-right")) {
+        *out = GUI_MONITOR_LAYOUT_HSTACK;
+        return 0;
+    }
+    if (ascii_streq_ci(value, "vstack") || ascii_streq_ci(value, "vertical") ||
+        ascii_streq_ci(value, "column") || ascii_streq_ci(value, "top-bottom")) {
+        *out = GUI_MONITOR_LAYOUT_VSTACK;
+        return 0;
+    }
+    if (ascii_streq_ci(value, "grid") || ascii_streq_ci(value, "tile") ||
+        ascii_streq_ci(value, "quad")) {
+        *out = GUI_MONITOR_LAYOUT_GRID;
+        return 0;
+    }
+    if (ascii_streq_ci(value, "mirror") || ascii_streq_ci(value, "clone") ||
+        ascii_streq_ci(value, "same")) {
+        *out = GUI_MONITOR_LAYOUT_MIRROR;
+        return 0;
+    }
+    return -1;
+}
+
+static void cmd_monitor_status(void)
+{
+    gui_monitor_info_t info;
+    gui_monitor_info(&info);
+    out_append("Monitors\n  detected-framebuffers=");
+    out_append_u32(info.detected_framebuffers);
+    out_append(" virtual=");
+    out_append(info.virtualized ? "on" : "off");
+    out_append(" layout=");
+    out_append(gui_monitor_layout_name_for(info.layout));
+    out_append(" count=");
+    out_append_u32(info.count);
+    out_append(" active=");
+    out_append_u32(info.active);
+    out_append(" desktop=");
+    out_append_u32(info.desktop_w);
+    out_append("x");
+    out_append_u32(info.desktop_h);
+    out_append(" last_error=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+    for (uint32_t i = 0; i < info.count && i < GUI_MONITOR_MAX; i++) {
+        out_append("  ");
+        out_append_u32(i + 1u);
+        out_append(": x=");
+        out_append_u32(info.x[i]);
+        out_append(" y=");
+        out_append_u32(info.y[i]);
+        out_append(" w=");
+        out_append_u32(info.w[i]);
+        out_append(" h=");
+        out_append_u32(info.h[i]);
+        if (info.active == i + 1u) out_append(" active");
+        out_append("\n");
+    }
+    out_append("  config=monitors.lardd commands: monitor count 2, monitor layout hstack, monitor move 2\n");
+}
+
+static void cmd_monitor(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        cfgsh_is_status_word(sub) || ascii_streq_ci(sub, "list") ||
+        ascii_streq_ci(sub, "show")) {
+        cmd_monitor_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "on")) {
+        if (gui_monitor_set_count(2u) == 0) cmd_monitor_status();
+        else out_append("monitor: could not enable second monitor.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "off") || ascii_streq_ci(sub, "single")) {
+        if (gui_monitor_set_layout(GUI_MONITOR_LAYOUT_SINGLE) == 0) cmd_monitor_status();
+        else out_append("monitor: could not switch to single monitor.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "count") || ascii_streq_ci(sub, "set")) {
+        uint64_t count;
+        if (lsh_parse_u64(&args, &count) != 0 || count < 1u || count > GUI_MONITOR_MAX ||
+            gui_monitor_set_count((uint32_t)count) != 0) {
+            out_append("Usage: monitor count 1..4\n");
+            return;
+        }
+        cmd_monitor_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "layout") || ascii_streq_ci(sub, "mode")) {
+        char mode[32];
+        uint32_t layout;
+        if (vcs_read_word(&args, mode, sizeof(mode)) != 0 ||
+            monitor_parse_layout_arg(mode, &layout) != 0 ||
+            gui_monitor_set_layout(layout) != 0) {
+            out_append("Usage: monitor layout single|hstack|vstack|grid|mirror\n");
+            return;
+        }
+        cmd_monitor_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "active") || ascii_streq_ci(sub, "focus") ||
+        ascii_streq_ci(sub, "select")) {
+        uint64_t id;
+        if (lsh_parse_u64(&args, &id) != 0 || gui_monitor_set_active((uint32_t)id) != 0) {
+            out_append("Usage: monitor active 1..4\n");
+            return;
+        }
+        cmd_monitor_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "move") || ascii_streq_ci(sub, "window") ||
+        ascii_streq_ci(sub, "send")) {
+        uint64_t id;
+        if (lsh_parse_u64(&args, &id) != 0 || gui_monitor_move_active_window((uint32_t)id) != 0) {
+            out_append("Usage: monitor move 1..4\n");
+            return;
+        }
+        cmd_monitor_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "use") || ascii_streq_ci(sub, "load")) {
+        char file[64];
+        if (vcs_read_word(&args, file, sizeof(file)) != 0) file[0] = '\0';
+        if (gui_monitor_load_config_file(file[0] ? file : "monitors.lardd") == 0) cmd_monitor_status();
+        else out_append("monitor: config load failed.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "reload")) {
+        if (gui_monitor_reload() == 0) cmd_monitor_status();
+        else out_append("monitor: reload failed.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "save")) {
+        out_append(gui_monitor_save() == 0 ? "monitor: monitors.lardd saved\n" : "monitor: save failed\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(gui_monitor_selftest() == 0 ? "monitor: selftest OK\n" : "monitor: selftest failed\n");
+        return;
+    }
+    {
+        uint32_t layout;
+        uint64_t count;
+        const char* p = sub;
+        if (monitor_parse_layout_arg(sub, &layout) == 0 && gui_monitor_set_layout(layout) == 0) {
+            cmd_monitor_status();
+            return;
+        }
+        if (lsh_parse_u64(&p, &count) == 0 && count >= 1u && count <= GUI_MONITOR_MAX &&
+            gui_monitor_set_count((uint32_t)count) == 0) {
+            cmd_monitor_status();
+            return;
+        }
+    }
+    out_append("Usage: monitor status|on|off|count N|layout single|hstack|vstack|grid|mirror|active N|move N|use file|reload|save|test\n");
 }
 
 static void cmd_renderfx_status(void)
@@ -11775,6 +11947,7 @@ static void cfgsh_help(void)
     out_append("  bugeye on|off      visual bug monitor\n");
     out_append("  ltheme name        classic|contrast|night|amber\n");
     out_append("  wallpaper color|grid|stripes|checker|bmp|lrec  desktop background\n");
+    out_append("  monitor count/layout/active/move  multi-monitor desktop layout\n");
     out_append("  sound on|off, sound boot on|off, sound fx on|off  PC speaker effects\n");
     out_append("  rollback snap|apply settings snapshot restore\n");
     out_append("  sram on|off        screen scratch RAM\n");
@@ -11806,6 +11979,7 @@ static void cfgsh_status(void)
     lardkit_bugeye_info_t be;
     lardkit_theme_info_t th;
     gui_wallpaper_info_t wp;
+    gui_monitor_info_t mon;
     gui_subpx_filter_info_t spx;
     lardsec_info_t sec;
     megaclip_status_t clip;
@@ -11819,6 +11993,7 @@ static void cfgsh_status(void)
     lardkit_bugeye_info(&be);
     lardkit_theme_info(&th);
     gui_wallpaper_info(&wp);
+    gui_monitor_info(&mon);
     gui_subpx_filter_info(&spx);
     lardsec_info(&sec);
     megaclip_status(&clip);
@@ -11839,6 +12014,12 @@ static void cfgsh_status(void)
     out_append(th.name);
     out_append(" wallpaper=");
     out_append(wp.name);
+    out_append(" monitor=");
+    out_append(gui_monitor_layout_name_for(mon.layout));
+    out_append("/");
+    out_append_u32(mon.count);
+    out_append(" active=");
+    out_append_u32(mon.active);
     out_append("\n  sram=");
     out_append(sr.enabled ? "on" : "off");
     out_append(" lsb=");
@@ -11973,6 +12154,30 @@ static int cfgsh_apply(const char* setting, const char* args)
         } else {
             snprintf(cmdline, sizeof(cmdline), "pattern %s %s", value, rest);
             cmd_wallpaper(cmdline);
+        }
+        return 1;
+    }
+    if (strcmp(setting, "monitor") == 0 || strcmp(setting, "monitors") == 0 ||
+        strcmp(setting, "display") == 0 || strcmp(setting, "screen") == 0) {
+        char cmdline[96];
+        const char* vp = value;
+        uint64_t count = 0;
+        uint32_t layout = 0;
+        if (!have_value || cfgsh_is_status_word(value)) { cmd_monitor_status(); return 1; }
+        if (strcmp(value, "count") == 0 || strcmp(value, "layout") == 0 ||
+            strcmp(value, "active") == 0 || strcmp(value, "focus") == 0 ||
+            strcmp(value, "move") == 0 || strcmp(value, "use") == 0 ||
+            strcmp(value, "reload") == 0 || strcmp(value, "save") == 0) {
+            snprintf(cmdline, sizeof(cmdline), "%s %s", value, rest);
+            cmd_monitor(cmdline);
+        } else if (lsh_parse_u64(&vp, &count) == 0 && count >= 1u && count <= GUI_MONITOR_MAX) {
+            snprintf(cmdline, sizeof(cmdline), "count %s", value);
+            cmd_monitor(cmdline);
+        } else if (monitor_parse_layout_arg(value, &layout) == 0) {
+            snprintf(cmdline, sizeof(cmdline), "layout %s", value);
+            cmd_monitor(cmdline);
+        } else {
+            out_append("Usage: monitor count N|layout hstack|vstack|grid|mirror|active N|move N\n");
         }
         return 1;
     }
@@ -12432,6 +12637,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
     if (strcmp(cmd, "wallpaper") == 0 || strcmp(cmd, "wall") == 0) { cmd_wallpaper(args); return; }
+    if (strcmp(cmd, "monitor") == 0 || strcmp(cmd, "monitors") == 0 ||
+        strcmp(cmd, "display") == 0 || strcmp(cmd, "multimon") == 0) { cmd_monitor(args); return; }
     if (strcmp(cmd, "sound") == 0 || strcmp(cmd, "lsound") == 0 ||
         strcmp(cmd, "sfx") == 0 || strcmp(cmd, "audio") == 0) { cmd_sound(args); return; }
     if (strcmp(cmd, "megaclip") == 0 || strcmp(cmd, "mclip") == 0 ||

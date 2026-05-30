@@ -6,6 +6,16 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.8.0b-mirage
+ITEM Adds user-owned multi-monitor desktop layout through monitor/monitors/display/multimon shell commands.
+ITEM Adds monitor count 1..4, monitor layout single/hstack/vstack/grid/mirror, monitor active N, and monitor move N.
+ITEM Stores editable monitor policy in writable monitors.lardd and reloads it at GUI startup.
+ITEM Splits the existing framebuffer into visible virtual monitor regions when hardware or a VM exposes only one framebuffer, instead of pretending extra physical outputs exist.
+ITEM Makes fullscreen fill the active monitor region, while windows and desktop/dock placement can move across the combined desktop.
+ITEM Adds POST/LUNIT coverage for monitor layout and writable monitor configuration.
+ITEM Preserves HC, LSND sound, LREC wallpaper, GUI apps, RXE/SYSRXE, LFS/LAR, PinClip/MegaClipboard, LardOS Connect, and user-control values without feature loss.
+ITEM Ships as beta because this expands the desktop/window-manager display model.
+
 SECTION v2.7.0b-mirage
 ITEM Adds HC, a LardOS-owned HolyC-flavored language surface for shell scripts and RXE/SYSRXE executable files.
 ITEM Adds hc/holyc/lardhc file.hc [input] so shell users can run editable .hc source through the native app-code runner.

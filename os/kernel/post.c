@@ -178,6 +178,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: glyph map writable", fs_open_writable("glyphmap.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode writable", fs_open_writable("dosmode.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: wallpaper writable", fs_open_writable("wallpaper.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: monitors writable", fs_open_writable("monitors.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: displayfix writable", fs_open_writable("displayfix.spfx") != NULL, emit, user, &pass, &fail);
     post_check("fs: security policy writable", fs_open_writable("security.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: megaclip guide writable", fs_open_writable("megaclip.lardd") != NULL, emit, user, &pass, &fail);
@@ -254,6 +255,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("gui: window bounds", gui_ok && gui_info.window_inside, emit, user, &pass, &fail);
     post_check("gui: response view layout", gui_ok && gui_info.response_view_ok, emit, user, &pass, &fail);
     post_check("gui: overlay chrome layout", gui_ok && gui_info.chrome_ok, emit, user, &pass, &fail);
+    post_check("gui: monitor layout", gui_ok && gui_info.monitor_layout_ok && gui_monitor_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: screenram scratch", gui_screenram_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: render modes", gui_render_effects_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: user wallpaper", gui_wallpaper_selftest() == 0, emit, user, &pass, &fail);

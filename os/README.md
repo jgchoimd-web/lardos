@@ -52,6 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.8.0b-mirage` adds user-owned multi-monitor layout. `monitor count 2`,
+`monitor layout hstack|vstack|grid|mirror`, `monitor active 1`, and
+`monitor move 2` split the visible desktop into monitor regions, keep the
+layout in editable `monitors.lardd`, and make fullscreen fill the selected
+monitor instead of assuming the whole framebuffer is one screen. When hardware
+or a VM exposes only one framebuffer, LardOS says so and virtualizes the extra
+outputs visibly rather than pretending they are hidden physical devices.
+
 `v2.7.0b-mirage` adds `HC`, a LardOS-owned HolyC-flavored language surface for
 both shell scripts and RXE/SYSRXE executables. `hc hello.hc 5` runs a local
 `.hc` file through the native in-kernel app runner, while `LANG HC` lets
@@ -597,6 +605,10 @@ commands:
   by stretching/squashing the current window image; `resize live` reflows during
   the drag. `subpx` loads SPFX scripts that apply per-region R/G/B channel
   multipliers for display defect correction.
+- `monitor status|count N|layout hstack|vstack|grid|mirror|active N|move N`
+  manages multi-monitor desktop regions from editable `monitors.lardd`.
+  Fullscreen uses the active monitor, and single-framebuffer hardware gets a
+  visible virtual split instead of losing the feature.
 - `screencheck status|retro|test` probes framebuffer/layout health. `retro`
   draws an old boot/storage-style screen scan with colored tile tracks and a
   dot-lane visibility check.

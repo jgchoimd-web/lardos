@@ -186,9 +186,21 @@ typedef struct {
     uint8_t bpp;
 } fb_t;
 
+typedef struct {
+    int x;
+    int y;
+    int w;
+    int h;
+} gui_monitor_rect_t;
+
 static fb_t g_fb;
 static int g_have_fb;
 static uint32_t g_bg;
+static gui_monitor_rect_t g_monitors[GUI_MONITOR_MAX];
+static uint32_t g_monitor_count = 1u;
+static uint32_t g_monitor_active = 0u;
+static uint32_t g_monitor_layout = GUI_MONITOR_LAYOUT_SINGLE;
+static uint32_t g_monitor_last_error;
 #define GUI_WALLPAPER_BMP_MAX_W 128u
 #define GUI_WALLPAPER_BMP_MAX_H 128u
 #define GUI_WALLPAPER_LREC_MAX_W 160u
@@ -239,6 +251,12 @@ static void gui_run_sysrxe_input(const char* input);
 static int gui_resize_corner_hit(int x, int y);
 static int gui_resize_hit_selftest(void);
 static int gui_active_edit_buffer(char** out_buf, uint32_t** out_len, uint32_t** out_cur, uint32_t* out_cap);
+static void gui_monitor_recompute(void);
+static const gui_monitor_rect_t* gui_monitor_rect_by_index(uint32_t idx);
+static const gui_monitor_rect_t* gui_monitor_active_rect(void);
+static int gui_monitor_index_for_point(int x, int y);
+static int gui_monitor_layout_rects_ok(void);
+static int in_rect(int x, int y, int rx, int ry, int rw, int rh);
 
 #define SCREENRAM_MAX_BYTES 8192u
 #define SCREENRAM_DEFAULT_W 64u
@@ -1117,6 +1135,454 @@ static void gui_wallpaper_copy(char* dst, uint32_t cap, const char* src)
     dst[i] = '\0';
 }
 
+const char* gui_monitor_layout_name_for(uint32_t layout)
+{
+    if (layout == GUI_MONITOR_LAYOUT_HSTACK) return "hstack";
+    if (layout == GUI_MONITOR_LAYOUT_VSTACK) return "vstack";
+    if (layout == GUI_MONITOR_LAYOUT_GRID) return "grid";
+    if (layout == GUI_MONITOR_LAYOUT_MIRROR) return "mirror";
+    return "single";
+}
+
+static int gui_monitor_parse_layout(const char* s, uint32_t* out)
+{
+    if (!s || !out) return -1;
+    if (gui_streq_ci(s, "single") || gui_streq_ci(s, "one") || gui_streq_ci(s, "1")) {
+        *out = GUI_MONITOR_LAYOUT_SINGLE;
+        return 0;
+    }
+    if (gui_streq_ci(s, "hstack") || gui_streq_ci(s, "horizontal") ||
+        gui_streq_ci(s, "side") || gui_streq_ci(s, "left-right") ||
+        gui_streq_ci(s, "row")) {
+        *out = GUI_MONITOR_LAYOUT_HSTACK;
+        return 0;
+    }
+    if (gui_streq_ci(s, "vstack") || gui_streq_ci(s, "vertical") ||
+        gui_streq_ci(s, "top-bottom") || gui_streq_ci(s, "column")) {
+        *out = GUI_MONITOR_LAYOUT_VSTACK;
+        return 0;
+    }
+    if (gui_streq_ci(s, "grid") || gui_streq_ci(s, "tile") || gui_streq_ci(s, "quad")) {
+        *out = GUI_MONITOR_LAYOUT_GRID;
+        return 0;
+    }
+    if (gui_streq_ci(s, "mirror") || gui_streq_ci(s, "clone") || gui_streq_ci(s, "same")) {
+        *out = GUI_MONITOR_LAYOUT_MIRROR;
+        return 0;
+    }
+    return -1;
+}
+
+static uint32_t gui_monitor_effective_count(void)
+{
+    uint32_t c = g_monitor_count;
+    if (g_monitor_layout == GUI_MONITOR_LAYOUT_SINGLE) c = 1u;
+    if (c < 1u) c = 1u;
+    if (c > GUI_MONITOR_MAX) c = GUI_MONITOR_MAX;
+    return c;
+}
+
+static void gui_monitor_recompute(void)
+{
+    uint32_t c = gui_monitor_effective_count();
+    int sw = g_have_fb ? (int)g_fb.w : 0;
+    int sh = g_have_fb ? (int)g_fb.h : 0;
+    for (uint32_t i = 0; i < GUI_MONITOR_MAX; i++) {
+        g_monitors[i].x = 0;
+        g_monitors[i].y = 0;
+        g_monitors[i].w = 0;
+        g_monitors[i].h = 0;
+    }
+    if (sw <= 0 || sh <= 0) {
+        g_monitor_last_error = 1u;
+        return;
+    }
+    if (g_monitor_active >= c) g_monitor_active = 0u;
+    if (g_monitor_layout == GUI_MONITOR_LAYOUT_MIRROR ||
+        g_monitor_layout == GUI_MONITOR_LAYOUT_SINGLE) {
+        for (uint32_t i = 0; i < c; i++) {
+            g_monitors[i].x = 0;
+            g_monitors[i].y = 0;
+            g_monitors[i].w = sw;
+            g_monitors[i].h = sh;
+        }
+        g_monitor_last_error = 0u;
+        return;
+    }
+    if (g_monitor_layout == GUI_MONITOR_LAYOUT_VSTACK) {
+        int y0 = 0;
+        for (uint32_t i = 0; i < c; i++) {
+            int y1 = (int)(((uint32_t)sh * (i + 1u)) / c);
+            g_monitors[i].x = 0;
+            g_monitors[i].y = y0;
+            g_monitors[i].w = sw;
+            g_monitors[i].h = y1 - y0;
+            if (g_monitors[i].h < 1) g_monitors[i].h = 1;
+            y0 = y1;
+        }
+        g_monitor_last_error = 0u;
+        return;
+    }
+    if (g_monitor_layout == GUI_MONITOR_LAYOUT_GRID) {
+        uint32_t cols = c <= 1u ? 1u : 2u;
+        uint32_t rows = (c + cols - 1u) / cols;
+        for (uint32_t i = 0; i < c; i++) {
+            uint32_t col = i % cols;
+            uint32_t row = i / cols;
+            int x0 = (int)(((uint32_t)sw * col) / cols);
+            int x1 = (int)(((uint32_t)sw * (col + 1u)) / cols);
+            int y0 = (int)(((uint32_t)sh * row) / rows);
+            int y1 = (int)(((uint32_t)sh * (row + 1u)) / rows);
+            g_monitors[i].x = x0;
+            g_monitors[i].y = y0;
+            g_monitors[i].w = x1 - x0;
+            g_monitors[i].h = y1 - y0;
+            if (g_monitors[i].w < 1) g_monitors[i].w = 1;
+            if (g_monitors[i].h < 1) g_monitors[i].h = 1;
+        }
+        g_monitor_last_error = 0u;
+        return;
+    }
+    {
+        int x0 = 0;
+        for (uint32_t i = 0; i < c; i++) {
+            int x1 = (int)(((uint32_t)sw * (i + 1u)) / c);
+            g_monitors[i].x = x0;
+            g_monitors[i].y = 0;
+            g_monitors[i].w = x1 - x0;
+            g_monitors[i].h = sh;
+            if (g_monitors[i].w < 1) g_monitors[i].w = 1;
+            x0 = x1;
+        }
+    }
+    g_monitor_last_error = 0u;
+}
+
+static const gui_monitor_rect_t* gui_monitor_rect_by_index(uint32_t idx)
+{
+    if (idx >= gui_monitor_effective_count()) return NULL;
+    if (g_monitors[idx].w <= 0 || g_monitors[idx].h <= 0) return NULL;
+    return &g_monitors[idx];
+}
+
+static const gui_monitor_rect_t* gui_monitor_active_rect(void)
+{
+    const gui_monitor_rect_t* m = gui_monitor_rect_by_index(g_monitor_active);
+    if (!m) m = gui_monitor_rect_by_index(0u);
+    return m;
+}
+
+static int gui_monitor_index_for_point(int x, int y)
+{
+    uint32_t c = gui_monitor_effective_count();
+    for (uint32_t i = 0; i < c; i++) {
+        const gui_monitor_rect_t* m = gui_monitor_rect_by_index(i);
+        if (m && in_rect(x, y, m->x, m->y, m->w, m->h)) return (int)i;
+    }
+    return -1;
+}
+
+static int gui_monitor_index_for_window(void)
+{
+    int cx = g.win_x + g.win_w / 2;
+    int cy = g.win_y + g.win_h / 2;
+    int idx = gui_monitor_index_for_point(cx, cy);
+    return idx >= 0 ? idx : (int)g_monitor_active;
+}
+
+static int gui_monitor_layout_rects_ok(void)
+{
+    uint32_t c = gui_monitor_effective_count();
+    if (!g_have_fb || !g_fb.w || !g_fb.h) return 0;
+    for (uint32_t i = 0; i < c; i++) {
+        const gui_monitor_rect_t* m = gui_monitor_rect_by_index(i);
+        if (!m || m->w <= 0 || m->h <= 0) return 0;
+        if (m->x < 0 || m->y < 0) return 0;
+        if (m->x + m->w > (int)g_fb.w || m->y + m->h > (int)g_fb.h) return 0;
+    }
+    return 1;
+}
+
+static int gui_monitor_write_config(void)
+{
+    FsWritableFile* w = fs_open_or_create_writable("monitors.lardd");
+    char buf[512];
+    int n;
+    if (!w) return -1;
+    n = snprintf(buf, sizeof(buf),
+                 "LARDD 1\nTITLE LardOS Monitors\nTEXT User-owned monitor layout. Physical framebuffer count is visible; virtual monitors are editable.\nCOUNT %u\nLAYOUT %s\nACTIVE %u\nEND\n",
+                 g_monitor_count,
+                 gui_monitor_layout_name_for(g_monitor_layout),
+                 g_monitor_active + 1u);
+    if (n < 0) return -2;
+    if ((uint32_t)n >= sizeof(buf)) n = (int)sizeof(buf) - 1;
+    return fs_write(w, 0, (const uint8_t*)buf, (uint32_t)n) == (uint32_t)n ? 0 : -3;
+}
+
+static int gui_monitor_parse_config_text(const char* text, uint32_t len, int persist)
+{
+    char buf[512];
+    const char* p;
+    uint32_t n = len < sizeof(buf) - 1u ? len : sizeof(buf) - 1u;
+    uint32_t count = g_monitor_count;
+    uint32_t layout = g_monitor_layout;
+    uint32_t active = g_monitor_active + 1u;
+    if (!text) return -1;
+    for (uint32_t i = 0; i < n; i++) buf[i] = text[i];
+    buf[n] = '\0';
+    p = buf;
+    while (*p) {
+        char key[24];
+        char val[40];
+        uint32_t ki = 0;
+        uint32_t vi = 0;
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        if (*p == '#') {
+            while (*p && *p != '\n') p++;
+            continue;
+        }
+        while (*p && *p != ' ' && *p != '\t' && *p != '\r' && *p != '\n' && ki + 1u < sizeof(key)) {
+            key[ki++] = *p++;
+        }
+        key[ki] = '\0';
+        while (*p == ' ' || *p == '\t') p++;
+        while (*p && *p != '\r' && *p != '\n' && vi + 1u < sizeof(val)) {
+            val[vi++] = *p++;
+        }
+        while (vi > 0 && (val[vi - 1u] == ' ' || val[vi - 1u] == '\t')) vi--;
+        val[vi] = '\0';
+        if (gui_streq_ci(key, "COUNT") || gui_streq_ci(key, "MONITORS")) {
+            (void)subpx_parse_u32(val, &count);
+        } else if (gui_streq_ci(key, "LAYOUT") || gui_streq_ci(key, "MODE")) {
+            (void)gui_monitor_parse_layout(val, &layout);
+        } else if (gui_streq_ci(key, "ACTIVE") || gui_streq_ci(key, "FOCUS")) {
+            (void)subpx_parse_u32(val, &active);
+        }
+        while (*p && *p != '\n') p++;
+    }
+    if (count < 1u) count = 1u;
+    if (count > GUI_MONITOR_MAX) count = GUI_MONITOR_MAX;
+    if (layout == GUI_MONITOR_LAYOUT_SINGLE) count = 1u;
+    if (layout > GUI_MONITOR_LAYOUT_MIRROR) layout = GUI_MONITOR_LAYOUT_SINGLE;
+    if (active < 1u) active = 1u;
+    if (active > count) active = count;
+    g_monitor_count = count;
+    g_monitor_layout = layout;
+    g_monitor_active = active - 1u;
+    gui_monitor_recompute();
+    if (g.win_w > 0 && g.win_h > 0) {
+        gui_clamp_window();
+        gui_sync_active_window();
+    }
+    if (persist) return gui_monitor_write_config();
+    return 0;
+}
+
+int gui_monitor_load_config_file(const char* file)
+{
+    const FsFile* f = fs_open(file && file[0] ? file : "monitors.lardd");
+    if (!f || !f->data || f->size == 0) {
+        g_monitor_last_error = 2u;
+        return -1;
+    }
+    return gui_monitor_parse_config_text((const char*)f->data, f->size, 1);
+}
+
+int gui_monitor_reload(void)
+{
+    const FsFile* f = fs_open("monitors.lardd");
+    if (!f || !f->data || f->size == 0) {
+        g_monitor_count = 1u;
+        g_monitor_layout = GUI_MONITOR_LAYOUT_SINGLE;
+        g_monitor_active = 0u;
+        gui_monitor_recompute();
+        if (g.win_w > 0 && g.win_h > 0) {
+            if (g.fullscreen) gui_apply_fullscreen();
+            else gui_clamp_window();
+            gui_sync_active_window();
+        }
+        return 0;
+    }
+    return gui_monitor_parse_config_text((const char*)f->data, f->size, 0);
+}
+
+int gui_monitor_save(void)
+{
+    return gui_monitor_write_config();
+}
+
+int gui_monitor_set_count(uint32_t count)
+{
+    if (count < 1u || count > GUI_MONITOR_MAX) {
+        g_monitor_last_error = 3u;
+        return -1;
+    }
+    g_monitor_count = count;
+    if (count == 1u) g_monitor_layout = GUI_MONITOR_LAYOUT_SINGLE;
+    else if (g_monitor_layout == GUI_MONITOR_LAYOUT_SINGLE) g_monitor_layout = GUI_MONITOR_LAYOUT_HSTACK;
+    if (g_monitor_active >= count) g_monitor_active = count - 1u;
+    gui_monitor_recompute();
+    if (g.fullscreen) gui_apply_fullscreen();
+    else gui_clamp_window();
+    gui_sync_active_window();
+    g_monitor_last_error = 0u;
+    return gui_monitor_write_config();
+}
+
+int gui_monitor_set_layout(uint32_t layout)
+{
+    if (layout > GUI_MONITOR_LAYOUT_MIRROR) {
+        g_monitor_last_error = 4u;
+        return -1;
+    }
+    g_monitor_layout = layout;
+    if (layout == GUI_MONITOR_LAYOUT_SINGLE) {
+        g_monitor_count = 1u;
+        g_monitor_active = 0u;
+    } else if (g_monitor_count < 2u) {
+        g_monitor_count = 2u;
+    }
+    gui_monitor_recompute();
+    if (g.fullscreen) gui_apply_fullscreen();
+    else gui_clamp_window();
+    gui_sync_active_window();
+    g_monitor_last_error = 0u;
+    return gui_monitor_write_config();
+}
+
+int gui_monitor_set_active(uint32_t id)
+{
+    uint32_t c = gui_monitor_effective_count();
+    if (id < 1u || id > c) {
+        g_monitor_last_error = 5u;
+        return -1;
+    }
+    g_monitor_active = id - 1u;
+    if (g.fullscreen) {
+        gui_apply_fullscreen();
+        gui_sync_active_window();
+    }
+    g_monitor_last_error = 0u;
+    return gui_monitor_write_config();
+}
+
+int gui_monitor_move_active_window(uint32_t id)
+{
+    const gui_monitor_rect_t* m;
+    int nw;
+    int nh;
+    if (gui_monitor_set_active(id) != 0) return -1;
+    m = gui_monitor_active_rect();
+    if (!m || !g.win_visible) {
+        g_monitor_last_error = 6u;
+        return -2;
+    }
+    if (g.fullscreen) {
+        gui_apply_fullscreen();
+        gui_sync_active_window();
+        return 0;
+    }
+    nw = g.win_w;
+    nh = g.win_h;
+    if (nw > m->w - 12) nw = m->w > 12 ? m->w - 12 : m->w;
+    if (nh > m->h - 34) nh = m->h > 34 ? m->h - 34 : m->h;
+    if (nw < GUI_WINDOW_MIN_W && m->w >= GUI_WINDOW_MIN_W) nw = GUI_WINDOW_MIN_W;
+    if (nh < GUI_WINDOW_MIN_H && m->h >= GUI_WINDOW_MIN_H) nh = GUI_WINDOW_MIN_H;
+    g.win_w = nw;
+    g.win_h = nh;
+    g.win_x = m->x + (m->w - g.win_w) / 2;
+    g.win_y = m->y + 30 + (m->h - 30 - g.win_h) / 2;
+    if (g.win_y < m->y) g.win_y = m->y;
+    gui_clamp_window();
+    gui_sync_active_window();
+    g_monitor_last_error = 0u;
+    return 0;
+}
+
+void gui_monitor_info(gui_monitor_info_t* out)
+{
+    uint32_t c = gui_monitor_effective_count();
+    if (!out) return;
+    out->enabled = c > 1u ? 1u : 0u;
+    out->count = c;
+    out->active = g_monitor_active + 1u;
+    out->layout = g_monitor_layout;
+    out->detected_framebuffers = g_have_fb ? 1u : 0u;
+    out->virtualized = c > 1u ? 1u : 0u;
+    out->desktop_w = g_have_fb ? g_fb.w : 0u;
+    out->desktop_h = g_have_fb ? g_fb.h : 0u;
+    out->last_error = g_monitor_last_error;
+    for (uint32_t i = 0; i < GUI_MONITOR_MAX; i++) {
+        out->x[i] = (uint32_t)(g_monitors[i].x < 0 ? 0 : g_monitors[i].x);
+        out->y[i] = (uint32_t)(g_monitors[i].y < 0 ? 0 : g_monitors[i].y);
+        out->w[i] = (uint32_t)(g_monitors[i].w < 0 ? 0 : g_monitors[i].w);
+        out->h[i] = (uint32_t)(g_monitors[i].h < 0 ? 0 : g_monitors[i].h);
+    }
+}
+
+int gui_monitor_selftest(void)
+{
+    uint32_t old_count = g_monitor_count;
+    uint32_t old_layout = g_monitor_layout;
+    uint32_t old_active = g_monitor_active;
+    uint32_t old_error = g_monitor_last_error;
+    gui_window_t old_window;
+    int old_x = g.win_x;
+    int old_y = g.win_y;
+    int old_w = g.win_w;
+    int old_h = g.win_h;
+    int old_visible = g.win_visible;
+    int old_full = g.fullscreen;
+    int old_app = g.app_id;
+    int ok = 1;
+    if (!g_have_fb) return -1;
+    old_window = g_windows[(old_app >= 0 && old_app < GUI_APP_COUNT) ? old_app : 0];
+    g_monitor_count = 2u;
+    g_monitor_layout = GUI_MONITOR_LAYOUT_HSTACK;
+    g_monitor_active = 0u;
+    gui_monitor_recompute();
+    if (ok && !gui_monitor_layout_rects_ok()) ok = 0;
+    g_monitor_active = 1u;
+    if (ok) {
+        const gui_monitor_rect_t* m = gui_monitor_active_rect();
+        if (!m || m->x <= 0) ok = 0;
+    }
+    if (ok) {
+        const gui_monitor_rect_t* m = gui_monitor_active_rect();
+        g.win_visible = 1;
+        g.fullscreen = 0;
+        if (!m) ok = 0;
+        else {
+            g.win_w = 160;
+            g.win_h = 160;
+            g.win_x = m->x + 8;
+            g.win_y = m->y + 32;
+            if (gui_monitor_index_for_window() != 1) ok = 0;
+        }
+    }
+    g_monitor_count = 4u;
+    g_monitor_layout = GUI_MONITOR_LAYOUT_GRID;
+    g_monitor_active = 0u;
+    gui_monitor_recompute();
+    if (ok && !gui_monitor_layout_rects_ok()) ok = 0;
+
+    g_monitor_count = old_count;
+    g_monitor_layout = old_layout;
+    g_monitor_active = old_active;
+    g_monitor_last_error = old_error;
+    gui_monitor_recompute();
+    g.win_x = old_x;
+    g.win_y = old_y;
+    g.win_w = old_w;
+    g.win_h = old_h;
+    g.win_visible = old_visible;
+    g.fullscreen = old_full;
+    if (old_app >= 0 && old_app < GUI_APP_COUNT) g_windows[old_app] = old_window;
+    gui_clamp_window();
+    gui_sync_active_window();
+    return ok ? 0 : -1;
+}
+
 static uint32_t gui_wallpaper_argb(uint32_t c)
 {
     return (c & 0xFF000000u) ? c : (0xFF000000u | c);
@@ -1600,6 +2066,11 @@ int gui_init(void)
     const FsFile* lguilib_file = fs_open("default.lguilib");
     if (lguilib_file) (void)lguilib_load_active(lguilib_file->data, lguilib_file->size);
     (void)gui_wallpaper_reload();
+    g_monitor_count = 1u;
+    g_monitor_active = 0u;
+    g_monitor_layout = GUI_MONITOR_LAYOUT_SINGLE;
+    gui_monitor_recompute();
+    (void)gui_monitor_reload();
     if (g_fb.w <= 1024 && g_fb.h <= 768) {
         g_bb.fb = g_backbuf;
         g_bb.w = g_fb.w;
@@ -1621,8 +2092,11 @@ int gui_init(void)
     g.prev_buttons = 0;
 
     // Window
-    int sw = (int)g_fb.w;
-    int sh = (int)g_fb.h;
+    const gui_monitor_rect_t* mon = gui_monitor_active_rect();
+    int base_x = mon ? mon->x : 0;
+    int base_y = mon ? mon->y : 0;
+    int sw = mon ? mon->w : (int)g_fb.w;
+    int sh = mon ? mon->h : (int)g_fb.h;
     int usable_top = 30;
     int usable_bottom = sh - 58;
     int usable_h = usable_bottom - usable_top;
@@ -1631,10 +2105,10 @@ int gui_init(void)
     g.win_h = usable_h >= 420 ? 420 : usable_h;
     if (g.win_w < 240) g.win_w = sw > 8 ? sw - 8 : sw;
     if (g.win_h < 180) g.win_h = sh > 8 ? sh - 8 : sh;
-    g.win_x = (sw - g.win_w) / 2;
-    g.win_y = usable_top + (usable_h - g.win_h) / 2;
-    if (g.win_x < 0) g.win_x = 0;
-    if (g.win_y < 0) g.win_y = 0;
+    g.win_x = base_x + (sw - g.win_w) / 2;
+    g.win_y = base_y + usable_top + (usable_h - g.win_h) / 2;
+    if (g.win_x < base_x) g.win_x = base_x;
+    if (g.win_y < base_y) g.win_y = base_y;
     g.fullscreen = 0;
     g.restore_x = g.win_x;
     g.restore_y = g.win_y;
@@ -3307,12 +3781,15 @@ static void gui_item_from_folder(gui_item_t* item, int x, int y)
 static void gui_dock_rect(int* out_x, int* out_y, int* out_w, int* out_h, int* out_cell)
 {
     int count = g_dock_item_count > 0 ? g_dock_item_count : (int)(sizeof(s_dock_launchers) / sizeof(s_dock_launchers[0]));
-    int cell = g_have_fb && g_fb.w < 420 ? 32 : 44;
+    const gui_monitor_rect_t* mon = gui_monitor_active_rect();
+    int base_x = mon ? mon->x : 0;
+    int base_y = mon ? mon->y : 0;
+    int sw = mon ? mon->w : (g_have_fb ? (int)g_fb.w : 0);
+    int sh = mon ? mon->h : (g_have_fb ? (int)g_fb.h : 0);
+    int cell = sw < 420 ? 32 : 44;
     int margin = 8;
     int w = count * cell + margin * 2;
     int h = cell + 12;
-    int sw = g_have_fb ? (int)g_fb.w : 0;
-    int sh = g_have_fb ? (int)g_fb.h : 0;
     if (w > sw - 12 && count > 0) {
         cell = (sw - 24) / count;
         if (cell < 24) cell = 24;
@@ -3321,18 +3798,25 @@ static void gui_dock_rect(int* out_x, int* out_y, int* out_w, int* out_h, int* o
     }
     if (out_w) *out_w = w;
     if (out_h) *out_h = h;
-    if (out_x) *out_x = (sw - w) / 2;
-    if (out_y) *out_y = sh - h - 6;
+    if (out_x) *out_x = base_x + (sw - w) / 2;
+    if (out_y) *out_y = base_y + sh - h - 6;
     if (out_cell) *out_cell = cell;
 }
 
 static void gui_apply_fullscreen(void)
 {
+    const gui_monitor_rect_t* m;
     if (!g_have_fb || !g.fullscreen) return;
-    g.win_x = 0;
-    g.win_y = 0;
-    g.win_w = (int)g_fb.w;
-    g.win_h = (int)g_fb.h;
+    if (gui_monitor_effective_count() > 1u) {
+        int idx = gui_monitor_index_for_window();
+        if (idx >= 0) g_monitor_active = (uint32_t)idx;
+    }
+    m = gui_monitor_active_rect();
+    if (!m) return;
+    g.win_x = m->x;
+    g.win_y = m->y;
+    g.win_w = m->w;
+    g.win_h = m->h;
 }
 
 static void gui_clamp_window(void)
@@ -3542,14 +4026,17 @@ static void gui_settings_panel_rect(int* out_x, int* out_y, int* out_w, int* out
 
 static void gui_default_item_rect(int index, int* out_x, int* out_y, int* out_w, int* out_h)
 {
-    int sw = g_have_fb ? (int)g_fb.w : 640;
+    const gui_monitor_rect_t* mon = gui_monitor_active_rect();
+    int base_x = mon ? mon->x : 0;
+    int base_y = mon ? mon->y : 0;
+    int sw = mon ? mon->w : (g_have_fb ? (int)g_fb.w : 640);
     int cols = (sw - 36) / 88;
     if (cols < 1) cols = 1;
     if (cols > 6) cols = 6;
     int col = index % cols;
     int row = index / cols;
-    if (out_x) *out_x = 18 + col * 88;
-    if (out_y) *out_y = 44 + row * 74;
+    if (out_x) *out_x = base_x + 18 + col * 88;
+    if (out_y) *out_y = base_y + 44 + row * 74;
     if (out_w) *out_w = 76;
     if (out_h) *out_h = 62;
 }
@@ -3613,24 +4100,39 @@ static int gui_dock_hit_item(int x, int y)
     return -1;
 }
 
-static int gui_top_action_hit(int x, int y)
+static int gui_top_action_hit_monitor(int x, int y, int* out_monitor)
 {
-    if (!in_rect(x, y, 0, 0, (int)g_fb.w, 24)) return 0;
-    if (in_rect(x, y, 126, 3, 54, 18)) return GUI_TOP_NEW_FOLDER;
-    if (in_rect(x, y, 186, 3, 52, 18)) return GUI_TOP_PIN_DESKTOP;
-    if (in_rect(x, y, 244, 3, 52, 18)) return GUI_TOP_PIN_DOCK;
-    if (in_rect(x, y, 302, 3, 62, 18)) return GUI_TOP_RENAME_ITEM;
-    if (in_rect(x, y, 370, 3, 58, 18)) return GUI_TOP_DELETE_ITEM;
-    if (in_rect(x, y, 434, 3, 62, 18)) return GUI_TOP_DELETE_FILE;
+    uint32_t c = gui_monitor_effective_count();
+    for (uint32_t i = 0; i < c; i++) {
+        const gui_monitor_rect_t* m = gui_monitor_rect_by_index(i);
+        int ox;
+        if (!m || !in_rect(x, y, m->x, m->y, m->w, 24)) continue;
+        if (m->w < 520) return 0;
+        ox = m->x;
+        if (out_monitor) *out_monitor = (int)i;
+        if (in_rect(x, y, ox + 126, m->y + 3, 54, 18)) return GUI_TOP_NEW_FOLDER;
+        if (in_rect(x, y, ox + 186, m->y + 3, 52, 18)) return GUI_TOP_PIN_DESKTOP;
+        if (in_rect(x, y, ox + 244, m->y + 3, 52, 18)) return GUI_TOP_PIN_DOCK;
+        if (in_rect(x, y, ox + 302, m->y + 3, 62, 18)) return GUI_TOP_RENAME_ITEM;
+        if (in_rect(x, y, ox + 370, m->y + 3, 58, 18)) return GUI_TOP_DELETE_ITEM;
+        if (in_rect(x, y, ox + 434, m->y + 3, 62, 18)) return GUI_TOP_DELETE_FILE;
+        return 0;
+    }
+    if (out_monitor) *out_monitor = -1;
     return 0;
 }
 
-static void gui_draw_top_button(const fb_t* tgt, int x, const char* label, int w, int hot)
+static int gui_top_action_hit(int x, int y)
+{
+    return gui_top_action_hit_monitor(x, y, NULL);
+}
+
+static void gui_draw_top_button_at(const fb_t* tgt, int x, int y, const char* label, int w, int hot)
 {
     uint32_t bg = hot ? 0xFF235D64u : 0xFF1C2632u;
-    fb_fill_rect(tgt, (uint16_t)x, 3, (uint16_t)w, 18, bg);
-    fb_fill_rect(tgt, (uint16_t)x, 3, (uint16_t)w, 1, 0xFF5B6E78u);
-    fb_draw_text(tgt, (uint16_t)(x + 6), 9, label, 0xFFFFFFFFu, bg);
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)(y + 3), (uint16_t)w, 18, bg);
+    fb_fill_rect(tgt, (uint16_t)x, (uint16_t)(y + 3), (uint16_t)w, 1, 0xFF5B6E78u);
+    fb_draw_text(tgt, (uint16_t)(x + 6), (uint16_t)(y + 9), label, 0xFFFFFFFFu, bg);
 }
 
 static int gui_draw_ldi_icon_asset(const fb_t* tgt, const char* name,
@@ -3684,19 +4186,38 @@ static void gui_draw_launcher(const fb_t* tgt, const gui_item_t* item, int x, in
 
 static void gui_draw_desktop(const fb_t* tgt)
 {
-    int sw = (int)g_fb.w;
     int dock_x, dock_y, dock_w, dock_h, cell;
     gui_draw_wallpaper(tgt);
-    fb_fill_rect(tgt, 0, 0, g_fb.w, 24, 0xFF121821u);
-    fb_fill_rect(tgt, 0, 23, g_fb.w, 1, 0xFF2F8EA3u);
-    fb_draw_text(tgt, 10, 8, "LARDOS DESKTOP", 0xFFFFFFFFu, 0xFF121821u);
-    gui_draw_top_button(tgt, 126, "Folder", 54, gui_top_action_hit(g.mx, g.my) == GUI_TOP_NEW_FOLDER);
-    gui_draw_top_button(tgt, 186, "Pin", 52, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DESKTOP);
-    gui_draw_top_button(tgt, 244, "Dock", 52, gui_top_action_hit(g.mx, g.my) == GUI_TOP_PIN_DOCK);
-    gui_draw_top_button(tgt, 302, "Rename", 62, gui_top_action_hit(g.mx, g.my) == GUI_TOP_RENAME_ITEM);
-    gui_draw_top_button(tgt, 370, "Delete", 58, gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_ITEM);
-    gui_draw_top_button(tgt, 434, "File", 62, gui_top_action_hit(g.mx, g.my) == GUI_TOP_DELETE_FILE);
-    fb_draw_text(tgt, (uint16_t)(sw > 116 ? sw - 116 : 10), 8, LARDOS_VERSION, 0xFF9DEAE4u, 0xFF121821u);
+    for (uint32_t mi = 0; mi < gui_monitor_effective_count(); mi++) {
+        const gui_monitor_rect_t* m = gui_monitor_rect_by_index(mi);
+        char label[24];
+        int hot = gui_top_action_hit(g.mx, g.my);
+        uint32_t bar = mi == g_monitor_active ? 0xFF121821u : 0xFF101722u;
+        if (!m) continue;
+        snprintf(label, sizeof(label), "LARDOS M%u", mi + 1u);
+        fb_fill_rect(tgt, (uint16_t)m->x, (uint16_t)m->y, (uint16_t)m->w, 24, bar);
+        fb_fill_rect(tgt, (uint16_t)m->x, (uint16_t)(m->y + 23), (uint16_t)m->w, 1,
+                     mi == g_monitor_active ? 0xFF2F8EA3u : 0xFF30424Au);
+        if (gui_monitor_effective_count() > 1u && g_monitor_layout != GUI_MONITOR_LAYOUT_MIRROR) {
+            fb_fill_rect(tgt, (uint16_t)m->x, (uint16_t)m->y, (uint16_t)m->w, 1, 0xFF3A5968u);
+            fb_fill_rect(tgt, (uint16_t)m->x, (uint16_t)m->y, 1, (uint16_t)m->h, 0xFF3A5968u);
+            fb_fill_rect(tgt, (uint16_t)(m->x + m->w - 1), (uint16_t)m->y, 1, (uint16_t)m->h, 0xFF0B0D10u);
+            fb_fill_rect(tgt, (uint16_t)m->x, (uint16_t)(m->y + m->h - 1), (uint16_t)m->w, 1, 0xFF0B0D10u);
+        }
+        fb_draw_text(tgt, (uint16_t)(m->x + 10), (uint16_t)(m->y + 8), label, 0xFFFFFFFFu, bar);
+        if (m->w >= 520) {
+            gui_draw_top_button_at(tgt, m->x + 126, m->y, "Folder", 54, mi == g_monitor_active && hot == GUI_TOP_NEW_FOLDER);
+            gui_draw_top_button_at(tgt, m->x + 186, m->y, "Pin", 52, mi == g_monitor_active && hot == GUI_TOP_PIN_DESKTOP);
+            gui_draw_top_button_at(tgt, m->x + 244, m->y, "Dock", 52, mi == g_monitor_active && hot == GUI_TOP_PIN_DOCK);
+            gui_draw_top_button_at(tgt, m->x + 302, m->y, "Rename", 62, mi == g_monitor_active && hot == GUI_TOP_RENAME_ITEM);
+            gui_draw_top_button_at(tgt, m->x + 370, m->y, "Delete", 58, mi == g_monitor_active && hot == GUI_TOP_DELETE_ITEM);
+            gui_draw_top_button_at(tgt, m->x + 434, m->y, "File", 62, mi == g_monitor_active && hot == GUI_TOP_DELETE_FILE);
+        }
+        if (m->w > 116) {
+            fb_draw_text(tgt, (uint16_t)(m->x + m->w - 116), (uint16_t)(m->y + 8),
+                         LARDOS_VERSION, 0xFF9DEAE4u, bar);
+        }
+    }
 
     for (int i = 0; i < g_desktop_item_count; i++) {
         gui_item_t* item = &g_desktop_items[i];
@@ -3721,20 +4242,23 @@ static void gui_draw_desktop(const fb_t* tgt)
 
 static void gui_default_window_rect(int app, int* out_x, int* out_y, int* out_w, int* out_h)
 {
-    int sw = (int)g_fb.w;
-    int sh = (int)g_fb.h;
+    const gui_monitor_rect_t* mon = gui_monitor_active_rect();
+    int base_x = mon ? mon->x : 0;
+    int base_y = mon ? mon->y : 0;
+    int sw = mon ? mon->w : (int)g_fb.w;
+    int sh = mon ? mon->h : (int)g_fb.h;
     int w = sw >= 660 ? 640 : sw - 20;
     int h = sh >= 520 ? 420 : sh - 70;
     int x;
     int y;
     if (w < 240) w = sw > 8 ? sw - 8 : sw;
     if (h < 180) h = sh > 8 ? sh - 8 : sh;
-    x = (sw - w) / 2 + (app % 4) * 22 - 33;
-    y = 34 + (app % 5) * 18;
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x + w > sw) x = sw - w;
-    if (y + h > sh) y = sh - h;
+    x = base_x + (sw - w) / 2 + (app % 4) * 22 - 33;
+    y = base_y + 34 + (app % 5) * 18;
+    if (x < base_x) x = base_x;
+    if (y < base_y) y = base_y;
+    if (x + w > base_x + sw) x = base_x + sw - w;
+    if (y + h > base_y + sh) y = base_y + sh - h;
     if (out_x) *out_x = x;
     if (out_y) *out_y = y;
     if (out_w) *out_w = w;
@@ -5068,6 +5592,10 @@ void gui_handle_mouse(int dx, int dy, int buttons)
     if (g.my < 0) g.my = 0;
     if (g.mx > (int)g_fb.w - 1) g.mx = (int)g_fb.w - 1;
     if (g.my > (int)g_fb.h - 1) g.my = (int)g_fb.h - 1;
+    {
+        int mon = gui_monitor_index_for_point(g.mx, g.my);
+        if (mon >= 0) g_monitor_active = (uint32_t)mon;
+    }
 
     int l_down = (g.buttons & 0x1) != 0;
     int l_prev = (g.prev_buttons & 0x1) != 0;
@@ -5169,8 +5697,10 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             gui_clear_item_selection();
             if (hit_window != g.app_id) gui_select_app(hit_window);
         } else {
-            int action = gui_top_action_hit(g.mx, g.my);
+            int action_mon = -1;
+            int action = gui_top_action_hit_monitor(g.mx, g.my, &action_mon);
             int item = -1;
+            if (action_mon >= 0) g_monitor_active = (uint32_t)action_mon;
             if (action == GUI_TOP_NEW_FOLDER) {
                 gui_clear_item_selection();
                 (void)gui_desktop_add_folder();
@@ -6160,6 +6690,9 @@ int gui_post_check(gui_post_info_t* out)
         out->width = g_fb.w;
         out->height = g_fb.h;
         out->changed_samples = 0;
+        out->monitor_count = gui_monitor_effective_count();
+        out->monitor_active = g_monitor_active + 1u;
+        out->monitor_layout = g_monitor_layout;
         out->window_inside = (g.win_x >= 0 && g.win_y >= 0 &&
                               g.win_x + g.win_w <= (int)g_fb.w &&
                               g.win_y + g.win_h <= (int)g_fb.h);
@@ -6168,6 +6701,7 @@ int gui_post_check(gui_post_info_t* out)
         out->chrome_ok = (guioverlay_selftest() == 0 &&
                           g.win_w - 32 >= 160 &&
                           g.win_h >= 240);
+        out->monitor_layout_ok = gui_monitor_layout_rects_ok();
         uint32_t step_x = g_fb.w >= 64 ? (uint32_t)g_fb.w / 32u : 1u;
         uint32_t step_y = g_fb.h >= 64 ? (uint32_t)g_fb.h / 24u : 1u;
         if (step_x == 0) step_x = 1;

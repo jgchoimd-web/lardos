@@ -254,6 +254,18 @@ static const uint8_t wallpaper_init[] =
 static uint8_t ram_wallpaper_buf[WALLPAPER_CAP];
 static FsWritableFile ram_wallpaper = { "wallpaper.lardd", ram_wallpaper_buf, 0, WALLPAPER_CAP };
 
+#define MONITORS_CAP 512u
+static const uint8_t monitors_init[] =
+    "LARDD 1\n"
+    "TITLE LardOS Monitors\n"
+    "TEXT User-owned monitor layout. One detected framebuffer can be split into virtual monitors until real extra framebuffers are available.\n"
+    "COUNT 1\n"
+    "LAYOUT single\n"
+    "ACTIVE 1\n"
+    "END\n";
+static uint8_t ram_monitors_buf[MONITORS_CAP];
+static FsWritableFile ram_monitors = { "monitors.lardd", ram_monitors_buf, 0, MONITORS_CAP };
+
 #define DISPLAYFIX_CAP 1024u
 static const uint8_t displayfix_init[] =
     "SPFX 1\n"
@@ -538,6 +550,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use sram on or sram rect x y w h to turn quiet screen pixels into scratch RAM.\n"
     "li Use renderfx aa none/antianti/basic/nonlinear, renderfx brightness, renderfx resize stretch/live, renderfx lsb, renderfx vblank, and renderfx subpx for user-owned display filtering.\n"
     "li Use renderfx subpx use displayfix.spfx to apply per-region R/G/B subpixel defect correction from an editable script.\n"
+    "li Use monitor count 2, monitor layout hstack/vstack/grid/mirror, monitor active 1, and monitor move 2 for user-owned multi-monitor layout; monitors.lardd stores the editable policy.\n"
     "li Use wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, wallpaper bmp sample.bmp, or wallpaper lrec screenrec.lrec to set the desktop background from user-owned state.\n"
     "li Use sound status, sound on/off, sound boot on/off, sound fx on/off, sound play boot.lsnd, and sound new file.lsnd for native vector LSND sounds.\n"
     "li Use Ctrl+Y, Ctrl+P, Ctrl+Space then 1..9/0, or megaclip status/list/mode/push/file/pull/write for the 10-slot MegaClipboard.\n"
@@ -664,6 +677,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.92.1p makes HTTPS visible with webstack tls, LardTLS info, and POST/selftest TLS checks while preserving all v1.92 methods.\n"
     "li v1.92.0b expands HTTP/HTTPS to GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS without external web libraries.\n"
     "li v1.91.1p hotpatches GUI resize hit-testing so only the visible bottom-right grip starts window resizing.\n"
+    "li v2.8.0b adds user-owned multi-monitor layout with monitor commands, monitors.lardd, virtual split/mirror modes, and monitor-local fullscreen.\n"
     "li v2.7.0b adds HC for shell .hc files and LANG HC in RXE/SYSRXE executables without replacing LANG C.\n"
     "li v2.6.0b adds native LSND vector sound files plus boot/effect sound toggles through sound.lardd.\n"
     "li v2.5.0b adds native LREC video wallpaper through wallpaper lrec file.lrec while preserving BMP, pattern, and editable wallpaper.lardd state.\n"
@@ -727,6 +741,9 @@ static const uint8_t file_lardos_lars[] =
     "cmd cfgsh status\n"
     "cmd cfg ltheme night\n"
     "cmd cfg http 7\n"
+    "cmd monitor status\n"
+    "cmd monitor layout hstack\n"
+    "cmd monitor move 2\n"
     "cmd buddy joke\n"
     "cmd lguilib show default.lguilib\n"
     "cmd time\n"
@@ -1545,6 +1562,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable userlaw.lardd\n"
     "CHECK writable glyphmap.lardd\n"
     "CHECK writable wallpaper.lardd\n"
+    "CHECK writable monitors.lardd\n"
     "CHECK writable sound.lardd\n"
     "CHECK writable usersound.lsnd\n"
     "CHECK writable megaclip.lardd\n"
@@ -1556,6 +1574,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command glyph\n"
     "CHECK command wallpaper\n"
     "CHECK command sound\n"
+    "CHECK command monitor\n"
     "CHECK command cursor\n"
     "CHECK command vm\n"
     "CHECK command hc\n"
@@ -2451,7 +2470,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 44u;
+    return 47u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2500,8 +2519,9 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 41) return &ram_screenshot;
     if (idx == 42) return &ram_screenrec;
     if (idx == 43) return &ram_screencap;
-    if (idx == 44) return &ram_sound_cfg;
-    if (idx == 45) return &ram_usersound;
+    if (idx == 44) return &ram_monitors;
+    if (idx == 45) return &ram_sound_cfg;
+    if (idx == 46) return &ram_usersound;
     return NULL;
 }
 
@@ -2584,6 +2604,10 @@ void fs_init(void)
         ram_wallpaper_buf[i] = wallpaper_init[i];
     }
     ram_wallpaper.size = sizeof(wallpaper_init) - 1;
+    for (uint32_t i = 0; i < sizeof(monitors_init) - 1 && i < MONITORS_CAP; i++) {
+        ram_monitors_buf[i] = monitors_init[i];
+    }
+    ram_monitors.size = sizeof(monitors_init) - 1;
     for (uint32_t i = 0; i < sizeof(displayfix_init) - 1 && i < DISPLAYFIX_CAP; i++) {
         ram_displayfix_buf[i] = displayfix_init[i];
     }

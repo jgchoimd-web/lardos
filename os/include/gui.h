@@ -50,6 +50,12 @@ void gui_reload_sysrxe_apps(void);
 #define GUI_WALLPAPER_LREC 5
 #define GUI_WALLPAPER_NAME_MAX 31u
 #define GUI_SUBPX_SCRIPT_NAME_MAX 31u
+#define GUI_MONITOR_MAX 4u
+#define GUI_MONITOR_LAYOUT_SINGLE 0u
+#define GUI_MONITOR_LAYOUT_HSTACK 1u
+#define GUI_MONITOR_LAYOUT_VSTACK 2u
+#define GUI_MONITOR_LAYOUT_GRID 3u
+#define GUI_MONITOR_LAYOUT_MIRROR 4u
 
 typedef struct {
     uint32_t aa_mode;
@@ -131,15 +137,46 @@ typedef struct {
     uint32_t width;
     uint32_t height;
     uint32_t changed_samples;
+    uint32_t monitor_count;
+    uint32_t monitor_active;
+    uint32_t monitor_layout;
     int window_inside;
     int response_view_ok;
     int chrome_ok;
+    int monitor_layout_ok;
 } gui_post_info_t;
 
 /* POST-visible screen sanity checks. Returns 0 when a framebuffer is present. */
 int gui_post_check(gui_post_info_t* out);
 int gui_img_glyph_interaction_selftest(void);
 int gui_desktop_interaction_selftest(void);
+
+typedef struct {
+    uint32_t enabled;
+    uint32_t count;
+    uint32_t active;
+    uint32_t layout;
+    uint32_t detected_framebuffers;
+    uint32_t virtualized;
+    uint32_t desktop_w;
+    uint32_t desktop_h;
+    uint32_t x[GUI_MONITOR_MAX];
+    uint32_t y[GUI_MONITOR_MAX];
+    uint32_t w[GUI_MONITOR_MAX];
+    uint32_t h[GUI_MONITOR_MAX];
+    uint32_t last_error;
+} gui_monitor_info_t;
+
+const char* gui_monitor_layout_name_for(uint32_t layout);
+int gui_monitor_set_count(uint32_t count);
+int gui_monitor_set_layout(uint32_t layout);
+int gui_monitor_set_active(uint32_t id);
+int gui_monitor_move_active_window(uint32_t id);
+int gui_monitor_load_config_file(const char* file);
+int gui_monitor_reload(void);
+int gui_monitor_save(void);
+void gui_monitor_info(gui_monitor_info_t* out);
+int gui_monitor_selftest(void);
 
 typedef struct {
     uint32_t enabled;

@@ -25,6 +25,7 @@ typedef enum {
     PS2K_CTRL_Y,
     PS2K_CTRL_P,
     PS2K_CTRL_SPACE,
+    PS2K_CTRL_H,
 } ps2_key_kind_t;
 
 typedef struct {

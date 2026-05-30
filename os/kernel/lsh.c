@@ -97,6 +97,7 @@ static int cfgsh_is_status_word(const char* value);
 static int cfgsh_bool_value(const char* value, int* out);
 static int ascii_streq_ci(const char* a, const char* b);
 static void out_append_char(char c);
+static const char* lsh_canonical_command(const char* raw, char* out, uint32_t out_cap);
 
 static const char* env_get(const char* name)
 {
@@ -370,13 +371,52 @@ static int ascii_prefix_ci(const char* s, const char* pfx)
 }
 
 typedef struct {
+    const char* alias;
+    const char* command;
+} lsh_command_alias_t;
+
+static const lsh_command_alias_t s_lsh_command_aliases[] = {
+    { "도움말", "help" }, { "도움", "help" }, { "명령어", "help" },
+    { "상태", "status" }, { "값", "values" }, { "가치관", "values" },
+    { "버전", "ver" }, { "릴리스", "release" },
+    { "시간", "time" }, { "날짜", "date" }, { "음력", "lunar" }, { "단군", "dangun" },
+    { "목록", "dir" }, { "파일목록", "dir" }, { "읽기", "type" }, { "보기", "type" },
+    { "더보기", "more" }, { "쓰기", "write" }, { "추가", "append" },
+    { "복사", "copy" }, { "이름변경", "ren" }, { "이름바꾸기", "ren" },
+    { "삭제", "del" }, { "복구", "restore" }, { "동기화", "sync" },
+    { "종료", "bye" }, { "전원끄기", "bye" }, { "재시작", "restart" }, { "다시시작", "restart" },
+    { "설정", "cfgsh" }, { "설정쉘", "cfgsh" }, { "한글", "hangul" }, { "한국어", "hangul" },
+    { "스크린샷", "screenshot" }, { "녹화", "screenrec" }, { "소리", "sound" },
+    { "배경화면", "wallpaper" }, { "벽지", "wallpaper" }, { "모니터", "monitor" },
+    { "렌더", "renderfx" }, { "커서", "cursor" }, { "글리프", "glyph" },
+    { "클립보드", "megaclip" }, { "고정클립", "pinclip" }, { "연결", "lconnect" },
+    { "마법", "magic" }, { "매직", "magic" },
+};
+
+static const char* lsh_canonical_command(const char* raw, char* out, uint32_t out_cap)
+{
+    uint32_t i = 0;
+    if (!raw) raw = "";
+    if (!out || out_cap == 0) return raw;
+    while (raw[i] && i + 1u < out_cap) {
+        out[i] = ascii_lower_char(raw[i]);
+        i++;
+    }
+    out[i] = '\0';
+    for (uint32_t a = 0; a < sizeof(s_lsh_command_aliases) / sizeof(s_lsh_command_aliases[0]); a++) {
+        if (strcmp(out, s_lsh_command_aliases[a].alias) == 0) return s_lsh_command_aliases[a].command;
+    }
+    return out;
+}
+
+typedef struct {
     const char* name;
     uint8_t magic_safe;
 } magic_cmd_entry_t;
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
-    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
+    { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "hangul", 1 }, { "korean", 1 }, { "ime", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "hc", 1 }, { "holyc", 1 }, { "lardhc", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "monitor", 1 }, { "monitors", 1 }, { "display", 1 }, { "multimon", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
@@ -575,8 +615,10 @@ static void cmd_magic(const char* args)
             out_append("Usage: magic dryrun [-f] command [args]\n");
             return;
         }
-        const magic_cmd_entry_t* exact_dry = magic_find_exact(dry);
-        const magic_cmd_entry_t* pick_dry = exact_dry ? exact_dry : magic_predict(dry, dry_force);
+        char dry_canon_buf[64];
+        const char* dry_canon = lsh_canonical_command(dry, dry_canon_buf, sizeof(dry_canon_buf));
+        const magic_cmd_entry_t* exact_dry = magic_find_exact(dry_canon);
+        const magic_cmd_entry_t* pick_dry = exact_dry ? exact_dry : magic_predict(dry_canon, dry_force);
         if (!pick_dry || (!pick_dry->magic_safe && !dry_force)) {
             lardkit_magic_record(dry, pick_dry ? pick_dry->name : "", 0,
                                  pick_dry ? "dryrun found raw-control; add -f to force" : "dryrun found no safe executable prediction");
@@ -591,15 +633,17 @@ static void cmd_magic(const char* args)
                              exact_dry ? "dryrun exact safe command" : "dryrun edit-distance safe command prediction");
         out_append("magic dryrun: ");
         out_append(dry);
-        if (!magic_cmd_equals(dry, pick_dry->name)) {
+        if (!magic_cmd_equals(dry_canon, pick_dry->name)) {
             out_append(" -> ");
             out_append(pick_dry->name);
         }
         out_append(dry_force && !pick_dry->magic_safe ? " (force; not executed)\n" : " (not executed)\n");
         return;
     }
-    const magic_cmd_entry_t* exact = magic_find_exact(cmd);
-    const magic_cmd_entry_t* pick = exact ? exact : magic_predict(cmd, force);
+    char cmd_canon_buf[64];
+    const char* cmd_canon = lsh_canonical_command(cmd, cmd_canon_buf, sizeof(cmd_canon_buf));
+    const magic_cmd_entry_t* exact = magic_find_exact(cmd_canon);
+    const magic_cmd_entry_t* pick = exact ? exact : magic_predict(cmd_canon, force);
     if (!pick) {
         lardkit_magic_record(cmd, "", 0, "no confident safe command match");
         out_append("magic: no confident command match for ");
@@ -618,7 +662,7 @@ static void cmd_magic(const char* args)
     }
     out_append(force ? "magic -f: " : "magic: ");
     out_append(cmd);
-    if (!magic_cmd_equals(cmd, pick->name)) {
+    if (!magic_cmd_equals(cmd_canon, pick->name)) {
         out_append(" -> ");
         out_append(pick->name);
     }
@@ -2966,7 +3010,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -3012,6 +3056,7 @@ static void cmd_help(const char* args)
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
     out_append("  renderfx status|aa|brightness|resize|lsb|vblank|subpx|test  user-owned render modes\n");
+    out_append("  hangul on|off|toggle|status     UTF-8 Korean aliases and optional 2-beolsik GUI input (Ctrl+H)\n");
     out_append("  fstwt show|sample|clear|test      live .fstwts path translator/virtual-FS scripts\n");
     out_append("  oschat say|send|read            local OSLink chat-style messages\n");
     out_append("  larsview open|reload|back|actions file  native LARS/LARDD browser state\n");
@@ -3038,6 +3083,45 @@ static void cmd_help(const char* args)
     out_append("  restart|reboot      sync RAM files, then request firmware/VM restart\n");
     out_append("  sum exitsum peek addr [len] poke addr value [8|16|32] asm_ ...\n");
     out_append("Tips: _: merged, X: main, Y: floppy, Z: aux, A: extra, R: RAM.\n");
+    out_append("Commands are ASCII case-insensitive; Korean aliases include 도움말, 상태, 목록, 읽기, 한글.\n");
+}
+
+static void cmd_hangul(const char* args)
+{
+    const char* p = args ? args : "";
+    char sub[24];
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "show")) {
+        out_append("Hangul/English command support: ON\n");
+        out_append("ASCII command names ignore case. Korean aliases are UTF-8, e.g. 도움말, 상태, 목록, 읽기, 한글.\n");
+        out_append("GUI Hangul input: ");
+        out_append(gui_hangul_input_enabled() ? "ON" : "OFF");
+        out_append(" (toggle with Ctrl+H or hangul on/off)\n");
+        out_append("Input layout: 2-beolsik keys, stored as UTF-8, rendered with native Hangul cells/failsafe fallback.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "on") || strcmp(sub, "켜기") == 0 || strcmp(sub, "켬") == 0) {
+        gui_hangul_input_set(1);
+        out_append("Hangul GUI input ON. Ctrl+H toggles it.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "off") || strcmp(sub, "끄기") == 0 || strcmp(sub, "끔") == 0) {
+        gui_hangul_input_set(0);
+        out_append("Hangul GUI input OFF. English input unchanged.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "toggle") || ascii_streq_ci(sub, "switch")) {
+        int on = gui_hangul_input_toggle();
+        out_append("Hangul GUI input ");
+        out_append(on ? "ON" : "OFF");
+        out_append(".\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(gui_hangul_selftest() == 0 ? "hangul: selftest OK\n" : "hangul: selftest failed\n");
+        return;
+    }
+    out_append("Usage: hangul on|off|toggle|status|test\n");
 }
 
 static void cmd_control(const char* args)
@@ -12553,6 +12637,23 @@ int lsh_output_selftest(void)
     return ok ? 0 : -1;
 }
 
+int lsh_language_selftest(void)
+{
+    char buf[64];
+    const char* c;
+    c = lsh_canonical_command("HELP", buf, sizeof(buf));
+    if (strcmp(c, "help") != 0) return -1;
+    c = lsh_canonical_command("StAtUs", buf, sizeof(buf));
+    if (strcmp(c, "status") != 0) return -2;
+    c = lsh_canonical_command("도움말", buf, sizeof(buf));
+    if (strcmp(c, "help") != 0) return -3;
+    c = lsh_canonical_command("목록", buf, sizeof(buf));
+    if (strcmp(c, "dir") != 0) return -4;
+    c = lsh_canonical_command("한글", buf, sizeof(buf));
+    if (strcmp(c, "hangul") != 0) return -5;
+    return 0;
+}
+
 static int run_lsh_cmd(const char* name, const char* argv)
 {
     (void)argv;
@@ -12596,6 +12697,9 @@ static int run_lsh_cmd(const char* name, const char* argv)
 static void parse_and_run(const char* cmd, const char* args)
 {
     if (!cmd || !cmd[0]) return;
+    const char* raw_cmd = cmd;
+    char canon_cmd[64];
+    cmd = lsh_canonical_command(raw_cmd, canon_cmd, sizeof(canon_cmd));
     lardkit_trace_event("shell", cmd, 0);
     if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) lardkit_trace_event("kmodtalk", cmd, 0);
@@ -12690,6 +12794,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "exitcfg") == 0) { s_cfgsh_mode = 0; out_append("CFGSH OFF.\n"); return; }
     if (strcmp(cmd, "buddy") == 0 || strcmp(cmd, "assistant") == 0 || strcmp(cmd, "lardbuddy") == 0) { cmd_buddy(args); return; }
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
+    if (strcmp(cmd, "hangul") == 0 || strcmp(cmd, "korean") == 0 || strcmp(cmd, "ime") == 0) { cmd_hangul(args); return; }
     if (strcmp(cmd, "vm") == 0 || strcmp(cmd, "vms") == 0) { cmd_vm(args); return; }
     if (strcmp(cmd, "lss") == 0 || strcmp(cmd, "shrine") == 0 || strcmp(cmd, "srine") == 0) { cmd_lss(args); return; }
     if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
@@ -12779,6 +12884,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "fstwt") == 0 || strcmp(cmd, "fstwts") == 0) { cmd_fstwt(args); return; }
     if (strcmp(cmd, "vpath") == 0 || strcmp(cmd, "pathmap") == 0) { cmd_vpath(args); return; }
     if (strcmp(cmd, "bleed") == 0) { cmd_bleed(args); return; }
+    if (strcmp(cmd, "del") == 0 || strcmp(cmd, "erase") == 0) { dos_delete(args); return; }
+    if (strcmp(cmd, "restore") == 0 || strcmp(cmd, "undelete") == 0) { dos_restore(args); return; }
     if (strcmp(cmd, "ren") == 0 || strcmp(cmd, "rename") == 0) { cmd_rename(args); return; }
     if (strcmp(cmd, "copy") == 0 || strcmp(cmd, "cp") == 0) { cmd_copy(args); return; }
     if (strcmp(cmd, "write") == 0) { cmd_write(args); return; }
@@ -12857,6 +12964,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] >= 'a' && cmd[0] <= 'z' && cmd[1] == ':' && cmd[2] == '\0') { s_drive = (char)(cmd[0] - 32); return; }
 
     if (run_lsh_cmd(cmd, args)) return;
+    if (!magic_cmd_equals(raw_cmd, cmd) && run_lsh_cmd(raw_cmd, args)) return;
     {
         char reply[KMODTALK_REPLY_MAX];
         int r = kmo_run_command(cmd, args, reply, sizeof(reply));
@@ -12867,9 +12975,19 @@ static void parse_and_run(const char* cmd, const char* args)
             }
             return;
         }
+        if (!magic_cmd_equals(raw_cmd, cmd)) {
+            r = kmo_run_command(raw_cmd, args, reply, sizeof(reply));
+            if (r != -2) {
+                if (reply[0]) {
+                    out_append(reply);
+                    out_append("\n");
+                }
+                return;
+            }
+        }
     }
     out_append("Unknown command: ");
-    out_append(cmd);
+    out_append(raw_cmd);
     out_append("\n");
 }
 

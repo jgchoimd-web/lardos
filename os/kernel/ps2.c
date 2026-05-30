@@ -296,6 +296,12 @@ int ps2_kbd_poll(ps2_key_t* out)
             ext = 0;
             return 0;
         }
+        if (code == 0x23) {
+            out->kind = PS2K_CTRL_H;
+            out->ch = 0;
+            ext = 0;
+            return 0;
+        }
     }
 
     if (code == 0x44) {

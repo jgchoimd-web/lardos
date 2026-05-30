@@ -52,6 +52,17 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.9.0b-mirage` adds language/input support without removing existing command
+forms. Shell command names are ASCII case-insensitive, so `HELP`, `Help`,
+`DIR`, and `Status` resolve like their lower-case forms. LSH also accepts
+Korean UTF-8 command aliases such as `도움말`, `상태`, `목록`, `읽기`,
+`쓰기`, `복사`, `삭제`, `종료`, `재시작`, `설정`, and `한글`. `hangul
+on|off|toggle|status` and Ctrl+H control an optional 2-beolsik GUI Hangul input
+mode that stores text as UTF-8. GUI editors now paste high-bit UTF-8 text, delete
+whole codepoints, place the caret by visible cells, render Hangul syllables and
+compatibility jamo natively, and still use the grayscale Unicode barcode
+failsafe for characters LardOS cannot draw yet.
+
 `v2.8.2p-mirage` hotpatches the Lard Shell output buffer so long command
 output, especially `help`, keeps the newest lines instead of filling the
 buffer and making later commands appear unusable. When old shell output must be

@@ -265,6 +265,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("sound: vector LSND parser", lsound_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: clickable image glyphs", gui_img_glyph_interaction_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: unicode cursor slot", gui_unicode_cursor_selftest() == 0, emit, user, &pass, &fail);
+    post_check("gui: hangul input/render", gui_hangul_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: desktop interactions", gui_desktop_interaction_selftest() == 0, emit, user, &pass, &fail);
     post_check("kit: user feature suite", lardkit_selftest() == 0, emit, user, &pass, &fail);
     post_check("gui: lard buddy assistant", lassist_selftest() == 0, emit, user, &pass, &fail);
@@ -278,6 +279,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lsh: settings shell grammar", lsh_cfgsh_selftest() == 0, emit, user, &pass, &fail);
     post_check("lsh: DOS mode aliases", lsh_dosmode_selftest() == 0, emit, user, &pass, &fail);
     post_check("lsh: output rollover", lsh_output_selftest() == 0, emit, user, &pass, &fail);
+    post_check("lsh: case and Korean aliases", lsh_language_selftest() == 0, emit, user, &pass, &fail);
     post_check("bootprof: profile flags", bootprof_selftest() == 0, emit, user, &pass, &fail);
     post_check("awake: background boot tracker", awake_selftest() == 0, emit, user, &pass, &fail);
     post_check("crashlog: writable log", crashlog_selftest() == 0, emit, user, &pass, &fail);

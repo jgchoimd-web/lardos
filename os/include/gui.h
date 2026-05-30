@@ -11,6 +11,10 @@ void gui_render(void);
 void gui_activity(void);  /* reset idle timer (call on mouse/key) */
 int gui_screensaver_active(void);  /* 1 if screensaver is showing */
 void gui_demo(void);
+void gui_hangul_input_set(int on);
+int gui_hangul_input_enabled(void);
+int gui_hangul_input_toggle(void);
+int gui_hangul_selftest(void);
 
 // GUI -> kernel integration for "fetch" demo
 #define GUI_HTTP_URL_MAX 256u

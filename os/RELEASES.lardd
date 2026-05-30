@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.9.0b-mirage
+ITEM Adds ASCII case-insensitive shell command dispatch so HELP, Help, hElP, DIR, Status, and other English command forms work without changing the command's meaning.
+ITEM Adds Korean UTF-8 shell aliases such as 도움말, 상태, 목록, 읽기, 쓰기, 복사, 이름변경, 삭제, 종료, 재시작, 설정, 한글, 배경화면, 모니터, 커서, 클립보드, and 연결.
+ITEM Adds hangul on/off/toggle/status/test plus Ctrl+H to enable an optional 2-beolsik GUI Hangul input path that stores Korean text as UTF-8.
+ITEM Makes GUI editing more UTF-8 aware by inserting/pasting high-bit text bytes, deleting whole UTF-8 codepoints, and placing the caret by visible cells instead of raw bytes.
+ITEM Adds native Hangul syllable and compatibility-jamo cell rendering before falling back to the existing grayscale Unicode barcode failsafe.
+ITEM Adds POST/selftest coverage for shell case/Korean aliases and Hangul input/render primitives.
+ITEM Ships as beta because this expands language/input behavior while preserving existing English commands, custom command files, GUI apps, RXE/SYSRXE, and user-control values.
+
 SECTION v2.8.2p-mirage
 ITEM Hotpatches Lard Shell output rollover so help and other long command output cannot permanently fill the visible shell buffer.
 ITEM Keeps the newest shell lines when old output must be trimmed, leaves a visible trim notice, and preserves cls as the user-owned clear command.

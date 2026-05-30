@@ -62,3 +62,6 @@ int lsh_dosmode_selftest(void);
 
 /* Non-mutating output rollover selftest for long help text. */
 int lsh_output_selftest(void);
+
+/* Non-mutating command language selftest for ASCII case and Korean aliases. */
+int lsh_language_selftest(void);

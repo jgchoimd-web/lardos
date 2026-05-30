@@ -424,12 +424,21 @@ typedef struct {
     int selected_area; /* 0=none, 1=desktop, 2=dock */
     int selected_index;
     int megaclip_pull_wait;
+    int hangul_input;
+    int hangul_active;
+    int hangul_l;
+    int hangul_v;
+    int hangul_t;
+    uint32_t hangul_start;
+    uint32_t hangul_len;
 } gui_state_t;
 
 #define SS_IDLE_THRESHOLD  120
 #define SS_IDLE_LOOP_DIVIDER 500000u
 
 static gui_state_t g;
+
+static void gui_hangul_compose_clear(void);
 
 const char* gui_http_method_name_for(int method)
 {
@@ -1017,10 +1026,119 @@ static void fb_draw_unicode_failsafe(const fb_t* f, uint16_t x, uint16_t y, uint
     }
 }
 
+static void fb_hangul_hline(const fb_t* f, uint16_t x, uint16_t y, uint16_t x0, uint16_t x1, uint16_t yy, uint32_t fg)
+{
+    if (x1 < x0) return;
+    for (uint16_t px = x0; px <= x1; px++) fb_putpixel(f, (uint16_t)(x + px), (uint16_t)(y + yy), fg);
+}
+
+static void fb_hangul_vline(const fb_t* f, uint16_t x, uint16_t y, uint16_t xx, uint16_t y0, uint16_t y1, uint32_t fg)
+{
+    if (y1 < y0) return;
+    for (uint16_t py = y0; py <= y1; py++) fb_putpixel(f, (uint16_t)(x + xx), (uint16_t)(y + py), fg);
+}
+
+static void fb_hangul_diag(const fb_t* f, uint16_t x, uint16_t y, uint16_t x0, uint16_t y0, int dx, int dy, uint16_t n, uint32_t fg)
+{
+    int px = (int)x0;
+    int py = (int)y0;
+    for (uint16_t i = 0; i < n; i++) {
+        if (px >= 0 && px < 8 && py >= 0 && py < 8) fb_putpixel(f, (uint16_t)(x + px), (uint16_t)(y + py), fg);
+        px += dx;
+        py += dy;
+    }
+}
+
+static void fb_draw_hangul_consonant(const fb_t* f, uint16_t x, uint16_t y, int l, uint32_t fg)
+{
+    switch (l) {
+    case 0: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_vline(f,x,y,5,1,5,fg); break;              /* ㄱ */
+    case 1: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_vline(f,x,y,5,1,5,fg); break;
+    case 2: fb_hangul_vline(f,x,y,1,1,5,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;              /* ㄴ */
+    case 3: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_vline(f,x,y,1,1,5,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;
+    case 4: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_vline(f,x,y,1,1,5,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;
+    case 5: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_vline(f,x,y,5,1,3,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_vline(f,x,y,1,3,5,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;
+    case 6: fb_hangul_vline(f,x,y,1,1,5,fg); fb_hangul_vline(f,x,y,5,1,5,fg); fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;
+    case 7: fb_hangul_vline(f,x,y,1,1,5,fg); fb_hangul_vline(f,x,y,5,1,5,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;
+    case 8: fb_hangul_vline(f,x,y,1,1,5,fg); fb_hangul_vline(f,x,y,5,1,5,fg); fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;
+    case 9: fb_hangul_diag(f,x,y,3,1,-1,1,4,fg); fb_hangul_diag(f,x,y,3,1,1,1,4,fg); break;
+    case 10: fb_hangul_diag(f,x,y,2,1,-1,1,4,fg); fb_hangul_diag(f,x,y,4,1,1,1,4,fg); fb_hangul_hline(f,x,y,2,4,1,fg); break;
+    case 11: fb_hangul_hline(f,x,y,2,4,1,fg); fb_hangul_hline(f,x,y,1,5,5,fg); fb_hangul_vline(f,x,y,1,2,4,fg); fb_hangul_vline(f,x,y,5,2,4,fg); break;
+    case 12: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_diag(f,x,y,3,2,-1,1,3,fg); fb_hangul_diag(f,x,y,3,2,1,1,3,fg); break;
+    case 13: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_hline(f,x,y,1,5,2,fg); fb_hangul_diag(f,x,y,3,3,-1,1,3,fg); fb_hangul_diag(f,x,y,3,3,1,1,3,fg); break;
+    case 14: fb_hangul_hline(f,x,y,2,4,1,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_diag(f,x,y,3,3,-1,1,3,fg); fb_hangul_diag(f,x,y,3,3,1,1,3,fg); break;
+    case 15: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_hline(f,x,y,2,5,3,fg); fb_hangul_vline(f,x,y,5,1,5,fg); break;
+    case 16: fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_vline(f,x,y,1,1,5,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;
+    case 17: fb_hangul_vline(f,x,y,1,1,5,fg); fb_hangul_vline(f,x,y,5,1,5,fg); fb_hangul_hline(f,x,y,1,5,1,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_hline(f,x,y,1,5,5,fg); break;
+    default: fb_hangul_hline(f,x,y,2,4,1,fg); fb_hangul_hline(f,x,y,1,5,3,fg); fb_hangul_hline(f,x,y,1,5,6,fg); fb_hangul_vline(f,x,y,1,4,5,fg); fb_hangul_vline(f,x,y,5,4,5,fg); break;
+    }
+}
+
+static void fb_draw_hangul_vowel(const fb_t* f, uint16_t x, uint16_t y, int v, uint32_t fg)
+{
+    switch (v) {
+    case 0: fb_hangul_vline(f,x,y,5,1,6,fg); fb_hangul_hline(f,x,y,5,7,3,fg); break;
+    case 1: fb_hangul_vline(f,x,y,4,1,6,fg); fb_hangul_vline(f,x,y,6,1,6,fg); fb_hangul_hline(f,x,y,6,7,3,fg); break;
+    case 2: fb_hangul_vline(f,x,y,5,1,6,fg); fb_hangul_hline(f,x,y,5,7,2,fg); fb_hangul_hline(f,x,y,5,7,4,fg); break;
+    case 3: fb_hangul_vline(f,x,y,4,1,6,fg); fb_hangul_vline(f,x,y,6,1,6,fg); fb_hangul_hline(f,x,y,6,7,2,fg); fb_hangul_hline(f,x,y,6,7,4,fg); break;
+    case 4: fb_hangul_vline(f,x,y,5,1,6,fg); fb_hangul_hline(f,x,y,3,5,3,fg); break;
+    case 5: fb_hangul_vline(f,x,y,4,1,6,fg); fb_hangul_vline(f,x,y,6,1,6,fg); fb_hangul_hline(f,x,y,3,4,3,fg); break;
+    case 6: fb_hangul_vline(f,x,y,5,1,6,fg); fb_hangul_hline(f,x,y,3,5,2,fg); fb_hangul_hline(f,x,y,3,5,4,fg); break;
+    case 7: fb_hangul_vline(f,x,y,4,1,6,fg); fb_hangul_vline(f,x,y,6,1,6,fg); fb_hangul_hline(f,x,y,3,4,2,fg); fb_hangul_hline(f,x,y,3,4,4,fg); break;
+    case 8: fb_hangul_hline(f,x,y,1,6,5,fg); fb_hangul_vline(f,x,y,3,2,5,fg); break;
+    case 12: fb_hangul_hline(f,x,y,1,6,5,fg); fb_hangul_vline(f,x,y,2,2,5,fg); fb_hangul_vline(f,x,y,5,2,5,fg); break;
+    case 13: fb_hangul_hline(f,x,y,1,6,2,fg); fb_hangul_vline(f,x,y,3,2,6,fg); break;
+    case 17: fb_hangul_hline(f,x,y,1,6,2,fg); fb_hangul_vline(f,x,y,2,2,6,fg); fb_hangul_vline(f,x,y,5,2,6,fg); break;
+    case 18: fb_hangul_hline(f,x,y,1,6,5,fg); break;
+    case 20: fb_hangul_vline(f,x,y,4,1,6,fg); break;
+    default: fb_draw_hangul_vowel(f,x,y,(v >= 9 && v <= 11) ? 8 : (v >= 14 && v <= 16) ? 13 : 18,fg); fb_draw_hangul_vowel(f,x,y,20,fg); break;
+    }
+}
+
+static int hangul_l_from_compat(uint32_t cp)
+{
+    static const uint32_t cps[19] = {0x3131,0x3132,0x3134,0x3137,0x3138,0x3139,0x3141,0x3142,0x3143,0x3145,0x3146,0x3147,0x3148,0x3149,0x314A,0x314B,0x314C,0x314D,0x314E};
+    for (int i = 0; i < 19; i++) if (cps[i] == cp) return i;
+    return -1;
+}
+
+static int hangul_v_from_compat(uint32_t cp)
+{
+    if (cp >= 0x314Fu && cp <= 0x3163u) return (int)(cp - 0x314Fu);
+    return -1;
+}
+
+static void fb_draw_hangul_cell(const fb_t* f, uint16_t x, uint16_t y, uint32_t cp, uint32_t fg, uint32_t bg)
+{
+    for (uint16_t yy = 0; yy < 8; yy++)
+        for (uint16_t xx = 0; xx < 8; xx++)
+            fb_putpixel(f, (uint16_t)(x + xx), (uint16_t)(y + yy), bg);
+    if (cp >= 0xAC00u && cp <= 0xD7A3u) {
+        uint32_t s = cp - 0xAC00u;
+        int l = (int)(s / 588u);
+        int v = (int)((s % 588u) / 28u);
+        int t = (int)(s % 28u);
+        fb_draw_hangul_consonant(f, x, y, l, fg);
+        fb_draw_hangul_vowel(f, x, y, v, fg);
+        if (t) {
+            static const int t_to_l[28] = {-1,0,1,9,2,12,18,3,5,0,6,7,9,16,17,18,6,7,9,9,10,11,12,14,15,16,17,18};
+            fb_hangul_hline(f, x, y, 1, 6, 7, fg);
+            fb_draw_hangul_consonant(f, x, y, t_to_l[t], fg);
+        }
+        return;
+    }
+    int l = hangul_l_from_compat(cp);
+    if (l >= 0) { fb_draw_hangul_consonant(f, x, y, l, fg); return; }
+    int v = hangul_v_from_compat(cp);
+    if (v >= 0) { fb_draw_hangul_vowel(f, x, y, v, fg); return; }
+}
+
 static void fb_draw_codepoint_cell(const fb_t* f, uint16_t x, uint16_t y, uint32_t cp, uint32_t fg, uint32_t bg)
 {
     if (cp >= 32u && cp <= 126u) {
         fb_draw_char(f, x, y, (char)cp, fg, bg);
+    } else if ((cp >= 0xAC00u && cp <= 0xD7A3u) || (cp >= 0x3131u && cp <= 0x3163u)) {
+        fb_draw_hangul_cell(f, x, y, cp, fg, bg);
     } else {
         fb_draw_unicode_failsafe(f, x, y, cp, bg);
     }
@@ -2206,6 +2324,8 @@ int gui_init(void)
     g.item_drag_orig_y = 0;
     g.selected_area = 0;
     g.selected_index = -1;
+    g.hangul_input = 0;
+    gui_hangul_compose_clear();
     g.lafillo_extracted[0] = '\0';
 
     // Default URL
@@ -6258,6 +6378,326 @@ static int gui_active_edit_buffer(char** out_buf, uint32_t** out_len, uint32_t**
     return 1;
 }
 
+static void gui_hangul_compose_clear(void)
+{
+    g.hangul_active = 0;
+    g.hangul_l = -1;
+    g.hangul_v = -1;
+    g.hangul_t = 0;
+    g.hangul_start = 0;
+    g.hangul_len = 0;
+}
+
+void gui_hangul_input_set(int on)
+{
+    g.hangul_input = on ? 1 : 0;
+    gui_hangul_compose_clear();
+}
+
+int gui_hangul_input_enabled(void)
+{
+    return g.hangul_input;
+}
+
+int gui_hangul_input_toggle(void)
+{
+    gui_hangul_input_set(!g.hangul_input);
+    return g.hangul_input;
+}
+
+static int gui_utf8_encode(uint32_t cp, char* out, uint32_t* out_len)
+{
+    if (!out || !out_len) return -1;
+    if (cp < 0x80u) { out[0] = (char)cp; *out_len = 1; return 0; }
+    if (cp < 0x800u) {
+        out[0] = (char)(0xC0u | (cp >> 6));
+        out[1] = (char)(0x80u | (cp & 0x3Fu));
+        *out_len = 2;
+        return 0;
+    }
+    if (cp < 0x10000u) {
+        out[0] = (char)(0xE0u | (cp >> 12));
+        out[1] = (char)(0x80u | ((cp >> 6) & 0x3Fu));
+        out[2] = (char)(0x80u | (cp & 0x3Fu));
+        *out_len = 3;
+        return 0;
+    }
+    if (cp <= 0x10FFFFu) {
+        out[0] = (char)(0xF0u | (cp >> 18));
+        out[1] = (char)(0x80u | ((cp >> 12) & 0x3Fu));
+        out[2] = (char)(0x80u | ((cp >> 6) & 0x3Fu));
+        out[3] = (char)(0x80u | (cp & 0x3Fu));
+        *out_len = 4;
+        return 0;
+    }
+    return -1;
+}
+
+static int gui_edit_insert_bytes(char* buf, uint32_t* len, uint32_t* cur, uint32_t cap, const char* bytes, uint32_t n)
+{
+    if (!buf || !len || !cur || !bytes || n == 0) return -1;
+    if (*cur > *len) *cur = *len;
+    if (*len + n >= cap) return -1;
+    memmove(buf + *cur + n, buf + *cur, (size_t)(*len - *cur + 1u));
+    for (uint32_t i = 0; i < n; i++) buf[*cur + i] = bytes[i];
+    *cur += n;
+    *len += n;
+    return 0;
+}
+
+static uint32_t gui_utf8_prev_start(const char* buf, uint32_t cur)
+{
+    if (!buf || cur == 0) return 0;
+    uint32_t i = cur - 1u;
+    while (i > 0 && (((uint8_t)buf[i] & 0xC0u) == 0x80u)) i--;
+    return i;
+}
+
+static uint32_t gui_utf8_next_start(const char* buf, uint32_t len, uint32_t cur)
+{
+    if (!buf || cur >= len) return len;
+    uint32_t i = cur + 1u;
+    while (i < len && (((uint8_t)buf[i] & 0xC0u) == 0x80u)) i++;
+    return i;
+}
+
+static int gui_edit_delete_range(char* buf, uint32_t* len, uint32_t* cur, uint32_t start, uint32_t n)
+{
+    if (!buf || !len || !cur || start > *len || start + n > *len) return -1;
+    memmove(buf + start, buf + start + n, (size_t)(*len - start - n + 1u));
+    *len -= n;
+    if (*cur > start + n) *cur -= n;
+    else if (*cur > start) *cur = start;
+    return 0;
+}
+
+static int gui_edit_replace_range(char* buf, uint32_t* len, uint32_t* cur, uint32_t cap,
+                                  uint32_t start, uint32_t old_len, const char* bytes, uint32_t n)
+{
+    if (gui_edit_delete_range(buf, len, cur, start, old_len) != 0) return -1;
+    *cur = start;
+    return gui_edit_insert_bytes(buf, len, cur, cap, bytes, n);
+}
+
+static uint32_t gui_utf8_cells_before(const char* s, uint32_t byte_pos)
+{
+    const char* base = s ? s : "";
+    const char* p = base;
+    uint32_t cells = 0;
+    while (*p && (uint32_t)(p - base) < byte_pos) {
+        (void)utf8_next(&p);
+        cells++;
+    }
+    return cells;
+}
+
+static const uint32_t s_hangul_l_cp[19] = {
+    0x3131,0x3132,0x3134,0x3137,0x3138,0x3139,0x3141,0x3142,0x3143,0x3145,
+    0x3146,0x3147,0x3148,0x3149,0x314A,0x314B,0x314C,0x314D,0x314E
+};
+static const uint32_t s_hangul_v_cp[21] = {
+    0x314F,0x3150,0x3151,0x3152,0x3153,0x3154,0x3155,0x3156,0x3157,0x3158,
+    0x3159,0x315A,0x315B,0x315C,0x315D,0x315E,0x315F,0x3160,0x3161,0x3162,0x3163
+};
+
+static uint32_t hangul_syllable_cp(int l, int v, int t)
+{
+    if (l < 0 || l >= 19 || v < 0 || v >= 21 || t < 0 || t >= 28) return 0;
+    return 0xAC00u + (uint32_t)((l * 21 + v) * 28 + t);
+}
+
+static int hangul_key_l(char ch)
+{
+    switch (ch) {
+    case 'r': return 0; case 'R': return 1; case 's': return 2; case 'e': return 3; case 'E': return 4;
+    case 'f': return 5; case 'a': return 6; case 'q': return 7; case 'Q': return 8; case 't': return 9;
+    case 'T': return 10; case 'd': return 11; case 'w': return 12; case 'W': return 13; case 'c': return 14;
+    case 'z': return 15; case 'x': return 16; case 'v': return 17; case 'g': return 18;
+    default: return -1;
+    }
+}
+
+static int hangul_key_v(char ch)
+{
+    switch (ch) {
+    case 'k': return 0; case 'o': return 1; case 'i': return 2; case 'O': return 3; case 'j': return 4;
+    case 'p': return 5; case 'u': return 6; case 'P': return 7; case 'h': return 8; case 'y': return 12;
+    case 'n': return 13; case 'b': return 17; case 'm': return 18; case 'l': return 20;
+    default: return -1;
+    }
+}
+
+static int hangul_l_to_t(int l)
+{
+    static const int map[19] = {1,2,4,7,0,8,16,17,0,19,20,21,22,0,23,24,25,26,27};
+    return (l >= 0 && l < 19) ? map[l] : 0;
+}
+
+static int hangul_t_to_l(int t)
+{
+    static const int map[28] = {-1,0,1,9,2,12,18,3,5,0,6,7,9,16,17,18,6,7,9,9,10,11,12,14,15,16,17,18};
+    return (t >= 0 && t < 28) ? map[t] : -1;
+}
+
+static int hangul_combine_v(int a, int b)
+{
+    if (a == 8 && b == 0) return 9;
+    if (a == 8 && b == 1) return 10;
+    if (a == 8 && b == 20) return 11;
+    if (a == 13 && b == 4) return 14;
+    if (a == 13 && b == 5) return 15;
+    if (a == 13 && b == 20) return 16;
+    if (a == 18 && b == 20) return 19;
+    return -1;
+}
+
+static int hangul_combine_t(int a, int b)
+{
+    if (a == 1 && b == 19) return 3;
+    if (a == 4 && b == 22) return 5;
+    if (a == 4 && b == 27) return 6;
+    if (a == 8 && b == 1) return 9;
+    if (a == 8 && b == 16) return 10;
+    if (a == 8 && b == 17) return 11;
+    if (a == 8 && b == 19) return 12;
+    if (a == 8 && b == 25) return 13;
+    if (a == 8 && b == 26) return 14;
+    if (a == 8 && b == 27) return 15;
+    if (a == 17 && b == 19) return 18;
+    return -1;
+}
+
+static int hangul_split_t(int t, int* prev_t, int* next_l)
+{
+    if (!prev_t || !next_l) return 0;
+    switch (t) {
+    case 3: *prev_t = 1; *next_l = 9; return 1;
+    case 5: *prev_t = 4; *next_l = 12; return 1;
+    case 6: *prev_t = 4; *next_l = 18; return 1;
+    case 9: *prev_t = 8; *next_l = 0; return 1;
+    case 10: *prev_t = 8; *next_l = 6; return 1;
+    case 11: *prev_t = 8; *next_l = 7; return 1;
+    case 12: *prev_t = 8; *next_l = 9; return 1;
+    case 13: *prev_t = 8; *next_l = 16; return 1;
+    case 14: *prev_t = 8; *next_l = 17; return 1;
+    case 15: *prev_t = 8; *next_l = 18; return 1;
+    case 18: *prev_t = 17; *next_l = 9; return 1;
+    default:
+        *prev_t = 0;
+        *next_l = hangul_t_to_l(t);
+        return *next_l >= 0;
+    }
+}
+
+static int gui_hangul_replace_active(char* buf, uint32_t* len, uint32_t* cur, uint32_t cap, uint32_t cp)
+{
+    char enc[4];
+    uint32_t n = 0;
+    if (gui_utf8_encode(cp, enc, &n) != 0) return -1;
+    if (!g.hangul_active || *cur != g.hangul_start + g.hangul_len || g.hangul_start + g.hangul_len > *len) {
+        if (gui_edit_insert_bytes(buf, len, cur, cap, enc, n) != 0) return -1;
+        g.hangul_start = *cur - n;
+    } else {
+        if (gui_edit_replace_range(buf, len, cur, cap, g.hangul_start, g.hangul_len, enc, n) != 0) return -1;
+    }
+    g.hangul_len = n;
+    g.hangul_active = 1;
+    return 0;
+}
+
+static int gui_hangul_handle_key(char ch, char* buf, uint32_t* len, uint32_t* cur, uint32_t cap)
+{
+    int l = hangul_key_l(ch);
+    int v = hangul_key_v(ch);
+    if (!g.hangul_input || (l < 0 && v < 0)) {
+        if (ch == ' ' || ch == '\n' || ch == '\t') gui_hangul_compose_clear();
+        return 0;
+    }
+    if (g.app_id == 1) return 0;
+    if (g.hangul_active && (*cur != g.hangul_start + g.hangul_len || g.hangul_start + g.hangul_len > *len)) {
+        gui_hangul_compose_clear();
+    }
+    if (l >= 0) {
+        int t = hangul_l_to_t(l);
+        if (g.hangul_active && g.hangul_l >= 0 && g.hangul_v >= 0 && t > 0) {
+            if (g.hangul_t == 0) {
+                g.hangul_t = t;
+                return gui_hangul_replace_active(buf, len, cur, cap, hangul_syllable_cp(g.hangul_l, g.hangul_v, g.hangul_t)) == 0;
+            }
+            int combo = hangul_combine_t(g.hangul_t, t);
+            if (combo > 0) {
+                g.hangul_t = combo;
+                return gui_hangul_replace_active(buf, len, cur, cap, hangul_syllable_cp(g.hangul_l, g.hangul_v, g.hangul_t)) == 0;
+            }
+        }
+        gui_hangul_compose_clear();
+        g.hangul_l = l;
+        g.hangul_v = -1;
+        g.hangul_t = 0;
+        return gui_hangul_replace_active(buf, len, cur, cap, s_hangul_l_cp[l]) == 0;
+    }
+    if (g.hangul_active && g.hangul_l >= 0 && g.hangul_v < 0) {
+        g.hangul_v = v;
+        g.hangul_t = 0;
+        return gui_hangul_replace_active(buf, len, cur, cap, hangul_syllable_cp(g.hangul_l, g.hangul_v, 0)) == 0;
+    }
+    if (g.hangul_active && g.hangul_l >= 0 && g.hangul_v >= 0 && g.hangul_t == 0) {
+        int combo = hangul_combine_v(g.hangul_v, v);
+        if (combo >= 0) {
+            g.hangul_v = combo;
+            return gui_hangul_replace_active(buf, len, cur, cap, hangul_syllable_cp(g.hangul_l, g.hangul_v, 0)) == 0;
+        }
+    }
+    if (g.hangul_active && g.hangul_l >= 0 && g.hangul_v >= 0 && g.hangul_t > 0) {
+        int prev_t = 0;
+        int next_l = -1;
+        uint32_t old_start = g.hangul_start;
+        uint32_t old_len = g.hangul_len;
+        if (hangul_split_t(g.hangul_t, &prev_t, &next_l)) {
+            char prev_enc[4], next_enc[4];
+            uint32_t prev_n = 0, next_n = 0;
+            uint32_t prev_cp = hangul_syllable_cp(g.hangul_l, g.hangul_v, prev_t);
+            uint32_t next_cp = hangul_syllable_cp(next_l, v, 0);
+            if (gui_utf8_encode(prev_cp, prev_enc, &prev_n) == 0 &&
+                gui_utf8_encode(next_cp, next_enc, &next_n) == 0 &&
+                gui_edit_replace_range(buf, len, cur, cap, old_start, old_len, prev_enc, prev_n) == 0 &&
+                gui_edit_insert_bytes(buf, len, cur, cap, next_enc, next_n) == 0) {
+                g.hangul_l = next_l;
+                g.hangul_v = v;
+                g.hangul_t = 0;
+                g.hangul_start = old_start + prev_n;
+                g.hangul_len = next_n;
+                g.hangul_active = 1;
+                return 1;
+            }
+        }
+    }
+    if (g.hangul_active && g.hangul_l < 0 && g.hangul_v >= 0) {
+        int combo = hangul_combine_v(g.hangul_v, v);
+        if (combo >= 0) {
+            g.hangul_v = combo;
+            return gui_hangul_replace_active(buf, len, cur, cap, s_hangul_v_cp[combo]) == 0;
+        }
+        gui_hangul_compose_clear();
+    }
+    g.hangul_l = -1;
+    g.hangul_v = v;
+    g.hangul_t = 0;
+    return gui_hangul_replace_active(buf, len, cur, cap, s_hangul_v_cp[v]) == 0;
+}
+
+int gui_hangul_selftest(void)
+{
+    char enc[4];
+    uint32_t n = 0;
+    if (hangul_syllable_cp(18, 0, 4) != 0xD55Cu) return -1; /* 한 */
+    if (hangul_syllable_cp(0, 18, 1) != 0xAE09u) return -2; /* 극 */
+    if (hangul_combine_v(8, 0) != 9 || hangul_combine_t(1, 19) != 3) return -3;
+    if (gui_utf8_encode(0xD55Cu, enc, &n) != 0 || n != 3u ||
+        (uint8_t)enc[0] != 0xEDu || (uint8_t)enc[1] != 0x95u || (uint8_t)enc[2] != 0x9Cu) return -4;
+    return 0;
+}
+
 static void gui_megaclip_feedback(const char* msg)
 {
     gui_resp_clear();
@@ -6273,14 +6713,12 @@ static int gui_megaclip_insert(const megaclip_item_t* item)
     uint32_t* edit_cur;
     uint32_t edit_cap;
     if (!item || !gui_active_edit_buffer(&edit_buf, &edit_len, &edit_cur, &edit_cap)) return -1;
+    gui_hangul_compose_clear();
     for (uint32_t i = 0; i < item->size && *edit_len + 1u < edit_cap; i++) {
         char ch = (char)item->data[i];
         if (ch == 0) break;
-        if ((ch < ' ' || ch > '~') && ch != '\n' && ch != '\t') continue;
-        for (uint32_t j = *edit_len; j > *edit_cur; j--) edit_buf[j] = edit_buf[j - 1u];
-        edit_buf[(*edit_cur)++] = ch;
-        (*edit_len)++;
-        edit_buf[*edit_len] = '\0';
+        if (((uint8_t)ch < ' ' && ch != '\n' && ch != '\t') || ch == '\r') continue;
+        if (gui_edit_insert_bytes(edit_buf, edit_len, edit_cur, edit_cap, &ch, 1) != 0) break;
     }
     return 0;
 }
@@ -6400,20 +6838,17 @@ void gui_handle_key(char ch)
 
     if (ch == '\b') {
         if (*edit_cur > 0 && *edit_len) {
-            for (uint32_t i = *edit_cur - 1; i + 1 < *edit_len; i++) edit_buf[i] = edit_buf[i + 1];
-            (*edit_len)--;
-            (*edit_cur)--;
-            edit_buf[*edit_len] = '\0';
+            uint32_t start = gui_utf8_prev_start(edit_buf, *edit_cur);
+            gui_edit_delete_range(edit_buf, edit_len, edit_cur, start, *edit_cur - start);
+            gui_hangul_compose_clear();
         }
         return;
     }
     if (ch == '\n') {
         if (g.app_id == 9 && g.lafaelo_focus) {
             if (g.lafaelo_len + 1 < sizeof(g.lafaelo_buf)) {
-                for (uint32_t i = g.lafaelo_len; i > g.lafaelo_cur; i--) g.lafaelo_buf[i] = g.lafaelo_buf[i - 1];
-                g.lafaelo_buf[g.lafaelo_cur++] = '\n';
-                g.lafaelo_len++;
-                g.lafaelo_buf[g.lafaelo_len] = '\0';
+                gui_edit_insert_bytes(g.lafaelo_buf, &g.lafaelo_len, &g.lafaelo_cur, sizeof(g.lafaelo_buf), "\n", 1);
+                gui_hangul_compose_clear();
             }
             return;
         }
@@ -6465,13 +6900,11 @@ void gui_handle_key(char ch)
     }
     if (ch == '\t') return;
 
+    if (gui_hangul_handle_key(ch, edit_buf, edit_len, edit_cur, edit_cap)) return;
+
     if (ch >= ' ' && ch <= '~') {
-        if (*edit_len + 1 < edit_cap) {
-            for (uint32_t i = *edit_len; i > *edit_cur; i--) edit_buf[i] = edit_buf[i - 1];
-            edit_buf[(*edit_cur)++] = ch;
-            (*edit_len)++;
-            edit_buf[*edit_len] = '\0';
-        }
+        gui_hangul_compose_clear();
+        (void)gui_edit_insert_bytes(edit_buf, edit_len, edit_cur, edit_cap, &ch, 1);
     }
 }
 
@@ -6496,6 +6929,11 @@ void gui_handle_key_nav(int kind)
         gui_megaclip_feedback("stack pull armed; press 1..9 or 0, or P for fixed");
         return;
     }
+    if (kind == PS2K_CTRL_H) {
+        int on = gui_hangul_input_toggle();
+        gui_megaclip_feedback(on ? "Hangul input ON" : "Hangul input OFF");
+        return;
+    }
     if (kind == PS2K_F10) {
         gui_activate_ring0_shortcut();
         return;
@@ -6508,8 +6946,10 @@ void gui_handle_key_nav(int kind)
         if (kind == PS2K_DOWN) { gui_run_sysrxe_input("down"); return; }
         if (kind == PS2K_HOME) { gui_run_sysrxe_input("reset"); return; }
     }
+    char* nav_buf = (g.app_id == 1) ? g.calc_display : (g.app_id == 9 && g.lafaelo_focus) ? g.lafaelo_buf : g.tb;
     uint32_t* cur = (g.app_id == 1) ? &g.calc_cur : (g.app_id == 9 && g.lafaelo_focus) ? &g.lafaelo_cur : &g.tb_cur;
-    uint32_t len = (g.app_id == 1) ? g.calc_len : (g.app_id == 9 && g.lafaelo_focus) ? g.lafaelo_len : g.tb_len;
+    uint32_t* lenp = (g.app_id == 1) ? &g.calc_len : (g.app_id == 9 && g.lafaelo_focus) ? &g.lafaelo_len : &g.tb_len;
+    uint32_t len = *lenp;
     if (!g.tb_focused && !(g.app_id == 9 && g.lafaelo_focus)) {
         // kind values come from ps2_key_kind_t in include/ps2.h
         if (kind == 4) { // UP
@@ -6542,30 +6982,28 @@ void gui_handle_key_nav(int kind)
     }
 
     switch (kind) {
-        case 2: if (*cur) (*cur)--; break;
-        case 3: if (*cur < len) (*cur)++; break;
-        case 6: *cur = 0; break;
-        case 7: *cur = len; break;
+        case 2: if (*cur) { *cur = gui_utf8_prev_start(nav_buf, *cur); gui_hangul_compose_clear(); } break;
+        case 3: if (*cur < len) { *cur = gui_utf8_next_start(nav_buf, len, *cur); gui_hangul_compose_clear(); } break;
+        case 6: *cur = 0; gui_hangul_compose_clear(); break;
+        case 7: *cur = len; gui_hangul_compose_clear(); break;
         case 10:
             if (g.app_id == 1) {
                 if (g.calc_cur < g.calc_len) {
-                    for (uint32_t i = g.calc_cur; i + 1 < g.calc_len; i++) g.calc_display[i] = g.calc_display[i + 1];
-                    g.calc_len--;
-                    g.calc_display[g.calc_len] = '\0';
+                    uint32_t next = gui_utf8_next_start(g.calc_display, g.calc_len, g.calc_cur);
+                    gui_edit_delete_range(g.calc_display, &g.calc_len, &g.calc_cur, g.calc_cur, next - g.calc_cur);
                 }
             } else if (g.app_id == 9 && g.lafaelo_focus) {
                 if (g.lafaelo_cur < g.lafaelo_len) {
-                    for (uint32_t i = g.lafaelo_cur; i + 1 < g.lafaelo_len; i++) g.lafaelo_buf[i] = g.lafaelo_buf[i + 1];
-                    g.lafaelo_len--;
-                    g.lafaelo_buf[g.lafaelo_len] = '\0';
+                    uint32_t next = gui_utf8_next_start(g.lafaelo_buf, g.lafaelo_len, g.lafaelo_cur);
+                    gui_edit_delete_range(g.lafaelo_buf, &g.lafaelo_len, &g.lafaelo_cur, g.lafaelo_cur, next - g.lafaelo_cur);
                 }
             } else {
                 if (g.tb_cur < g.tb_len) {
-                    for (uint32_t i = g.tb_cur; i + 1 < g.tb_len; i++) g.tb[i] = g.tb[i + 1];
-                    g.tb_len--;
-                    g.tb[g.tb_len] = '\0';
+                    uint32_t next = gui_utf8_next_start(g.tb, g.tb_len, g.tb_cur);
+                    gui_edit_delete_range(g.tb, &g.tb_len, &g.tb_cur, g.tb_cur, next - g.tb_cur);
                 }
             }
+            gui_hangul_compose_clear();
             break;
         default:
             break;
@@ -7000,8 +7438,10 @@ void gui_render(void)
         uint16_t cx, cy;
         if (g.app_id == 9 && g.lafaelo_focus) {
             int line = 0, col = 0;
-            for (uint32_t i = 0; i < g.lafaelo_cur && g.lafaelo_buf[i]; i++) {
-                if (g.lafaelo_buf[i] == '\n') { line++; col = 0; } else col++;
+            const char* p = g.lafaelo_buf;
+            while (*p && (uint32_t)(p - g.lafaelo_buf) < g.lafaelo_cur) {
+                uint32_t cp = utf8_next(&p);
+                if (cp == '\n') { line++; col = 0; } else col++;
             }
             int row = line - g.resp_scroll;
             cx = (uint16_t)(view_x + col * 8);
@@ -7012,7 +7452,7 @@ void gui_render(void)
             if (cy > (uint16_t)(view_y + view_h - 12)) cy = (uint16_t)(view_y + view_h - 12);
             fb_fill_rect(tgt, cx, cy, 1, 10, 0xFFFFFFFF);
         } else {
-            cx = (uint16_t)(tb_x + 6 + (int)input_cur * 8);
+            cx = (uint16_t)(tb_x + 6 + (int)gui_utf8_cells_before(input_text, input_cur) * 8);
             cy = (uint16_t)(tb_y + 6);
             if (cx > (uint16_t)(tb_x + tb_w - 2)) cx = (uint16_t)(tb_x + tb_w - 2);
             fb_fill_rect(tgt, cx, cy, 1, 12, 0xFFFFFFFF);

@@ -52,6 +52,15 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.8.2p-mirage` hotpatches the Lard Shell output buffer so long command
+output, especially `help`, keeps the newest lines instead of filling the
+buffer and making later commands appear unusable. When old shell output must be
+dropped, LSH leaves a visible trim notice and `cls` still clears the view.
+The GUI shell now follows the newest command output after `help`, Run, and
+background shell updates so later commands do not hide below the old help text.
+POST now includes an output rollover check that appends after `help` and
+verifies the new command text remains visible.
+
 `v2.8.1p-mirage` hotpatches two bugs found during the multi-monitor audit.
 LPST persistence now restores writable settings by file name first instead of
 trusting table order when the writable count is unchanged, which protects files

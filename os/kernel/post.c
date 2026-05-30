@@ -277,6 +277,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("taskprio: priority queue", taskprio_selftest() == 0, emit, user, &pass, &fail);
     post_check("lsh: settings shell grammar", lsh_cfgsh_selftest() == 0, emit, user, &pass, &fail);
     post_check("lsh: DOS mode aliases", lsh_dosmode_selftest() == 0, emit, user, &pass, &fail);
+    post_check("lsh: output rollover", lsh_output_selftest() == 0, emit, user, &pass, &fail);
     post_check("bootprof: profile flags", bootprof_selftest() == 0, emit, user, &pass, &fail);
     post_check("awake: background boot tracker", awake_selftest() == 0, emit, user, &pass, &fail);
     post_check("crashlog: writable log", crashlog_selftest() == 0, emit, user, &pass, &fail);

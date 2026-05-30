@@ -5381,6 +5381,7 @@ static void gui_lsh_sync_output(void)
         i++;
     }
     g.resp[i] = '\0';
+    g.resp_scroll = 1000000;
 }
 
 void gui_activate_ring0_shortcut(void)
@@ -6038,10 +6039,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
             } else if (in_rect(g.mx, g.my, btn_x + (lfb + 4) * 2, btn_y, lfb, btn_h)) {
                 /* Run: execute lafaelo_buf via LSH */
                 lsh_exec(g.lafaelo_buf);
-                const char* out = lsh_get_output();
-                uint32_t i = 0;
-                while (out[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = out[i]; i++; }
-                g.resp[i] = '\0';
+                gui_lsh_sync_output();
                 g.lafaelo_show_run = 1;
             }
         } else if (g.btn_pressed && gui_file_rxe_app(g.app_id) &&
@@ -6128,10 +6126,7 @@ void gui_handle_mouse(int dx, int dy, int buttons)
                 g.resp[i] = '\0';
             } else if (g.app_id == 7) {
                 lsh_exec(g.tb);
-                const char* out = lsh_get_output();
-                uint32_t i = 0;
-                while (out[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = out[i]; i++; }
-                g.resp[i] = '\0';
+                gui_lsh_sync_output();
                 g.tb_len = 0;
                 g.tb_cur = 0;
                 g.tb[0] = '\0';
@@ -6449,10 +6444,7 @@ void gui_handle_key(char ch)
             kr_basic_run(g.tb, g.resp, sizeof(g.resp));
         } else if (g.app_id == 7) {
             lsh_exec(g.tb);
-            const char* out = lsh_get_output();
-            uint32_t i = 0;
-            while (out[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = out[i]; i++; }
-            g.resp[i] = '\0';
+            gui_lsh_sync_output();
             g.tb_len = 0;
             g.tb_cur = 0;
             g.tb[0] = '\0';
@@ -6586,10 +6578,7 @@ void gui_tick(void)
     g.glyph_tick++;
     lassist_tick((uint32_t)g.app_id);
     if (lsh_poll_background() && g.app_id == 7) {
-        const char* out = lsh_get_output();
-        uint32_t i = 0;
-        while (out[i] && i + 1 < sizeof(g.resp)) { g.resp[i] = out[i]; i++; }
-        g.resp[i] = '\0';
+        gui_lsh_sync_output();
     }
     g.caret_tick++;
     if ((g.caret_tick & 0x1FFFFu) == 0) {

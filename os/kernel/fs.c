@@ -677,6 +677,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.92.1p makes HTTPS visible with webstack tls, LardTLS info, and POST/selftest TLS checks while preserving all v1.92 methods.\n"
     "li v1.92.0b expands HTTP/HTTPS to GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS without external web libraries.\n"
     "li v1.91.1p hotpatches GUI resize hit-testing so only the visible bottom-right grip starts window resizing.\n"
+    "li v2.8.2p hotpatches LSH output rollover and GUI shell follow so help cannot hide later visible commands.\n"
     "li v2.8.1p hotpatches LPST name-based writable restore and fullscreen monitor retargeting.\n"
     "li v2.8.0b adds user-owned multi-monitor layout with monitor commands, monitors.lardd, virtual split/mirror modes, and monitor-local fullscreen.\n"
     "li v2.7.0b adds HC for shell .hc files and LANG HC in RXE/SYSRXE executables without replacing LANG C.\n"

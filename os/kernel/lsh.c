@@ -64,10 +64,12 @@
 #include <stdint.h>
 
 #define LSH_MAGIC  0x0048534Cu  /* "LSH\0" LE */
+#define LSH_OUTPUT_TRIM_NOTICE "[output trimmed: run cls to clear]\n"
 
 static char s_drive = 'X';
 static char s_output[LSH_MAX_OUTPUT];
 static uint32_t s_out_len;
+static int s_output_trimmed;
 
 /* Environment variables: s_env_buf[i][0]=name, s_env_buf[i][1]=value */
 static char s_env_buf[LSH_MAX_ENV][2][LSH_MAX_VAR_LEN];
@@ -94,6 +96,7 @@ static void parse_and_run(const char* cmd, const char* args);
 static int cfgsh_is_status_word(const char* value);
 static int cfgsh_bool_value(const char* value, int* out);
 static int ascii_streq_ci(const char* a, const char* b);
+static void out_append_char(char c);
 
 static const char* env_get(const char* name)
 {
@@ -172,8 +175,7 @@ static void out_append(const char* s)
         while (*s && s_pipe_len + 1 < LSH_PIPE_BUF) s_pipe_buf[s_pipe_len++] = *s++;
         s_pipe_buf[s_pipe_len] = '\0';
     } else {
-        while (*s && s_out_len + 1 < LSH_MAX_OUTPUT) s_output[s_out_len++] = *s++;
-        s_output[s_out_len] = '\0';
+        while (*s) out_append_char(*s++);
     }
 }
 
@@ -185,6 +187,33 @@ static void out_append_char(char c)
             s_pipe_buf[s_pipe_len] = '\0';
         }
     } else {
+        if (s_out_len + 1 >= LSH_MAX_OUTPUT) {
+            const char* notice = LSH_OUTPUT_TRIM_NOTICE;
+            uint32_t notice_len = (uint32_t)strlen(notice);
+            uint32_t protect = 0;
+            if (!s_output_trimmed || strncmp(s_output, notice, notice_len) != 0) {
+                s_out_len = 0;
+                while (notice[s_out_len] && s_out_len + 1 < LSH_MAX_OUTPUT) {
+                    s_output[s_out_len] = notice[s_out_len];
+                    s_out_len++;
+                }
+                s_output[s_out_len] = '\0';
+                s_output_trimmed = 1;
+            }
+            if (strncmp(s_output, notice, notice_len) == 0) protect = notice_len;
+            while (s_out_len + 1 >= LSH_MAX_OUTPUT) {
+                uint32_t drop = protect;
+                while (drop < s_out_len && s_output[drop] != '\n') drop++;
+                if (drop < s_out_len) drop++;
+                if (drop <= protect || drop >= s_out_len) {
+                    s_out_len = protect;
+                    s_output[s_out_len] = '\0';
+                    break;
+                }
+                memmove(s_output + protect, s_output + drop, (size_t)(s_out_len - drop + 1));
+                s_out_len -= drop - protect;
+            }
+        }
         if (s_out_len + 1 < LSH_MAX_OUTPUT) {
             s_output[s_out_len++] = c;
             s_output[s_out_len] = '\0';
@@ -12487,6 +12516,43 @@ int lsh_cfgsh_selftest(void)
     return 0;
 }
 
+static int lsh_output_contains(const char* needle)
+{
+    if (!needle || !needle[0]) return 1;
+    for (uint32_t i = 0; s_output[i]; i++) {
+        uint32_t j = 0;
+        while (needle[j] && s_output[i + j] == needle[j]) j++;
+        if (!needle[j]) return 1;
+    }
+    return 0;
+}
+
+int lsh_output_selftest(void)
+{
+    static char saved[LSH_MAX_OUTPUT];
+    uint32_t saved_len = s_out_len;
+    int saved_trimmed = s_output_trimmed;
+    int saved_redirect = s_redirect_to_pipe;
+    uint32_t i;
+    int ok;
+
+    for (i = 0; i <= saved_len && i < LSH_MAX_OUTPUT; i++) saved[i] = s_output[i];
+
+    s_redirect_to_pipe = 0;
+    lsh_clear_output();
+    cmd_help("");
+    out_append("AFTERHELP_COMMAND_OK\n");
+    ok = lsh_output_contains("AFTERHELP_COMMAND_OK\n");
+
+    for (i = 0; i <= saved_len && i < LSH_MAX_OUTPUT; i++) s_output[i] = saved[i];
+    s_out_len = saved_len;
+    if (s_out_len < LSH_MAX_OUTPUT) s_output[s_out_len] = '\0';
+    s_output_trimmed = saved_trimmed;
+    s_redirect_to_pipe = saved_redirect;
+
+    return ok ? 0 : -1;
+}
+
 static int run_lsh_cmd(const char* name, const char* argv)
 {
     (void)argv;
@@ -12812,6 +12878,7 @@ void lsh_init(void)
     s_drive = 'X';
     s_out_len = 0;
     s_output[0] = '\0';
+    s_output_trimmed = 0;
     s_nenv = 0;
     s_in_sum_mode = 0;
     s_sandbox_mode = 0;
@@ -12949,6 +13016,7 @@ void lsh_clear_output(void)
 {
     s_out_len = 0;
     s_output[0] = '\0';
+    s_output_trimmed = 0;
 }
 
 char lsh_get_drive(void)

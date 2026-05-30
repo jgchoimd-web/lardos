@@ -59,3 +59,6 @@ int lsh_cfgsh_selftest(void);
 
 /* Non-mutating parser selftest for DOS mode command aliases. */
 int lsh_dosmode_selftest(void);
+
+/* Non-mutating output rollover selftest for long help text. */
+int lsh_output_selftest(void);

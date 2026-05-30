@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.8.2p-mirage
+ITEM Hotpatches Lard Shell output rollover so help and other long command output cannot permanently fill the visible shell buffer.
+ITEM Keeps the newest shell lines when old output must be trimmed, leaves a visible trim notice, and preserves cls as the user-owned clear command.
+ITEM Makes the GUI shell follow the newest LSH output after help, Run, and background command updates so later command results do not hide below old help text.
+ITEM Adds POST/selftest coverage that writes help-sized output and verifies a later command marker still appears.
+ITEM Preserves v2.8.1p persistence, multi-monitor, GUI, RXE/SYSRXE, HC, LardOS Connect, clipboard, sound, wallpaper, and user-control values without feature loss.
+
 SECTION v2.8.1p-mirage
 ITEM Hotpatches LPST writable-file restore so saved settings are matched by file name first instead of trusting table order when the writable count is unchanged.
 ITEM Prevents fixed writable slots from being renamed by persisted entries, protecting monitors.lardd, sound.lardd, usersound.lsnd, and future user-owned settings from slot-order drift.

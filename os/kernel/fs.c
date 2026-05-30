@@ -431,7 +431,7 @@ static const uint8_t userapp_sysrxe_init[] =
     "DESKTOP 1\n"
     "DOCK 0\n"
     "TEXT This writable app proves that new apps can be edited as files.\n"
-    "TEXT Open userapp.sysrxe in Edit, change NAME/TEXT/COMMAND/ICONASSET, then run sysrxe reload.\n"
+    "TEXT Open userapp.sysrxe in Edit, change NAME/TEXT/COMMAND/ICONASSET/LANG HC, then run sysrxe reload.\n"
     "COMMAND echo user-sysrxe\n";
 static uint8_t ram_userapp_sysrxe_buf[USERAPP_SYSRXE_CAP];
 static FsWritableFile ram_userapp_sysrxe = { "userapp.sysrxe", ram_userapp_sysrxe_buf, 0, USERAPP_SYSRXE_CAP };
@@ -565,6 +565,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use time, date, lunar, and dangun for LardOS Time ticks, five-digit years, Dangun year, and the native lunar view.\n"
     "li Use vm status, vm limits, and vm selftest to monitor BOSL, LIL, GASM, Lafillo VM, and OSVM under common step budgets.\n"
     "li Use shrine status, shrine list, shrine verify hello.shrine, and shrine run hello.shrine for the Lard Subsystem for Shrine with BOSL payload validation.\n"
+    "li Use hc hello.hc 5 or LANG HC in .rxe/.sysrxe files for LardOS-owned HolyC-flavored app code.\n"
     "li Use glyph demo, glyph auto sample.bmp avatar, glyph move/copy/rename/pixel, glyph live U+E000 on, glyph click U+E000, and glyph insert U+E000 notes.txt to own and edit clickable realtime private-use Unicode picture characters.\n"
     "li The default cursor is the pretty mouse picture at U+E004; use cursor mouse to restore it or cursor set U+E000 to choose another user-owned slot.\n"
     "li Use dir X: for seed/default files, dir R: for RAM, and dir _: for merged storage.\n"
@@ -581,7 +582,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use rxr verify sample.rxr, rxr list sample.rxr, and rxr install sample.rxr to install an app bundle with its files.\n"
     "li Use sysrxe list, sysrxe reload, sysrxe show userapp.sysrxe, and sysrxe run 0 text for file-defined system executables.\n"
     "li Use rxe list, rxe show demo_game.rxe, and rxe run 0 right to play the normal RXE demo game.\n"
-    "li Use rxe show langdemo.rxe and rxe run 1 7 after rxe reload to try app-side C/LardOS language code.\n"
+    "li Use rxe show langdemo.rxe, rxe show hc_demo.rxe, rxe run 1 7, and hc hello.hc 5 after rxe reload to try app-side C/HC/LardOS language code.\n"
     "li Use kmod history to read kmodtalk.lardd after direct kernel-module messages.\n"
     "li Use screencheck retro for an old boot/storage-style visual screen scan.\n"
     "li Use screenshot [file.lshot] [w h] to capture the visible GUI to a native local LSHOT file.\n"
@@ -663,6 +664,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.92.1p makes HTTPS visible with webstack tls, LardTLS info, and POST/selftest TLS checks while preserving all v1.92 methods.\n"
     "li v1.92.0b expands HTTP/HTTPS to GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS without external web libraries.\n"
     "li v1.91.1p hotpatches GUI resize hit-testing so only the visible bottom-right grip starts window resizing.\n"
+    "li v2.7.0b adds HC for shell .hc files and LANG HC in RXE/SYSRXE executables without replacing LANG C.\n"
     "li v2.6.0b adds native LSND vector sound files plus boot/effect sound toggles through sound.lardd.\n"
     "li v2.5.0b adds native LREC video wallpaper through wallpaper lrec file.lrec while preserving BMP, pattern, and editable wallpaper.lardd state.\n"
     "li v1.91.0a officially promotes user-owned desktop wallpaper settings without feature loss or value changes.\n"
@@ -1343,9 +1345,10 @@ static const uint8_t file_sysrxe_guide[] =
     "ITEM COLOR 0xAARRGGBB\n"
     "ITEM INPUT label\n"
     "ITEM BUTTON label\n"
-    "ITEM LANG LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, or LML selects the app code runner.\n"
+    "ITEM LANG LSH, HC, LIL, GASM, BOSL, LAFILLO, OSVM, C, or LML selects the app code runner.\n"
     "ITEM CODE source-line appends code for the selected language.\n"
     "ITEM LANG C uses the in-kernel C-style app runner: int vars, expressions, print/println, appkit(\"UI ...\"), lsh(\"command\"), and return.\n"
+    "ITEM LANG HC uses the same native runner with HC/HolyC-flavored names such as I64, U64, Bool, PrintLn, appkit, and lsh.\n"
     "ITEM DESKTOP 1 and DOCK 1 decide launcher placement.\n"
     "ITEM TEXT app body line\n"
     "ITEM COMMAND lsh-command optionally receives textbox input when LANG is LSH.\n"
@@ -1396,9 +1399,10 @@ static const uint8_t file_rxe_guide[] =
     "ITEM COLOR 0xAARRGGBB\n"
     "ITEM INPUT label\n"
     "ITEM BUTTON label\n"
-    "ITEM LANG LSH, LIL, GASM, BOSL, LAFILLO, OSVM, C, or LML selects the executable code runner.\n"
+    "ITEM LANG LSH, HC, LIL, GASM, BOSL, LAFILLO, OSVM, C, or LML selects the executable code runner.\n"
     "ITEM CODE source-line appends code for the selected language.\n"
     "ITEM LANG C uses the in-kernel C-style app runner: int vars, expressions, print/println, appkit(\"UI ...\"), lsh(\"command\"), and return.\n"
+    "ITEM LANG HC uses the same native runner with HC/HolyC-flavored names such as I64, U64, Bool, PrintLn, appkit, and lsh.\n"
     "ITEM DESKTOP 1 and DOCK 1 decide launcher placement.\n"
     "ITEM TYPE GAME turns the executable into a native RXE game.\n"
     "ITEM BOARD width height declares the game map size, up to 24x12.\n"
@@ -1524,6 +1528,7 @@ static const uint8_t file_raw_control_kmo[] =
  */
 #include "app_hello_sysrxe.inc"
 #include "app_langdemo_rxe.inc"
+#include "app_hc_demo_rxe.inc"
 #include "app_demo_game_rxe.inc"
 #include "app_lardwrite_rxe.inc"
 #include "app_lardsheet_rxe.inc"
@@ -1553,6 +1558,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command sound\n"
     "CHECK command cursor\n"
     "CHECK command vm\n"
+    "CHECK command hc\n"
     "CHECK command gasm\n"
     "CHECK command shrine\n"
     "CHECK file hello.shrine\n"
@@ -1616,6 +1622,9 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file kmo_guide.lardd\n"
     "CHECK file hello.sysrxe\n"
     "CHECK file langdemo.rxe\n"
+    "CHECK file hc_demo.rxe\n"
+    "CHECK file hello.hc\n"
+    "CHECK file hc_guide.lardd\n"
     "CHECK file demo_game.rxe\n"
     "CHECK file lardwrite.rxe\n"
     "CHECK file lardsheet.rxe\n"
@@ -1730,6 +1739,31 @@ static const uint8_t file_lsound_guide[] =
     "TEXT The active policy lives in writable sound.lardd, and boot/effect .lsnd files can be overwritten by the user.\n"
     "END\n";
 
+static const uint8_t file_hc_guide[] =
+    "LARDD 1\n"
+    "TITLE LardOS HC Guide\n"
+    "TEXT HC is a LardOS-owned HolyC-flavored shell/app language surface.\n"
+    "TEXT It reuses the in-kernel C-style app runner so the feature stays local, editable, and dependency-free.\n"
+    "SECTION Shell\n"
+    "ITEM hc hello.hc 5\n"
+    "ITEM holyc hello.hc 5\n"
+    "SECTION RXE/SYSRXE\n"
+    "ITEM LANG HC\n"
+    "ITEM CODE I64 bonus = 64;\n"
+    "ITEM CODE PrintLn(input + bonus);\n"
+    "ITEM CODE appkit(\"UI BADGE 0 0 80 18 HC\");\n"
+    "ITEM CODE lsh(\"echo from-hc\");\n"
+    "SECTION Language\n"
+    "ITEM int/I64/U64/Bool variables\n"
+    "ITEM + - * / % expressions and input numeric value\n"
+    "ITEM print, println, Print, PrintLn, return, appkit, and lsh calls\n"
+    "END\n";
+
+static const uint8_t file_hello_hc[] =
+    "I64 bonus = 37;\n"
+    "PrintLn(input + bonus);\n"
+    "lsh(\"echo hc-shell-ok\");\n";
+
 static const uint8_t file_boot_lsnd[] =
     "LSND 1\n"
     "TITLE LardOS Boot Sound\n"
@@ -1814,11 +1848,14 @@ static const FsFile FS_FILES[] = {
     { "sample.rxr",    file_sample_rxr,    sizeof(file_sample_rxr) - 1 },
     { "sysrxe_guide.lardd", file_sysrxe_guide, sizeof(file_sysrxe_guide) - 1 },
     { "rxe_guide.lardd", file_rxe_guide, sizeof(file_rxe_guide) - 1 },
+    { "hc_guide.lardd", file_hc_guide, sizeof(file_hc_guide) - 1 },
+    { "hello.hc", file_hello_hc, sizeof(file_hello_hc) - 1 },
     { "kmodtalk_guide.lardd", file_kmodtalk_guide, sizeof(file_kmodtalk_guide) - 1 },
     { "kmo_guide.lardd", file_kmo_guide, sizeof(file_kmo_guide) - 1 },
     { "hello.sysrxe", file_hello_sysrxe, sizeof(file_hello_sysrxe) },
     { "demo_game.rxe", file_demo_game_rxe, sizeof(file_demo_game_rxe) },
     { "langdemo.rxe", file_langdemo_rxe, sizeof(file_langdemo_rxe) },
+    { "hc_demo.rxe", file_hc_demo_rxe, sizeof(file_hc_demo_rxe) },
     { "lardwrite.rxe", file_lardwrite_rxe, sizeof(file_lardwrite_rxe) },
     { "lardsheet.rxe", file_lardsheet_rxe, sizeof(file_lardsheet_rxe) },
     { "lardshow.rxe", file_lardshow_rxe, sizeof(file_lardshow_rxe) },

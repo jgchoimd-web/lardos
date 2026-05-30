@@ -6,6 +6,16 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.7.0b-mirage
+ITEM Adds HC, a LardOS-owned HolyC-flavored language surface for shell scripts and RXE/SYSRXE executable files.
+ITEM Adds hc/holyc/lardhc file.hc [input] so shell users can run editable .hc source through the native app-code runner.
+ITEM Adds LANG HC and HOLYC/LARDHC aliases for .rxe and .sysrxe files, preserving existing LANG C behavior while giving HC its own visible language name.
+ITEM Extends the native C-style app runner with I64, U64, Bool, and case-insensitive PrintLn/Print/LSh style calls for HC code.
+ITEM Adds hello.hc, hc_guide.lardd, and bundled hc_demo.rxe app source in apps/bundled instead of hard-coding the demo into kernel GUI logic.
+ITEM Adds POST/selftest coverage through the SYSRXE/RXE parser and LUNIT command/file checks.
+ITEM Preserves LSND sound, LREC wallpaper, GUI, RXE/SYSRXE, LFS/LAR, PinClip/MegaClipboard, LardOS Connect, and user-control values without feature loss.
+ITEM Ships as beta because this expands the app language surface.
+
 SECTION v2.6.0b-mirage
 ITEM Adds LSND, a native editable vector sound recording file format for LardOS.
 ITEM Adds a PC-speaker sound layer for boot sounds and short OS effect sounds without external samples, codecs, or runtime libraries.

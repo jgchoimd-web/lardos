@@ -1,0 +1,23 @@
+RXE 1
+ID hc-demo
+NAME HC Demo
+ICON H
+ICONASSET icon_rxe.ldi
+LAYOUT responsive
+COLOR 0xFFB388FF
+INPUT Number:
+BUTTON Run
+USE APPKIT
+UI PANEL 0 0 220 36 HC executable
+UI BUTTON 8 8 72 20 Run | 7
+UI BADGE 118 9 80 18 LANG HC
+UI INPUT 0 46 220 24 Number:
+UI OUTPUT 0 84 0 0 HC output
+DESKTOP 1
+DOCK 1
+TEXT HC is a LardOS-owned HolyC-flavored app language surface. It runs through the in-kernel C-style app runner, not an external compiler.
+LANG HC
+CODE I64 bonus = 64;
+CODE PrintLn(input + bonus);
+CODE appkit("UI CUSTOM meter 230 46 110 18 hc-code | 64");
+CODE lsh("echo hc-from-rxe");

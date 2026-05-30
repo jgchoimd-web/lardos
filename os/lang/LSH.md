@@ -32,6 +32,7 @@
 - `shrine status|list|info|verify|run|test [file.shrine]` / `lss ...` -
   inspect and run LSS Shrine subsystem wrappers, including BOSL payload
   magic/version verification. `srine` is accepted too.
+- `hc file.hc [input]` / `holyc ...` - run LardOS-owned HC source through the native app runner from the shell.
 - `gasm file.gasm` - run an in-tree GASM source file from LSH.
 - `sram` / `screenram` - use a quiet or selected screen rectangle as scratch RAM.
 - `screencheck status|retro|test` - probe or draw the retro visual screen checker.
@@ -75,6 +76,7 @@
 - `larsform file` / `larsact file index` - list or run LARS button/link/fetch/input actions.
 - `lpack info|list|verify|install|undo file.lpack` - inspect, validate, install, or roll back a native LardPack package.
 - `rxr info|list|verify|install|undo file.rxr` / `rxr path rxr/file` - inspect, validate, install, roll back, or resolve a native app bundle containing one RXE/SYSRXE app plus required files. LardOS exposes bundled files through the OS filesystem namespace `rxr/name`.
+- `LANG HC` in RXE/SYSRXE files selects the HolyC-flavored native app runner. `hello.hc`, `hc_guide.lardd`, and `hc_demo.rxe` are bundled examples.
 - `vpath path` / `pathmap path` - inspect the OS filesystem mapping for a virtual path such as `folder/inside/path`. Use quotes for spaces, for example `vpath "Final Final Release/final fix"`.
 - `drivers status|reload|load file.drfl|show name` - inspect loaded DRFL files, rescan installed `.drfl` files, load one driver file directly, or show the code carried inside a DRFL 2 file.
 - `set` — list or set environment variables

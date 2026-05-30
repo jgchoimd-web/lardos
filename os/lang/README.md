@@ -7,10 +7,11 @@
 | **Lafillo VM** | HTML→text 전용 (push/lafillo/print/halt) | `kernel/lafillo_vm.c` | `lafvm` LSH |
 | **LIL** | S-expression **auxiliary** interpreter (int64, `let`/`if`/…) | `kernel/lil.c` | `tools/lil` (C) |
 | **GASM** | Accumulator-based VM (load/add/sub/mul/div/print) | `kernel/gasm_vm.c` | `gasm` LSH / `GASM_ASM` |
+| **HC** | HolyC-flavored native app/shell source using the C-style app runner | `kernel/sysrxe.c` | `hc` LSH |
 | **LML** | Markup language (config, UI, documents) | `kernel/lml.c` | — |
 | **Seed** | 셀프 호스팅 컴파일러 언어 (C 스타일 → BOSL) | — | `lang/seed/seedc` (C) |
 
-See `LIL.md` for LIL syntax, `GASM.md` for GASM, `LML.md` for LML, `LSH.md` for LSH shell, `lang/seed/SEED.md` for Seed, and `bosla` / this file for BOSL.
+See `LIL.md` for LIL syntax, `GASM.md` for GASM, `LML.md` for LML, `LSH.md` for LSH shell, `lang/seed/SEED.md` for Seed, and `bosla` / this file for BOSL. `hc hello.hc 5` runs HC source from the shell, and `LANG HC` selects HC in RXE/SYSRXE files.
 
 `vm status`, `vm limits`, and `vm selftest` expose the shared VM Monitor for
 BOSL, LIL, GASM, Lafillo VM, and OSVM. The monitor tracks runs, failures,

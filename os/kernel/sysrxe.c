@@ -243,6 +243,8 @@ static int lang_from_name(const char* name)
     if (streq_ci(name, "OSVM") || streq_ci(name, "OVM")) return SYSRXE_LANG_OSVM;
     if (streq_ci(name, "C") || streq_ci(name, "LC") || streq_ci(name, "LARDC")) return SYSRXE_LANG_C;
     if (streq_ci(name, "LML")) return SYSRXE_LANG_LML;
+    if (streq_ci(name, "HC") || streq_ci(name, "HOLYC") ||
+        streq_ci(name, "HOLY-C") || streq_ci(name, "LARDHC")) return SYSRXE_LANG_HC;
     return SYSRXE_LANG_LSH;
 }
 
@@ -307,6 +309,7 @@ static const char* lang_name(int lang)
     if (lang == SYSRXE_LANG_OSVM) return "OSVM";
     if (lang == SYSRXE_LANG_C) return "C";
     if (lang == SYSRXE_LANG_LML) return "LML";
+    if (lang == SYSRXE_LANG_HC) return "HC";
     return "LSH";
 }
 
@@ -1274,8 +1277,11 @@ static int capp_run(sysrxe_app_t* app, const char* src, const char* input, app_o
         if (!*p) break;
         c.p = p;
         if (*p == ';' || *p == '\n' || *p == '\r') { c.p++; continue; }
-        if (starts_ci_word(p, "int")) {
-            c.p = skip_ws(p + 3);
+        if (starts_ci_word(p, "int") || starts_ci_word(p, "I64") ||
+            starts_ci_word(p, "U64") || starts_ci_word(p, "Bool")) {
+            if (starts_ci_word(p, "I64") || starts_ci_word(p, "U64")) c.p = skip_ws(p + 3);
+            else if (starts_ci_word(p, "Bool")) c.p = skip_ws(p + 4);
+            else c.p = skip_ws(p + 3);
             if (c_read_ident(&c, name, sizeof(name))) {
                 int64_t value = 0;
                 p = skip_ws(c.p);
@@ -1330,6 +1336,26 @@ static int capp_run(sysrxe_app_t* app, const char* src, const char* input, app_o
         }
     }
     return 0;
+}
+
+int sysrxe_run_hc_source(const char* src, const char* input, char* out, uint32_t out_cap)
+{
+    static char raw[2048];
+    sysrxe_app_t app;
+    app_out_t buf;
+    int r;
+    if (!out || out_cap == 0) return -1;
+    memset(&app, 0, sizeof(app));
+    app.lang = SYSRXE_LANG_HC;
+    app_out_init(&buf, raw, sizeof(raw));
+    r = capp_run(&app, src, input, &buf);
+    if (r != 0) {
+        app_out_append(&buf, "HC execution failed: ");
+        app_out_append_i64(&buf, r);
+        app_putc('\n', &buf);
+    }
+    copy_text(out, out_cap, raw);
+    return r;
 }
 
 static int lml_emit_cb(lml_event_t ev, const char* name, const char* value, void* user)
@@ -1389,7 +1415,7 @@ static int app_run_language(sysrxe_app_t* a, const char* input, char* out, uint3
         r = lafillo_vm_asm_eval(src, app_putc, &buf);
     } else if (a->lang == SYSRXE_LANG_OSVM) {
         r = os_vm_asm_eval(src, app_putc, &buf);
-    } else if (a->lang == SYSRXE_LANG_C) {
+    } else if (a->lang == SYSRXE_LANG_C || a->lang == SYSRXE_LANG_HC) {
         r = capp_run(a, src, input, &buf);
     } else if (a->lang == SYSRXE_LANG_LML) {
         r = lml_parse(src, lml_emit_cb, &buf);
@@ -1536,10 +1562,18 @@ int sysrxe_selftest(void)
         "NAME LIL App\n"
         "LANG LIL\n"
         "CODE (print (+ 40 2))\n";
+    static const char hcapp[] =
+        "RXE 1\n"
+        "ID hc-app\n"
+        "NAME HC App\n"
+        "LANG HC\n"
+        "CODE I64 bonus = 80;\n"
+        "CODE PrintLn(input + bonus);\n";
     sysrxe_app_t app;
     sysrxe_app_t game_app;
     sysrxe_app_t c_app;
     sysrxe_app_t lil_app;
+    rxe_app_t hc_app;
     char out[512];
     char visible[256];
     if (parse_sysrxe(&app, "test.sysrxe", sample, sizeof(sample) - 1) != 0) return -1;
@@ -1580,6 +1614,12 @@ int sysrxe_selftest(void)
     if (lil_app.lang != SYSRXE_LANG_LIL || !lil_app.code[0]) return -30;
     if (app_run_language(&lil_app, "", out, sizeof(out)) != 0) return -31;
     if (strcmp(out, "42\n") != 0) return -32;
+    if (parse_normal_rxe(&hc_app, "hc.rxe", hcapp, sizeof(hcapp) - 1) != 0) return -39;
+    if (hc_app.lang != SYSRXE_LANG_HC || !hc_app.code[0]) return -40;
+    if (app_run_language(&hc_app, "5", out, sizeof(out)) != 0) return -41;
+    if (strcmp(out, "85\n") != 0) return -42;
+    if (sysrxe_run_hc_source("I64 x = 10;\nPrintLn(input + x);\n", "2", out, sizeof(out)) != 0) return -43;
+    if (strcmp(out, "12\n") != 0) return -44;
     return 0;
 }
 

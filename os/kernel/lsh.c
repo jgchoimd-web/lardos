@@ -348,7 +348,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
-    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "hc", 1 }, { "holyc", 1 }, { "lardhc", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "pinclip", 1 }, { "fixedclip", 1 }, { "pclip", 1 },
@@ -2937,7 +2937,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -2952,6 +2952,7 @@ static void cmd_help(const char* args)
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
+    out_append("  hc file.hc [input]                run HC source through the native app runner\n");
     out_append("  lword show|add|title|section|bullet|quote|code|find|stats|new  document app\n");
     out_append("  lsheet show|add|cell|formula|col|csv|sum|find|new  spreadsheet app\n");
     out_append("  lshow show|add|play|next|prev|slide N|theme|note|new  presentation app\n");
@@ -3019,7 +3020,7 @@ static void cmd_control(const char* args)
     out_append("  _: merges R:/X:/Y:/Z:/A:; writes go visibly to R:.\n");
     out_append("  LardOS Connect can share MegaClipboard, CPU, GPU, storage, and peripherals over LAN; keyboard/mouse stay local.\n");
     out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
-    out_append("  Code runs through LSH, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
+    out_append("  Code runs through LSH, HC, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
     out_append("  DOS mode visibly maps _:/C:/A:/Z:/U:/R: onto LardOS drives.\n");
     out_append("  The user owns the machine: SUM exposes raw I/O and memory controls.\n");
     out_append("  Values: visible power, editable state, local formats, explainable automation, repair over halt.\n");
@@ -11434,6 +11435,39 @@ static void cmd_gasm(const char* args)
     }
 }
 
+static void cmd_hc(const char* args)
+{
+    char file_arg[64];
+    char name[64];
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    static char src[SYSRXE_CODE_MAX];
+    static char result[2048];
+    const char* p = args ? args : "";
+    if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
+        out_append("Usage: hc [drive:]file.hc [input]\n");
+        return;
+    }
+    if (lsh_read_data_arg(file_arg, &data, &size, name, sizeof(name)) != 0 || !name[0]) {
+        out_append("HC file not found.\n");
+        return;
+    }
+    if (!data || size == 0) {
+        out_append("HC file empty or not found.\n");
+        return;
+    }
+    if (size >= sizeof(src)) {
+        out_append("HC source too large.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < size; i++) src[i] = (char)data[i];
+    src[size] = '\0';
+    if (sysrxe_run_hc_source(src, p, result, sizeof(result)) != 0) {
+        out_append("HC execution failed.\n");
+    }
+    if (result[0]) out_append(result);
+}
+
 #define DVM_MAGIC 0x004D5644u  /* "DVM\0" LE */
 
 static void cmd_lafvm(const char* args)
@@ -12446,6 +12480,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "larsapp") == 0) { cmd_larsapp(args); return; }
     if (strcmp(cmd, "sysrxe") == 0) { cmd_sysrxe(args); return; }
     if (strcmp(cmd, "rxe") == 0) { cmd_rxe(args); return; }
+    if (strcmp(cmd, "hc") == 0 || strcmp(cmd, "holyc") == 0 ||
+        strcmp(cmd, "lardhc") == 0) { cmd_hc(args); return; }
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) { cmd_kmodtalk(args); return; }
     if (strcmp(cmd, "kmo") == 0) { cmd_kmo(args); return; }
     if (strcmp(cmd, "liveupdate") == 0 || strcmp(cmd, "live") == 0) { cmd_liveupdate(args); return; }

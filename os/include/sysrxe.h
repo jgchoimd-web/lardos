@@ -35,6 +35,7 @@
 #define SYSRXE_LANG_OSVM 5
 #define SYSRXE_LANG_C 6
 #define SYSRXE_LANG_LML 7
+#define SYSRXE_LANG_HC 8
 #define SYSRXE_RESIZE_REFLOW 0
 #define SYSRXE_RESIZE_FIXED 1
 
@@ -101,6 +102,7 @@ int sysrxe_index_from_app(int app);
 int sysrxe_load_file(const char* name);
 int sysrxe_format_home(int app, char* out, uint32_t out_cap);
 int sysrxe_run(int app, const char* input, char* out, uint32_t out_cap);
+int sysrxe_run_hc_source(const char* src, const char* input, char* out, uint32_t out_cap);
 int sysrxe_apply_appkit(int app, const char* script);
 int sysrxe_is_game(int app);
 int sysrxe_selftest(void);

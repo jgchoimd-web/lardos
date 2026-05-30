@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.7.0b-mirage` adds `HC`, a LardOS-owned HolyC-flavored language surface for
+both shell scripts and RXE/SYSRXE executables. `hc hello.hc 5` runs a local
+`.hc` file through the native in-kernel app runner, while `LANG HC` lets
+`.rxe` and `.sysrxe` files carry HC-style `CODE` lines using `I64`, `U64`,
+`Bool`, `PrintLn`, `appkit(...)`, and `lsh(...)`. The demo `hc_demo.rxe` stays
+in `apps/bundled/` as real app source rather than a hard-coded GUI branch.
+
 `v2.6.0b-mirage` adds `LSND`, a native editable vector sound recording
 format for boot sounds and short OS effects. `sound status`, `sound on|off`,
 `sound boot on|off`, `sound fx on|off`, `sound play file.lsnd`, and
@@ -145,8 +152,8 @@ above the user.
 
 `v2.0.2b` moves bundled app source out of `kernel/fs.c` and into
 `apps/bundled/`. The build now converts `hello.sysrxe`, `demo_game.rxe`,
-`langdemo.rxe`, `lardwrite.rxe`, `lardsheet.rxe`, and `lardshow.rxe` into
-generated payload includes, while `fs.c` only registers the seed/default files.
+`langdemo.rxe`, `hc_demo.rxe`, `lardwrite.rxe`, `lardsheet.rxe`, and
+`lardshow.rxe` into generated payload includes, while `fs.c` only registers the seed/default files.
 This keeps default app code in a dedicated, editable app space instead of
 mixing it with filesystem registration code.
 
@@ -575,8 +582,8 @@ commands:
 - `mode guard` performs the real-mode roundtrip with a before/after guard and
   reports restoration state.
 - `vm status|limits|selftest|clear` monitors BOSL, LIL, GASM, Lafillo VM, and
-  OSVM runs under common step budgets; `gasm file.gasm` runs GASM source from
-  the shell.
+  OSVM runs under common step budgets; `gasm file.gasm` runs GASM source and
+  `hc file.hc [input]` runs HC source from the shell.
 - `shrine status|list|verify|run|test` exposes LSS, the Lard Subsystem for
   Shrine. `srine` is accepted as a typo-friendly alias.
 - `sram` / `screenram` turns a quiet framebuffer/backbuffer rectangle into

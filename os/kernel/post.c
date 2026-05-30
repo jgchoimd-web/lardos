@@ -200,6 +200,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user kmo writable", fs_open_writable("user0.kmo") != NULL, emit, user, &pass, &fail);
     post_check("fs: fstwt writable", fs_open_writable("fstwt.fstwts") != NULL, emit, user, &pass, &fail);
+    post_check("fs: lpst name mapping", fs_persist_mapping_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: hard delete overlay ownership", fs_delete_overlay_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable rename", fs_rename_selftest() == 0, emit, user, &pass, &fail);
     post_check("fs: writable directory index", fs_writable_count() >= 36u, emit, user, &pass, &fail);

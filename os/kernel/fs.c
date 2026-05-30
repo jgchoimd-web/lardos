@@ -677,6 +677,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.92.1p makes HTTPS visible with webstack tls, LardTLS info, and POST/selftest TLS checks while preserving all v1.92 methods.\n"
     "li v1.92.0b expands HTTP/HTTPS to GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS without external web libraries.\n"
     "li v1.91.1p hotpatches GUI resize hit-testing so only the visible bottom-right grip starts window resizing.\n"
+    "li v2.8.1p hotpatches LPST name-based writable restore and fullscreen monitor retargeting.\n"
     "li v2.8.0b adds user-owned multi-monitor layout with monitor commands, monitors.lardd, virtual split/mirror modes, and monitor-local fullscreen.\n"
     "li v2.7.0b adds HC for shell .hc files and LANG HC in RXE/SYSRXE executables without replacing LANG C.\n"
     "li v2.6.0b adds native LSND vector sound files plus boot/effect sound toggles through sound.lardd.\n"
@@ -1905,6 +1906,7 @@ static FsFile g_ram_result;
 static int fs_name_eq(const char* a, const char* b);
 static uint32_t writable_count(void);
 static FsWritableFile* writable_at(uint32_t idx);
+static int fs_is_empty_rxr_slot(const FsWritableFile* w);
 
 typedef struct {
     void (*cb)(const char* name, uint32_t size, void* user);
@@ -2795,6 +2797,40 @@ static int lpst_name_equals(const uint8_t* fixed_name, const char* name)
     return 0;
 }
 
+static FsWritableFile* lpst_find_writable_for_entry(const uint8_t* entry, uint32_t fallback_index,
+                                                    int* matched_by_name)
+{
+    if (matched_by_name) *matched_by_name = 0;
+    if (lpst_entry_name_valid(entry)) {
+        for (uint32_t wi = 0; wi < writable_count(); wi++) {
+            FsWritableFile* cand = writable_at(wi);
+            if (cand && lpst_name_equals(entry, cand->name)) {
+                if (matched_by_name) *matched_by_name = 1;
+                return cand;
+            }
+        }
+    }
+    return fallback_index < writable_count() ? writable_at(fallback_index) : NULL;
+}
+
+int fs_persist_mapping_selftest(void)
+{
+    uint8_t entry[LPST_ENTRY_SIZE];
+    FsWritableFile* sound = fs_open_writable("sound.lardd");
+    FsWritableFile* monitor = fs_open_writable("monitors.lardd");
+    FsWritableFile* picked;
+    for (uint32_t i = 0; i < sizeof(entry); i++) entry[i] = 0;
+    if (!sound || !monitor) return -1;
+    for (uint32_t i = 0; sound->name[i] && i < 31u; i++) entry[i] = (uint8_t)sound->name[i];
+    picked = lpst_find_writable_for_entry(entry, 44u, NULL);
+    if (picked != sound) return -2;
+    for (uint32_t i = 0; i < sizeof(entry); i++) entry[i] = 0;
+    for (uint32_t i = 0; monitor->name[i] && i < 31u; i++) entry[i] = (uint8_t)monitor->name[i];
+    picked = lpst_find_writable_for_entry(entry, 45u, NULL);
+    if (picked != monitor) return -3;
+    return 0;
+}
+
 void fs_mark_dirty(void)
 {
     s_fs_dirty = 1;
@@ -2922,22 +2958,13 @@ int fs_persist_load(void)
         uint32_t cap = lpst_read32(entry + 40);
         uint32_t hash = lpst_read32(entry + 44);
         FsWritableFile* w = NULL;
+        int matched_by_name = 0;
 
-        if (count == writable_count()) {
-            w = writable_at(i);
-        } else {
-            for (uint32_t wi = 0; wi < writable_count(); wi++) {
-                FsWritableFile* cand = writable_at(wi);
-                if (cand && lpst_name_equals(entry, cand->name)) {
-                    w = cand;
-                    break;
-                }
-            }
-        }
+        w = lpst_find_writable_for_entry(entry, i, &matched_by_name);
         if (!w) continue;
         if (cap != w->cap || size > w->cap || data_off > total || size > total - data_off) continue;
         if (lpst_hash(s_lpstore + data_off, size) != hash) continue;
-        if (count == writable_count() && lpst_entry_name_valid(entry)) {
+        if (!matched_by_name && fs_is_empty_rxr_slot(w) && lpst_entry_name_valid(entry)) {
             lpst_entry_name_copy(w->name, sizeof(w->name), entry);
         }
         for (uint32_t j = 0; j < size; j++) w->data[j] = s_lpstore[data_off + j];

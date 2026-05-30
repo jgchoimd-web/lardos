@@ -51,6 +51,7 @@ int fs_readonly_deleted(const char* name);
 int fs_delete_overlay_selftest(void);
 int fs_rename_selftest(void);
 int fs_path_selftest(void);
+int fs_persist_mapping_selftest(void);
 
 /* Persistent LPST store on the boot block device. */
 int fs_persist_load(void);

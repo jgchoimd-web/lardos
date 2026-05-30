@@ -52,6 +52,13 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.8.1p-mirage` hotpatches two bugs found during the multi-monitor audit.
+LPST persistence now restores writable settings by file name first instead of
+trusting table order when the writable count is unchanged, which protects files
+such as `monitors.lardd`, `sound.lardd`, and `usersound.lsnd` from slot drift.
+Fullscreen windows can also be retargeted with `monitor active N` or
+`monitor move N` without snapping back to the previous monitor.
+
 `v2.8.0b-mirage` adds user-owned multi-monitor layout. `monitor count 2`,
 `monitor layout hstack|vstack|grid|mirror`, `monitor active 1`, and
 `monitor move 2` split the visible desktop into monitor regions, keep the

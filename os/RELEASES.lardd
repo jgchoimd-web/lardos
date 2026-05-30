@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.8.1p-mirage
+ITEM Hotpatches LPST writable-file restore so saved settings are matched by file name first instead of trusting table order when the writable count is unchanged.
+ITEM Prevents fixed writable slots from being renamed by persisted entries, protecting monitors.lardd, sound.lardd, usersound.lsnd, and future user-owned settings from slot-order drift.
+ITEM Hotpatches fullscreen multi-monitor movement so monitor active N and monitor move N can retarget a fullscreen window to the selected monitor instead of snapping back to the old window center.
+ITEM Adds POST/selftest coverage for LPST name mapping and extends the monitor selftest to cover fullscreen retargeting.
+ITEM Preserves v2.8.0b multi-monitor layout, all writable files, RXE/SYSRXE, HC, LSND, wallpaper, clipboard, LardOS Connect, and user-control values without feature loss.
+
 SECTION v2.8.0b-mirage
 ITEM Adds user-owned multi-monitor desktop layout through monitor/monitors/display/multimon shell commands.
 ITEM Adds monitor count 1..4, monitor layout single/hstack/vstack/grid/mirror, monitor active N, and monitor move N.

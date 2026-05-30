@@ -1565,6 +1565,21 @@ int gui_monitor_selftest(void)
     g_monitor_active = 0u;
     gui_monitor_recompute();
     if (ok && !gui_monitor_layout_rects_ok()) ok = 0;
+    g_monitor_count = 2u;
+    g_monitor_layout = GUI_MONITOR_LAYOUT_HSTACK;
+    g_monitor_active = 1u;
+    gui_monitor_recompute();
+    if (ok) {
+        const gui_monitor_rect_t* m = gui_monitor_active_rect();
+        g.win_visible = 1;
+        g.fullscreen = 1;
+        g.win_x = 0;
+        g.win_y = 32;
+        g.win_w = 160;
+        g.win_h = 160;
+        gui_apply_fullscreen();
+        if (!m || g.win_x != m->x || g.win_y != m->y || g.win_w != m->w || g.win_h != m->h) ok = 0;
+    }
 
     g_monitor_count = old_count;
     g_monitor_layout = old_layout;
@@ -3807,10 +3822,6 @@ static void gui_apply_fullscreen(void)
 {
     const gui_monitor_rect_t* m;
     if (!g_have_fb || !g.fullscreen) return;
-    if (gui_monitor_effective_count() > 1u) {
-        int idx = gui_monitor_index_for_window();
-        if (idx >= 0) g_monitor_active = (uint32_t)idx;
-    }
     m = gui_monitor_active_rect();
     if (!m) return;
     g.win_x = m->x;
@@ -3984,6 +3995,10 @@ static void gui_toggle_fullscreen(void)
 {
     if (!g_have_fb) return;
     if (!g.fullscreen) {
+        if (gui_monitor_effective_count() > 1u) {
+            int idx = gui_monitor_index_for_window();
+            if (idx >= 0) g_monitor_active = (uint32_t)idx;
+        }
         g.restore_x = g.win_x;
         g.restore_y = g.win_y;
         g.restore_w = g.win_w;

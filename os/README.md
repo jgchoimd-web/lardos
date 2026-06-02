@@ -52,6 +52,15 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.9.1p-mirage` hotpatches GUI resizing and presentation. Stretch-resize
+preview no longer draws the original active window at the old size while also
+showing the preview at the new size. When a backbuffer is available, GUI render
+now computes a dirty rectangle from the old/current window, cursor, top bar,
+dock, settings, ScreenRAM, and resize preview state, redraws that clipped area,
+and only filtered-blits that area to the real framebuffer. First frame,
+screensaver, animated video wallpaper frame changes, and desktop item drags keep
+full redraw for correctness.
+
 `v2.9.0b-mirage` adds language/input support without removing existing command
 forms. Shell command names are ASCII case-insensitive, so `HELP`, `Help`,
 `DIR`, and `Status` resolve like their lower-case forms. LSH also accepts

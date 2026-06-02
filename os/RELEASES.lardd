@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.9.1p-mirage
+ITEM Hotpatches GUI stretch-resize preview so the original active window is no longer drawn at the old size while the preview is shown at the new size.
+ITEM Replaces full-screen present on every mouse/window motion with dirty-rectangle redraw and dirty-rectangle filtered blit when the backbuffer is available.
+ITEM Keeps full redraw for first frame, screensaver, animated video wallpaper frame changes, and desktop item drag paths where the whole desktop can legitimately change.
+ITEM Clips fill, wallpaper, and pixel paths to the dirty area so mouse movement and window dragging avoid repainting unchanged screen regions.
+ITEM Preserves live resize, stretch resize, fullscreen, desktop/dock items, RXE/SYSRXE apps, Hangul input, screen capture, ScreenRAM, renderfx settings, and user-control values without feature loss.
+
 SECTION v2.9.0b-mirage
 ITEM Adds ASCII case-insensitive shell command dispatch so HELP, Help, hElP, DIR, Status, and other English command forms work without changing the command's meaning.
 ITEM Adds Korean UTF-8 shell aliases such as 도움말, 상태, 목록, 읽기, 쓰기, 복사, 이름변경, 삭제, 종료, 재시작, 설정, 한글, 배경화면, 모니터, 커서, 클립보드, and 연결.

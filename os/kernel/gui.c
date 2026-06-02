@@ -224,6 +224,7 @@ static uint32_t g_wallpaper_lrec_frames;
 static uint32_t g_wallpaper_lrec_frame_bytes;
 static uint32_t g_wallpaper_lrec_frame;
 static uint32_t g_wallpaper_last_error;
+static uint32_t g_wallpaper_generation;
 static uint32_t g_wallpaper_pixels[GUI_WALLPAPER_BMP_MAX_W * GUI_WALLPAPER_BMP_MAX_H];
 static char g_wallpaper_cfg_buf[GUI_WALLPAPER_CFG_MAX];
 #define GUI_LDI_ICON_MAX_W 32u
@@ -235,6 +236,57 @@ static uint32_t g_backbuf[1024u * 768u];
 static fb_t g_bb;
 static int g_have_bb;
 static const fb_t* g_syscall_target_override;
+
+typedef struct {
+    int x;
+    int y;
+    int w;
+    int h;
+} gui_rect_t;
+
+typedef struct {
+    int valid;
+    int mx;
+    int my;
+    int win_visible;
+    int fullscreen;
+    int app_id;
+    int win_x;
+    int win_y;
+    int win_w;
+    int win_h;
+    int resizing;
+    int resize_visual_mode;
+    int resize_preview_x;
+    int resize_preview_y;
+    int resize_preview_w;
+    int resize_preview_h;
+    int settings_open;
+    int item_drag_area;
+    int ss_active;
+    uint32_t wallpaper_lrec_frame;
+    uint32_t glyph_tick;
+    uint32_t fb_w;
+    uint32_t fb_h;
+    int brightness;
+    int quality;
+    int aa_mode;
+    uint32_t subpx_enabled;
+    uint32_t subpx_rules;
+    uint32_t wallpaper_mode;
+    uint32_t wallpaper_color1;
+    uint32_t wallpaper_color2;
+    uint32_t wallpaper_generation;
+    uint32_t monitor_count;
+    uint32_t monitor_layout;
+} gui_present_state_t;
+
+static gui_present_state_t g_present_state;
+static int g_clip_enabled;
+static int g_clip_x;
+static int g_clip_y;
+static int g_clip_w;
+static int g_clip_h;
 
 static void gui_clamp_window(void);
 static void gui_apply_fullscreen(void);
@@ -480,6 +532,7 @@ static int fb_from_bootinfo(fb_t* out)
 
 static void fb_putpixel(const fb_t* f, uint16_t x, uint16_t y, uint32_t argb);
 static uint32_t fb_getpixel(const fb_t* f, uint16_t x, uint16_t y);
+static void fb_fill_rect(const fb_t* f, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t argb);
 
 static uint32_t screenram_rect_capacity(uint32_t w, uint32_t h)
 {
@@ -768,10 +821,65 @@ static uint32_t gui_apply_subpx_filter(uint16_t x, uint16_t y, uint32_t argb)
     return a | ((uint32_t)r << 16) | ((uint32_t)gch << 8) | (uint32_t)b;
 }
 
-static void fb_blit(const fb_t* dst, const fb_t* src)
+static void gui_clip_disable(void)
 {
-    uint16_t w = src->w < dst->w ? src->w : dst->w;
-    uint16_t h = src->h < dst->h ? src->h : dst->h;
+    g_clip_enabled = 0;
+    g_clip_x = 0;
+    g_clip_y = 0;
+    g_clip_w = 0;
+    g_clip_h = 0;
+}
+
+static void gui_clip_set_rect(int x, int y, int w, int h)
+{
+    if (w <= 0 || h <= 0) {
+        gui_clip_disable();
+        return;
+    }
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (w <= 0 || h <= 0) {
+        gui_clip_disable();
+        return;
+    }
+    g_clip_enabled = 1;
+    g_clip_x = x;
+    g_clip_y = y;
+    g_clip_w = w;
+    g_clip_h = h;
+}
+
+static int gui_clip_contains(int x, int y)
+{
+    if (!g_clip_enabled) return 1;
+    return x >= g_clip_x && y >= g_clip_y &&
+           x < g_clip_x + g_clip_w && y < g_clip_y + g_clip_h;
+}
+
+static void gui_clip_bounds_for(const fb_t* f, int* x0, int* y0, int* x1, int* y1)
+{
+    int lx0 = 0;
+    int ly0 = 0;
+    int lx1 = f ? (int)f->w : 0;
+    int ly1 = f ? (int)f->h : 0;
+    if (g_clip_enabled) {
+        if (lx0 < g_clip_x) lx0 = g_clip_x;
+        if (ly0 < g_clip_y) ly0 = g_clip_y;
+        if (lx1 > g_clip_x + g_clip_w) lx1 = g_clip_x + g_clip_w;
+        if (ly1 > g_clip_y + g_clip_h) ly1 = g_clip_y + g_clip_h;
+    }
+    if (lx1 < lx0) lx1 = lx0;
+    if (ly1 < ly0) ly1 = ly0;
+    if (x0) *x0 = lx0;
+    if (y0) *y0 = ly0;
+    if (x1) *x1 = lx1;
+    if (y1) *y1 = ly1;
+}
+
+static void fb_blit_rect(const fb_t* dst, const fb_t* src, int rx, int ry, int rw, int rh)
+{
+    int max_w = src->w < dst->w ? src->w : dst->w;
+    int max_h = src->h < dst->h ? src->h : dst->h;
     int br = g.brightness;
     if (br < 50) br = 50;
     if (br > 150) br = 150;
@@ -781,13 +889,20 @@ static void fb_blit(const fb_t* dst, const fb_t* src)
     int aa = g.aa_mode;
     if (aa < GUI_AA_NONE) aa = GUI_AA_NONE;
     if (aa > GUI_AA_NONLINEAR) aa = GUI_AA_NONLINEAR;
-    for (uint16_t y = 0; y < h; y++) {
-        for (uint16_t x = 0; x < w; x++) {
+    if (rx < 0) { rw += rx; rx = 0; }
+    if (ry < 0) { rh += ry; ry = 0; }
+    if (rx + rw > max_w) rw = max_w - rx;
+    if (ry + rh > max_h) rh = max_h - ry;
+    if (rw <= 0 || rh <= 0) return;
+    for (int yy = ry; yy < ry + rh; yy++) {
+        for (int xx = rx; xx < rx + rw; xx++) {
+            uint16_t x = (uint16_t)xx;
+            uint16_t y = (uint16_t)yy;
             uint32_t p = fb_sample(src, x, y);
             uint32_t l = fb_sample(src, x > 0 ? (uint16_t)(x - 1u) : x, y);
-            uint32_t rpx = fb_sample(src, x + 1u < w ? (uint16_t)(x + 1u) : x, y);
+            uint32_t rpx = fb_sample(src, x + 1u < (uint16_t)max_w ? (uint16_t)(x + 1u) : x, y);
             uint32_t u = fb_sample(src, x, y > 0 ? (uint16_t)(y - 1u) : y);
-            uint32_t d = fb_sample(src, x, y + 1u < h ? (uint16_t)(y + 1u) : y);
+            uint32_t d = fb_sample(src, x, y + 1u < (uint16_t)max_h ? (uint16_t)(y + 1u) : y);
             uint32_t a = (p >> 24) & 0xFF;
             uint32_t center_luma = gui_luma(p);
             uint32_t avg_luma = (gui_luma(l) + gui_luma(rpx) + gui_luma(u) + gui_luma(d)) / 4u;
@@ -811,9 +926,17 @@ static void fb_blit(const fb_t* dst, const fb_t* src)
     }
 }
 
+static void fb_blit(const fb_t* dst, const fb_t* src)
+{
+    int w = src->w < dst->w ? src->w : dst->w;
+    int h = src->h < dst->h ? src->h : dst->h;
+    fb_blit_rect(dst, src, 0, 0, w, h);
+}
+
 static void fb_putpixel(const fb_t* f, uint16_t x, uint16_t y, uint32_t argb)
 {
     if (x >= f->w || y >= f->h) return;
+    if (!gui_clip_contains((int)x, (int)y)) return;
     uint8_t* row = (uint8_t*)f->fb + (uintptr_t)f->pitch_bytes * y;
     if (f->bpp == 32) {
         ((uint32_t*)row)[x] = argb;
@@ -854,18 +977,32 @@ static void gui_vblank_mark_frame(void)
 
 static void fb_clear(const fb_t* f, uint32_t argb)
 {
-    for (uint16_t y = 0; y < f->h; y++) {
-        for (uint16_t x = 0; x < f->w; x++) {
-            fb_putpixel(f, x, y, argb);
-        }
-    }
+    fb_fill_rect(f, 0, 0, f->w, f->h, argb);
 }
 
 static void fb_fill_rect(const fb_t* f, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t argb)
 {
-    for (uint16_t yy = 0; yy < h; yy++) {
-        for (uint16_t xx = 0; xx < w; xx++) {
-            fb_putpixel(f, (uint16_t)(x + xx), (uint16_t)(y + yy), argb);
+    int x0 = (int)x;
+    int y0 = (int)y;
+    int x1 = x0 + (int)w;
+    int y1 = y0 + (int)h;
+    int cx0;
+    int cy0;
+    int cx1;
+    int cy1;
+    gui_clip_bounds_for(f, &cx0, &cy0, &cx1, &cy1);
+    if (x0 < cx0) x0 = cx0;
+    if (y0 < cy0) y0 = cy0;
+    if (x1 > cx1) x1 = cx1;
+    if (y1 > cy1) y1 = cy1;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > (int)f->w) x1 = (int)f->w;
+    if (y1 > (int)f->h) y1 = (int)f->h;
+    if (x1 <= x0 || y1 <= y0) return;
+    for (int yy = y0; yy < y1; yy++) {
+        for (int xx = x0; xx < x1; xx++) {
+            fb_putpixel(f, (uint16_t)xx, (uint16_t)yy, argb);
         }
     }
 }
@@ -1206,24 +1343,6 @@ static void fb_draw_image_fit(const fb_t* f, int x, int y, int dw, int dh,
             if ((argb >> 24) != 0 && dx >= 0 && dy >= 0 && dx < (int)f->w && dy < (int)f->h) {
                 fb_putpixel(f, (uint16_t)dx, (uint16_t)dy, argb);
             }
-        }
-    }
-}
-
-static void fb_blit_scaled_rect(const fb_t* dst, const fb_t* src,
-                                int sx, int sy, int sw, int sh,
-                                int dx, int dy, int dw, int dh)
-{
-    if (!dst || !src || !dst->fb || !src->fb || sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
-    for (int y = 0; y < dh; y++) {
-        int ty = dy + y;
-        int src_y = sy + (y * sh) / dh;
-        if (ty < 0 || ty >= (int)dst->h || src_y < 0 || src_y >= (int)src->h) continue;
-        for (int x = 0; x < dw; x++) {
-            int tx = dx + x;
-            int src_x = sx + (x * sw) / dw;
-            if (tx < 0 || tx >= (int)dst->w || src_x < 0 || src_x >= (int)src->w) continue;
-            fb_putpixel(dst, (uint16_t)tx, (uint16_t)ty, fb_getpixel(src, (uint16_t)src_x, (uint16_t)src_y));
         }
     }
 }
@@ -1950,6 +2069,7 @@ static int gui_wallpaper_set_state(uint32_t mode, const char* name, const char* 
     g_wallpaper_color1 = gui_wallpaper_argb(color1);
     g_wallpaper_color2 = gui_wallpaper_argb(color2);
     g_wallpaper_last_error = 0;
+    g_wallpaper_generation++;
     if (persist) {
         r = gui_wallpaper_write_config();
         if (r != 0) {
@@ -2136,6 +2256,11 @@ static void gui_draw_wallpaper(const fb_t* tgt)
 {
     int sw = (int)tgt->w;
     int sh = (int)tgt->h;
+    int x0 = 0;
+    int y0 = 0;
+    int x1 = sw;
+    int y1 = sh;
+    gui_clip_bounds_for(tgt, &x0, &y0, &x1, &y1);
     if (g_wallpaper_mode == GUI_WALLPAPER_LREC && g_wallpaper_lrec_data &&
         g_wallpaper_lrec_w && g_wallpaper_lrec_h && g_wallpaper_lrec_frames &&
         g_wallpaper_lrec_frame_bytes) {
@@ -2143,9 +2268,9 @@ static void gui_draw_wallpaper(const fb_t* tgt)
         const uint8_t* frame = g_wallpaper_lrec_data + g_wallpaper_lrec_header_size +
                                frame_idx * g_wallpaper_lrec_frame_bytes;
         g_wallpaper_lrec_frame = frame_idx;
-        for (int y = 0; y < sh; y++) {
+        for (int y = y0; y < y1; y++) {
             uint32_t sy = ((uint32_t)y * g_wallpaper_lrec_h) / (uint32_t)sh;
-            for (int x = 0; x < sw; x++) {
+            for (int x = x0; x < x1; x++) {
                 uint32_t sx = ((uint32_t)x * g_wallpaper_lrec_w) / (uint32_t)sw;
                 uint8_t luma = frame[sy * g_wallpaper_lrec_w + sx];
                 uint32_t c = 0xFF000000u | ((uint32_t)luma << 16) |
@@ -2156,9 +2281,9 @@ static void gui_draw_wallpaper(const fb_t* tgt)
         return;
     }
     if (g_wallpaper_mode == GUI_WALLPAPER_BMP && g_wallpaper_bmp_w && g_wallpaper_bmp_h) {
-        for (int y = 0; y < sh; y++) {
+        for (int y = y0; y < y1; y++) {
             uint32_t sy = (uint32_t)y % g_wallpaper_bmp_h;
-            for (int x = 0; x < sw; x++) {
+            for (int x = x0; x < x1; x++) {
                 uint32_t sx = (uint32_t)x % g_wallpaper_bmp_w;
                 uint32_t c = g_wallpaper_pixels[sy * g_wallpaper_bmp_w + sx];
                 fb_putpixel(tgt, (uint16_t)x, (uint16_t)y, (c >> 24) ? c : g_wallpaper_color1);
@@ -2171,8 +2296,9 @@ static void gui_draw_wallpaper(const fb_t* tgt)
         for (int y = 24; y < sh; y += 28) fb_fill_rect(tgt, 0, (uint16_t)y, tgt->w, 1, g_wallpaper_color2);
         for (int x = 0; x < sw; x += 36) fb_fill_rect(tgt, (uint16_t)x, 24, 1, (uint16_t)(sh > 24 ? sh - 24 : 0), g_wallpaper_color2);
     } else if (g_wallpaper_mode == GUI_WALLPAPER_STRIPES) {
-        for (int y = 24; y < sh; y++) {
-            for (int x = 0; x < sw; x++) {
+        int sy0 = y0 < 24 ? 24 : y0;
+        for (int y = sy0; y < y1; y++) {
+            for (int x = x0; x < x1; x++) {
                 if (((x + y) / 16) & 1) fb_putpixel(tgt, (uint16_t)x, (uint16_t)y, g_wallpaper_color2);
             }
         }
@@ -2278,6 +2404,8 @@ int gui_init(void)
     g.resp_total_lines = 0;
     g.scroll_drag = 0;
     g.scroll_drag_off_y = 0;
+    g_present_state.valid = 0;
+    gui_clip_disable();
     g.http_post_mode = GUI_HTTP_GET;
     g.app_id = 0;
     g.calc_display[0] = '0';
@@ -7201,6 +7329,225 @@ static void fb_fill_circle(const fb_t* f, int cx, int cy, int r, uint32_t color)
     }
 }
 
+static gui_rect_t gui_rect_empty(void)
+{
+    gui_rect_t r = { 0, 0, 0, 0 };
+    return r;
+}
+
+static gui_rect_t gui_rect_screen(void)
+{
+    gui_rect_t r = { 0, 0, g_have_fb ? (int)g_fb.w : 0, g_have_fb ? (int)g_fb.h : 0 };
+    return r;
+}
+
+static gui_rect_t gui_rect_clamp(gui_rect_t r)
+{
+    int x2 = r.x + r.w;
+    int y2 = r.y + r.h;
+    if (!g_have_fb || r.w <= 0 || r.h <= 0) return gui_rect_empty();
+    if (r.x < 0) r.x = 0;
+    if (r.y < 0) r.y = 0;
+    if (x2 > (int)g_fb.w) x2 = (int)g_fb.w;
+    if (y2 > (int)g_fb.h) y2 = (int)g_fb.h;
+    r.w = x2 - r.x;
+    r.h = y2 - r.y;
+    if (r.w <= 0 || r.h <= 0) return gui_rect_empty();
+    return r;
+}
+
+static gui_rect_t gui_rect_expand(gui_rect_t r, int pad)
+{
+    r.x -= pad;
+    r.y -= pad;
+    r.w += pad * 2;
+    r.h += pad * 2;
+    return gui_rect_clamp(r);
+}
+
+static void gui_dirty_union(gui_rect_t* dirty, gui_rect_t r)
+{
+    int dx2;
+    int dy2;
+    int rx2;
+    int ry2;
+    r = gui_rect_clamp(r);
+    if (!dirty || r.w <= 0 || r.h <= 0) return;
+    if (dirty->w <= 0 || dirty->h <= 0) {
+        *dirty = r;
+        return;
+    }
+    dx2 = dirty->x + dirty->w;
+    dy2 = dirty->y + dirty->h;
+    rx2 = r.x + r.w;
+    ry2 = r.y + r.h;
+    if (r.x < dirty->x) dirty->x = r.x;
+    if (r.y < dirty->y) dirty->y = r.y;
+    if (rx2 > dx2) dx2 = rx2;
+    if (ry2 > dy2) dy2 = ry2;
+    dirty->w = dx2 - dirty->x;
+    dirty->h = dy2 - dirty->y;
+}
+
+static gui_rect_t gui_current_window_dirty_rect(void)
+{
+    gui_rect_t r = gui_rect_empty();
+    if (!g.win_visible) return r;
+    if (g.resizing && gui_resize_mode() == GUI_RESIZE_STRETCH && g_have_bb) {
+        r.x = g.resize_preview_x;
+        r.y = g.resize_preview_y;
+        r.w = g.resize_preview_w;
+        r.h = g.resize_preview_h;
+    } else {
+        r.x = g.win_x;
+        r.y = g.win_y;
+        r.w = g.win_w;
+        r.h = g.win_h;
+    }
+    return gui_rect_expand(r, 12);
+}
+
+static gui_rect_t gui_present_window_dirty_rect(const gui_present_state_t* s)
+{
+    gui_rect_t r = gui_rect_empty();
+    if (!s || !s->win_visible) return r;
+    if (s->resizing && s->resize_visual_mode == GUI_RESIZE_STRETCH && g_have_bb) {
+        r.x = s->resize_preview_x;
+        r.y = s->resize_preview_y;
+        r.w = s->resize_preview_w;
+        r.h = s->resize_preview_h;
+    } else {
+        r.x = s->win_x;
+        r.y = s->win_y;
+        r.w = s->win_w;
+        r.h = s->win_h;
+    }
+    return gui_rect_expand(r, 12);
+}
+
+static void gui_dirty_add_cursor(gui_rect_t* dirty, int mx, int my)
+{
+    gui_rect_t r = { mx - 4, my - 4, 32, 32 };
+    gui_dirty_union(dirty, r);
+}
+
+static void gui_dirty_add_dock(gui_rect_t* dirty)
+{
+    int dx;
+    int dy;
+    int dw;
+    int dh;
+    int cell;
+    gui_dock_rect(&dx, &dy, &dw, &dh, &cell);
+    gui_dirty_union(dirty, (gui_rect_t){ dx - 4, dy - 4, dw + 8, dh + 8 });
+}
+
+static void gui_dirty_add_topbars(gui_rect_t* dirty)
+{
+    for (uint32_t mi = 0; mi < gui_monitor_effective_count(); mi++) {
+        const gui_monitor_rect_t* m = gui_monitor_rect_by_index(mi);
+        if (m) gui_dirty_union(dirty, (gui_rect_t){ m->x, m->y, m->w, 26 });
+    }
+}
+
+static gui_rect_t gui_dirty_compute(void)
+{
+    gui_rect_t dirty = gui_rect_empty();
+    uint32_t wall_frame = g_wallpaper_lrec_frame;
+    if (!g_have_bb || !g_present_state.valid ||
+        g_present_state.fb_w != (uint32_t)g_fb.w ||
+        g_present_state.fb_h != (uint32_t)g_fb.h) {
+        return gui_rect_screen();
+    }
+    if (g_present_state.brightness != g.brightness ||
+        g_present_state.quality != g.quality ||
+        g_present_state.aa_mode != g.aa_mode ||
+        g_present_state.subpx_enabled != g_subpx_enabled ||
+        g_present_state.subpx_rules != g_subpx_rule_count ||
+        g_present_state.wallpaper_mode != g_wallpaper_mode ||
+        g_present_state.wallpaper_color1 != g_wallpaper_color1 ||
+        g_present_state.wallpaper_color2 != g_wallpaper_color2 ||
+        g_present_state.wallpaper_generation != g_wallpaper_generation ||
+        g_present_state.monitor_count != g_monitor_count ||
+        g_present_state.monitor_layout != g_monitor_layout) {
+        return gui_rect_screen();
+    }
+    if (g.ss_active || g_present_state.ss_active) return gui_rect_screen();
+    if (g_wallpaper_mode == GUI_WALLPAPER_LREC && g_wallpaper_lrec_frames) {
+        wall_frame = (g.glyph_tick / 6u) % g_wallpaper_lrec_frames;
+        if (wall_frame != g_present_state.wallpaper_lrec_frame) return gui_rect_screen();
+    }
+    if (g.item_drag_area || g_present_state.item_drag_area) return gui_rect_screen();
+
+    gui_dirty_union(&dirty, gui_present_window_dirty_rect(&g_present_state));
+    gui_dirty_union(&dirty, gui_current_window_dirty_rect());
+    gui_dirty_add_cursor(&dirty, g_present_state.mx, g_present_state.my);
+    gui_dirty_add_cursor(&dirty, g.mx, g.my);
+
+    if (g.mx != g_present_state.mx || g.my != g_present_state.my ||
+        g.app_id != g_present_state.app_id ||
+        g.settings_open != g_present_state.settings_open) {
+        gui_dirty_add_topbars(&dirty);
+        gui_dirty_add_dock(&dirty);
+    }
+    if (!g.win_visible || !g_present_state.win_visible) {
+        gui_dirty_union(&dirty, (gui_rect_t){ 0, 24, 260, 210 });
+    }
+    if (g_screenram_enabled) {
+        gui_dirty_union(&dirty, (gui_rect_t){ (int)g_screenram_x, (int)g_screenram_y,
+                                             (int)g_screenram_w, (int)g_screenram_h });
+    }
+    if (dirty.w <= 0 || dirty.h <= 0) dirty = gui_rect_screen();
+    return gui_rect_clamp(dirty);
+}
+
+static void gui_present_snapshot(void)
+{
+    g_present_state.valid = 1;
+    g_present_state.mx = g.mx;
+    g_present_state.my = g.my;
+    g_present_state.win_visible = g.win_visible;
+    g_present_state.fullscreen = g.fullscreen;
+    g_present_state.app_id = g.app_id;
+    g_present_state.win_x = g.win_x;
+    g_present_state.win_y = g.win_y;
+    g_present_state.win_w = g.win_w;
+    g_present_state.win_h = g.win_h;
+    g_present_state.resizing = g.resizing;
+    g_present_state.resize_visual_mode = gui_resize_mode();
+    g_present_state.resize_preview_x = g.resize_preview_x;
+    g_present_state.resize_preview_y = g.resize_preview_y;
+    g_present_state.resize_preview_w = g.resize_preview_w;
+    g_present_state.resize_preview_h = g.resize_preview_h;
+    g_present_state.settings_open = g.settings_open;
+    g_present_state.item_drag_area = g.item_drag_area;
+    g_present_state.ss_active = g.ss_active;
+    g_present_state.wallpaper_lrec_frame = g_wallpaper_lrec_frame;
+    g_present_state.glyph_tick = g.glyph_tick;
+    g_present_state.fb_w = g_have_fb ? (uint32_t)g_fb.w : 0u;
+    g_present_state.fb_h = g_have_fb ? (uint32_t)g_fb.h : 0u;
+    g_present_state.brightness = g.brightness;
+    g_present_state.quality = g.quality;
+    g_present_state.aa_mode = g.aa_mode;
+    g_present_state.subpx_enabled = g_subpx_enabled;
+    g_present_state.subpx_rules = g_subpx_rule_count;
+    g_present_state.wallpaper_mode = g_wallpaper_mode;
+    g_present_state.wallpaper_color1 = g_wallpaper_color1;
+    g_present_state.wallpaper_color2 = g_wallpaper_color2;
+    g_present_state.wallpaper_generation = g_wallpaper_generation;
+    g_present_state.monitor_count = g_monitor_count;
+    g_present_state.monitor_layout = g_monitor_layout;
+}
+
+static void gui_present_backbuffer(gui_rect_t dirty)
+{
+    gui_clip_disable();
+    if (!g_have_bb) return;
+    dirty = gui_rect_clamp(dirty);
+    if (dirty.w <= 0 || dirty.h <= 0) return;
+    fb_blit_rect(&g_fb, &g_bb, dirty.x, dirty.y, dirty.w, dirty.h);
+}
+
 static void render_screensaver(void)
 {
     fb_t* tgt = g_have_bb ? &g_bb : &g_fb;
@@ -7258,19 +7605,22 @@ void gui_render(void)
     if (!g_have_fb) return;
 
     fb_t* tgt = g_have_bb ? &g_bb : &g_fb;
+    gui_rect_t dirty = gui_dirty_compute();
+    if (g_have_bb) gui_clip_set_rect(dirty.x, dirty.y, dirty.w, dirty.h);
+    else gui_clip_disable();
     g_syscall_target_override = tgt;
     if (g.ss_active) {
         render_screensaver();
         lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my, 8u, 8u, 220u, 160u);
         screenram_flush_to_target(tgt);
         gui_vblank_mark_frame();
-        if (g_have_bb) fb_blit(&g_fb, &g_bb);
+        if (g_have_bb) gui_present_backbuffer(dirty);
         screencap_after_render();
+        gui_present_snapshot();
         g_syscall_target_override = 0;
         return;
     }
 
-    // Full redraw for simplicity & correctness.
     fb_clear(tgt, g_bg);
     gui_glyph_hits_begin();
     gui_draw_desktop(tgt);
@@ -7281,20 +7631,23 @@ void gui_render(void)
         screenram_flush_to_target(tgt);
         gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
         gui_vblank_mark_frame();
-        if (g_have_bb) fb_blit(&g_fb, &g_bb);
+        if (g_have_bb) gui_present_backbuffer(dirty);
         screencap_after_render();
+        gui_present_snapshot();
         g_syscall_target_override = 0;
         return;
     }
 
-    fb_t* real_tgt = tgt;
-    fb_t* resize_src = &g_fb;
     int stretch_resize = g.resizing && gui_resize_mode() == GUI_RESIZE_STRETCH && g_have_bb;
+    int saved_win_x = g.win_x;
+    int saved_win_y = g.win_y;
+    int saved_win_w = g.win_w;
+    int saved_win_h = g.win_h;
     if (stretch_resize) {
-        fb_fill_rect(resize_src, (uint16_t)g.win_x, (uint16_t)g.win_y,
-                     (uint16_t)g.win_w, (uint16_t)g.win_h, g_bg);
-        tgt = resize_src;
-        g_syscall_target_override = tgt;
+        g.win_x = g.resize_preview_x;
+        g.win_y = g.resize_preview_y;
+        g.win_w = g.resize_preview_w;
+        g.win_h = g.resize_preview_h;
     }
 
     // Window frame
@@ -7685,14 +8038,10 @@ void gui_render(void)
     }
 
     if (stretch_resize) {
-        fb_blit_scaled_rect(real_tgt, resize_src,
-                            g.win_x, g.win_y, g.win_w, g.win_h,
-                            g.resize_preview_x, g.resize_preview_y,
-                            g.resize_preview_w, g.resize_preview_h);
-        gui_draw_resize_grip_at(real_tgt, g.resize_preview_x, g.resize_preview_y,
-                                g.resize_preview_w, g.resize_preview_h, 0xFFFFD166u);
-        tgt = real_tgt;
-        g_syscall_target_override = tgt;
+        g.win_x = saved_win_x;
+        g.win_y = saved_win_y;
+        g.win_w = saved_win_w;
+        g.win_h = saved_win_h;
     }
 
     lassist_draw((uint32_t)g.app_id, (uint32_t)g.mx, (uint32_t)g.my,
@@ -7706,10 +8055,9 @@ void gui_render(void)
     gui_draw_cursor_at(g.mx, g.my, 0xFFFFFFFF);
 
     gui_vblank_mark_frame();
-    if (g_have_bb) {
-        fb_blit(&g_fb, &g_bb);
-    }
+    if (g_have_bb) gui_present_backbuffer(dirty);
     screencap_after_render();
+    gui_present_snapshot();
     g_syscall_target_override = 0;
 }
 

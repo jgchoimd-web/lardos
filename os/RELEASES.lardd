@@ -6,6 +6,15 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v3.0.0b-keplet
+ITEM Creates the Keplet distribution branch as a CLI/DOS-first LardOS variant for mode switching and macro-heavy productivity.
+ITEM Adds keplet on|off|status|mode dos|nav|edit|macro|lsh|guide|test with a visible KEPLET[mode] prompt.
+ITEM Adds macro list|set name command|run name [args]|delete name|clear|explain|guide|test backed by writable keplet.lardd.
+ITEM Lets Keplet macro mode run saved macro names directly while keeping LSH command as a native escape and preserving normal DOS commands.
+ITEM Adds nav/edit abbreviations for keyboard-first work while keeping GUI, RXE/SYSRXE, SUM, KMO, media, recovery, and existing LardOS commands available.
+ITEM Adds keplet_guide.lardd, LUNIT checks, and POST coverage for the Keplet config, guide, and macro parser.
+ITEM Ships as beta because this is a new distribution surface and does not remove Mirage-era functionality or user-control values.
+
 SECTION v2.9.1p-mirage
 ITEM Hotpatches GUI stretch-resize preview so the original active window is no longer drawn at the old size while the preview is shown at the new size.
 ITEM Replaces full-screen present on every mouse/window motion with dirty-rectangle redraw and dirty-rectangle filtered blit when the backbuffer is available.

@@ -241,6 +241,29 @@ static const uint8_t dosmode_init[] =
 static uint8_t ram_dosmode_buf[DOSMODE_CAP];
 static FsWritableFile ram_dosmode = { "dosmode.lardd", ram_dosmode_buf, 0, DOSMODE_CAP };
 
+#define KEPLET_CAP 4096u
+static const uint8_t keplet_init[] =
+    "LARDD 1\n"
+    "TITLE Keplet Distro Mode\n"
+    "TEXT Keplet is the CLI/DOS-first LardOS distribution for mode switching and macro-heavy work.\n"
+    "TEXT Edit this file directly: MACRO name = command lines are live user-owned shortcuts.\n"
+    "TEXT Modes: dos, nav, edit, macro, lsh. Use keplet mode name or mode name inside Keplet.\n"
+    "TEXT Default is not hidden automation: macros are visible, editable, explainable, and deletable.\n"
+    "MODE dos\n"
+    "SECTION Macros\n"
+    "MACRO ls = dir\n"
+    "MACRO ll = dir _:\n"
+    "MACRO rd = type readme.txt\n"
+    "MACRO h = help\n"
+    "MACRO p = megaclip pull 1\n"
+    "MACRO y = megaclip push\n"
+    "MACRO save = sync\n"
+    "MACRO work = dos on\n"
+    "MACRO law = values\n"
+    "END\n";
+static uint8_t ram_keplet_buf[KEPLET_CAP];
+static FsWritableFile ram_keplet = { "keplet.lardd", ram_keplet_buf, 0, KEPLET_CAP };
+
 #define WALLPAPER_CAP 512u
 static const uint8_t wallpaper_init[] =
     "LARDD 1\n"
@@ -677,6 +700,7 @@ static const uint8_t file_lardos_lars[] =
     "li v1.92.1p makes HTTPS visible with webstack tls, LardTLS info, and POST/selftest TLS checks while preserving all v1.92 methods.\n"
     "li v1.92.0b expands HTTP/HTTPS to GET, POST, HEAD, PUT, PATCH, DELETE, and OPTIONS without external web libraries.\n"
     "li v1.91.1p hotpatches GUI resize hit-testing so only the visible bottom-right grip starts window resizing.\n"
+    "li v3.0.0b-keplet creates the CLI/DOS-first Keplet distro with visible modes, writable keplet.lardd macros, macro command, and KEPLET prompt.\n"
     "li v2.9.1p hotpatches GUI resize preview duplication and adds dirty-rectangle redraw/present for smoother mouse and window motion.\n"
     "li v2.9.0b adds case-insensitive English commands, Korean UTF-8 aliases, and optional 2-beolsik Hangul GUI input.\n"
     "li v2.8.2p hotpatches LSH output rollover and GUI shell follow so help cannot hide later visible commands.\n"
@@ -1106,6 +1130,27 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM REN moves data into an existing writable slot instead of hiding a mutable filename table.\n"
     "ITEM fsdelete.lardd keeps HIDE, SHOW, and DELETE records so force deletes are inspectable and persisted by sync.\n"
     "ITEM TOMB rewrites fsdelete.lardd on user request, preserving the LardOS rule that visible system state remains user-editable.\n"
+    "END\n";
+
+static const uint8_t file_keplet_guide[] =
+    "LARDD 1\n"
+    "TITLE Keplet Distribution\n"
+    "TEXT Keplet is a LardOS distribution branch focused on CLI/DOS productivity, modes, and visible macros.\n"
+    "TEXT It keeps the full LardOS value set: user ownership, no hidden external libraries, visible raw control, native files, and keyboard completeness.\n"
+    "SECTION Commands\n"
+    "ITEM keplet on -> enter the Keplet prompt.\n"
+    "ITEM keplet off -> leave the Keplet prompt without disabling normal LardOS features.\n"
+    "ITEM keplet mode dos|nav|edit|macro|lsh -> switch the active Keplet submode.\n"
+    "ITEM macro set name command -> save a user-owned shortcut in keplet.lardd.\n"
+    "ITEM macro run name [args] -> run a saved macro, optionally appending extra args.\n"
+    "ITEM macro list|show|delete name|clear|guide|test -> inspect and edit macro state.\n"
+    "SECTION Modes\n"
+    "ITEM In macro mode, typing a macro name runs it directly; LSH command escapes to normal LardOS.\n"
+    "ITEM In nav mode, l/r/m/g/b abbreviate dir/type/more/cd/cd .. while all DOS commands still work.\n"
+    "ITEM In edit mode, w/a/n abbreviate write/append/notes add for keyboard-first editing.\n"
+    "SECTION Philosophy\n"
+    "ITEM Keplet is a distribution overlay, not a feature-loss fork: GUI, RXE/SYSRXE, SUM, KMO, media, and recovery remain available.\n"
+    "ITEM keplet.lardd is writable and inspectable; automation is fast but never hidden from the user.\n"
     "END\n";
 
 static const uint8_t file_installer_guide[] =
@@ -1587,6 +1632,8 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file hello.shrine\n"
     "CHECK file shrine_guide.lardd\n"
     "CHECK command dos\n"
+    "CHECK command keplet\n"
+    "CHECK command macro\n"
     "CHECK command install\n"
     "CHECK command media\n"
     "CHECK file media_guide.lardd\n"
@@ -1604,8 +1651,10 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command tomb\n"
     "CHECK command tombstone\n"
     "CHECK file dosmode_guide.lardd\n"
+    "CHECK file keplet_guide.lardd\n"
     "CHECK file installer_guide.lardd\n"
     "CHECK writable dosmode.lardd\n"
+    "CHECK writable keplet.lardd\n"
     "CHECK writable fsdelete.lardd\n"
     "CHECK file vm_guide.lardd\n"
     "CHECK command time\n"
@@ -1857,6 +1906,7 @@ static const FsFile FS_FILES[] = {
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
     { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
     { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
+    { "keplet_guide.lardd", file_keplet_guide, sizeof(file_keplet_guide) - 1 },
     { "installer_guide.lardd", file_installer_guide, sizeof(file_installer_guide) - 1 },
     { "media_guide.lardd", file_media_guide, sizeof(file_media_guide) - 1 },
     { "webstack_guide.lardd", file_webstack_guide, sizeof(file_webstack_guide) - 1 },
@@ -2527,6 +2577,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 44) return &ram_monitors;
     if (idx == 45) return &ram_sound_cfg;
     if (idx == 46) return &ram_usersound;
+    if (idx == 47) return &ram_keplet;
     return NULL;
 }
 
@@ -2605,6 +2656,10 @@ void fs_init(void)
         ram_dosmode_buf[i] = dosmode_init[i];
     }
     ram_dosmode.size = sizeof(dosmode_init) - 1;
+    for (uint32_t i = 0; i < sizeof(keplet_init) - 1 && i < KEPLET_CAP; i++) {
+        ram_keplet_buf[i] = keplet_init[i];
+    }
+    ram_keplet.size = sizeof(keplet_init) - 1;
     for (uint32_t i = 0; i < sizeof(wallpaper_init) - 1 && i < WALLPAPER_CAP; i++) {
         ram_wallpaper_buf[i] = wallpaper_init[i];
     }

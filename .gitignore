@@ -21,3 +21,4 @@ os/lang/examples/*.bosx
 os/lang/examples/*.elf
 os/lang/examples/*.o
 os/os-image.bin
+os/os-image-iso.bin

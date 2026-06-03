@@ -65,3 +65,6 @@ int lsh_output_selftest(void);
 
 /* Non-mutating command language selftest for ASCII case and Korean aliases. */
 int lsh_language_selftest(void);
+
+/* Non-mutating Keplet distro mode/macro parser selftest. */
+int lsh_keplet_selftest(void);

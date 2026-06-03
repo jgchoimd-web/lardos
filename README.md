@@ -7,6 +7,11 @@ where power stays visible, editable, explainable, local, and recoverable.
 The project favors in-tree C code, native LardOS formats, and user-controlled
 system surfaces over hidden automation or external runtime dependencies.
 
+Distribution branches carry focused LardOS variants. The `keplet` branch is the
+CLI/DOS productivity distro: it adds visible modes and editable macros through
+`keplet`, `macro`, `keplet.lardd`, and `keplet_guide.lardd` while preserving the
+main LardOS feature set.
+
 ## Values
 
 LardOS is guided by a simple rule: the user owns the machine.

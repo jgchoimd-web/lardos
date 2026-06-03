@@ -52,6 +52,15 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v3.0.0b-keplet` creates the Keplet distribution branch: a CLI/DOS-first
+LardOS variant for mode switching and macro-heavy work. `keplet on` enters a
+visible `KEPLET[mode]` prompt, `keplet mode dos|nav|edit|macro|lsh` changes the
+active submode, and `macro list|set|run|delete|clear|explain` manages writable
+shortcuts in `keplet.lardd`. Macro mode can run saved macro names directly,
+while `LSH command` escapes to the normal shell. Keplet adds
+`keplet_guide.lardd`, POST/LUNIT coverage, and keeps GUI, RXE/SYSRXE, SUM, KMO,
+media, recovery, and existing LardOS commands available.
+
 `v2.9.1p-mirage` hotpatches GUI resizing and presentation. Stretch-resize
 preview no longer draws the original active window at the old size while also
 showing the preview at the new size. When a backbuffer is available, GUI render

@@ -65,6 +65,7 @@
 
 #define LSH_MAGIC  0x0048534Cu  /* "LSH\0" LE */
 #define LSH_OUTPUT_TRIM_NOTICE "[output trimmed: run cls to clear]\n"
+#define LSH_KEPLET_CAP 4096u
 
 static char s_drive = 'X';
 static char s_output[LSH_MAX_OUTPUT];
@@ -88,11 +89,20 @@ static int s_in_sum_mode;
 static int s_sandbox_mode;
 static int s_cfgsh_mode;
 static int s_dos_mode;
+static int s_keplet_mode;
+static char s_keplet_submode[12];
 static char s_dos_cwd[32];
 static int s_magic_depth;
+static int s_keplet_depth;
 
 static void lsh_putc(char c, void* user);
 static void parse_and_run(const char* cmd, const char* args);
+static void lsh_exec_impl(const char* buf, int show_prompt);
+static int dos_dispatch(const char* cmd, const char* args);
+static void dos_cd(const char* args);
+static void cmd_more(const char* args);
+static void cmd_keplet(const char* args);
+static void cmd_macro(const char* args);
 static int cfgsh_is_status_word(const char* value);
 static int cfgsh_bool_value(const char* value, int* out);
 static int ascii_streq_ci(const char* a, const char* b);
@@ -428,6 +438,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "lar", 1 }, { "extract", 1 }, { "larpass", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
     { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
+    { "keplet", 1 }, { "kpl", 1 }, { "macro", 1 }, { "mac", 1 },
     { "lcnt", 1 }, { "container", 1 },
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
     { "vcslog", 1 }, { "vcsshow", 1 },
@@ -3010,7 +3021,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos keplet macro tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -3023,6 +3034,8 @@ static void cmd_help(const char* args)
     out_append("  secure status|key|on|off|seal|lock|unlock KEY|ecc on|off|ram on|storage on  user-owned disk sealing\n");
     out_append("  auxkernel status|real16|report|lockdown confirm|keydrop confirm  tiny REAL16 emergency kernel path\n");
     out_append("  dos on|off|status|help|map|log|test  enter L-DOS compatibility mode\n");
+    out_append("  keplet on|off|mode dos|nav|edit|macro|lsh  CLI distro mode with visible macros\n");
+    out_append("  macro list|set name command|run name [args]|delete name|clear  edit keplet.lardd shortcuts\n");
     out_append("  sysrxe list|reload|show|run       file-defined system executables\n");
     out_append("  rxe list|reload|show|run          file-defined normal executables\n");
     out_append("  hc file.hc [input]                run HC source through the native app runner\n");
@@ -10158,6 +10171,520 @@ static void fsw_append_s(FsWritableFile* w, const char* s)
     (void)fs_append(w, (const uint8_t*)s, n);
 }
 
+static const char* keplet_mode_name(void)
+{
+    return s_keplet_submode[0] ? s_keplet_submode : "dos";
+}
+
+static int keplet_valid_mode(const char* name)
+{
+    return ascii_streq_ci(name, "dos") || ascii_streq_ci(name, "nav") ||
+           ascii_streq_ci(name, "edit") || ascii_streq_ci(name, "macro") ||
+           ascii_streq_ci(name, "lsh");
+}
+
+static void keplet_set_mode_name(const char* name)
+{
+    uint32_t i = 0;
+    if (!keplet_valid_mode(name)) name = "dos";
+    while (name[i] && i + 1u < sizeof(s_keplet_submode)) {
+        s_keplet_submode[i] = ascii_lower_char(name[i]);
+        i++;
+    }
+    s_keplet_submode[i] = '\0';
+}
+
+static const char* keplet_skip_line_space(const char* p, const char* end)
+{
+    while (p < end && (*p == ' ' || *p == '\t')) p++;
+    return p;
+}
+
+static int keplet_read_line_token(const char** pp, const char* end, char* out, uint32_t cap)
+{
+    const char* p = keplet_skip_line_space(*pp, end);
+    uint32_t n = 0;
+    while (p < end && *p != ' ' && *p != '\t' && *p != '=' && *p != '\r' && *p != '\n') {
+        if (n + 1u < cap) out[n++] = *p;
+        p++;
+    }
+    out[n] = '\0';
+    *pp = p;
+    return n ? 0 : -1;
+}
+
+static int keplet_parse_macro_line(const char* line, const char* end,
+                                   char* name, uint32_t name_cap,
+                                   char* command, uint32_t command_cap,
+                                   int* deleted)
+{
+    char tag[16];
+    const char* p = line;
+    const char* ce;
+    uint32_t n = 0;
+    if (deleted) *deleted = 0;
+    if (command && command_cap) command[0] = '\0';
+    if (name && name_cap) name[0] = '\0';
+    if (keplet_read_line_token(&p, end, tag, sizeof(tag)) != 0) return 0;
+    if (!ascii_streq_ci(tag, "macro") && !ascii_streq_ci(tag, "unmacro")) return 0;
+    if (deleted && ascii_streq_ci(tag, "unmacro")) *deleted = 1;
+    if (keplet_read_line_token(&p, end, name, name_cap) != 0) return 0;
+    if (deleted && *deleted) return 1;
+    p = keplet_skip_line_space(p, end);
+    if (p < end && *p == '=') p++;
+    p = keplet_skip_line_space(p, end);
+    ce = end;
+    while (ce > p && (ce[-1] == ' ' || ce[-1] == '\t' || ce[-1] == '\r' || ce[-1] == '\n')) ce--;
+    while (p < ce && n + 1u < command_cap) command[n++] = *p++;
+    if (command && command_cap) command[n] = '\0';
+    return 1;
+}
+
+static void keplet_log_event(const char* action, const char* detail)
+{
+    FsWritableFile* w = fs_open_writable("keplet.lardd");
+    if (!w) return;
+    fsw_append_s(w, "EVENT ");
+    fsw_append_s(w, action ? action : "event");
+    if (detail && detail[0]) {
+        fsw_append_s(w, " ");
+        fsw_append_s(w, detail);
+    }
+    fsw_append_s(w, "\n");
+}
+
+static int keplet_macro_find(const char* target, char* out, uint32_t out_cap)
+{
+    FsWritableFile* w = fs_open_writable("keplet.lardd");
+    const char* p;
+    const char* end;
+    int found = 0;
+    if (!w || !target || !target[0]) return 0;
+    p = (const char*)w->data;
+    end = p + w->size;
+    while (p < end) {
+        const char* ls = p;
+        const char* le;
+        char name[32];
+        char command[LSH_MAX_LINE];
+        int deleted = 0;
+        while (p < end && *p != '\n') p++;
+        le = p;
+        if (p < end && *p == '\n') p++;
+        if (keplet_parse_macro_line(ls, le, name, sizeof(name), command, sizeof(command), &deleted) &&
+            ascii_streq_ci(name, target)) {
+            if (deleted) {
+                found = 0;
+                if (out && out_cap) out[0] = '\0';
+            } else {
+                uint32_t i = 0;
+                while (command[i] && i + 1u < out_cap) {
+                    out[i] = command[i];
+                    i++;
+                }
+                if (out && out_cap) out[i] = '\0';
+                found = 1;
+            }
+        }
+    }
+    return found;
+}
+
+static void keplet_copy_range(char* dst, uint32_t* n, uint32_t cap, const char* a, const char* b)
+{
+    while (a < b && *n + 1u < cap) dst[(*n)++] = *a++;
+}
+
+static int keplet_rewrite_without(const char* target, const char* add_line)
+{
+    FsWritableFile* w = fs_open_or_create_writable("keplet.lardd");
+    static char tmp[LSH_KEPLET_CAP];
+    const char* p;
+    const char* end;
+    uint32_t n = 0;
+    if (!w || !target || !target[0]) return -1;
+    p = (const char*)w->data;
+    end = p + w->size;
+    while (p < end) {
+        const char* ls = p;
+        const char* le;
+        char name[32];
+        char command[LSH_MAX_LINE];
+        int deleted = 0;
+        int skip = 0;
+        while (p < end && *p != '\n') p++;
+        le = p;
+        if (p < end && *p == '\n') p++;
+        if (keplet_parse_macro_line(ls, le, name, sizeof(name), command, sizeof(command), &deleted) &&
+            ascii_streq_ci(name, target)) {
+            skip = 1;
+        }
+        if (!skip) {
+            keplet_copy_range(tmp, &n, sizeof(tmp), ls, p);
+            if (le == p && n + 1u < sizeof(tmp)) tmp[n++] = '\n';
+        }
+    }
+    if (add_line && add_line[0]) {
+        const char* q = add_line;
+        while (*q && n + 1u < sizeof(tmp)) tmp[n++] = *q++;
+        if (n == 0 || tmp[n - 1u] != '\n') {
+            if (n + 1u < sizeof(tmp)) tmp[n++] = '\n';
+        }
+    }
+    tmp[n] = '\0';
+    return fs_write(w, 0, (const uint8_t*)tmp, n) == n ? 0 : -2;
+}
+
+static int keplet_macro_store(const char* name, const char* command)
+{
+    char line[LSH_MAX_LINE];
+    uint32_t n = 0;
+    const char* p;
+    if (!name || !name[0] || !command || !command[0]) return -1;
+    p = "MACRO ";
+    while (*p && n + 1u < sizeof(line)) line[n++] = *p++;
+    p = name;
+    while (*p && *p != ' ' && *p != '\t' && *p != '=' && n + 1u < sizeof(line)) line[n++] = *p++;
+    p = " = ";
+    while (*p && n + 1u < sizeof(line)) line[n++] = *p++;
+    p = command;
+    while (*p && n + 1u < sizeof(line)) line[n++] = *p++;
+    line[n] = '\0';
+    return keplet_rewrite_without(name, line);
+}
+
+static void keplet_macro_list(void)
+{
+    FsWritableFile* w = fs_open_writable("keplet.lardd");
+    const char* p;
+    const char* end;
+    uint32_t count = 0;
+    if (!w) {
+        out_append("Keplet macro file missing.\n");
+        return;
+    }
+    out_append("Keplet macros in keplet.lardd (later lines win):\n");
+    p = (const char*)w->data;
+    end = p + w->size;
+    while (p < end) {
+        const char* ls = p;
+        const char* le;
+        char name[32];
+        char command[LSH_MAX_LINE];
+        int deleted = 0;
+        while (p < end && *p != '\n') p++;
+        le = p;
+        if (p < end && *p == '\n') p++;
+        if (keplet_parse_macro_line(ls, le, name, sizeof(name), command, sizeof(command), &deleted)) {
+            out_append(deleted ? "  - " : "  ");
+            out_append(name);
+            out_append(deleted ? " deleted\n" : " = ");
+            if (!deleted) {
+                out_append(command);
+                out_append("\n");
+            }
+            count++;
+        }
+    }
+    if (!count) out_append("  (none)\n");
+}
+
+static int keplet_run_line(const char* command, const char* extra_args)
+{
+    char line[LSH_MAX_LINE];
+    uint32_t n = 0;
+    const char* p = command ? command : "";
+    if (!p[0]) return 0;
+    if (s_keplet_depth > 8) {
+        out_append("macro: recursion guard stopped the command.\n");
+        return -1;
+    }
+    while (*p && n + 1u < sizeof(line)) line[n++] = *p++;
+    if (extra_args) {
+        while (*extra_args == ' ' || *extra_args == '\t') extra_args++;
+        if (*extra_args && n + 1u < sizeof(line)) line[n++] = ' ';
+        while (*extra_args && n + 1u < sizeof(line)) line[n++] = *extra_args++;
+    }
+    line[n] = '\0';
+    s_keplet_depth++;
+    lsh_exec_impl(line, 0);
+    s_keplet_depth--;
+    return 1;
+}
+
+static int keplet_macro_run_named(const char* name, const char* extra_args, int report_missing)
+{
+    char command[LSH_MAX_LINE];
+    if (!keplet_macro_find(name, command, sizeof(command))) {
+        if (report_missing) {
+            out_append("macro: not found: ");
+            out_append(name ? name : "");
+            out_append("\n");
+        }
+        return 0;
+    }
+    out_append("macro ");
+    out_append(name);
+    out_append(" -> ");
+    out_append(command);
+    out_append("\n");
+    return keplet_run_line(command, extra_args);
+}
+
+static void keplet_help(void)
+{
+    out_append("Keplet CLI distro\n");
+    out_append("  keplet on|off|status|mode dos|nav|edit|macro|lsh|guide|test\n");
+    out_append("  macro list|show|set name command|run name [args]|delete name|clear|guide|test\n");
+    out_append("  modes: dos=CLI defaults, nav=l/r/m/g/b, edit=w/a/n, macro=name runs macro, lsh=native escape.\n");
+    out_append("  config: keplet.lardd is writable; MACRO name = command lines are live.\n");
+}
+
+static void cmd_macro(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "list") || ascii_streq_ci(sub, "show") ||
+        ascii_streq_ci(sub, "status")) {
+        keplet_macro_list();
+        return;
+    }
+    if (ascii_streq_ci(sub, "guide") || ascii_streq_ci(sub, "help")) {
+        keplet_help();
+        cmd_larddoc("keplet_guide.lardd", "Usage: macro guide");
+        return;
+    }
+    if (ascii_streq_ci(sub, "run") || ascii_streq_ci(sub, "do")) {
+        char name[32];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: macro run name [args]\n");
+            return;
+        }
+        (void)keplet_macro_run_named(name, args, 1);
+        return;
+    }
+    if (ascii_streq_ci(sub, "set") || ascii_streq_ci(sub, "add") ||
+        ascii_streq_ci(sub, "bind")) {
+        char name[32];
+        args = lsh_skip_spaces(args);
+        if (vcs_read_word(&args, name, sizeof(name)) != 0 || !args[0]) {
+            out_append("Usage: macro set name command\n");
+            return;
+        }
+        if (keplet_macro_store(name, lsh_skip_spaces(args)) == 0) {
+            out_append("macro saved: ");
+            out_append(name);
+            out_append("\n");
+            keplet_log_event("set", name);
+        } else {
+            out_append("macro: could not save; keplet.lardd may be full.\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "delete") || ascii_streq_ci(sub, "del") ||
+        ascii_streq_ci(sub, "rm") || ascii_streq_ci(sub, "clearone")) {
+        char name[32];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: macro delete name\n");
+            return;
+        }
+        if (keplet_rewrite_without(name, NULL) == 0) {
+            out_append("macro deleted: ");
+            out_append(name);
+            out_append("\n");
+            keplet_log_event("delete", name);
+        } else {
+            out_append("macro: delete failed.\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "clear") || ascii_streq_ci(sub, "reset")) {
+        FsWritableFile* w = fs_open_writable("keplet.lardd");
+        const char* header =
+            "LARDD 1\nTITLE Keplet Distro Mode\nTEXT User-cleared macro table.\nMODE dos\nSECTION Macros\nEND\n";
+        if (w && fs_write(w, 0, (const uint8_t*)header, (uint32_t)strlen(header)) == strlen(header)) {
+            out_append("macro table cleared. keplet.lardd remains editable.\n");
+        } else {
+            out_append("macro: clear failed.\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "explain")) {
+        char command[LSH_MAX_LINE];
+        char name[32];
+        if (vcs_read_word(&args, name, sizeof(name)) != 0) {
+            out_append("Usage: macro explain name\n");
+            return;
+        }
+        if (keplet_macro_find(name, command, sizeof(command))) {
+            out_append(name);
+            out_append(" expands to: ");
+            out_append(command);
+            out_append("\nSource: editable keplet.lardd MACRO line.\n");
+        } else {
+            out_append("macro: not found.\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(lsh_keplet_selftest() == 0 ? "keplet: selftest OK\n" : "keplet: selftest failed\n");
+        return;
+    }
+    (void)keplet_macro_run_named(sub, args, 1);
+}
+
+static void cmd_keplet(const char* args)
+{
+    char sub[32];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "info")) {
+        out_append("Keplet distro: ");
+        out_append(s_keplet_mode ? "on" : "off");
+        out_append(", mode=");
+        out_append(keplet_mode_name());
+        out_append(", config=keplet.lardd, guide=keplet_guide.lardd\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "on") || ascii_streq_ci(sub, "enter")) {
+        s_keplet_mode = 1;
+        if (!s_keplet_submode[0]) keplet_set_mode_name("dos");
+        out_append("Keplet mode ON. Use mode macro/nav/edit/dos/lsh, macro list, or exit.\n");
+        keplet_log_event("on", keplet_mode_name());
+        return;
+    }
+    if (ascii_streq_ci(sub, "off") || ascii_streq_ci(sub, "exit") ||
+        ascii_streq_ci(sub, "quit")) {
+        s_keplet_mode = 0;
+        out_append("Keplet mode OFF.\n");
+        keplet_log_event("off", "user");
+        return;
+    }
+    if (ascii_streq_ci(sub, "mode")) {
+        char mode[16];
+        if (vcs_read_word(&args, mode, sizeof(mode)) != 0 || !keplet_valid_mode(mode)) {
+            out_append("Usage: keplet mode dos|nav|edit|macro|lsh\n");
+            return;
+        }
+        keplet_set_mode_name(mode);
+        out_append("Keplet mode=");
+        out_append(keplet_mode_name());
+        out_append("\n");
+        keplet_log_event("mode", keplet_mode_name());
+        return;
+    }
+    if (keplet_valid_mode(sub)) {
+        keplet_set_mode_name(sub);
+        s_keplet_mode = 1;
+        out_append("Keplet mode=");
+        out_append(keplet_mode_name());
+        out_append("\n");
+        keplet_log_event("mode", keplet_mode_name());
+        return;
+    }
+    if (ascii_streq_ci(sub, "macro") || ascii_streq_ci(sub, "mac")) {
+        cmd_macro(args);
+        return;
+    }
+    if (ascii_streq_ci(sub, "guide") || ascii_streq_ci(sub, "help")) {
+        keplet_help();
+        cmd_larddoc("keplet_guide.lardd", "Usage: keplet guide");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(lsh_keplet_selftest() == 0 ? "keplet: selftest OK\n" : "keplet: selftest failed\n");
+        return;
+    }
+    out_append("Usage: keplet on|off|status|mode dos|nav|edit|macro|lsh|macro|guide|test\n");
+}
+
+static int keplet_dispatch(const char* cmd, const char* args)
+{
+    int native_escape = ascii_streq_ci(keplet_mode_name(), "lsh");
+    if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "quit") == 0) {
+        s_keplet_mode = 0;
+        out_append("Keplet mode OFF.\n");
+        keplet_log_event("off", "exit");
+        return 1;
+    }
+    if (strcmp(cmd, "help") == 0 || strcmp(cmd, "?") == 0) { keplet_help(); return 1; }
+    if (strcmp(cmd, "keplet") == 0 || strcmp(cmd, "kpl") == 0) { cmd_keplet(args); return 1; }
+    if (strcmp(cmd, "macro") == 0 || strcmp(cmd, "mac") == 0) { cmd_macro(args); return 1; }
+    if (strcmp(cmd, "mode") == 0) {
+        char mode[16];
+        if (vcs_read_word(&args, mode, sizeof(mode)) != 0 || !keplet_valid_mode(mode)) {
+            out_append("Usage: mode dos|nav|edit|macro|lsh\n");
+        } else {
+            keplet_set_mode_name(mode);
+            out_append("Keplet mode=");
+            out_append(keplet_mode_name());
+            out_append("\n");
+            keplet_log_event("mode", keplet_mode_name());
+        }
+        return 1;
+    }
+    if (strcmp(cmd, "lsh") == 0 || native_escape) {
+        char native_cmd[64];
+        if (native_escape) {
+            int was = s_keplet_mode;
+            s_keplet_mode = 0;
+            parse_and_run(cmd, args);
+            s_keplet_mode = was;
+            return 1;
+        }
+        if (vcs_read_word(&args, native_cmd, sizeof(native_cmd)) != 0) {
+            out_append("Usage: LSH command [args]\n");
+            return 1;
+        }
+        {
+            int was = s_keplet_mode;
+            s_keplet_mode = 0;
+            parse_and_run(native_cmd, args);
+            s_keplet_mode = was;
+        }
+        return 1;
+    }
+    if (ascii_streq_ci(keplet_mode_name(), "nav")) {
+        if (strcmp(cmd, "l") == 0) { cmd_dir(args); return 1; }
+        if (strcmp(cmd, "r") == 0) { cmd_type(args); return 1; }
+        if (strcmp(cmd, "m") == 0) { cmd_more(args); return 1; }
+        if (strcmp(cmd, "g") == 0) { dos_cd(args); return 1; }
+        if (strcmp(cmd, "b") == 0) { dos_cd(".."); return 1; }
+    } else if (ascii_streq_ci(keplet_mode_name(), "edit")) {
+        if (strcmp(cmd, "w") == 0) { cmd_write(args); return 1; }
+        if (strcmp(cmd, "a") == 0) { cmd_append(args); return 1; }
+        if (strcmp(cmd, "n") == 0) { cmd_larddnotes(args); return 1; }
+    }
+    if (keplet_macro_run_named(cmd, args, 0)) return 1;
+    if (ascii_streq_ci(keplet_mode_name(), "macro")) {
+        out_append("Keplet macro mode: unknown macro ");
+        out_append(cmd);
+        out_append(". Try macro list or LSH command.\n");
+        return 1;
+    }
+    if (dos_dispatch(cmd, args)) return 1;
+    out_append("Keplet: unknown command or macro: ");
+    out_append(cmd);
+    out_append("\n");
+    return 1;
+}
+
+int lsh_keplet_selftest(void)
+{
+    char name[32];
+    char command[LSH_MAX_LINE];
+    int deleted = 0;
+    const char* line = "MACRO zz = dir _:";
+    const char* end = line + strlen(line);
+    if (!fs_open_writable("keplet.lardd")) return -1;
+    if (!fs_open("keplet_guide.lardd")) return -2;
+    if (!keplet_valid_mode("macro") || !keplet_valid_mode("nav") || keplet_valid_mode("mouseonly")) return -3;
+    if (!keplet_parse_macro_line(line, end, name, sizeof(name), command, sizeof(command), &deleted)) return -4;
+    if (deleted || strcmp(name, "zz") != 0 || strcmp(command, "dir _:") != 0) return -5;
+    return 0;
+}
+
 static char dos_drive_to_lard(char d)
 {
     d = ascii_upper_char(d);
@@ -11110,6 +11637,12 @@ static void append_lsh_prompt(void)
         out_append(lcontainer_active_name());
         out_append("] ");
         out_append_char(s_drive);
+        out_append(":\\> ");
+    } else if (s_keplet_mode) {
+        out_append("KEPLET[");
+        out_append(keplet_mode_name());
+        out_append("] ");
+        out_append_char(dos_drive_from_lard(s_drive));
         out_append(":\\> ");
     } else if (s_dos_mode) {
         out_append("L-DOS ");
@@ -12706,6 +13239,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
     if (strcmp(cmd, "liveupdate") == 0 || strcmp(cmd, "live") == 0) lardkit_trace_event("liveupdate", cmd, 0);
     if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
+    if (strcmp(cmd, "keplet") == 0 || strcmp(cmd, "kpl") == 0 ||
+        strcmp(cmd, "macro") == 0 || strcmp(cmd, "mac") == 0) lardkit_trace_event("keplet", cmd, 0);
     if (strcmp(cmd, "secure") == 0 || strcmp(cmd, "lardsec") == 0 ||
         strcmp(cmd, "locker") == 0 || strcmp(cmd, "bitlocker") == 0) lardkit_trace_event("security", cmd, 0);
     if (strcmp(cmd, "auxkernel") == 0 || strcmp(cmd, "aux") == 0 ||
@@ -12754,6 +13289,10 @@ static void parse_and_run(const char* cmd, const char* args)
         return;
     }
 
+    if (s_keplet_mode) {
+        if (keplet_dispatch(cmd, args)) return;
+    }
+
     if (s_dos_mode) {
         if (dos_dispatch(cmd, args)) return;
         out_append("Bad command or file name: ");
@@ -12782,6 +13321,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "auxkernel") == 0 || strcmp(cmd, "aux") == 0 ||
         strcmp(cmd, "emergency") == 0) { cmd_auxkernel(args); return; }
     if (strcmp(cmd, "dos") == 0 || strcmp(cmd, "dosmode") == 0) { cmd_dos(args); return; }
+    if (strcmp(cmd, "keplet") == 0 || strcmp(cmd, "kpl") == 0) { cmd_keplet(args); return; }
+    if (strcmp(cmd, "macro") == 0 || strcmp(cmd, "mac") == 0) { cmd_macro(args); return; }
     if (strcmp(cmd, "tomb") == 0 || strcmp(cmd, "tombstone") == 0 || strcmp(cmd, "tombstones") == 0) { dos_tombstone(args); return; }
     if (strcmp(cmd, "time") == 0 || strcmp(cmd, "lardtime") == 0 || strcmp(cmd, "ltime") == 0) { cmd_lardtime_mode(args, "now"); return; }
     if (strcmp(cmd, "date") == 0) { cmd_lardtime_mode(args, "solar"); return; }
@@ -13002,6 +13543,9 @@ void lsh_init(void)
     s_sandbox_mode = 0;
     s_cfgsh_mode = 0;
     s_dos_mode = 0;
+    s_keplet_mode = 0;
+    keplet_set_mode_name("dos");
+    s_keplet_depth = 0;
     s_dos_cwd[0] = '\0';
     taskprio_init();
     lcontainer_init();

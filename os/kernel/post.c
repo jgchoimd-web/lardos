@@ -177,6 +177,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: user law writable", fs_open_writable("userlaw.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: glyph map writable", fs_open_writable("glyphmap.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: dosmode writable", fs_open_writable("dosmode.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: keplet config writable", fs_open_writable("keplet.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: wallpaper writable", fs_open_writable("wallpaper.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: monitors writable", fs_open_writable("monitors.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: displayfix writable", fs_open_writable("displayfix.spfx") != NULL, emit, user, &pass, &fail);
@@ -212,6 +213,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
                mediafs_drive_supported('S') && mediafs_drive_supported('U'), emit, user, &pass, &fail);
     post_check("fs: lunit tests", fs_open("tests.lunit") != NULL, emit, user, &pass, &fail);
     post_check("fs: vm guide", fs_open("vm_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: keplet guide", fs_open("keplet_guide.lardd") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
     post_check("doc: LARS web demo", post_doc_parse("webdemo.lars"), emit, user, &pass, &fail);
@@ -280,6 +282,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("lsh: DOS mode aliases", lsh_dosmode_selftest() == 0, emit, user, &pass, &fail);
     post_check("lsh: output rollover", lsh_output_selftest() == 0, emit, user, &pass, &fail);
     post_check("lsh: case and Korean aliases", lsh_language_selftest() == 0, emit, user, &pass, &fail);
+    post_check("lsh: keplet mode macros", lsh_keplet_selftest() == 0, emit, user, &pass, &fail);
     post_check("bootprof: profile flags", bootprof_selftest() == 0, emit, user, &pass, &fail);
     post_check("awake: background boot tracker", awake_selftest() == 0, emit, user, &pass, &fail);
     post_check("crashlog: writable log", crashlog_selftest() == 0, emit, user, &pass, &fail);

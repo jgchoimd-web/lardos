@@ -1,0 +1,27 @@
+LARDD 1
+TITLE Keplet Distribution
+TEXT Keplet is the LardOS CLI/DOS productivity distribution.
+TEXT It is built for mode switching, visible macros, and keyboard-first work.
+SECTION Identity
+ITEM Branch: keplet
+ITEM Version line: v3.0.0b-keplet
+ITEM Channel: beta, because this is a new distribution surface.
+ITEM Base: main LardOS features are preserved instead of removed.
+SECTION Workflow
+ITEM keplet on enters the KEPLET[mode] prompt.
+ITEM keplet mode dos keeps DOS-style commands close at hand.
+ITEM keplet mode nav adds l/r/m/g/b for list/read/more/go/back navigation.
+ITEM keplet mode edit adds w/a/n for write/append/notes.
+ITEM keplet mode macro runs saved macro names directly.
+ITEM keplet mode lsh lets normal Lard Shell commands pass through first.
+SECTION Macros
+ITEM macro list shows visible shortcuts from keplet.lardd.
+ITEM macro set name command writes a shortcut the user can edit later.
+ITEM macro run name args runs the shortcut and appends extra args.
+ITEM macro delete name removes the macro definition from keplet.lardd.
+ITEM macro explain name says exactly what the macro expands to.
+SECTION Values
+ITEM Keplet does not hide automation; keplet.lardd is writable and inspectable.
+ITEM Keplet keeps GUI, RXE, SYSRXE, KMO, SUM, media, recovery, and raw-control paths.
+ITEM The distribution changes the default work style, not the user's ownership.
+END

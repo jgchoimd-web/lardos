@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.11.0b-mirage
+ITEM Adds LEMAMD, a LardOS-native Vim/Emacs-style modal editor command set that works from the shell without external editor code.
+ITEM Adds lemamd file/open/view/goto/i/a/dd/yy/p/r/s/macro/runmacro/w/help commands with current file, cursor, and mode state.
+ITEM Adds aliases lem, lemand, lvim, lemacs, vi, vim, and emacs so familiar keyboard-editor muscle memory reaches the native editor surface.
+ITEM Connects yanks/deletes/pastes to MegaClipboard and stores user macros visibly in lemamd.lardd instead of hiding editor state in kernel-only tables.
+ITEM Adds lemamd_guide.lardd, writable lemamd.lardd, POST/LUNIT checks, and keeps GUI, mouse, regular write/append, RXE/SYSRXE, StatePack, and user-control values intact.
+
 SECTION v2.10.0b-mirage
 ITEM Adds StatePack full-state export/import through state export [file.lcfg] and state import [file.lcfg].
 ITEM LCFG 1 captures RUNTIME settings plus writable user-state files including apps, KMO/RXR slots, wallpaper, clipboard/pinclip, office docs, monitor layout, sound, recovery logs, and user policy files.

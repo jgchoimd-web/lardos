@@ -417,7 +417,7 @@ typedef struct {
 static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "hangul", 1 }, { "korean", 1 }, { "ime", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
-    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "hc", 1 }, { "holyc", 1 }, { "lardhc", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
+    { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "lemamd", 1 }, { "lem", 1 }, { "lemand", 1 }, { "lvim", 1 }, { "lemacs", 1 }, { "vi", 1 }, { "vim", 1 }, { "emacs", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "hc", 1 }, { "holyc", 1 }, { "lardhc", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "monitor", 1 }, { "monitors", 1 }, { "display", 1 }, { "multimon", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "state", 0 }, { "statepack", 0 }, { "cfgio", 0 }, { "configio", 0 }, { "settingsio", 0 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "pinclip", 1 }, { "fixedclip", 1 }, { "pclip", 1 },
@@ -3010,7 +3010,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -3047,6 +3047,7 @@ static void cmd_help(const char* args)
     out_append("  webstack status|methods|tls|guide|demo|selftest for native LARS/HTTP/HTTPS support\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
     out_append("  state export|import|iso [file]     full OS user-state config and ISO export\n");
+    out_append("  lemamd [file] [i|a|dd|yy|p|r|s|macro]  Vim/Emacs-style native modal editor\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  wallpaper status|color|pattern|bmp|lrec|use|reload|reset  user-owned desktop wallpaper\n");
     out_append("  sound boot on|off, sound fx ok, sound play file.lsnd  native vector sound\n");
@@ -9964,6 +9965,656 @@ static const char* lsh_skip_spaces(const char* s)
     return s ? s : "";
 }
 
+#define LEMAMD_BUF_CAP 8192u
+#define LEMAMD_VIEW_LINES 18u
+
+static char s_lemamd_file[64] = "notes.txt";
+static char s_lemamd_drive = 'R';
+static char s_lemamd_mode[12] = "normal";
+static uint32_t s_lemamd_cursor = 1u;
+static uint32_t s_lemamd_edits;
+static int s_lemamd_macro_depth;
+
+static void lemamd_copy_text(char* dst, uint32_t cap, const char* src)
+{
+    uint32_t i = 0;
+    if (!dst || cap == 0) return;
+    if (!src) src = "";
+    while (src[i] && i + 1u < cap) {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
+}
+
+static int lemamd_known_sub(const char* s)
+{
+    return ascii_streq_ci(s, "help") || ascii_streq_ci(s, "guide") ||
+           ascii_streq_ci(s, "status") || ascii_streq_ci(s, "open") ||
+           ascii_streq_ci(s, "e") || ascii_streq_ci(s, "new") ||
+           ascii_streq_ci(s, "view") || ascii_streq_ci(s, "show") ||
+           ascii_streq_ci(s, "goto") || ascii_streq_ci(s, "g") ||
+           ascii_streq_ci(s, "mode") || ascii_streq_ci(s, "i") ||
+           ascii_streq_ci(s, "insert") || ascii_streq_ci(s, "a") ||
+           ascii_streq_ci(s, "append") || ascii_streq_ci(s, "dd") ||
+           ascii_streq_ci(s, "delete") || ascii_streq_ci(s, "d") ||
+           ascii_streq_ci(s, "yy") || ascii_streq_ci(s, "yank") ||
+           ascii_streq_ci(s, "y") || ascii_streq_ci(s, "p") ||
+           ascii_streq_ci(s, "paste") || ascii_streq_ci(s, "r") ||
+           ascii_streq_ci(s, "replace") || ascii_streq_ci(s, "s") ||
+           ascii_streq_ci(s, "sub") || ascii_streq_ci(s, "macro") ||
+           ascii_streq_ci(s, "runmacro") || ascii_streq_ci(s, "w") ||
+           ascii_streq_ci(s, "write") || ascii_streq_ci(s, "test") ||
+           ascii_streq_ci(s, "selftest");
+}
+
+static int lemamd_set_file(const char* file_arg)
+{
+    char drv;
+    char name[64];
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    if (!name[0]) return -1;
+    s_lemamd_drive = drv;
+    lemamd_copy_text(s_lemamd_file, sizeof(s_lemamd_file), name);
+    return 0;
+}
+
+static int lemamd_load_current(char* buf, uint32_t cap, uint32_t* size)
+{
+    const uint8_t* data = NULL;
+    uint32_t len = 0;
+    if (!buf || cap == 0 || !size) return -1;
+    if (lsh_read_drive_data(s_lemamd_drive, s_lemamd_file, &data, &len, NULL) != 0) {
+        buf[0] = '\0';
+        *size = 0;
+        return 0;
+    }
+    if (len + 1u > cap) return -2;
+    for (uint32_t i = 0; i < len; i++) buf[i] = (char)data[i];
+    buf[len] = '\0';
+    *size = len;
+    return 0;
+}
+
+static int lemamd_write_current(const char* buf, uint32_t size)
+{
+    char drv = drive_write_target(s_lemamd_drive);
+    if (drive_to_fs(drv) == 2) {
+        return mediafs_write(drv, s_lemamd_file, (const uint8_t*)buf, size, 0) < 0 ? -1 : 0;
+    }
+    if (drive_to_fs(drv) == 0 || drive_to_fs(drv) == 1) {
+        FsWritableFile* w = fs_open_or_create_writable(s_lemamd_file);
+        if (!w || size > w->cap) return -2;
+        return fs_write(w, 0, (const uint8_t*)(buf ? buf : ""), size) == size ? 0 : -3;
+    }
+    return -4;
+}
+
+static uint32_t lemamd_line_count(const char* buf, uint32_t size)
+{
+    uint32_t lines = size ? 1u : 0u;
+    for (uint32_t i = 0; i < size; i++) {
+        if (buf[i] == '\n' && i + 1u < size) lines++;
+    }
+    return lines;
+}
+
+static uint32_t lemamd_line_start(const char* buf, uint32_t size, uint32_t line)
+{
+    uint32_t cur = 1u;
+    if (line <= 1u) return 0;
+    for (uint32_t i = 0; i < size; i++) {
+        if (buf[i] == '\n') {
+            cur++;
+            if (cur == line) return i + 1u;
+        }
+    }
+    return size;
+}
+
+static uint32_t lemamd_line_end(const char* buf, uint32_t size, uint32_t line)
+{
+    uint32_t p = lemamd_line_start(buf, size, line);
+    while (p < size && buf[p] != '\n' && buf[p] != '\r') p++;
+    return p;
+}
+
+static void lemamd_clamp_cursor(uint32_t lines)
+{
+    if (s_lemamd_cursor == 0) s_lemamd_cursor = 1u;
+    if (lines && s_lemamd_cursor > lines) s_lemamd_cursor = lines;
+}
+
+static int lemamd_insert_bytes(char* buf, uint32_t* size, uint32_t pos,
+                               const uint8_t* text, uint32_t text_size,
+                               int prefix_newline, int suffix_newline)
+{
+    uint32_t extra = text_size + (prefix_newline ? 1u : 0u) + (suffix_newline ? 1u : 0u);
+    uint32_t o = pos;
+    if (!buf || !size || !text || pos > *size) return -1;
+    if (*size + extra + 1u > LEMAMD_BUF_CAP) return -2;
+    memmove(buf + pos + extra, buf + pos, (size_t)(*size - pos));
+    if (prefix_newline) buf[o++] = '\n';
+    for (uint32_t i = 0; i < text_size; i++) buf[o++] = (char)text[i];
+    if (suffix_newline) buf[o++] = '\n';
+    *size += extra;
+    buf[*size] = '\0';
+    return 0;
+}
+
+static int lemamd_insert_line_text(char* buf, uint32_t* size, uint32_t line,
+                                   const char* text, int after)
+{
+    uint32_t len = 0;
+    uint32_t pos;
+    int prefix_newline = 0;
+    if (!text) text = "";
+    text = lsh_skip_spaces(text);
+    while (text[len]) len++;
+    if (!len) return -1;
+    pos = after ? lemamd_line_start(buf, *size, line + 1u) : lemamd_line_start(buf, *size, line);
+    if (after && pos == *size && *size && buf[*size - 1u] != '\n') prefix_newline = 1;
+    return lemamd_insert_bytes(buf, size, pos, (const uint8_t*)text, len, prefix_newline, 1);
+}
+
+static int lemamd_slice_lines(const char* buf, uint32_t size, uint32_t line, uint32_t count,
+                              uint32_t* start, uint32_t* end)
+{
+    uint32_t lines = lemamd_line_count(buf, size);
+    if (!start || !end || !count || !lines || line < 1u || line > lines) return -1;
+    *start = lemamd_line_start(buf, size, line);
+    *end = lemamd_line_start(buf, size, line + count);
+    if (*end < *start) *end = size;
+    return 0;
+}
+
+static int lemamd_delete_lines(char* buf, uint32_t* size, uint32_t line, uint32_t count,
+                               uint8_t* yank, uint32_t* yank_size)
+{
+    uint32_t start;
+    uint32_t end;
+    uint32_t removed;
+    if (!buf || !size || lemamd_slice_lines(buf, *size, line, count, &start, &end) != 0) return -1;
+    removed = end - start;
+    if (yank && yank_size) {
+        uint32_t n = removed;
+        if (n > MEGACLIP_DATA_MAX) n = MEGACLIP_DATA_MAX;
+        for (uint32_t i = 0; i < n; i++) yank[i] = (uint8_t)buf[start + i];
+        *yank_size = n;
+    }
+    memmove(buf + start, buf + end, (size_t)(*size - end));
+    *size -= removed;
+    buf[*size] = '\0';
+    lemamd_clamp_cursor(lemamd_line_count(buf, *size));
+    return 0;
+}
+
+static void lemamd_view_current(uint32_t from)
+{
+    static char buf[LEMAMD_BUF_CAP];
+    uint32_t size = 0;
+    uint32_t lines;
+    uint32_t printed = 0;
+    int r = lemamd_load_current(buf, sizeof(buf), &size);
+    if (r != 0) {
+        out_append("lemamd: file too large for modal buffer.\n");
+        return;
+    }
+    lines = lemamd_line_count(buf, size);
+    lemamd_clamp_cursor(lines);
+    if (from == 0) from = s_lemamd_cursor > 3u ? s_lemamd_cursor - 3u : 1u;
+    out_append("LEMAMD ");
+    out_append(s_lemamd_mode);
+    out_append(" ");
+    out_append_char(s_lemamd_drive);
+    out_append(":");
+    out_append(s_lemamd_file);
+    out_append(" cursor=");
+    out_append_u32(s_lemamd_cursor);
+    out_append(" lines=");
+    out_append_u32(lines);
+    out_append("\n");
+    if (!lines) {
+        out_append("  (empty file)\n");
+        return;
+    }
+    for (uint32_t ln = from; ln <= lines && printed < LEMAMD_VIEW_LINES; ln++, printed++) {
+        uint32_t st = lemamd_line_start(buf, size, ln);
+        uint32_t en = lemamd_line_end(buf, size, ln);
+        out_append(ln == s_lemamd_cursor ? "> " : "  ");
+        out_append_u32(ln);
+        out_append(": ");
+        for (uint32_t i = st, col = 0; i < en && col < 120u; i++, col++) out_append_char(buf[i]);
+        if (en - st > 120u) out_append("...");
+        out_append("\n");
+    }
+}
+
+static int lemamd_yank_lines(uint32_t count)
+{
+    static char buf[LEMAMD_BUF_CAP];
+    uint32_t size = 0;
+    uint32_t start;
+    uint32_t end;
+    uint32_t n;
+    if (lemamd_load_current(buf, sizeof(buf), &size) != 0 ||
+        lemamd_slice_lines(buf, size, s_lemamd_cursor, count ? count : 1u, &start, &end) != 0) {
+        return -1;
+    }
+    n = end - start;
+    if (n > MEGACLIP_DATA_MAX) n = MEGACLIP_DATA_MAX;
+    return megaclip_push("text", "lemamd-yank", (const uint8_t*)buf + start, n);
+}
+
+static int lemamd_replace_line(char* buf, uint32_t* size, uint32_t line, const char* text)
+{
+    uint32_t st;
+    uint32_t en;
+    uint32_t len = 0;
+    if (!text) text = "";
+    text = lsh_skip_spaces(text);
+    while (text[len]) len++;
+    if (!len) return -1;
+    if (lemamd_slice_lines(buf, *size, line, 1u, &st, &en) != 0) {
+        s_lemamd_cursor = lemamd_line_count(buf, *size) + 1u;
+        return lemamd_insert_line_text(buf, size, s_lemamd_cursor, text, 1);
+    }
+    memmove(buf + st, buf + en, (size_t)(*size - en));
+    *size -= en - st;
+    buf[*size] = '\0';
+    return lemamd_insert_bytes(buf, size, st, (const uint8_t*)text, len, 0, 1);
+}
+
+static int lemamd_substitute(char* buf, uint32_t* size, const char* old_text, const char* new_text,
+                             uint32_t* replacements)
+{
+    static char out[LEMAMD_BUF_CAP];
+    uint32_t old_len = 0;
+    uint32_t new_len = 0;
+    uint32_t i = 0;
+    uint32_t o = 0;
+    uint32_t reps = 0;
+    if (!old_text || !new_text || !replacements) return -1;
+    while (old_text[old_len]) old_len++;
+    while (new_text[new_len]) new_len++;
+    if (!old_len) return -2;
+    while (i < *size) {
+        uint32_t m = 0;
+        while (m < old_len && i + m < *size && buf[i + m] == old_text[m]) m++;
+        if (m == old_len) {
+            if (o + new_len + 1u > sizeof(out)) return -3;
+            for (uint32_t j = 0; j < new_len; j++) out[o++] = new_text[j];
+            i += old_len;
+            reps++;
+        } else {
+            if (o + 2u > sizeof(out)) return -3;
+            out[o++] = buf[i++];
+        }
+    }
+    out[o] = '\0';
+    for (uint32_t k = 0; k < o; k++) buf[k] = out[k];
+    buf[o] = '\0';
+    *size = o;
+    *replacements = reps;
+    return 0;
+}
+
+static int lemamd_config_append(const char* key, const char* value)
+{
+    FsWritableFile* w = fs_open_or_create_writable("lemamd.lardd");
+    uint32_t kn = 0;
+    uint32_t vn = 0;
+    const uint8_t sp = ' ';
+    const uint8_t nl = '\n';
+    if (!w || !key || !key[0] || !value || !value[0]) return -1;
+    while (key[kn]) kn++;
+    while (value[vn]) vn++;
+    if (w->size + kn + 1u + vn + 1u > w->cap) return -2;
+    if (fs_append(w, (const uint8_t*)key, kn) != kn) return -3;
+    if (fs_append(w, &sp, 1u) != 1u) return -4;
+    if (fs_append(w, (const uint8_t*)value, vn) != vn) return -5;
+    if (fs_append(w, &nl, 1u) != 1u) return -6;
+    return 0;
+}
+
+static int lemamd_macro_append(const char* name, const char* command)
+{
+    FsWritableFile* w = fs_open_or_create_writable("lemamd.lardd");
+    static const char prefix[] = "MACRO ";
+    uint32_t nn = 0;
+    uint32_t cn = 0;
+    const uint8_t sp = ' ';
+    const uint8_t nl = '\n';
+    if (!w || !name || !name[0] || !command || !command[0]) return -1;
+    while (name[nn]) nn++;
+    while (command[cn]) cn++;
+    if (w->size + sizeof(prefix) - 1u + nn + 1u + cn + 1u > w->cap) return -2;
+    if (fs_append(w, (const uint8_t*)prefix, sizeof(prefix) - 1u) != sizeof(prefix) - 1u) return -3;
+    if (fs_append(w, (const uint8_t*)name, nn) != nn) return -4;
+    if (fs_append(w, &sp, 1u) != 1u) return -5;
+    if (fs_append(w, (const uint8_t*)command, cn) != cn) return -6;
+    if (fs_append(w, &nl, 1u) != 1u) return -7;
+    return 0;
+}
+
+static int lemamd_macro_find(const char* name, char* out, uint32_t cap)
+{
+    const FsFile* f = fs_open("lemamd.lardd");
+    const uint8_t* d;
+    uint32_t name_len = 0;
+    int found = 0;
+    if (!f || !name || !out || cap == 0) return -1;
+    d = f->data;
+    while (name[name_len]) name_len++;
+    out[0] = '\0';
+    for (uint32_t p = 0; p < f->size;) {
+        uint32_t le = p;
+        while (le < f->size && d[le] != '\n' && d[le] != '\r') le++;
+        if (le > p + 7u && d[p] == 'M' && d[p + 1u] == 'A' && d[p + 2u] == 'C' &&
+            d[p + 3u] == 'R' && d[p + 4u] == 'O' && d[p + 5u] == ' ') {
+            uint32_t ns = p + 6u;
+            uint32_t ne = ns;
+            while (ne < le && d[ne] != ' ' && d[ne] != '\t') ne++;
+            if (ne - ns == name_len) {
+                uint32_t i = 0;
+                while (i < name_len && (char)d[ns + i] == name[i]) i++;
+                if (i == name_len) {
+                    uint32_t cs = ne;
+                    uint32_t o = 0;
+                    while (cs < le && (d[cs] == ' ' || d[cs] == '\t')) cs++;
+                    while (cs < le && o + 1u < cap) out[o++] = (char)d[cs++];
+                    out[o] = '\0';
+                    found = 1;
+                }
+            }
+        }
+        p = le;
+        while (p < f->size && (d[p] == '\n' || d[p] == '\r')) p++;
+    }
+    return found ? 0 : -2;
+}
+
+static void lemamd_status(void)
+{
+    out_append("LEMAMD modal editor: file=");
+    out_append_char(s_lemamd_drive);
+    out_append(":");
+    out_append(s_lemamd_file);
+    out_append(" mode=");
+    out_append(s_lemamd_mode);
+    out_append(" cursor=");
+    out_append_u32(s_lemamd_cursor);
+    out_append(" edits=");
+    out_append_u32(s_lemamd_edits);
+    out_append("\nUse lemamd help for keyboard-first commands. Config/macros: lemamd.lardd\n");
+}
+
+static int lemamd_selftest(void)
+{
+    char old_file[64];
+    char old_mode[12];
+    char old_drive = s_lemamd_drive;
+    uint32_t old_cursor = s_lemamd_cursor;
+    uint32_t old_edits = s_lemamd_edits;
+    static char buf[LEMAMD_BUF_CAP];
+    uint32_t size = 0;
+    int ok = 1;
+    lemamd_copy_text(old_file, sizeof(old_file), s_lemamd_file);
+    lemamd_copy_text(old_mode, sizeof(old_mode), s_lemamd_mode);
+    s_lemamd_drive = 'R';
+    lemamd_copy_text(s_lemamd_file, sizeof(s_lemamd_file), "lemamd_test.txt");
+    s_lemamd_cursor = 1u;
+    if (lemamd_write_current("one\nthree\n", 10u) != 0) ok = 0;
+    if (ok && lemamd_load_current(buf, sizeof(buf), &size) != 0) ok = 0;
+    if (ok) {
+        s_lemamd_cursor = 2u;
+        if (lemamd_insert_line_text(buf, &size, s_lemamd_cursor, "two", 0) != 0) ok = 0;
+    }
+    if (ok && lemamd_write_current(buf, size) != 0) ok = 0;
+    if (ok && lemamd_yank_lines(1u) != 0) ok = 0;
+    if (ok && lemamd_load_current(buf, sizeof(buf), &size) != 0) ok = 0;
+    if (ok && lemamd_line_count(buf, size) < 3u) ok = 0;
+    s_lemamd_drive = old_drive;
+    lemamd_copy_text(s_lemamd_file, sizeof(s_lemamd_file), old_file);
+    lemamd_copy_text(s_lemamd_mode, sizeof(s_lemamd_mode), old_mode);
+    s_lemamd_cursor = old_cursor;
+    s_lemamd_edits = old_edits;
+    return ok ? 0 : -1;
+}
+
+static void cmd_lemamd(const char* args)
+{
+    char first[64];
+    char sub[32];
+    const char* rest = args ? args : "";
+    const char* op_args;
+    if (vcs_read_word(&rest, first, sizeof(first)) != 0) {
+        lemamd_status();
+        lemamd_view_current(0);
+        return;
+    }
+    if (lemamd_known_sub(first)) {
+        lemamd_copy_text(sub, sizeof(sub), first);
+        op_args = rest;
+    } else {
+        if (lemamd_set_file(first) != 0) {
+            out_append("Usage: lemamd [file] [command] | lemamd command\n");
+            return;
+        }
+        if (vcs_read_word(&rest, sub, sizeof(sub)) != 0) {
+            lemamd_view_current(0);
+            return;
+        }
+        op_args = rest;
+    }
+
+    if (ascii_streq_ci(sub, "help") || ascii_streq_ci(sub, "guide")) {
+        cmd_larddoc("lemamd_guide.lardd", "Usage: lemamd help");
+        return;
+    }
+    if (ascii_streq_ci(sub, "status")) {
+        lemamd_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "open") || ascii_streq_ci(sub, "e")) {
+        char file[64];
+        if (vcs_read_word(&op_args, file, sizeof(file)) == 0 && lemamd_set_file(file) != 0) {
+            out_append("lemamd: bad file name.\n");
+            return;
+        }
+        lemamd_copy_text(s_lemamd_mode, sizeof(s_lemamd_mode), "normal");
+        lemamd_view_current(0);
+        return;
+    }
+    if (ascii_streq_ci(sub, "new")) {
+        char file[64];
+        if (vcs_read_word(&op_args, file, sizeof(file)) == 0) {
+            if (lemamd_set_file(file) != 0) {
+                out_append("lemamd: bad file name.\n");
+                return;
+            }
+        }
+        if (lemamd_write_current("", 0u) != 0) {
+            out_append("lemamd: could not create writable file.\n");
+            return;
+        }
+        s_lemamd_cursor = 1u;
+        s_lemamd_edits++;
+        lardkit_journal_event("lemamd", "new file");
+        lemamd_view_current(0);
+        return;
+    }
+    if (ascii_streq_ci(sub, "view") || ascii_streq_ci(sub, "show")) {
+        uint32_t from = 0;
+        (void)vcs_parse_u32(&op_args, &from);
+        lemamd_view_current(from);
+        return;
+    }
+    if (ascii_streq_ci(sub, "goto") || ascii_streq_ci(sub, "g")) {
+        uint32_t line;
+        if (vcs_parse_u32(&op_args, &line) != 0 || line == 0) {
+            out_append("Usage: lemamd goto line\n");
+            return;
+        }
+        s_lemamd_cursor = line;
+        lemamd_view_current(0);
+        return;
+    }
+    if (ascii_streq_ci(sub, "mode")) {
+        char mode[16];
+        if (vcs_read_word(&op_args, mode, sizeof(mode)) != 0) {
+            lemamd_status();
+            return;
+        }
+        if (!ascii_streq_ci(mode, "normal") && !ascii_streq_ci(mode, "insert") &&
+            !ascii_streq_ci(mode, "command") && !ascii_streq_ci(mode, "visual")) {
+            out_append("lemamd: mode is normal|insert|command|visual\n");
+            return;
+        }
+        lemamd_copy_text(s_lemamd_mode, sizeof(s_lemamd_mode), mode);
+        (void)lemamd_config_append("MODE", mode);
+        lemamd_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "i") || ascii_streq_ci(sub, "insert") ||
+        ascii_streq_ci(sub, "a") || ascii_streq_ci(sub, "append") ||
+        ascii_streq_ci(sub, "dd") || ascii_streq_ci(sub, "delete") || ascii_streq_ci(sub, "d") ||
+        ascii_streq_ci(sub, "r") || ascii_streq_ci(sub, "replace") ||
+        ascii_streq_ci(sub, "s") || ascii_streq_ci(sub, "sub") ||
+        ascii_streq_ci(sub, "p") || ascii_streq_ci(sub, "paste")) {
+        static char buf[LEMAMD_BUF_CAP];
+        uint32_t size = 0;
+        uint32_t lines;
+        if (lemamd_load_current(buf, sizeof(buf), &size) != 0) {
+            out_append("lemamd: file too large for modal buffer.\n");
+            return;
+        }
+        lines = lemamd_line_count(buf, size);
+        lemamd_clamp_cursor(lines);
+        if (ascii_streq_ci(sub, "i") || ascii_streq_ci(sub, "insert")) {
+            if (lemamd_insert_line_text(buf, &size, s_lemamd_cursor, op_args, 0) != 0) {
+                out_append("Usage: lemamd i text\n");
+                return;
+            }
+        } else if (ascii_streq_ci(sub, "a") || ascii_streq_ci(sub, "append")) {
+            if (lemamd_insert_line_text(buf, &size, s_lemamd_cursor, op_args, 1) != 0) {
+                out_append("Usage: lemamd a text\n");
+                return;
+            }
+            s_lemamd_cursor++;
+        } else if (ascii_streq_ci(sub, "dd") || ascii_streq_ci(sub, "delete") || ascii_streq_ci(sub, "d")) {
+            uint32_t count = 1u;
+            uint8_t yank[MEGACLIP_DATA_MAX + 1u];
+            uint32_t yank_size = 0;
+            (void)vcs_parse_u32(&op_args, &count);
+            if (lemamd_delete_lines(buf, &size, s_lemamd_cursor, count, yank, &yank_size) != 0) {
+                out_append("lemamd: no line to delete.\n");
+                return;
+            }
+            (void)megaclip_push("text", "lemamd-delete", yank, yank_size);
+        } else if (ascii_streq_ci(sub, "r") || ascii_streq_ci(sub, "replace")) {
+            uint32_t line = s_lemamd_cursor;
+            const char* p = op_args;
+            if (vcs_parse_u32(&p, &line) == 0) op_args = p;
+            if (lemamd_replace_line(buf, &size, line, op_args) != 0) {
+                out_append("Usage: lemamd r [line] text\n");
+                return;
+            }
+            s_lemamd_cursor = line;
+        } else if (ascii_streq_ci(sub, "s") || ascii_streq_ci(sub, "sub")) {
+            char old_text[64];
+            uint32_t reps = 0;
+            if (vcs_read_word(&op_args, old_text, sizeof(old_text)) != 0) {
+                out_append("Usage: lemamd s old new\n");
+                return;
+            }
+            op_args = lsh_skip_spaces(op_args);
+            if (lemamd_substitute(buf, &size, old_text, op_args, &reps) != 0) {
+                out_append("lemamd: substitute failed.\n");
+                return;
+            }
+            out_append("lemamd: replaced ");
+            out_append_u32(reps);
+            out_append(" occurrence(s).\n");
+        } else {
+            megaclip_item_t item;
+            uint32_t slot = 0;
+            int have_slot = vcs_parse_u32(&op_args, &slot) == 0 && slot > 0u;
+            int pr = have_slot ? megaclip_pull(slot - 1u, &item) : megaclip_pull_latest(&item);
+            uint32_t pos;
+            int prefix;
+            int suffix;
+            if (pr != 0) {
+                out_append("lemamd: paste failed; MegaClipboard is empty.\n");
+                return;
+            }
+            pos = lemamd_line_start(buf, size, s_lemamd_cursor + 1u);
+            prefix = (pos == size && size && buf[size - 1u] != '\n') ? 1 : 0;
+            suffix = (item.size == 0 || item.data[item.size - 1u] != '\n') ? 1 : 0;
+            if (lemamd_insert_bytes(buf, &size, pos, item.data, item.size, prefix, suffix) != 0) {
+                out_append("lemamd: paste failed; MegaClipboard is empty or data is too large.\n");
+                return;
+            }
+            s_lemamd_cursor++;
+        }
+        if (lemamd_write_current(buf, size) != 0) {
+            out_append("lemamd: write failed.\n");
+            return;
+        }
+        s_lemamd_edits++;
+        lardkit_journal_event("lemamd", "edited file");
+        lemamd_view_current(0);
+        return;
+    }
+    if (ascii_streq_ci(sub, "yy") || ascii_streq_ci(sub, "yank") || ascii_streq_ci(sub, "y")) {
+        uint32_t count = 1u;
+        (void)vcs_parse_u32(&op_args, &count);
+        if (lemamd_yank_lines(count) != 0) out_append("lemamd: yank failed.\n");
+        else out_append("lemamd: yanked to MegaClipboard.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "macro")) {
+        char name[32];
+        if (vcs_read_word(&op_args, name, sizeof(name)) != 0 || !lsh_skip_spaces(op_args)[0]) {
+            out_append("Usage: lemamd macro name command\n");
+            return;
+        }
+        if (lemamd_macro_append(name, lsh_skip_spaces(op_args)) != 0) out_append("lemamd: macro save failed.\n");
+        else out_append("lemamd: macro saved in lemamd.lardd\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "runmacro")) {
+        char name[32];
+        char command[160];
+        if (vcs_read_word(&op_args, name, sizeof(name)) != 0 || lemamd_macro_find(name, command, sizeof(command)) != 0) {
+            out_append("Usage: lemamd runmacro name\n");
+            return;
+        }
+        if (s_lemamd_macro_depth > 3) {
+            out_append("lemamd: macro recursion stopped.\n");
+            return;
+        }
+        out_append("lemamd macro ");
+        out_append(name);
+        out_append(" -> ");
+        out_append(command);
+        out_append("\n");
+        s_lemamd_macro_depth++;
+        cmd_lemamd(command);
+        s_lemamd_macro_depth--;
+        return;
+    }
+    if (ascii_streq_ci(sub, "w") || ascii_streq_ci(sub, "write")) {
+        cmd_fssave("");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(lemamd_selftest() == 0 ? "lemamd: selftest OK\n" : "lemamd: selftest failed\n");
+        return;
+    }
+    out_append("Usage: lemamd [file] [open|view|goto|i|a|dd|yy|p|r|s|macro|runmacro|w|help]\n");
+}
+
 static void cmd_rename_file(const char* src_arg, const char* dst_arg)
 {
     char src_name[64];
@@ -12822,6 +13473,11 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
     if (strcmp(cmd, "liveupdate") == 0 || strcmp(cmd, "live") == 0) lardkit_trace_event("liveupdate", cmd, 0);
     if (strcmp(cmd, "rxr") == 0) lardkit_trace_event("rxr", cmd, 0);
+    if (strcmp(cmd, "lemamd") == 0 || strcmp(cmd, "lem") == 0 || strcmp(cmd, "lemand") == 0 ||
+        strcmp(cmd, "lvim") == 0 || strcmp(cmd, "lemacs") == 0 ||
+        strcmp(cmd, "vi") == 0 || strcmp(cmd, "vim") == 0 || strcmp(cmd, "emacs") == 0) {
+        lardkit_trace_event("lemamd", cmd, 0);
+    }
     if (strcmp(cmd, "secure") == 0 || strcmp(cmd, "lardsec") == 0 ||
         strcmp(cmd, "locker") == 0 || strcmp(cmd, "bitlocker") == 0) lardkit_trace_event("security", cmd, 0);
     if (strcmp(cmd, "auxkernel") == 0 || strcmp(cmd, "aux") == 0 ||
@@ -12968,6 +13624,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "lword") == 0 || strcmp(cmd, "lwrite") == 0) { cmd_lword(args); return; }
     if (strcmp(cmd, "lsheet") == 0) { cmd_lsheet(args); return; }
     if (strcmp(cmd, "lshow") == 0) { cmd_lshow(args); return; }
+    if (strcmp(cmd, "lemamd") == 0 || strcmp(cmd, "lem") == 0 || strcmp(cmd, "lemand") == 0 ||
+        strcmp(cmd, "lvim") == 0 || strcmp(cmd, "lemacs") == 0 ||
+        strcmp(cmd, "vi") == 0 || strcmp(cmd, "vim") == 0 || strcmp(cmd, "emacs") == 0) { cmd_lemamd(args); return; }
     if (strcmp(cmd, "peek") == 0) { cmd_peek(args); return; }
     if (strcmp(cmd, "poke") == 0) { cmd_poke(args); return; }
     if (strcmp(cmd, "lars") == 0) { cmd_larddoc(args, "Usage: lars [drive:]file.lars"); return; }

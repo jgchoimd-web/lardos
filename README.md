@@ -7,9 +7,9 @@ where power stays visible, editable, explainable, local, and recoverable.
 The project favors in-tree C code, native LardOS formats, and user-controlled
 system surfaces over hidden automation or external runtime dependencies.
 
-Current mainline adds StatePack: `state export`, `state import`, and `state iso`
-move the visible OS user-state through local `LCFG` files and ISO data images
-without external serializers.
+Current mainline adds LEMAMD: a native Vim/Emacs-style modal editor command set
+with visible macros in `lemamd.lardd`, MegaClipboard yank/paste support, and no
+external editor dependency.
 
 ## Values
 

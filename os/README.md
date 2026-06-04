@@ -52,6 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.11.0b-mirage` adds LEMAMD, a native keyboard-first modal editor command set
+inspired by Vim and Emacs without embedding either editor or depending on an
+external library. `lemamd file` opens a text target, keeps a current file/cursor
+state, and supports `goto`, `i`, `a`, `dd`, `yy`, `p`, `r`, and `s` editing
+commands from the shell. Yanks and deletes use MegaClipboard, macros are stored
+as visible `MACRO` lines in `lemamd.lardd`, and aliases `lem`, `lemand`, `lvim`,
+`lemacs`, `vi`, `vim`, and `emacs` enter the same LardOS-native editor surface.
+
 `v2.10.0b-mirage` adds StatePack full-state input/output. `state export
 [file.lcfg]` writes a visible `LCFG 1` file containing runtime settings plus
 all writable user-state files: apps, KMO/RXE/RXR slots, wallpaper config,

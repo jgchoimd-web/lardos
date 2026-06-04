@@ -413,6 +413,17 @@ static const uint8_t usersound_init[] =
 static uint8_t ram_usersound_buf[USERSOUND_CAP];
 static FsWritableFile ram_usersound = { "usersound.lsnd", ram_usersound_buf, 0, USERSOUND_CAP };
 
+#define LEMAMD_CAP 4096u
+static const uint8_t lemamd_init[] =
+    "LARDD 1\n"
+    "TITLE LEMAMD Modal Editor\n"
+    "TEXT User-owned Vim/Emacs-style command editor settings and macros.\n"
+    "MODE normal\n"
+    "KEYMAP vim-emacs\n"
+    "END\n";
+static uint8_t ram_lemamd_buf[LEMAMD_CAP];
+static FsWritableFile ram_lemamd = { "lemamd.lardd", ram_lemamd_buf, 0, LEMAMD_CAP };
+
 #define STATEPACK_CAP 524288u
 static const uint8_t statepack_init[] =
     "LCFG 1\n"
@@ -1548,6 +1559,30 @@ static const uint8_t file_statepack_guide[] =
     "ITEM ISO export is a state-transfer image, not a fake bootable clone unless a future boot path explicitly says so.\n"
     "END\n";
 
+static const uint8_t file_lemamd_guide[] =
+    "LARDD 1\n"
+    "TITLE LEMAMD Modal Editor\n"
+    "TEXT LEMAMD is a native keyboard-first text editor command set inspired by Vim and Emacs, but stored and explained the LardOS way.\n"
+    "SECTION Model\n"
+    "ITEM lemamd file opens a user-owned editing target and shows numbered lines.\n"
+    "ITEM The editor keeps a current file, cursor line, and mode so short commands can work without repeating the file name.\n"
+    "ITEM Macros live in lemamd.lardd as visible MACRO lines; users can edit them directly.\n"
+    "SECTION Commands\n"
+    "ITEM lemamd open file | lemamd file -> select and view a file.\n"
+    "ITEM lemamd new file -> create or clear a writable text file.\n"
+    "ITEM lemamd view [line] -> show numbered lines around the cursor.\n"
+    "ITEM lemamd goto N -> move cursor.\n"
+    "ITEM lemamd i text -> insert before cursor; lemamd a text -> insert after cursor.\n"
+    "ITEM lemamd dd [count] -> delete lines and push them to MegaClipboard.\n"
+    "ITEM lemamd yy [count] -> yank lines to MegaClipboard; lemamd p [slot] -> paste after cursor.\n"
+    "ITEM lemamd r [line] text -> replace a line; lemamd s old new -> substitute text through the file.\n"
+    "ITEM lemamd macro name command -> save a visible macro; lemamd runmacro name -> run it.\n"
+    "ITEM Aliases: lem, lemand, lvim, lemacs, vi, vim, emacs.\n"
+    "SECTION Values\n"
+    "ITEM Keyboard-only editing is first-class, but mouse and GUI workflows remain intact.\n"
+    "ITEM No external editor library is used; files stay visible, local, editable, and user-owned.\n"
+    "END\n";
+
 static const uint8_t file_gui_status_kmo[] =
     "KMO 1\n"
     "ID gui-status\n"
@@ -1625,12 +1660,17 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file fstwt_guide.lardd\n"
     "CHECK file liveupdate_guide.lardd\n"
     "CHECK file statepack_guide.lardd\n"
+    "CHECK file lemamd_guide.lardd\n"
     "CHECK file default.fstwts\n"
     "CHECK writable fstwt.fstwts\n"
+    "CHECK writable lemamd.lardd\n"
     "CHECK writable state.lcfg\n"
     "CHECK writable state.iso\n"
     "CHECK command state\n"
     "CHECK command cfgio\n"
+    "CHECK command lemamd\n"
+    "CHECK command vim\n"
+    "CHECK command emacs\n"
     "CHECK command fstwt\n"
     "CHECK command bleed\n"
     "CHECK command crash\n"
@@ -1898,6 +1938,7 @@ static const FsFile FS_FILES[] = {
     { "fstwt_guide.lardd", file_fstwt_guide, sizeof(file_fstwt_guide) - 1 },
     { "liveupdate_guide.lardd", file_liveupdate_guide, sizeof(file_liveupdate_guide) - 1 },
     { "statepack_guide.lardd", file_statepack_guide, sizeof(file_statepack_guide) - 1 },
+    { "lemamd_guide.lardd", file_lemamd_guide, sizeof(file_lemamd_guide) - 1 },
     { "default.fstwts", file_default_fstwts, sizeof(file_default_fstwts) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
@@ -2510,7 +2551,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 49u;
+    return 50u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2562,8 +2603,9 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 44) return &ram_monitors;
     if (idx == 45) return &ram_sound_cfg;
     if (idx == 46) return &ram_usersound;
-    if (idx == 47) return &ram_statepack;
-    if (idx == 48) return &ram_stateiso;
+    if (idx == 47) return &ram_lemamd;
+    if (idx == 48) return &ram_statepack;
+    if (idx == 49) return &ram_stateiso;
     return NULL;
 }
 
@@ -2696,6 +2738,10 @@ void fs_init(void)
         ram_usersound_buf[i] = usersound_init[i];
     }
     ram_usersound.size = sizeof(usersound_init) - 1;
+    for (uint32_t i = 0; i < sizeof(lemamd_init) - 1 && i < LEMAMD_CAP; i++) {
+        ram_lemamd_buf[i] = lemamd_init[i];
+    }
+    ram_lemamd.size = sizeof(lemamd_init) - 1;
     for (uint32_t i = 0; i < sizeof(statepack_init) - 1 && i < STATEPACK_CAP; i++) {
         ram_statepack_buf[i] = statepack_init[i];
     }

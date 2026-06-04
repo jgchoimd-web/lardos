@@ -417,7 +417,7 @@ typedef struct {
 } magic_cmd_entry_t;
 
 static const magic_cmd_entry_t s_magic_cmds[] = {
-    { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
+    { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "timecfg", 1 }, { "timezone", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "hangul", 1 }, { "korean", 1 }, { "ime", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "lemamd", 1 }, { "lem", 1 }, { "lemand", 1 }, { "lvim", 1 }, { "lemacs", 1 }, { "vi", 1 }, { "vim", 1 }, { "emacs", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "hc", 1 }, { "holyc", 1 }, { "lardhc", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
     { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "bluetooth", 1 }, { "bt", 1 }, { "lbt", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "monitor", 1 }, { "monitors", 1 }, { "display", 1 }, { "multimon", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "state", 0 }, { "statepack", 0 }, { "cfgio", 0 }, { "configio", 0 }, { "settingsio", 0 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
@@ -2947,6 +2947,175 @@ static void lardtime_out_lunar(const lardtime_lunar_t* l)
     out_append_2(l->day);
 }
 
+static void lardtime_out_zone(int32_t minutes)
+{
+    uint32_t m;
+    uint32_t hh;
+    uint32_t mm;
+    out_append(minutes < 0 ? "-" : "+");
+    m = minutes < 0 ? (uint32_t)(-minutes) : (uint32_t)minutes;
+    hh = m / 60u;
+    mm = m % 60u;
+    out_append_2(hh);
+    out_append_char(':');
+    out_append_2(mm);
+}
+
+static int lsh_parse_zone(const char* word, int32_t* out)
+{
+    int sign = 1;
+    int hh;
+    int mm;
+    if (!word || !out) return -1;
+    if (word[0] == '+') {
+        sign = 1;
+        word++;
+    } else if (word[0] == '-') {
+        sign = -1;
+        word++;
+    }
+    if (word[0] < '0' || word[0] > '9' || word[1] < '0' || word[1] > '9') return -1;
+    hh = (word[0] - '0') * 10 + (word[1] - '0');
+    if (word[2] == ':') {
+        if (word[3] < '0' || word[3] > '9' || word[4] < '0' || word[4] > '9' ||
+            word[5] != '\0') return -1;
+        mm = (word[3] - '0') * 10 + (word[4] - '0');
+    } else if (word[2] == '\0') {
+        mm = 0;
+    } else {
+        return -1;
+    }
+    if (hh > 23 || mm > 59) return -1;
+    *out = (int32_t)sign * (int32_t)(hh * 60 + mm);
+    return 0;
+}
+
+static int lsh_bool_word(const char* word, int* out)
+{
+    if (!word || !out) return -1;
+    if (ascii_streq_ci(word, "on") || ascii_streq_ci(word, "yes") ||
+        ascii_streq_ci(word, "true") || strcmp(word, "1") == 0) {
+        *out = 1;
+        return 0;
+    }
+    if (ascii_streq_ci(word, "off") || ascii_streq_ci(word, "no") ||
+        ascii_streq_ci(word, "false") || strcmp(word, "0") == 0) {
+        *out = 0;
+        return 0;
+    }
+    return -1;
+}
+
+static void cmd_timecfg_status(void)
+{
+    lardtime_config_t cfg;
+    char buf[96];
+    lardtime_config_get(&cfg);
+    out_append("TimeCfg zone=");
+    lardtime_out_zone(cfg.zone_minutes);
+    out_append(" dst=");
+    out_append(cfg.dst_enabled ? "on" : "off");
+    out_append(" default=");
+    out_append(lardtime_view_name(cfg.default_view));
+    out_append(" topbar=");
+    out_append(cfg.topbar_enabled ? "on" : "off");
+    out_append(" battery=");
+    out_append(cfg.battery_enabled ? "on" : "off");
+    out_append("/");
+    if (cfg.battery_percent == LARDTIME_BATTERY_UNKNOWN) out_append("?");
+    else out_append_u32(cfg.battery_percent);
+    out_append("\nDefault time: ");
+    if (lardtime_format_default(buf, sizeof(buf)) == 0) out_append(buf);
+    else out_append("RTC unavailable");
+    out_append("\nTopbar: ");
+    if (lardtime_format_topbar(buf, sizeof(buf)) == 0) out_append(buf);
+    else out_append("off");
+    out_append("\nConfig file: timecfg.lardd\n");
+}
+
+static void cmd_timecfg(const char* args)
+{
+    char sub[24];
+    char val[32];
+    const char* p = args ? args : "";
+    int on;
+    int32_t zone;
+    uint32_t view;
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "info")) {
+        cmd_timecfg_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "show") || ascii_streq_ci(sub, "open")) {
+        cmd_larddoc("timecfg.lardd", "Usage: timecfg show");
+        return;
+    }
+    if (ascii_streq_ci(sub, "reload")) {
+        (void)lardtime_config_reload();
+        out_append("timecfg: reloaded from timecfg.lardd\n");
+        cmd_timecfg_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "zone") || ascii_streq_ci(sub, "timezone")) {
+        if (vcs_read_word(&p, val, sizeof(val)) != 0 || lsh_parse_zone(val, &zone) != 0) {
+            out_append("Usage: timecfg zone +09:00\n");
+            return;
+        }
+        if (lardtime_set_zone_minutes(zone) == 0) out_append("timecfg: zone updated.\n");
+        else out_append("timecfg: zone update failed.\n");
+        cmd_timecfg_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "dst") || ascii_streq_ci(sub, "daylight")) {
+        if (vcs_read_word(&p, val, sizeof(val)) != 0 || lsh_bool_word(val, &on) != 0) {
+            out_append("Usage: timecfg dst on|off\n");
+            return;
+        }
+        if (lardtime_set_dst(on) == 0) out_append("timecfg: dst updated.\n");
+        else out_append("timecfg: dst update failed.\n");
+        cmd_timecfg_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "default") || ascii_streq_ci(sub, "view") ||
+        ascii_streq_ci(sub, "calendar")) {
+        if (vcs_read_word(&p, val, sizeof(val)) != 0 ||
+            lardtime_view_from_name(val, &view) != 0) {
+            out_append("Usage: timecfg default dangun|solar|lunar\n");
+            return;
+        }
+        if (lardtime_set_default_view(view) == 0) out_append("timecfg: default view updated.\n");
+        else out_append("timecfg: default view update failed.\n");
+        cmd_timecfg_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "topbar") || ascii_streq_ci(sub, "deck") ||
+        ascii_streq_ci(sub, "statusbar")) {
+        if (vcs_read_word(&p, val, sizeof(val)) != 0 || lsh_bool_word(val, &on) != 0) {
+            out_append("Usage: timecfg topbar on|off\n");
+            return;
+        }
+        if (lardtime_set_topbar(on) == 0) out_append("timecfg: topbar updated.\n");
+        else out_append("timecfg: topbar update failed.\n");
+        cmd_timecfg_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "battery") || ascii_streq_ci(sub, "bat")) {
+        if (vcs_read_word(&p, val, sizeof(val)) != 0 || lsh_bool_word(val, &on) != 0) {
+            out_append("Usage: timecfg battery on|off\n");
+            return;
+        }
+        if (lardtime_set_battery_visible(on) == 0) out_append("timecfg: battery display updated.\n");
+        else out_append("timecfg: battery display update failed.\n");
+        cmd_timecfg_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(lardtime_selftest() == 0 ? "timecfg: selftest OK\n" : "timecfg: selftest failed\n");
+        return;
+    }
+    out_append("Usage: timecfg status|zone +09:00|dst on|off|default dangun|solar|lunar|topbar on|off|battery on|off|show|reload\n");
+}
+
 static void cmd_lardtime_mode(const char* args, const char* default_mode)
 {
     char sub[16];
@@ -2958,15 +3127,20 @@ static void cmd_lardtime_mode(const char* args, const char* default_mode)
         out_append("LardOS Time uses ticks since 00000-01-01 00:00:00, not Unix epoch seconds.\n");
         out_append("Years print with at least five digits to keep year 10000 visible.\n");
         out_append("Calendar views include solar CE, Dangun year (CE+2333), and a native lunar estimate.\n");
-        return;
-    }
-    if (lardtime_now(&now) != 0) {
-        out_append("lardtime: RTC unavailable.\n");
+        out_append("Display policy lives in user-owned timecfg.lardd: timezone, DST, default view, topbar clock, and battery field.\n");
         return;
     }
     if (strcmp(mode, "raw") == 0 || strcmp(mode, "ticks") == 0) {
+        if (lardtime_now(&now) != 0) {
+            out_append("lardtime: RTC unavailable.\n");
+            return;
+        }
         out_append_i64(now.ticks);
         out_append("\n");
+        return;
+    }
+    if (lardtime_now_configured(&now) != 0) {
+        out_append("lardtime: RTC unavailable.\n");
         return;
     }
     if (strcmp(mode, "solar") == 0 || strcmp(mode, "date") == 0) {
@@ -2990,12 +3164,16 @@ static void cmd_lardtime_mode(const char* args, const char* default_mode)
         return;
     }
     if (!(strcmp(mode, "now") == 0 || strcmp(mode, "status") == 0 || strcmp(mode, "all") == 0)) {
-        out_append("Usage: time|lardtime [now|raw|solar|dangun|lunar|explain]\n");
+        out_append("Usage: time|lardtime [now|raw|solar|dangun|lunar|explain] or timecfg status\n");
         return;
     }
-    out_append("LardOS Time ticks=");
-    out_append_i64(now.ticks);
-    out_append("\nSolar ");
+    {
+        char default_buf[96];
+        out_append("Default ");
+        if (lardtime_format_default(default_buf, sizeof(default_buf)) == 0) out_append(default_buf);
+        else out_append("RTC unavailable");
+    }
+    out_append("\nLocal Solar ");
     lardtime_out_solar(&now.civil);
     out_append("\nDangun ");
     out_append_year5(now.dangun_year);
@@ -3005,14 +3183,14 @@ static void cmd_lardtime_mode(const char* args, const char* default_mode)
     out_append_2(now.civil.day);
     out_append("\nLunar ");
     lardtime_out_lunar(&now.lunar);
-    out_append(" (Lard lunar)\nYear width: >=5, epoch: 00000-01-01, source: CMOS RTC -> LardOS Time\n");
+    out_append(" (Lard lunar)\nYear width: >=5, epoch: 00000-01-01, source: CMOS RTC -> LardOS Time, display: timecfg.lardd\n");
 }
 
 static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect bluetooth bt buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time timecfg date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect bluetooth bt buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -3057,7 +3235,8 @@ static void cmd_help(const char* args)
     out_append("  pinclip list|set slot text|from fixed [slot]|pull|write|clear  fixed shortcut clipboard slots\n");
     out_append("  lconnect on|direct|discover|share|syncclip|request|grant|deny  LAN resource sharing except keyboard/mouse\n");
     out_append("  bluetooth/bt status|on|off|scan|devices|add|pair|trust|hid|send|log|show  local Bluetooth host control\n");
-    out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
+    out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  configured LardOS Time, default Dangun\n");
+    out_append("  timecfg status|zone +09:00|dst on|off|default dangun|solar|lunar|topbar|battery  global clock settings\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
     out_append("  renderfx status|aa|brightness|resize|lsb|vblank|subpx|test  user-owned render modes\n");
@@ -3139,6 +3318,7 @@ static void cmd_control(const char* args)
     out_append("  _: merges R:/X:/Y:/Z:/A:; writes go visibly to R:.\n");
     out_append("  LardOS Connect can share MegaClipboard, CPU, GPU, storage, and peripherals over LAN; keyboard/mouse stay local.\n");
     out_append("  Bluetooth is off by default, visible in bt.lardd, and HID input requires bt hid on.\n");
+    out_append("  Time display policy lives in editable timecfg.lardd; the top deck defaults to Dangun local time and BAT ?.\n");
     out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
     out_append("  Code runs through LSH, HC, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
     out_append("  Monitor layout lives in editable monitors.lardd; extra outputs are virtualized visibly when hardware only exposes one framebuffer.\n");
@@ -3174,7 +3354,8 @@ static void cmd_control(const char* args)
     out_append("  magic dryrun statsu show what magic would execute without running it\n");
     out_append("  magic dryrun -f bye show a forced raw-control prediction without running it\n");
     out_append("  magic explain       show why magic executed or refused its last prediction\n");
-    out_append("  time                show LardOS Time ticks, 5-digit CE year, Dangun year, and lunar view\n");
+    out_append("  time                show the configured LardOS Time view, defaulting to Dangun local time\n");
+    out_append("  timecfg status      inspect timezone, DST, default view, topbar, and battery field policy\n");
     out_append("  mode guard          guarded real16 <-> long64 roundtrip with restore check\n");
     out_append("  vm selftest         run guarded smoke tests across BOSL, LIL, GASM, Lafillo VM, and OSVM\n");
     out_append("  shrine run hello.shrine run a Shrine subsystem wrapper through LSS\n");
@@ -3422,13 +3603,22 @@ static void cmd_status(const char* args)
     out_append(", codename ");
     out_append(lardos_release_codename());
     out_append(")\n");
-    if (lardtime_now(&time_now) == 0) {
+    if (lardtime_now_configured(&time_now) == 0) {
+        lardtime_config_t tc;
+        lardtime_config_get(&tc);
         out_append("Time: ");
-        lardtime_out_solar(&time_now.civil);
+        out_append(lardtime_view_name(tc.default_view));
+        out_append("=");
+        {
+            char tbuf[96];
+            if (lardtime_format_default(tbuf, sizeof(tbuf)) == 0) out_append(tbuf);
+        }
+        out_append(", zone=");
+        lardtime_out_zone(tc.zone_minutes);
+        out_append(", dst=");
+        out_append(tc.dst_enabled ? "on" : "off");
         out_append(", LT=");
         out_append_i64(time_now.ticks);
-        out_append(", Dangun=");
-        out_append_year5(time_now.dangun_year);
         out_append(", Lunar=");
         lardtime_out_lunar(&time_now.lunar);
         out_append("\n");
@@ -13133,6 +13323,7 @@ static void cfgsh_help(void)
     out_append("  pinclip list|set 1 text|from 1 [2]  fixed clipboard shortcut slots\n");
     out_append("  lconnect on|off|auto|manual  LAN resource sharing control\n");
     out_append("  bluetooth on|off, bluetooth hid on|off  local wireless device control\n");
+    out_append("  timecfg zone +09:00, dst on|off, default dangun|solar|lunar, topbar/battery on|off\n");
     out_append("  state export|import|iso  full OS user-state input/output\n");
     out_append("  sync               persist writable settings/files\n");
 }
@@ -13153,6 +13344,7 @@ static void cfgsh_status(void)
     megaclip_status_t clip;
     lconnect_info_t lc;
     lbt_info_t bt;
+    lardtime_config_t tc;
     lardkit_rollback_info_t rb;
     bootprof_info(&bp);
     awake_info(&aw);
@@ -13168,6 +13360,7 @@ static void cfgsh_status(void)
     megaclip_status(&clip);
     lconnect_info(&lc);
     lbt_info(&bt);
+    lardtime_config_get(&tc);
     lardkit_rollback_info(&rb);
     out_append("CFGSH status\n");
     out_append("  boot=");
@@ -13221,6 +13414,12 @@ static void cfgsh_status(void)
     out_append(bt.enabled ? "on" : "off");
     out_append("/");
     out_append(bt.controller_present ? bt.controller : "none");
+    out_append(" time=");
+    out_append(lardtime_view_name(tc.default_view));
+    out_append("/");
+    lardtime_out_zone(tc.zone_minutes);
+    out_append("/");
+    out_append(tc.dst_enabled ? "dst" : "std");
     out_append(" http=");
     out_append(lsh_http_method_name());
     out_append(" priority=");
@@ -13563,6 +13762,45 @@ static int cfgsh_apply(const char* setting, const char* args)
         }
         return 1;
     }
+    if (strcmp(setting, "timecfg") == 0 || strcmp(setting, "clock") == 0 ||
+        strcmp(setting, "clockcfg") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_timecfg_status();
+        } else {
+            cmd_timecfg(args);
+        }
+        return 1;
+    }
+    if (strcmp(setting, "timezone") == 0 || strcmp(setting, "zone") == 0) {
+        char cmdline[48];
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_timecfg_status();
+            return 1;
+        }
+        snprintf(cmdline, sizeof(cmdline), "zone %s", value);
+        cmd_timecfg(cmdline);
+        return 1;
+    }
+    if (strcmp(setting, "dst") == 0 || strcmp(setting, "daylight") == 0) {
+        char cmdline[48];
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_timecfg_status();
+            return 1;
+        }
+        snprintf(cmdline, sizeof(cmdline), "dst %s", value);
+        cmd_timecfg(cmdline);
+        return 1;
+    }
+    if (strcmp(setting, "timeview") == 0 || strcmp(setting, "calendar") == 0) {
+        char cmdline[64];
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_timecfg_status();
+            return 1;
+        }
+        snprintf(cmdline, sizeof(cmdline), "default %s", value);
+        cmd_timecfg(cmdline);
+        return 1;
+    }
     if (strcmp(setting, "http") == 0 || strcmp(setting, "method") == 0) {
         if (!have_value || cfgsh_is_status_word(value)) {
             out_append("cfgsh: http=");
@@ -13879,6 +14117,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "dos") == 0 || strcmp(cmd, "dosmode") == 0) { cmd_dos(args); return; }
     if (strcmp(cmd, "tomb") == 0 || strcmp(cmd, "tombstone") == 0 || strcmp(cmd, "tombstones") == 0) { dos_tombstone(args); return; }
     if (strcmp(cmd, "time") == 0 || strcmp(cmd, "lardtime") == 0 || strcmp(cmd, "ltime") == 0) { cmd_lardtime_mode(args, "now"); return; }
+    if (strcmp(cmd, "timecfg") == 0 || strcmp(cmd, "timezone") == 0 || strcmp(cmd, "clockcfg") == 0) { cmd_timecfg(args); return; }
     if (strcmp(cmd, "date") == 0) { cmd_lardtime_mode(args, "solar"); return; }
     if (strcmp(cmd, "lunar") == 0) { cmd_lardtime_mode(args, "lunar"); return; }
     if (strcmp(cmd, "dangun") == 0) { cmd_lardtime_mode(args, "dangun"); return; }
@@ -14111,6 +14350,7 @@ void lsh_init(void)
     lvcs_init();
     lardkit_init();
     kmodtalk_init();
+    lardtime_config_init();
     liveupdate_init();
     lbt_init();
     (void)kmo_reload();

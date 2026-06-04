@@ -6,6 +6,14 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.13.0b-mirage
+ITEM Adds user-owned timecfg.lardd for timezone, DST, default calendar view, topbar clock visibility, and battery field visibility.
+ITEM Makes Dangun local time the OS-wide default display while keeping explicit solar date, lunar, raw ticks, and Dangun commands.
+ITEM Adds timecfg status, zone, dst, default, topbar, battery, show, reload, and selftest commands plus cfgsh integration.
+ITEM Draws the configured clock on the desktop top deck when space allows and reports BAT ? honestly until a real power driver supplies battery data.
+ITEM Adds POST/LUNIT coverage and docs without removing LardOS Time, lunar/Dangun support, GUI, RXE/SYSRXE, Bluetooth, LardOS Connect, or user-control values.
+ITEM Ships as beta because it changes the global/default time presentation surface while keeping the settings editable and visible.
+
 SECTION v2.12.0b-mirage
 ITEM Adds LBT, a native Bluetooth host-control layer with bt/bluetooth/lbt shell commands.
 ITEM Adds visible user-owned Bluetooth state in writable bt.lardd plus bt_guide.lardd documentation.

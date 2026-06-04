@@ -27,6 +27,7 @@
 #include "rxe.h"
 #include "io.h"
 #include "screencap.h"
+#include "lardtime.h"
 #include "string.h"
 
 #define LARSH_VIEW_W 160
@@ -4476,7 +4477,20 @@ static void gui_draw_desktop(const fb_t* tgt)
             gui_draw_top_button_at(tgt, m->x + 370, m->y, "Delete", 58, mi == g_monitor_active && hot == GUI_TOP_DELETE_ITEM);
             gui_draw_top_button_at(tgt, m->x + 434, m->y, "File", 62, mi == g_monitor_active && hot == GUI_TOP_DELETE_FILE);
         }
-        if (m->w > 116) {
+        if (m->w >= 760) {
+            char top_time[48];
+            if (lardtime_format_topbar(top_time, sizeof(top_time)) == 0) {
+                int tw = (int)strlen(top_time) * 8;
+                int tx = m->x + m->w - tw - 10;
+                if (tx > m->x + 506) {
+                    fb_draw_text(tgt, (uint16_t)tx, (uint16_t)(m->y + 8),
+                                 top_time, 0xFF9DEAE4u, bar);
+                }
+            } else {
+                fb_draw_text(tgt, (uint16_t)(m->x + m->w - 116), (uint16_t)(m->y + 8),
+                             LARDOS_VERSION, 0xFF9DEAE4u, bar);
+            }
+        } else if (m->w > 116) {
             fb_draw_text(tgt, (uint16_t)(m->x + m->w - 116), (uint16_t)(m->y + 8),
                          LARDOS_VERSION, 0xFF9DEAE4u, bar);
         }

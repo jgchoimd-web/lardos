@@ -206,6 +206,7 @@ static const uint8_t userlaw_init[] =
     "ITEM sound -> boot sounds and effects are native LSND vector files with visible sound.lardd toggles.\n"
     "ITEM lconnect -> LardOS computers may share resources over a visible LAN protocol; input sharing and quiet grants live only behind deprecated confirm commands and must remain logged.\n"
     "ITEM bluetooth -> local wireless radios default off, pairing/trust/HID input are explicit, and bt.lardd keeps visible logs.\n"
+    "ITEM timecfg -> timezone, DST, default Dangun/lunar/solar display, topbar clock, and battery display live in user-owned timecfg.lardd.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
@@ -348,6 +349,28 @@ static const uint8_t bt_init_doc[] =
     "END\n";
 static uint8_t ram_bt_buf[BT_CAP];
 static FsWritableFile ram_bt = { "bt.lardd", ram_bt_buf, 0, BT_CAP };
+
+#define TIMECFG_CAP 2048u
+static const uint8_t timecfg_init_doc[] =
+    "LARDD 1\n"
+    "TITLE LardOS Time Config\n"
+    "TEXT User-owned global time display policy. Defaults are Korean LardOS-style: Dangun year, UTC+09:00, DST off.\n"
+    "TEXT Battery is shown as BAT ? until a power driver reports a real value; LardOS does not fake hardware data.\n"
+    "SETTING zone +09:00\n"
+    "SETTING dst off\n"
+    "SETTING default dangun\n"
+    "SETTING topbar on\n"
+    "SETTING battery on\n"
+    "SECTION Commands\n"
+    "ITEM timecfg status\n"
+    "ITEM timecfg zone +09:00\n"
+    "ITEM timecfg dst on|off\n"
+    "ITEM timecfg default dangun|solar|lunar\n"
+    "ITEM timecfg topbar on|off\n"
+    "ITEM timecfg battery on|off\n"
+    "END\n";
+static uint8_t ram_timecfg_buf[TIMECFG_CAP];
+static FsWritableFile ram_timecfg = { "timecfg.lardd", ram_timecfg_buf, 0, TIMECFG_CAP };
 
 #define OFFICE_DOC_CAP 4096u
 static const uint8_t office_doc_init[] =
@@ -598,6 +621,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use monitor count 2, monitor layout hstack/vstack/grid/mirror, monitor active 1, and monitor move 2 for user-owned multi-monitor layout; monitors.lardd stores the editable policy.\n"
     "li Use wallpaper color 0xRRGGBB, wallpaper pattern grid/stripes/checker, wallpaper bmp sample.bmp, or wallpaper lrec screenrec.lrec to set the desktop background from user-owned state.\n"
     "li Use sound status, sound on/off, sound boot on/off, sound fx on/off, sound play boot.lsnd, and sound new file.lsnd for native vector LSND sounds.\n"
+    "li Use timecfg status, timecfg zone +09:00, timecfg dst off, timecfg default dangun, and timecfg show to control the global topbar clock.\n"
     "li Use Ctrl+Y, Ctrl+P, Ctrl+Space then 1..9/0, or megaclip status/list/mode/push/file/pull/write for the 10-slot MegaClipboard.\n"
     "li Use pinclip set/list/from/pull/write/clear and Ctrl+Space then P then 1..9/0 for fixed clipboard shortcuts.\n"
     "li Use lconnect on, lconnect direct, lconnect discover, and lconnect share all on to share non-input resources with another LardOS machine over LAN.\n"
@@ -1076,14 +1100,20 @@ static const uint8_t file_lardtime_guide[] =
     "TEXT LardOS Time is native time, not Unix epoch seconds.\n"
     "TEXT It counts ticks from 00000-01-01 00:00:00 and prints years with at least five digits.\n"
     "SECTION Commands\n"
-    "ITEM time -> show ticks, solar date, Dangun year, and Lard lunar date.\n"
+    "ITEM time -> show the configured default time view, Dangun by default.\n"
     "ITEM date -> show the five-digit solar date.\n"
     "ITEM lunar -> show the native lunar date estimate.\n"
     "ITEM dangun -> show CE+2333 as a five-digit Dangun year.\n"
+    "ITEM timecfg status -> show timezone, DST, default view, topbar, and battery display policy.\n"
+    "ITEM timecfg zone +09:00 -> set the local display offset.\n"
+    "ITEM timecfg dst on|off -> choose daylight-saving display adjustment.\n"
+    "ITEM timecfg default dangun|solar|lunar -> choose the OS-wide default time view.\n"
+    "ITEM timecfg topbar on|off; timecfg battery on|off -> control the desktop deck clock.\n"
     "ITEM time raw -> show LardOS Time ticks only.\n"
     "ITEM time explain -> show the policy.\n"
     "SECTION Notes\n"
     "ITEM RTC Unix seconds remain only as an internal compatibility input for hardware and TLS checks.\n"
+    "ITEM Default config lives in writable timecfg.lardd so the user can edit it directly.\n"
     "ITEM SYS_GET_TIME, LIL time, and BOSL time now expose LardOS Time ticks.\n"
     "END\n";
 
@@ -1668,6 +1698,7 @@ static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"
     "CHECK file lardos.lars\n"
     "CHECK file lardtime_guide.lardd\n"
+    "CHECK writable timecfg.lardd\n"
     "CHECK file ldi_guide.lardd\n"
     "CHECK file icon_doc.ldi\n"
     "CHECK file default.ltheme\n"
@@ -1686,6 +1717,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command lconnect\n"
     "CHECK command bluetooth\n"
     "CHECK command bt\n"
+    "CHECK command timecfg\n"
     "CHECK command glyph\n"
     "CHECK command wallpaper\n"
     "CHECK command sound\n"
@@ -2601,7 +2633,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 51u;
+    return 52u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2657,6 +2689,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 48) return &ram_statepack;
     if (idx == 49) return &ram_stateiso;
     if (idx == 50) return &ram_bt;
+    if (idx == 51) return &ram_timecfg;
     return NULL;
 }
 
@@ -2763,6 +2796,10 @@ void fs_init(void)
         ram_bt_buf[i] = bt_init_doc[i];
     }
     ram_bt.size = sizeof(bt_init_doc) - 1;
+    for (uint32_t i = 0; i < sizeof(timecfg_init_doc) - 1 && i < TIMECFG_CAP; i++) {
+        ram_timecfg_buf[i] = timecfg_init_doc[i];
+    }
+    ram_timecfg.size = sizeof(timecfg_init_doc) - 1;
     for (uint32_t i = 0; i < sizeof(office_doc_init) - 1 && i < OFFICE_DOC_CAP; i++) {
         ram_office_doc_buf[i] = office_doc_init[i];
     }

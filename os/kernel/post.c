@@ -188,6 +188,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: megaclip guide writable", fs_open_writable("megaclip.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: lconnect guide writable", fs_open_writable("lconnect.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: bluetooth writable", fs_open_writable("bt.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: time config writable", fs_open_writable("timecfg.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: office docs writable", fs_open_writable("office_doc.lardd") != NULL &&
                fs_open_writable("office_sheet.lsheet") != NULL &&
                fs_open_writable("office_deck.lshow") != NULL, emit, user, &pass, &fail);

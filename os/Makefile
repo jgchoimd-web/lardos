@@ -123,7 +123,7 @@ $(KERNEL_DIR)/lard_tls.o: $(KERNEL_DIR)/lard_tls.c $(KERNEL_DIR)/lard_tls_roots.
 $(KERNEL_DIR)/rtc.o: $(KERNEL_DIR)/rtc.c $(INCLUDE)/rtc.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/lardtime.o: $(KERNEL_DIR)/lardtime.c $(INCLUDE)/lardtime.h $(INCLUDE)/rtc.h
+$(KERNEL_DIR)/lardtime.o: $(KERNEL_DIR)/lardtime.c $(INCLUDE)/lardtime.h $(INCLUDE)/rtc.h $(INCLUDE)/fs.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/megaclip.o: $(KERNEL_DIR)/megaclip.c $(INCLUDE)/megaclip.h $(INCLUDE)/fs.h
@@ -359,7 +359,7 @@ $(KERNEL_DIR)/rtl8139.o: $(KERNEL_DIR)/rtl8139.c
 $(KERNEL_DIR)/net.o: $(KERNEL_DIR)/net.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/gui.o: $(KERNEL_DIR)/gui.c $(INCLUDE)/bootinfo.h $(INCLUDE)/gui.h $(INCLUDE)/ldi.h $(INCLUDE)/megaclip.h $(INCLUDE)/version.h $(VERSION_GEN)
+$(KERNEL_DIR)/gui.o: $(KERNEL_DIR)/gui.c $(INCLUDE)/bootinfo.h $(INCLUDE)/gui.h $(INCLUDE)/ldi.h $(INCLUDE)/megaclip.h $(INCLUDE)/lardtime.h $(INCLUDE)/version.h $(VERSION_GEN)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/ps2.o: $(KERNEL_DIR)/ps2.c $(INCLUDE)/ps2.h

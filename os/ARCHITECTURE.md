@@ -466,7 +466,11 @@ internal compatibility input for hardware-facing code such as TLS validation,
 but `SYS_GET_TIME`, LSH `time`, LIL `time`, and BOSL `time` expose LardOS Time
 ticks since `00000-01-01 00:00:00`. The shell prints years with at least five
 digits, adds Dangun year as CE+2333, and derives a native lunar view for LardOS
-calendar surfaces.
+calendar surfaces. `timecfg.lardd` is the writable policy file for display:
+timezone offset, DST adjustment, OS-wide default view (`dangun` by default),
+desktop topbar clock visibility, and battery-field visibility. The GUI topbar
+uses that same formatter and shows `BAT ?` until a power driver reports a real
+value rather than inventing a percentage.
 
 `lard_doc.c` also parses LARS web/app records. `button label | command` is
 rendered as an actionable control and can be listed with `larsform` or executed

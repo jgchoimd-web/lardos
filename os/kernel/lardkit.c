@@ -3,9 +3,13 @@
 #include "bootmeta.h"
 #include "bootprof.h"
 #include "fs.h"
+#include "fstwt.h"
 #include "gui.h"
 #include "lard_doc.h"
 #include "lassist.h"
+#include "liveupdate.h"
+#include "lsound.h"
+#include "megaclip.h"
 #include "screencheck.h"
 #include "taskprio.h"
 
@@ -61,6 +65,7 @@ typedef struct {
     lardkit_theme_info_t custom_theme;
     lardkit_magic_info_t magic;
     lardkit_larsview_info_t larsview;
+    lardkit_statepack_info_t statepack;
 } lardkit_state_t;
 
 static lardkit_state_t s_lardkit;
@@ -1382,6 +1387,600 @@ int lardkit_cfgprof_write(void)
         report_append(w, "\n");
     }
     report_append(w, "END\n");
+    return 0;
+}
+
+#define STATEPACK_DEFAULT_FILE "state.lcfg"
+#define STATEPACK_DEFAULT_ISO  "state.iso"
+#define STATEPACK_HEX_BYTES_PER_LINE 32u
+#define STATEPACK_ISO_SECTOR 2048u
+#define STATEPACK_ISO_PVD_SECTOR 16u
+#define STATEPACK_ISO_TERM_SECTOR 17u
+#define STATEPACK_ISO_PATH_SECTOR 18u
+#define STATEPACK_ISO_ROOT_SECTOR 19u
+#define STATEPACK_ISO_FILE_SECTOR 20u
+
+typedef struct {
+    FsWritableFile* out;
+    const char* skip_name;
+    uint32_t files;
+    uint32_t bytes;
+    uint32_t skipped;
+    uint32_t errors;
+} statepack_export_ctx_t;
+
+static uint32_t state_slen(const char* s)
+{
+    uint32_t n = 0;
+    if (!s) return 0;
+    while (s[n]) n++;
+    return n;
+}
+
+static int state_name_eq(const char* a, const char* b)
+{
+    return streq(a ? a : "", b ? b : "");
+}
+
+static int state_append(FsWritableFile* f, const char* s)
+{
+    uint32_t n = state_slen(s);
+    if (!f || !s) return -1;
+    return fs_append(f, (const uint8_t*)s, n) == n ? 0 : -1;
+}
+
+static int state_append_u32(FsWritableFile* f, uint32_t v)
+{
+    char tmp[10];
+    uint32_t n = 0;
+    if (v == 0) return state_append(f, "0");
+    while (v && n < sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (v % 10u));
+        v /= 10u;
+    }
+    while (n > 0) {
+        char c = tmp[--n];
+        if (fs_append(f, (const uint8_t*)&c, 1u) != 1u) return -1;
+    }
+    return 0;
+}
+
+static int state_append_i32(FsWritableFile* f, int32_t v)
+{
+    if (v < 0) {
+        if (state_append(f, "-") != 0) return -1;
+        return state_append_u32(f, (uint32_t)(-v));
+    }
+    return state_append_u32(f, (uint32_t)v);
+}
+
+static int state_append_hex_byte(FsWritableFile* f, uint8_t b)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    char out[2];
+    out[0] = hex[(b >> 4) & 0x0Fu];
+    out[1] = hex[b & 0x0Fu];
+    return fs_append(f, (const uint8_t*)out, 2u) == 2u ? 0 : -1;
+}
+
+static int state_append_runtime(FsWritableFile* f)
+{
+    bootprof_info_t bp;
+    awake_info_t aw;
+    lassist_info_t buddy;
+    bootprof_info(&bp);
+    awake_info(&aw);
+    lassist_info(&buddy);
+    if (state_append(f, "SECTION Runtime\n") != 0) return -1;
+    if (state_append(f, "RUNTIME buddy ") != 0 || state_append_u32(f, buddy.enabled) != 0 || state_append(f, "\n") != 0) return -1;
+    if (state_append(f, "RUNTIME http ") != 0 || state_append_u32(f, (uint32_t)gui_http_method()) != 0 || state_append(f, "\n") != 0) return -1;
+    if (state_append(f, "RUNTIME priority ") != 0 || state_append_i32(f, taskprio_default_priority()) != 0 || state_append(f, "\n") != 0) return -1;
+    if (state_append(f, "RUNTIME boot ") != 0 || state_append(f, bp.name) != 0 || state_append(f, "\n") != 0) return -1;
+    if (state_append(f, "RUNTIME awake ") != 0 || state_append_u32(f, aw.enabled) != 0 || state_append(f, "\n") != 0) return -1;
+    if (state_append(f, "RUNTIME theme ") != 0 || state_append_u32(f, s_lardkit.active_theme) != 0 || state_append(f, "\n") != 0) return -1;
+    return state_append(f, "SECTION Files\n");
+}
+
+static int state_should_skip(const statepack_export_ctx_t* ctx, const char* name)
+{
+    if (!name || !name[0]) return 1;
+    if (ctx && ctx->skip_name && state_name_eq(name, ctx->skip_name)) return 1;
+    if (state_name_eq(name, STATEPACK_DEFAULT_ISO)) return 1;
+    return 0;
+}
+
+static int state_append_file(FsWritableFile* out, const char* name, const uint8_t* data,
+                             uint32_t size, uint32_t cap)
+{
+    uint32_t pos = 0;
+    if (state_append(out, "FILE ") != 0 || state_append(out, name) != 0 ||
+        state_append(out, " ") != 0 || state_append_u32(out, size) != 0 ||
+        state_append(out, " ") != 0 || state_append_u32(out, cap) != 0 ||
+        state_append(out, "\n") != 0) {
+        return -1;
+    }
+    while (pos < size) {
+        uint32_t line = size - pos;
+        if (line > STATEPACK_HEX_BYTES_PER_LINE) line = STATEPACK_HEX_BYTES_PER_LINE;
+        if (state_append(out, "HEX ") != 0) return -1;
+        for (uint32_t i = 0; i < line; i++) {
+            if (state_append_hex_byte(out, data[pos + i]) != 0) return -1;
+        }
+        if (state_append(out, "\n") != 0) return -1;
+        pos += line;
+    }
+    return state_append(out, "END_FILE\n");
+}
+
+static void state_export_cb(const char* name, uint32_t size, void* user)
+{
+    statepack_export_ctx_t* ctx = (statepack_export_ctx_t*)user;
+    FsWritableFile* src;
+    (void)size;
+    if (!ctx || !ctx->out) return;
+    if (state_should_skip(ctx, name)) {
+        ctx->skipped++;
+        return;
+    }
+    src = fs_open_writable(name);
+    if (!src) {
+        ctx->skipped++;
+        return;
+    }
+    if (state_append_file(ctx->out, src->name, src->data, src->size, src->cap) != 0) {
+        ctx->errors++;
+        return;
+    }
+    ctx->files++;
+    ctx->bytes += src->size;
+}
+
+int lardkit_statepack_export(const char* file)
+{
+    const char* target = (file && file[0]) ? file : STATEPACK_DEFAULT_FILE;
+    FsWritableFile* out = fs_open_or_create_writable(target);
+    statepack_export_ctx_t ctx;
+    if (!out) {
+        s_lardkit.statepack.last_error = 1u;
+        return -1;
+    }
+    out->size = 0;
+    ctx.out = out;
+    ctx.skip_name = out->name;
+    ctx.files = 0;
+    ctx.bytes = 0;
+    ctx.skipped = 0;
+    ctx.errors = 0;
+    if (state_append(out, "LCFG 1\nTITLE LardOS Full State Export\n") != 0 ||
+        state_append(out, "TEXT Contains runtime settings plus all visible writable user-state files.\n") != 0 ||
+        state_append(out, "TEXT Import takes a rollback snapshot first and reloads visible runtime surfaces.\n") != 0 ||
+        state_append_runtime(out) != 0) {
+        s_lardkit.statepack.last_error = 2u;
+        return -2;
+    }
+    fs_list_writable(state_export_cb, &ctx);
+    if (state_append(out, "END\n") != 0 || ctx.errors) {
+        s_lardkit.statepack.last_error = 3u + ctx.errors;
+        return -3;
+    }
+    s_lardkit.statepack.exports++;
+    s_lardkit.statepack.files = ctx.files;
+    s_lardkit.statepack.bytes = ctx.bytes;
+    s_lardkit.statepack.skipped = ctx.skipped;
+    s_lardkit.statepack.last_error = 0;
+    scopy(s_lardkit.statepack.last_file, sizeof(s_lardkit.statepack.last_file), out->name);
+    lardkit_journal_event("statepack", "exported full state");
+    return 0;
+}
+
+static const char* state_skip_spaces(const char* p)
+{
+    while (p && (*p == ' ' || *p == '\t')) p++;
+    return p;
+}
+
+static int state_read_word(const char** pp, char* out, uint32_t cap)
+{
+    const char* p = state_skip_spaces(*pp);
+    uint32_t n = 0;
+    if (!p || !out || cap == 0 || !*p) return -1;
+    while (*p && *p != ' ' && *p != '\t' && n + 1u < cap) out[n++] = *p++;
+    out[n] = '\0';
+    while (*p && *p != ' ' && *p != '\t') p++;
+    *pp = p;
+    return n ? 0 : -1;
+}
+
+static int state_parse_u32_word(const char** pp, uint32_t* out)
+{
+    const char* p = state_skip_spaces(*pp);
+    uint32_t v = 0;
+    uint32_t digits = 0;
+    if (!p || !out) return -1;
+    while (*p >= '0' && *p <= '9') {
+        v = v * 10u + (uint32_t)(*p - '0');
+        p++;
+        digits++;
+    }
+    if (!digits) return -1;
+    *out = v;
+    *pp = p;
+    return 0;
+}
+
+static int state_parse_i32_word(const char** pp, int32_t* out)
+{
+    const char* p = state_skip_spaces(*pp);
+    int neg = 0;
+    uint32_t v = 0;
+    if (!p || !out) return -1;
+    if (*p == '-') {
+        neg = 1;
+        p++;
+    }
+    *pp = p;
+    if (state_parse_u32_word(pp, &v) != 0) return -1;
+    *out = neg ? -(int32_t)v : (int32_t)v;
+    return 0;
+}
+
+static int state_line_starts(const char* line, const char* prefix)
+{
+    uint32_t i = 0;
+    if (!line || !prefix) return 0;
+    while (prefix[i]) {
+        if (line[i] != prefix[i]) return 0;
+        i++;
+    }
+    return 1;
+}
+
+static int state_next_line(const uint8_t* data, uint32_t size, uint32_t* pos,
+                           char* line, uint32_t cap)
+{
+    uint32_t n = 0;
+    if (!data || !pos || !line || cap == 0 || *pos >= size) return 0;
+    while (*pos < size && data[*pos] != '\n') {
+        if (data[*pos] != '\r' && n + 1u < cap) line[n++] = (char)data[*pos];
+        (*pos)++;
+    }
+    if (*pos < size && data[*pos] == '\n') (*pos)++;
+    line[n] = '\0';
+    return 1;
+}
+
+static int state_hex_val(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return -1;
+}
+
+static int state_apply_runtime_line(const char* line)
+{
+    const char* p = line + 8;
+    char key[24];
+    if (state_read_word(&p, key, sizeof(key)) != 0) return -1;
+    if (streq(key, "buddy")) {
+        uint32_t v;
+        if (state_parse_u32_word(&p, &v) == 0) lassist_enable(v ? 1 : 0);
+        return 0;
+    }
+    if (streq(key, "http")) {
+        uint32_t v;
+        if (state_parse_u32_word(&p, &v) == 0) gui_http_set_method((int)v);
+        return 0;
+    }
+    if (streq(key, "priority")) {
+        int32_t v;
+        if (state_parse_i32_word(&p, &v) == 0) taskprio_set_default(v);
+        return 0;
+    }
+    if (streq(key, "boot")) {
+        char v[32];
+        if (state_read_word(&p, v, sizeof(v)) == 0) (void)bootprof_set(v);
+        return 0;
+    }
+    if (streq(key, "awake")) {
+        uint32_t v;
+        if (state_parse_u32_word(&p, &v) == 0) {
+            if (v) awake_enable(1, 3u);
+            else awake_enable(0, 0);
+        }
+        return 0;
+    }
+    if (streq(key, "theme")) {
+        uint32_t v;
+        if (state_parse_u32_word(&p, &v) == 0 && v < lardkit_theme_count()) s_lardkit.active_theme = v;
+        return 0;
+    }
+    return -1;
+}
+
+static void state_apply_runtime_files(void)
+{
+    const FsFile* f = fs_open("fstwt.fstwts");
+    char reload_msg[96];
+    fs_apply_delete_log();
+    (void)gui_wallpaper_reload();
+    (void)megaclip_pin_reload();
+    if (f && f->data && f->size) (void)fstwt_load_script(f->data, f->size, f->name);
+    (void)lsound_reload();
+    (void)liveupdate_reload("all", reload_msg, sizeof(reload_msg));
+}
+
+int lardkit_statepack_import(const char* file)
+{
+    const char* src_name = (file && file[0]) ? file : STATEPACK_DEFAULT_FILE;
+    const FsFile* src = fs_open(src_name);
+    uint32_t pos = 0;
+    uint32_t imported = 0;
+    uint32_t imported_bytes = 0;
+    uint32_t skipped = 0;
+    uint32_t errors = 0;
+    FsWritableFile* cur = NULL;
+    uint32_t expected = 0;
+    uint32_t skip_cur = 0;
+    char line[192];
+    if (!src || !src->data || src->size < 7u) {
+        s_lardkit.statepack.last_error = 10u;
+        return -1;
+    }
+    if (!(src->data[0] == 'L' && src->data[1] == 'C' && src->data[2] == 'F' &&
+          src->data[3] == 'G' && src->data[4] == ' ' && src->data[5] == '1')) {
+        s_lardkit.statepack.last_error = 11u;
+        return -2;
+    }
+    (void)lardkit_snapshot("state-import");
+    while (state_next_line(src->data, src->size, &pos, line, sizeof(line))) {
+        if (state_line_starts(line, "RUNTIME ")) {
+            if (state_apply_runtime_line(line) != 0) errors++;
+            continue;
+        }
+        if (state_line_starts(line, "FILE ")) {
+            const char* p = line + 5;
+            char name[32];
+            uint32_t cap_ignored = 0;
+            if (cur && !skip_cur && cur->size != expected) errors++;
+            cur = NULL;
+            skip_cur = 0;
+            expected = 0;
+            if (state_read_word(&p, name, sizeof(name)) != 0 ||
+                state_parse_u32_word(&p, &expected) != 0) {
+                errors++;
+                skip_cur = 1;
+                continue;
+            }
+            (void)state_parse_u32_word(&p, &cap_ignored);
+            if (state_name_eq(name, src_name)) {
+                skipped++;
+                skip_cur = 1;
+                continue;
+            }
+            cur = fs_open_or_create_writable(name);
+            if (!cur) {
+                skipped++;
+                errors++;
+                skip_cur = 1;
+                continue;
+            }
+            cur->size = 0;
+            continue;
+        }
+        if (state_line_starts(line, "HEX ")) {
+            const char* p = line + 4;
+            int hi = -1;
+            if (!cur || skip_cur) continue;
+            while (*p) {
+                int v;
+                if (*p == ' ' || *p == '\t') {
+                    p++;
+                    continue;
+                }
+                v = state_hex_val(*p++);
+                if (v < 0) {
+                    errors++;
+                    break;
+                }
+                if (hi < 0) {
+                    hi = v;
+                } else {
+                    uint8_t b = (uint8_t)((hi << 4) | v);
+                    if (fs_append(cur, &b, 1u) != 1u) errors++;
+                    else imported_bytes++;
+                    hi = -1;
+                }
+            }
+            if (hi >= 0) errors++;
+            continue;
+        }
+        if (state_line_starts(line, "END_FILE")) {
+            if (cur && !skip_cur) {
+                if (cur->size != expected) errors++;
+                imported++;
+            }
+            cur = NULL;
+            skip_cur = 0;
+            expected = 0;
+            continue;
+        }
+    }
+    if (cur && !skip_cur && cur->size != expected) errors++;
+    state_apply_runtime_files();
+    fs_mark_dirty();
+    s_lardkit.statepack.imports++;
+    s_lardkit.statepack.imported_files = imported;
+    s_lardkit.statepack.imported_bytes = imported_bytes;
+    s_lardkit.statepack.skipped = skipped;
+    s_lardkit.statepack.last_error = errors;
+    scopy(s_lardkit.statepack.last_file, sizeof(s_lardkit.statepack.last_file), src_name);
+    lardkit_journal_event("statepack", errors ? "import completed with warnings" : "imported full state");
+    return errors ? -3 : 0;
+}
+
+static void iso_put16(uint8_t* p, uint16_t v)
+{
+    p[0] = (uint8_t)(v & 0xFFu);
+    p[1] = (uint8_t)(v >> 8);
+}
+
+static void iso_put16_be(uint8_t* p, uint16_t v)
+{
+    p[0] = (uint8_t)(v >> 8);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
+static void iso_put16_both(uint8_t* p, uint16_t v)
+{
+    iso_put16(p, v);
+    iso_put16_be(p + 2, v);
+}
+
+static void iso_put32(uint8_t* p, uint32_t v)
+{
+    p[0] = (uint8_t)(v & 0xFFu);
+    p[1] = (uint8_t)((v >> 8) & 0xFFu);
+    p[2] = (uint8_t)((v >> 16) & 0xFFu);
+    p[3] = (uint8_t)((v >> 24) & 0xFFu);
+}
+
+static void iso_put32_be(uint8_t* p, uint32_t v)
+{
+    p[0] = (uint8_t)((v >> 24) & 0xFFu);
+    p[1] = (uint8_t)((v >> 16) & 0xFFu);
+    p[2] = (uint8_t)((v >> 8) & 0xFFu);
+    p[3] = (uint8_t)(v & 0xFFu);
+}
+
+static void iso_put32_both(uint8_t* p, uint32_t v)
+{
+    iso_put32(p, v);
+    iso_put32_be(p + 4, v);
+}
+
+static void iso_put_padded(uint8_t* p, uint32_t len, const char* s)
+{
+    uint32_t i = 0;
+    while (i < len && s && s[i]) {
+        p[i] = (uint8_t)s[i];
+        i++;
+    }
+    while (i < len) p[i++] = ' ';
+}
+
+static uint32_t iso_dir_record(uint8_t* p, uint32_t extent, uint32_t size,
+                               uint8_t flags, const uint8_t* name, uint8_t name_len)
+{
+    uint32_t len = 33u + name_len;
+    if (len & 1u) len++;
+    p[0] = (uint8_t)len;
+    p[1] = 0;
+    iso_put32_both(p + 2, extent);
+    iso_put32_both(p + 10, size);
+    p[18] = 126; /* 2026 */
+    p[19] = 6;
+    p[20] = 4;
+    p[21] = 0;
+    p[22] = 0;
+    p[23] = 0;
+    p[24] = 0;
+    p[25] = flags;
+    p[26] = 0;
+    p[27] = 0;
+    iso_put16_both(p + 28, 1);
+    p[32] = name_len;
+    for (uint32_t i = 0; i < name_len; i++) p[33u + i] = name[i];
+    return len;
+}
+
+int lardkit_statepack_iso(const char* iso_file, const char* state_file)
+{
+    const char* iso_name = (iso_file && iso_file[0]) ? iso_file : STATEPACK_DEFAULT_ISO;
+    const char* state_name = (state_file && state_file[0]) ? state_file : STATEPACK_DEFAULT_FILE;
+    const FsFile* state = fs_open(state_name);
+    FsWritableFile* iso = fs_open_or_create_writable(iso_name);
+    uint32_t file_sectors;
+    uint32_t total_sectors;
+    uint32_t total_bytes;
+    uint8_t* pvd;
+    uint8_t* term;
+    uint8_t* path;
+    uint8_t* root;
+    uint32_t off;
+    static const uint8_t dot_name[] = { 0 };
+    static const uint8_t dotdot_name[] = { 1 };
+    static const uint8_t file_name[] = "STATE.LCFG;1";
+    if (!state || !state->data || state->size == 0 || !iso) {
+        s_lardkit.statepack.last_error = 30u;
+        return -1;
+    }
+    file_sectors = (state->size + STATEPACK_ISO_SECTOR - 1u) / STATEPACK_ISO_SECTOR;
+    total_sectors = STATEPACK_ISO_FILE_SECTOR + file_sectors;
+    total_bytes = total_sectors * STATEPACK_ISO_SECTOR;
+    if (total_bytes > iso->cap) {
+        s_lardkit.statepack.last_error = 31u;
+        return -2;
+    }
+    for (uint32_t i = 0; i < total_bytes; i++) iso->data[i] = 0;
+    iso->size = total_bytes;
+
+    pvd = iso->data + STATEPACK_ISO_PVD_SECTOR * STATEPACK_ISO_SECTOR;
+    pvd[0] = 1;
+    pvd[1] = 'C'; pvd[2] = 'D'; pvd[3] = '0'; pvd[4] = '0'; pvd[5] = '1';
+    pvd[6] = 1;
+    iso_put_padded(pvd + 8, 32, "LARDOS");
+    iso_put_padded(pvd + 40, 32, "LARDOS_STATE");
+    iso_put32_both(pvd + 80, total_sectors);
+    iso_put16_both(pvd + 120, 1);
+    iso_put16_both(pvd + 124, 1);
+    iso_put16_both(pvd + 128, STATEPACK_ISO_SECTOR);
+    iso_put32_both(pvd + 132, 10);
+    iso_put32(pvd + 140, STATEPACK_ISO_PATH_SECTOR);
+    iso_put32(pvd + 144, 0);
+    iso_put32_be(pvd + 148, 0);
+    iso_put32_be(pvd + 152, 0);
+    (void)iso_dir_record(pvd + 156, STATEPACK_ISO_ROOT_SECTOR, STATEPACK_ISO_SECTOR, 2, dot_name, 1);
+
+    term = iso->data + STATEPACK_ISO_TERM_SECTOR * STATEPACK_ISO_SECTOR;
+    term[0] = 255;
+    term[1] = 'C'; term[2] = 'D'; term[3] = '0'; term[4] = '0'; term[5] = '1';
+    term[6] = 1;
+
+    path = iso->data + STATEPACK_ISO_PATH_SECTOR * STATEPACK_ISO_SECTOR;
+    path[0] = 1;
+    path[1] = 0;
+    iso_put32(path + 2, STATEPACK_ISO_ROOT_SECTOR);
+    iso_put16(path + 6, 1);
+    path[8] = 0;
+    path[9] = 0;
+
+    root = iso->data + STATEPACK_ISO_ROOT_SECTOR * STATEPACK_ISO_SECTOR;
+    off = iso_dir_record(root, STATEPACK_ISO_ROOT_SECTOR, STATEPACK_ISO_SECTOR, 2, dot_name, 1);
+    off += iso_dir_record(root + off, STATEPACK_ISO_ROOT_SECTOR, STATEPACK_ISO_SECTOR, 2, dotdot_name, 1);
+    (void)iso_dir_record(root + off, STATEPACK_ISO_FILE_SECTOR, state->size, 0, file_name, sizeof(file_name) - 1u);
+    for (uint32_t i = 0; i < state->size; i++) {
+        iso->data[STATEPACK_ISO_FILE_SECTOR * STATEPACK_ISO_SECTOR + i] = state->data[i];
+    }
+    fs_mark_dirty();
+    s_lardkit.statepack.isos++;
+    s_lardkit.statepack.iso_bytes = total_bytes;
+    s_lardkit.statepack.last_error = 0;
+    scopy(s_lardkit.statepack.last_iso, sizeof(s_lardkit.statepack.last_iso), iso->name);
+    lardkit_journal_event("statepack", "exported state ISO");
+    return 0;
+}
+
+void lardkit_statepack_info(lardkit_statepack_info_t* out)
+{
+    if (out) *out = s_lardkit.statepack;
+}
+
+int lardkit_statepack_selftest(void)
+{
+    if (lardkit_statepack_export(STATEPACK_DEFAULT_FILE) != 0) return -1;
+    if (lardkit_statepack_iso(STATEPACK_DEFAULT_ISO, STATEPACK_DEFAULT_FILE) != 0) return -2;
+    if (lardkit_statepack_import(STATEPACK_DEFAULT_FILE) != 0) return -3;
     return 0;
 }
 

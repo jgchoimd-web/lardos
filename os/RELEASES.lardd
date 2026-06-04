@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.10.0b-mirage
+ITEM Adds StatePack full-state export/import through state export [file.lcfg] and state import [file.lcfg].
+ITEM LCFG 1 captures RUNTIME settings plus writable user-state files including apps, KMO/RXR slots, wallpaper, clipboard/pinclip, office docs, monitor layout, sound, recovery logs, and user policy files.
+ITEM Import takes a rollback snapshot first, writes files back, applies runtime settings, and reloads wallpaper, FSTWT, sound, apps, KMO, and clipboard pins.
+ITEM Adds state iso [file.iso] [file.lcfg], a no-external-library ISO9660 data image containing STATE.LCFG for moving the OS state as an ISO file.
+ITEM Keeps the value line honest: state ISO export is a visible transfer image, not mislabeled boot media; all data stays local, inspectable, editable, and user-owned.
+
 SECTION v2.9.1p-mirage
 ITEM Hotpatches GUI stretch-resize preview so the original active window is no longer drawn at the old size while the preview is shown at the new size.
 ITEM Replaces full-screen present on every mouse/window motion with dirty-rectangle redraw and dirty-rectangle filtered blit when the backbuffer is available.

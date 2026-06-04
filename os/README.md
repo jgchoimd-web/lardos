@@ -52,6 +52,16 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.10.0b-mirage` adds StatePack full-state input/output. `state export
+[file.lcfg]` writes a visible `LCFG 1` file containing runtime settings plus
+all writable user-state files: apps, KMO/RXE/RXR slots, wallpaper config,
+clipboard/pinclip state, office docs, monitor layout, sound files, recovery
+logs, and similar OS-owned state. `state import [file.lcfg]` takes a rollback
+snapshot first, restores those files, and reloads wallpaper, FSTWT, sound,
+apps, KMO, and clipboard pins. `state iso [file.iso] [file.lcfg]` creates a
+small ISO9660 data image containing `STATE.LCFG`; this is a state-transfer ISO,
+not a fake bootable clone.
+
 `v2.9.1p-mirage` hotpatches GUI resizing and presentation. Stretch-resize
 preview no longer draws the original active window at the old size while also
 showing the preview at the new size. When a backbuffer is available, GUI render

@@ -418,7 +418,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "hangul", 1 }, { "korean", 1 }, { "ime", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "hc", 1 }, { "holyc", 1 }, { "lardhc", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "monitor", 1 }, { "monitors", 1 }, { "display", 1 }, { "multimon", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "monitor", 1 }, { "monitors", 1 }, { "display", 1 }, { "multimon", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "state", 0 }, { "statepack", 0 }, { "cfgio", 0 }, { "configio", 0 }, { "settingsio", 0 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "pinclip", 1 }, { "fixedclip", 1 }, { "pclip", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
@@ -3010,7 +3010,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -3046,6 +3046,7 @@ static void cmd_help(const char* args)
     out_append("  lardtrace on|show|module gui, netwatch on|show, journal show\n");
     out_append("  webstack status|methods|tls|guide|demo|selftest for native LARS/HTTP/HTTPS support\n");
     out_append("  lunit run tests.lunit, cfgprof save name/load name, values, userlaw show\n");
+    out_append("  state export|import|iso [file]     full OS user-state config and ISO export\n");
     out_append("  ltheme list|use name            native theme presets for the LardOS shell\n");
     out_append("  wallpaper status|color|pattern|bmp|lrec|use|reload|reset  user-owned desktop wallpaper\n");
     out_append("  sound boot on|off, sound fx ok, sound play file.lsnd  native vector sound\n");
@@ -7146,6 +7147,111 @@ static void cmd_cfgprof(const char* args)
         return;
     }
     out_append("Usage: cfgprof list|save name|load name|show\n");
+}
+
+static void cmd_statepack_status(void)
+{
+    lardkit_statepack_info_t info;
+    lardkit_statepack_info(&info);
+    out_append("StatePack exports=");
+    out_append_u32(info.exports);
+    out_append(" imports=");
+    out_append_u32(info.imports);
+    out_append(" isos=");
+    out_append_u32(info.isos);
+    out_append("\n  last-file=");
+    out_append(info.last_file[0] ? info.last_file : "state.lcfg");
+    out_append(" files=");
+    out_append_u32(info.files);
+    out_append(" bytes=");
+    out_append_u32(info.bytes);
+    out_append(" skipped=");
+    out_append_u32(info.skipped);
+    out_append("\n  imported=");
+    out_append_u32(info.imported_files);
+    out_append(" imported-bytes=");
+    out_append_u32(info.imported_bytes);
+    out_append(" iso=");
+    out_append(info.last_iso[0] ? info.last_iso : "state.iso");
+    out_append(" iso-bytes=");
+    out_append_u32(info.iso_bytes);
+    out_append(" last-error=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+}
+
+static void cmd_statepack(const char* args)
+{
+    char sub[16];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        strcmp(sub, "status") == 0 || strcmp(sub, "info") == 0) {
+        cmd_statepack_status();
+        return;
+    }
+    if (strcmp(sub, "export") == 0 || strcmp(sub, "out") == 0 || strcmp(sub, "save") == 0) {
+        char file[32];
+        if (vcs_read_word(&args, file, sizeof(file)) != 0) {
+            file[0] = '\0';
+        }
+        if (lardkit_statepack_export(file[0] ? file : "state.lcfg") == 0) {
+            out_append("state: exported full OS user-state to ");
+            out_append(file[0] ? file : "state.lcfg");
+            out_append("\n");
+            cmd_statepack_status();
+        } else {
+            out_append("state: export failed. Try deleting old state.iso or using a smaller state file.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "import") == 0 || strcmp(sub, "in") == 0 || strcmp(sub, "load") == 0 ||
+        strcmp(sub, "apply") == 0) {
+        char file[32];
+        if (vcs_read_word(&args, file, sizeof(file)) != 0) {
+            file[0] = '\0';
+        }
+        if (lardkit_statepack_import(file[0] ? file : "state.lcfg") == 0) {
+            out_append("state: imported and applied ");
+            out_append(file[0] ? file : "state.lcfg");
+            out_append("\n");
+        } else {
+            out_append("state: import completed with warnings or failed. Check state status.\n");
+        }
+        cmd_statepack_status();
+        return;
+    }
+    if (strcmp(sub, "iso") == 0 || strcmp(sub, "image") == 0) {
+        char iso[32];
+        char state[32];
+        if (vcs_read_word(&args, iso, sizeof(iso)) != 0) iso[0] = '\0';
+        if (vcs_read_word(&args, state, sizeof(state)) != 0) state[0] = '\0';
+        if (!state[0]) {
+            if (lardkit_statepack_export("state.lcfg") != 0) {
+                out_append("state: could not refresh state.lcfg before ISO export.\n");
+                cmd_statepack_status();
+                return;
+            }
+        }
+        if (lardkit_statepack_iso(iso[0] ? iso : "state.iso", state[0] ? state : "state.lcfg") == 0) {
+            out_append("state: exported ISO data image ");
+            out_append(iso[0] ? iso : "state.iso");
+            out_append(" containing STATE.LCFG\n");
+            cmd_statepack_status();
+        } else {
+            out_append("state: ISO export failed. Run state export first or use a smaller state package.\n");
+        }
+        return;
+    }
+    if (strcmp(sub, "show") == 0) {
+        cmd_larddoc("statepack_guide.lardd", "Usage: state show");
+        return;
+    }
+    if (strcmp(sub, "test") == 0 || strcmp(sub, "selftest") == 0) {
+        out_append(lardkit_statepack_selftest() == 0 ? "state: selftest OK\n" : "state: selftest failed\n");
+        cmd_statepack_status();
+        return;
+    }
+    out_append("Usage: state status|export [file.lcfg]|import [file.lcfg]|iso [file.iso] [file.lcfg]|show|test\n");
 }
 
 static void cmd_userlaw(const char* args)
@@ -12079,6 +12185,7 @@ static void cfgsh_help(void)
     out_append("  megaclip stack|single|order  clipboard slot mode\n");
     out_append("  pinclip list|set 1 text|from 1 [2]  fixed clipboard shortcut slots\n");
     out_append("  lconnect on|off|auto|manual  LAN resource sharing control\n");
+    out_append("  state export|import|iso  full OS user-state input/output\n");
     out_append("  sync               persist writable settings/files\n");
 }
 
@@ -12453,6 +12560,15 @@ static int cfgsh_apply(const char* setting, const char* args)
             cmd_pinclip("list");
         } else {
             cmd_pinclip(args);
+        }
+        return 1;
+    }
+    if (strcmp(setting, "state") == 0 || strcmp(setting, "statepack") == 0 ||
+        strcmp(setting, "cfgio") == 0 || strcmp(setting, "settingsio") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_statepack_status();
+        } else {
+            cmd_statepack(args);
         }
         return 1;
     }
@@ -12842,6 +12958,9 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oldcheck") == 0) { cmd_oldcheck(args); return; }
     if (strcmp(cmd, "lfsdoctor") == 0) { cmd_lfsdoctor(args); return; }
     if (strcmp(cmd, "cfgprof") == 0) { cmd_cfgprof(args); return; }
+    if (strcmp(cmd, "state") == 0 || strcmp(cmd, "statepack") == 0 ||
+        strcmp(cmd, "cfgio") == 0 || strcmp(cmd, "configio") == 0 ||
+        strcmp(cmd, "settingsio") == 0) { cmd_statepack(args); return; }
     if (strcmp(cmd, "userlaw") == 0) { cmd_userlaw(args); return; }
     if (strcmp(cmd, "nice") == 0) { cmd_nice(args); return; }
     if (strcmp(cmd, "prio") == 0 || strcmp(cmd, "priority") == 0) { cmd_prio(args); return; }

@@ -131,6 +131,9 @@ $(KERNEL_DIR)/megaclip.o: $(KERNEL_DIR)/megaclip.c $(INCLUDE)/megaclip.h $(INCLU
 $(KERNEL_DIR)/lsound.o: $(KERNEL_DIR)/lsound.c $(INCLUDE)/lsound.h $(INCLUDE)/fs.h $(INCLUDE)/io.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(KERNEL_DIR)/lardkit.o: $(KERNEL_DIR)/lardkit.c $(INCLUDE)/lardkit.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lsound.h $(INCLUDE)/megaclip.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(KERNEL_DIR)/lconnect.o: $(KERNEL_DIR)/lconnect.c $(INCLUDE)/lconnect.h $(INCLUDE)/net.h $(INCLUDE)/megaclip.h $(INCLUDE)/lardkit.h
 	$(CC) $(CFLAGS) -c $< -o $@
 

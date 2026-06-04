@@ -413,6 +413,19 @@ static const uint8_t usersound_init[] =
 static uint8_t ram_usersound_buf[USERSOUND_CAP];
 static FsWritableFile ram_usersound = { "usersound.lsnd", ram_usersound_buf, 0, USERSOUND_CAP };
 
+#define STATEPACK_CAP 524288u
+static const uint8_t statepack_init[] =
+    "LCFG 1\n"
+    "TITLE LardOS State Export\n"
+    "TEXT Use state export to fill this user-owned full-state settings file.\n"
+    "END\n";
+static uint8_t ram_statepack_buf[STATEPACK_CAP];
+static FsWritableFile ram_statepack = { "state.lcfg", ram_statepack_buf, 0, STATEPACK_CAP };
+
+#define STATEISO_CAP 786432u
+static uint8_t ram_stateiso_buf[STATEISO_CAP];
+static FsWritableFile ram_stateiso = { "state.iso", ram_stateiso_buf, 0, STATEISO_CAP };
+
 #define FSDELETE_CAP 2048u
 static const uint8_t fsdelete_init[] =
     "LARDD 1\n"
@@ -1519,6 +1532,22 @@ static const uint8_t file_liveupdate_guide[] =
     "ITEM Raw-control KMO and SUM still exist for deliberately dangerous paths; LiveUpdate does not remove them.\n"
     "END\n";
 
+static const uint8_t file_statepack_guide[] =
+    "LARDD 1\n"
+    "TITLE StatePack LCFG\n"
+    "TEXT StatePack exports and imports the current user-owned LardOS state as one visible settings file.\n"
+    "TEXT It captures runtime settings plus writable files such as apps, wallpaper config, clipboard state, office docs, KMO, RXR slots, sound, monitor layout, and recovery logs.\n"
+    "SECTION Commands\n"
+    "ITEM state status -> show last export/import/ISO counts.\n"
+    "ITEM state export [file.lcfg] -> write LCFG 1 text with RUNTIME lines and HEX file payloads.\n"
+    "ITEM state import [file.lcfg] -> take a rollback snapshot, write files back, and reload wallpaper, FSTWT, sound, apps, KMO, and clipboard pins.\n"
+    "ITEM state iso [file.iso] [file.lcfg] -> make a small ISO9660 data image containing STATE.LCFG.\n"
+    "ITEM cfgio is an alias for state so settings input/output is easy to remember.\n"
+    "SECTION Values\n"
+    "ITEM The file is local, inspectable, editable, and recoverable; no hidden external serializer is used.\n"
+    "ITEM ISO export is a state-transfer image, not a fake bootable clone unless a future boot path explicitly says so.\n"
+    "END\n";
+
 static const uint8_t file_gui_status_kmo[] =
     "KMO 1\n"
     "ID gui-status\n"
@@ -1595,8 +1624,13 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file webdemo.lars\n"
     "CHECK file fstwt_guide.lardd\n"
     "CHECK file liveupdate_guide.lardd\n"
+    "CHECK file statepack_guide.lardd\n"
     "CHECK file default.fstwts\n"
     "CHECK writable fstwt.fstwts\n"
+    "CHECK writable state.lcfg\n"
+    "CHECK writable state.iso\n"
+    "CHECK command state\n"
+    "CHECK command cfgio\n"
     "CHECK command fstwt\n"
     "CHECK command bleed\n"
     "CHECK command crash\n"
@@ -1863,6 +1897,7 @@ static const FsFile FS_FILES[] = {
     { "webdemo.lars", file_webdemo_lars, sizeof(file_webdemo_lars) - 1 },
     { "fstwt_guide.lardd", file_fstwt_guide, sizeof(file_fstwt_guide) - 1 },
     { "liveupdate_guide.lardd", file_liveupdate_guide, sizeof(file_liveupdate_guide) - 1 },
+    { "statepack_guide.lardd", file_statepack_guide, sizeof(file_statepack_guide) - 1 },
     { "default.fstwts", file_default_fstwts, sizeof(file_default_fstwts) - 1 },
     { "releases.lardd", file_releases_lardd, sizeof(file_releases_lardd) - 1 },
     { "features.lil",  file_features_lil,  sizeof(file_features_lil) - 1 },
@@ -2346,7 +2381,7 @@ static void fsdelete_rewrite_from_state(void)
     s_fsdelete_rewriting = 0;
 }
 
-static void fs_apply_delete_log(void)
+void fs_apply_delete_log(void)
 {
     uint32_t i = 0;
     fs_hidden_clear();
@@ -2475,7 +2510,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 47u;
+    return 49u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2527,6 +2562,8 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 44) return &ram_monitors;
     if (idx == 45) return &ram_sound_cfg;
     if (idx == 46) return &ram_usersound;
+    if (idx == 47) return &ram_statepack;
+    if (idx == 48) return &ram_stateiso;
     return NULL;
 }
 
@@ -2659,6 +2696,11 @@ void fs_init(void)
         ram_usersound_buf[i] = usersound_init[i];
     }
     ram_usersound.size = sizeof(usersound_init) - 1;
+    for (uint32_t i = 0; i < sizeof(statepack_init) - 1 && i < STATEPACK_CAP; i++) {
+        ram_statepack_buf[i] = statepack_init[i];
+    }
+    ram_statepack.size = sizeof(statepack_init) - 1;
+    ram_stateiso.size = 0;
     for (uint32_t i = 0; i < sizeof(fsdelete_init) - 1 && i < FSDELETE_CAP; i++) {
         ram_fsdelete_buf[i] = fsdelete_init[i];
     }

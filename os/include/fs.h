@@ -52,6 +52,7 @@ int fs_delete_overlay_selftest(void);
 int fs_rename_selftest(void);
 int fs_path_selftest(void);
 int fs_persist_mapping_selftest(void);
+void fs_apply_delete_log(void);
 
 /* Persistent LPST store on the boot block device. */
 int fs_persist_load(void);

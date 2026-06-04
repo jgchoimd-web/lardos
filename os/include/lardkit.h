@@ -169,6 +169,21 @@ typedef struct {
     int32_t last_repair;
 } lardkit_lfsdoctor_info_t;
 
+typedef struct {
+    uint32_t exports;
+    uint32_t imports;
+    uint32_t isos;
+    uint32_t files;
+    uint32_t bytes;
+    uint32_t skipped;
+    uint32_t imported_files;
+    uint32_t imported_bytes;
+    uint32_t iso_bytes;
+    uint32_t last_error;
+    char last_file[LARDKIT_NAME_MAX + 1u];
+    char last_iso[LARDKIT_NAME_MAX + 1u];
+} lardkit_statepack_info_t;
+
 void lardkit_init(void);
 
 void lardkit_bugeye_enable(int on);
@@ -259,6 +274,12 @@ int lardkit_notes_append(const char* text);
 int lardkit_panic_capsule_write(void);
 int lardkit_lfsdoctor_scan(int repair);
 void lardkit_lfsdoctor_info(lardkit_lfsdoctor_info_t* out);
+
+int lardkit_statepack_export(const char* file);
+int lardkit_statepack_import(const char* file);
+int lardkit_statepack_iso(const char* iso_file, const char* state_file);
+void lardkit_statepack_info(lardkit_statepack_info_t* out);
+int lardkit_statepack_selftest(void);
 
 int lardkit_userlaw_reset(void);
 int lardkit_userlaw_check(void);

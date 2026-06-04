@@ -161,6 +161,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: webdemo lars", fs_open("webdemo.lars") != NULL, emit, user, &pass, &fail);
     post_check("fs: fstwt guide", fs_open("fstwt_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: liveupdate guide", fs_open("liveupdate_guide.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: statepack guide", fs_open("statepack_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: lfs v2 seed file", fs_open("lfs_info.txt") != NULL, emit, user, &pass, &fail);
     post_check("fs: default fstwt", fs_open("default.fstwts") != NULL, emit, user, &pass, &fail);
     post_check("fs: notes writable", fs_open_writable("notes.txt") != NULL, emit, user, &pass, &fail);
@@ -195,6 +196,8 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
                fs_open("error.lsnd") != NULL, emit, user, &pass, &fail);
     post_check("fs: sound config writable", fs_open_writable("sound.lardd") != NULL &&
                fs_open_writable("usersound.lsnd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: state export writable", fs_open_writable("state.lcfg") != NULL &&
+               fs_open_writable("state.iso") != NULL, emit, user, &pass, &fail);
     post_check("fs: delete overlay writable", fs_open_writable("fsdelete.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: user sysrxe writable", fs_open_writable("userapp.sysrxe") != NULL, emit, user, &pass, &fail);
     post_check("fs: kmodtalk writable", fs_open_writable("kmodtalk.lardd") != NULL, emit, user, &pass, &fail);

@@ -52,6 +52,12 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v3.0.0b-lardos-arm-mobile` creates the `lardos-arm-mobile` source/port
+distribution branch for ARM phones and tablets. The branch records the mobile
+ARM target, user-owned defaults, and port requirements in `distro_guide.lardd`.
+It does not label any x86 boot media as ARM; bootable ARM artifacts wait for an
+ARM entry path, memory map, timer, display, and input stack.
+
 `v2.9.1p-mirage` hotpatches GUI resizing and presentation. Stretch-resize
 preview no longer draws the original active window at the old size while also
 showing the preview at the new size. When a backbuffer is available, GUI render

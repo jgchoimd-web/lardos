@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v3.0.0b-lardos-arm-mobile
+ITEM Creates the lardos-arm-mobile distribution branch for ARM phones and tablets.
+ITEM Defines the mobile ARM port identity, target constraints, and user-owned mobile defaults in distro_guide.lardd and distros/lardos-arm-mobile/README.lardd.
+ITEM Marks ARM boot media as not yet produced because the current kernel and boot path are still x86 BIOS/long-mode based.
+ITEM Keeps the port honest: no x86 ISO is labeled as ARM, and the branch remains a source/port beta until ARM entry, memory map, timer, display, and input paths exist.
+ITEM Preserves the LardOS value set: visible state, native files, local control, recoverability, and user-editable policy remain required for the mobile port.
+
 SECTION v2.9.1p-mirage
 ITEM Hotpatches GUI stretch-resize preview so the original active window is no longer drawn at the old size while the preview is shown at the new size.
 ITEM Replaces full-screen present on every mouse/window motion with dirty-rectangle redraw and dirty-rectangle filtered blit when the backbuffer is available.

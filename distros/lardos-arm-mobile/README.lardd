@@ -1,0 +1,22 @@
+LARDD 1
+TITLE lardos-arm-mobile
+TEXT LardOS for ARM phones and tablets.
+SECTION Identity
+ITEM Branch: lardos-arm-mobile
+ITEM Version line: v3.0.0b-lardos-arm-mobile
+ITEM Channel: beta source/port branch
+ITEM Architecture target: ARM/AArch64 mobile
+SECTION Current State
+ITEM The existing bootable OS media path is x86 BIOS/long-mode.
+ITEM This branch does not call x86 ISO/IMG files ARM builds.
+ITEM GitHub release is source-first until ARM boot media can be produced honestly.
+SECTION Port Requirements
+ITEM ARM entry code and exception vectors.
+ITEM MMU/page table setup for ARM.
+ITEM Timer and interrupt-controller support.
+ITEM Mobile framebuffer/display and touch/input drivers.
+ITEM Storage path suitable for phone/tablet flash media.
+SECTION Values
+ITEM User-owned settings, visible power policy, native formats, and local control stay mandatory.
+ITEM Mobile convenience must never become hidden control by the OS.
+END

@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v3.0.0b-keplet-arm
+ITEM Creates the keplet-arm distribution branch from Keplet, not from plain main, so Keplet mode and macro features are not lost.
+ITEM Defines the ARM source-port identity for keyboard-first Keplet in distro_guide.lardd and distros/keplet-arm/README.lardd.
+ITEM Explicitly does not create a Keplet mobile distro; Keplet remains CLI/DOS, mode, macro, and keyboard centered.
+ITEM Marks ARM boot media as not yet produced because the current kernel and boot path are still x86 BIOS/long-mode based.
+ITEM Preserves Keplet and LardOS values: visible state, native files, local control, recoverability, user-editable policy, and keyboard-complete operation.
+
 SECTION v3.0.0b-keplet
 ITEM Creates the Keplet distribution branch as a CLI/DOS-first LardOS variant for mode switching and macro-heavy productivity.
 ITEM Adds keplet on|off|status|mode dos|nav|edit|macro|lsh|guide|test with a visible KEPLET[mode] prompt.

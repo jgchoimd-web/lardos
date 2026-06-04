@@ -12,6 +12,9 @@ CLI/DOS productivity distro: it adds visible modes and editable macros through
 `keplet`, `macro`, `keplet.lardd`, and `keplet_guide.lardd` while preserving the
 main LardOS feature set.
 
+`keplet-arm` is the ARM source-port line for Keplet. It is intentionally not a
+mobile distro: Keplet stays keyboard-, mode-, and macro-first.
+
 ## Values
 
 LardOS is guided by a simple rule: the user owns the machine.

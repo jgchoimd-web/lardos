@@ -1,0 +1,25 @@
+LARDD 1
+TITLE keplet-arm
+TEXT keplet-arm is the ARM source-port distribution branch for Keplet.
+TEXT It is intentionally not a mobile branch; Keplet stays keyboard-first, mode-first, and macro-heavy.
+
+SECTION Target
+ITEM ARM/AArch64 laptops, desktops, single-board computers, dev boards, and embedded systems with keyboard-centered workflows.
+ITEM Users who want Keplet's CLI/DOS mode switching and editable macro system on ARM.
+ITEM Not phone/tablet mobile UX; use lardos-arm-mobile for that line.
+
+SECTION Keplet Features To Preserve
+ITEM keplet on/off/status/mode/test/guide remains the visible mode surface.
+ITEM macro list/set/run/delete/clear/explain/guide/test remains writable through keplet.lardd.
+ITEM LSH command escape keeps the full LardOS shell reachable from Keplet modes.
+ITEM GUI, RXE/SYSRXE, SUM, KMO, media, recovery, and userlaw remain available.
+
+SECTION Port Status
+ITEM Current public boot media are x86 BIOS/long-mode based.
+ITEM This branch is a beta source/port branch until ARM entry, exception vectors, MMU setup, timer, interrupt controller, console/display, storage, and keyboard input paths exist.
+ITEM Do not publish x86 ISO/IMG files as ARM media.
+
+SECTION Values
+ITEM No feature-loss fork: Keplet is added to ARM, not reduced into a tiny demo shell.
+ITEM User ownership remains the rule: visible files, editable policy, native formats, keyboard completeness, and recoverable raw control.
+END

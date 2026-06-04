@@ -52,6 +52,12 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v3.0.0b-keplet-arm` creates the `keplet-arm` source/port distribution branch
+from Keplet. It keeps Keplet's CLI/DOS modes, editable macros, keyboard-first
+workflow, GUI/RXE/SYSRXE/KMO compatibility, and user-control values while
+recording the ARM port requirements in `distro_guide.lardd`. It is not a mobile
+branch, and it does not label x86 boot media as ARM.
+
 `v3.0.0b-keplet` creates the Keplet distribution branch: a CLI/DOS-first
 LardOS variant for mode switching and macro-heavy work. `keplet on` enters a
 visible `KEPLET[mode]` prompt, `keplet mode dos|nav|edit|macro|lsh` changes the

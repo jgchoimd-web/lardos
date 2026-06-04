@@ -1153,6 +1153,24 @@ static const uint8_t file_keplet_guide[] =
     "ITEM keplet.lardd is writable and inspectable; automation is fast but never hidden from the user.\n"
     "END\n";
 
+static const uint8_t file_distro_guide[] =
+    "LARDD 1\n"
+    "TITLE keplet-arm Distribution\n"
+    "TEXT keplet-arm is the ARM source-port branch for the Keplet distro.\n"
+    "TEXT It is intentionally not mobile; Keplet stays keyboard-first, mode-first, and macro-heavy.\n"
+    "SECTION Target\n"
+    "ITEM Architecture: ARM/AArch64 systems for keyboard-driven CLI/DOS productivity.\n"
+    "ITEM Devices: ARM laptops, desktops, SBCs, dev boards, and embedded keyboards; not phone/tablet mobile UX.\n"
+    "ITEM Channel: beta source/port branch.\n"
+    "SECTION Required Port Work\n"
+    "ITEM ARM exception/vector entry, MMU tables, timer, interrupt controller, console/display, storage, and keyboard input paths.\n"
+    "ITEM Keplet prompt, modes, and macros must survive the port without becoming hidden firmware behavior.\n"
+    "ITEM Boot media must be produced only when it is truly ARM media.\n"
+    "SECTION Values\n"
+    "ITEM Preserve Keplet: keyboard completeness, visible modes, editable macros, LSH escape, and DOS-style productivity remain required.\n"
+    "ITEM Preserve LardOS: local files, native formats, raw-control visibility, and recoverability remain required.\n"
+    "END\n";
+
 static const uint8_t file_installer_guide[] =
     "LARDD 1\n"
     "TITLE HDD/SSD Installer\n"
@@ -1652,6 +1670,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command tombstone\n"
     "CHECK file dosmode_guide.lardd\n"
     "CHECK file keplet_guide.lardd\n"
+    "CHECK file distro_guide.lardd\n"
     "CHECK file installer_guide.lardd\n"
     "CHECK writable dosmode.lardd\n"
     "CHECK writable keplet.lardd\n"
@@ -1907,6 +1926,7 @@ static const FsFile FS_FILES[] = {
     { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
     { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
     { "keplet_guide.lardd", file_keplet_guide, sizeof(file_keplet_guide) - 1 },
+    { "distro_guide.lardd", file_distro_guide, sizeof(file_distro_guide) - 1 },
     { "installer_guide.lardd", file_installer_guide, sizeof(file_installer_guide) - 1 },
     { "media_guide.lardd", file_media_guide, sizeof(file_media_guide) - 1 },
     { "webstack_guide.lardd", file_webstack_guide, sizeof(file_webstack_guide) - 1 },

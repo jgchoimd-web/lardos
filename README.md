@@ -7,6 +7,10 @@ where power stays visible, editable, explainable, local, and recoverable.
 The project favors in-tree C code, native LardOS formats, and user-controlled
 system surfaces over hidden automation or external runtime dependencies.
 
+Distribution branches carry focused variants. `lardos-arm` is the pure ARM
+source port line for non-mobile ARM machines; it records ARM port requirements
+without pretending that current x86 boot media are ARM artifacts.
+
 ## Values
 
 LardOS is guided by a simple rule: the user owns the machine.

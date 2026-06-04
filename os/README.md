@@ -52,6 +52,12 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v3.0.0b-lardos-arm` creates the `lardos-arm` source/port distribution branch
+for non-mobile ARM machines. The branch records the pure ARM target, port
+requirements, and user-owned policy in `distro_guide.lardd`. It does not label
+any x86 boot media as ARM; bootable ARM artifacts wait for an ARM entry path,
+memory map, timer, interrupt controller, display, and storage stack.
+
 `v2.9.1p-mirage` hotpatches GUI resizing and presentation. Stretch-resize
 preview no longer draws the original active window at the old size while also
 showing the preview at the new size. When a backbuffer is available, GUI render

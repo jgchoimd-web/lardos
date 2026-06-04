@@ -1,0 +1,20 @@
+LARDD 1
+TITLE lardos-arm
+TEXT lardos-arm is the pure ARM source-port distribution branch for LardOS.
+TEXT It is not the mobile branch; it keeps the normal LardOS desktop, CLI, RXE, SYSRXE, KMO, filesystem, recovery, and user-control direction.
+
+SECTION Target
+ITEM ARM/AArch64 systems that are not primarily phone/tablet builds.
+ITEM ARM desktops, laptops, single-board computers, embedded boards, appliances, and development hardware.
+ITEM Users who want LardOS values on ARM without mobile-first UI defaults.
+
+SECTION Port Status
+ITEM Current public boot media are x86 BIOS/long-mode based.
+ITEM This branch is a beta source/port branch until ARM entry, exception vectors, MMU setup, timer, interrupt controller, display, and storage drivers exist.
+ITEM Do not publish x86 ISO/IMG files as ARM media.
+
+SECTION Values
+ITEM User ownership remains the rule: visible files, editable policy, native formats, and recoverable raw control.
+ITEM ARM support must expand the machine choices without deleting existing LardOS behavior.
+ITEM Device-specific defaults should be visible and removable by the user.
+END

@@ -1,0 +1,17 @@
+LARDD 1
+TITLE lardos-x86-mobile
+TEXT LardOS for the 0.00001 percent sort of person with an x86-ISA phone, tablet, or handheld mobile PC.
+SECTION Identity
+ITEM Branch: lardos-x86-mobile
+ITEM Version line: v3.0.0b-lardos-x86-mobile
+ITEM Channel: beta
+ITEM Architecture: x86/x86_64 ISA
+SECTION What Changes
+ITEM Mobile-first guidance for compact screens, touch/compact pointer input, and battery-aware operation.
+ITEM Keeps the existing x86 boot media path so ISO/IMG artifacts are real x86 LardOS media.
+ITEM Adds distro_guide.lardd inside the OS for local self-description.
+SECTION What Does Not Change
+ITEM No feature loss from main LardOS.
+ITEM GUI, L-DOS, RXE, SYSRXE, SUM, KMO, media, recovery, native formats, and raw-control paths remain available.
+ITEM The user still owns the machine; mobile defaults must stay visible and editable.
+END

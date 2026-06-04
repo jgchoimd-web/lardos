@@ -52,6 +52,12 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v3.0.0b-lardos-x86-mobile` creates the `lardos-x86-mobile` distribution
+branch for rare x86-ISA phones, tablets, and handheld mobile PCs. It keeps the
+existing x86 LardOS boot path and Mirage feature set, then exposes a
+mobile-first distro guide for small screens, touch/compact pointer use,
+battery-aware boot profiles, local files, and user-owned mobile settings.
+
 `v2.9.1p-mirage` hotpatches GUI resizing and presentation. Stretch-resize
 preview no longer draws the original active window at the old size while also
 showing the preview at the new size. When a backbuffer is available, GUI render

@@ -1108,6 +1108,22 @@ static const uint8_t file_dosmode_guide[] =
     "ITEM TOMB rewrites fsdelete.lardd on user request, preserving the LardOS rule that visible system state remains user-editable.\n"
     "END\n";
 
+static const uint8_t file_distro_guide[] =
+    "LARDD 1\n"
+    "TITLE lardos-x86-mobile Distribution\n"
+    "TEXT lardos-x86-mobile is for the tiny population using x86-ISA phones, tablets, and handheld mobile PCs.\n"
+    "TEXT It is a LardOS distro branch, not a feature-loss fork: GUI, L-DOS, RXE/SYSRXE, KMO, SUM, media, and recovery remain available.\n"
+    "SECTION Target\n"
+    "ITEM Architecture: x86/x86_64 ISA, current BIOS/VM boot media path.\n"
+    "ITEM Devices: rare x86 mobile phones, handhelds, tablets, and small touch PCs.\n"
+    "ITEM Channel: beta, because mobile hardware quirks need real-device testing.\n"
+    "SECTION Defaults\n"
+    "ITEM Favor compact windows, readable pixel fonts, visible scrollbars, and keyboard/touch fallback paths.\n"
+    "ITEM Keep local-first files and no hidden cloud dependency.\n"
+    "ITEM Prefer battery-aware boot profiles and visible power controls over hidden throttling.\n"
+    "ITEM Preserve user ownership: every mobile convenience must remain inspectable, editable, and reversible.\n"
+    "END\n";
+
 static const uint8_t file_installer_guide[] =
     "LARDD 1\n"
     "TITLE HDD/SSD Installer\n"
@@ -1587,6 +1603,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file hello.shrine\n"
     "CHECK file shrine_guide.lardd\n"
     "CHECK command dos\n"
+    "CHECK file distro_guide.lardd\n"
     "CHECK command install\n"
     "CHECK command media\n"
     "CHECK file media_guide.lardd\n"
@@ -1857,6 +1874,7 @@ static const FsFile FS_FILES[] = {
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
     { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
     { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
+    { "distro_guide.lardd", file_distro_guide, sizeof(file_distro_guide) - 1 },
     { "installer_guide.lardd", file_installer_guide, sizeof(file_installer_guide) - 1 },
     { "media_guide.lardd", file_media_guide, sizeof(file_media_guide) - 1 },
     { "webstack_guide.lardd", file_webstack_guide, sizeof(file_webstack_guide) - 1 },

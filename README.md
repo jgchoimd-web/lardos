@@ -7,6 +7,10 @@ where power stays visible, editable, explainable, local, and recoverable.
 The project favors in-tree C code, native LardOS formats, and user-controlled
 system surfaces over hidden automation or external runtime dependencies.
 
+Distribution branches carry focused variants. `lardos-x86-mobile` targets the
+vanishingly small but real set of x86-ISA mobile devices while preserving the
+core LardOS feature set and user-control philosophy.
+
 ## Values
 
 LardOS is guided by a simple rule: the user owns the machine.

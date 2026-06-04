@@ -6,6 +6,13 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v3.0.0b-lardos-x86-mobile
+ITEM Creates the lardos-x86-mobile distribution branch for rare x86-ISA phones, tablets, and handheld mobile PCs.
+ITEM Keeps the standard x86 LardOS boot path and full Mirage feature set while documenting mobile-first defaults and constraints.
+ITEM Adds distro_guide.lardd and distros/lardos-x86-mobile/README.lardd so the distro identity is visible inside and outside the OS.
+ITEM Focuses on small-screen operation, touch/compact pointer use, battery-aware profiling, offline-first files, and user-owned mobile settings.
+ITEM Ships as beta because mobile hardware profiles vary widely and this distro starts from the existing x86 BIOS/VM media path.
+
 SECTION v2.9.1p-mirage
 ITEM Hotpatches GUI stretch-resize preview so the original active window is no longer drawn at the old size while the preview is shown at the new size.
 ITEM Replaces full-screen present on every mouse/window motion with dirty-rectangle redraw and dirty-rectangle filtered blit when the backbuffer is available.

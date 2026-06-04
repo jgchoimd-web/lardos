@@ -50,6 +50,7 @@
 - `bugreplay status|last|show|draw|clear` - replay BugEye scan frames from `bugreplay.lardd`.
 - `lardtrace on|off|show|module name` / `trace ...` - LardTrace event timeline for shell/modules.
 - `netwatch on|off|show|clear` - readable network, OSLink, and HTTP GET/POST/HEAD watcher.
+- `bt`/`bluetooth status|on|off|scan|devices|add|pair|trust|hid|send|log|show|test` - native Bluetooth host-control layer. Radios default off, HID input needs `bt hid on`, and `bt.lardd` keeps visible state/logs.
 - `webstack status|guide|demo|selftest` - inspect the native LARS/HTTP stack, including LARS `link`/`fetch` records and the request-builder selftest.
 - `journal show|add|clear` - automatic `.lardd` OS journal.
 - `rollback snap|last|apply` - settings snapshot and restore.

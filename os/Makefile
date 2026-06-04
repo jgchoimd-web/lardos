@@ -2,6 +2,7 @@ NASM      := nasm
 CC        := gcc
 LD        := ld
 QEMU      := qemu-system-x86_64
+HOST_CC   := gcc
 
 PROJECT   := lardos
 
@@ -91,7 +92,7 @@ KERNEL_LIB_OBJS := $(addprefix $(KERNEL_DIR)/,$(addsuffix .o,$(KERNEL_LIBS)))
 LDLL_INC_DEPS   := $(addprefix $(KERNEL_DIR)/ldll_lib,$(addsuffix .inc,$(LDLL_LIBS)))
 
 HOST_CFLAGS := -std=c11 -O2 -Wall
-CFLAGS    := -std=gnu11 -ffreestanding -Os -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -fcf-protection=none -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h -DLARDOS_HARDWARE_PROFILE=\"$(RELEASE_HW)\"
+CFLAGS    := -std=gnu11 -ffreestanding -Os -Wall -Wextra -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-pie -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -fcf-protection=none -nostdlib -fno-builtin -I$(INCLUDE) -include stdio.h -DLARDOS_HARDWARE_PROFILE=\"$(RELEASE_HW)\"
 
 LDFLAGS   := -T linker.ld -nostdlib -m elf_x86_64
 
@@ -113,7 +114,7 @@ $(STAGE2_BIN): $(BOOT_DIR)/boot.s
 $(ISO_MBR_BIN): $(BOOT_DIR)/iso_mbr.s
 	$(NASM) -f bin -D ISO_STAGE2_LBA=$(ISO_STAGE2_LBA) -D ISO_KERNEL_LBA=$(ISO_KERNEL_LBA) -D STAGE2_SECTORS=$(STAGE2_SECTORS) $< -o $@
 
-$(KERNEL_ELF): $(KERNEL_DIR)/entry64.o $(KERNEL_DIR)/isr64.o $(KERNEL_DIR)/kernel64.o $(KERNEL_DIR)/smp.o $(KERNEL_DIR)/ap_trampoline.o $(KERNEL_DIR)/aux_kernel.o $(KERNEL_DIR)/auxkernel.o $(KERNEL_DIR)/pci.o $(KERNEL_DIR)/rtl8139.o $(KERNEL_DIR)/net.o $(KERNEL_DIR)/oslink.o $(KERNEL_DIR)/lconnect.o $(KERNEL_DIR)/taskprio.o $(KERNEL_DIR)/awake.o $(KERNEL_DIR)/bootprof.o $(KERNEL_DIR)/bootmeta.o $(KERNEL_DIR)/liveupdate.o $(KERNEL_DIR)/crashlog.o $(KERNEL_DIR)/lpack.o $(KERNEL_DIR)/rxr.o $(KERNEL_DIR)/fstwt.o $(KERNEL_DIR)/screencheck.o $(KERNEL_DIR)/screencap.o $(KERNEL_DIR)/lsound.o $(KERNEL_DIR)/lardkit.o $(KERNEL_DIR)/lguilib.o $(KERNEL_DIR)/guioverlay.o $(KERNEL_DIR)/lassist.o $(KERNEL_DIR)/sysrxe.o $(KERNEL_DIR)/kmodtalk.o $(KERNEL_DIR)/kmo.o $(KERNEL_DIR)/lard_tls.o $(KERNEL_DIR)/rtc.o $(KERNEL_DIR)/lardtime.o $(KERNEL_DIR)/vmmon.o $(KERNEL_DIR)/storage.o $(KERNEL_DIR)/lardsec.o $(KERNEL_DIR)/megaclip.o $(KERNEL_DIR)/mediafs.o $(KERNEL_DIR)/installer.o $(KERNEL_DIR)/string.o $(KERNEL_DIR)/stdlib_min.o $(KERNEL_DIR)/lard_stdio.o $(KERNEL_DIR)/lard_printf.o $(KERNEL_DIR)/fs.o $(KERNEL_DIR)/bmp.o $(KERNEL_DIR)/lard_inflate.o $(KERNEL_DIR)/lafillo.o $(KERNEL_DIR)/lard_doc.o $(KERNEL_DIR)/ldi.o $(KERNEL_DIR)/lda.o $(KERNEL_DIR)/lar.o $(KERNEL_DIR)/lvcs.o $(KERNEL_DIR)/lcontainer.o $(KERNEL_DIR)/ldll.o $(KERNEL_DIR)/img_glyph.o $(KERNEL_DIR)/drfl.o $(KERNEL_DIR)/post.o $(KERNEL_DIR)/ssav.o $(KERNEL_DIR)/lss.o $(KERNEL_DIR)/lfs.o $(KERNEL_DIR)/lsh.o $(KERNEL_DIR)/larsh.o $(KERNEL_DIR)/kr_basic.o $(KERNEL_LIB_OBJS) $(KERNEL_DIR)/lardx_load.o $(KERNEL_DIR)/gui.o $(KERNEL_DIR)/ps2.o $(KERNEL_DIR)/idt64.o $(KERNEL_DIR)/panic.o $(KERNEL_DIR)/mmu.o $(KERNEL_DIR)/cpumode.o $(KERNEL_DIR)/mode_switch.o $(KERNEL_DIR)/mem.o $(KERNEL_DIR)/gc.o $(KERNEL_DIR)/gc_demo.o $(KERNEL_DIR)/lib3d.o $(KERNEL_DIR)/lib3d_demo.o $(KERNEL_DIR)/unicode.o $(KERNEL_DIR)/console.o $(KERNEL_DIR)/bosl_vm.o $(KERNEL_DIR)/bosl_jit.o $(KERNEL_DIR)/bosl_demo.o $(KERNEL_DIR)/bosl_asm.o $(KERNEL_DIR)/lil.o $(KERNEL_DIR)/lil_demo.o $(KERNEL_DIR)/lml.o $(KERNEL_DIR)/lml_demo.o $(KERNEL_DIR)/gasm_vm.o $(KERNEL_DIR)/gasm_demo.o $(KERNEL_DIR)/lafillo_vm.o $(KERNEL_DIR)/lafillo_demo.o $(KERNEL_DIR)/os_vm.o $(KERNEL_DIR)/os_demo.o $(KERNEL_DIR)/gdt64.o $(KERNEL_DIR)/gdt64_asm.o $(KERNEL_DIR)/lipc.o $(KERNEL_DIR)/syscall.o $(KERNEL_DIR)/usermode.o $(KERNEL_DIR)/usermode_asm.o
+$(KERNEL_ELF): $(KERNEL_DIR)/entry64.o $(KERNEL_DIR)/isr64.o $(KERNEL_DIR)/kernel64.o $(KERNEL_DIR)/smp.o $(KERNEL_DIR)/ap_trampoline.o $(KERNEL_DIR)/aux_kernel.o $(KERNEL_DIR)/auxkernel.o $(KERNEL_DIR)/pci.o $(KERNEL_DIR)/rtl8139.o $(KERNEL_DIR)/net.o $(KERNEL_DIR)/oslink.o $(KERNEL_DIR)/lconnect.o $(KERNEL_DIR)/bluetooth.o $(KERNEL_DIR)/taskprio.o $(KERNEL_DIR)/awake.o $(KERNEL_DIR)/bootprof.o $(KERNEL_DIR)/bootmeta.o $(KERNEL_DIR)/liveupdate.o $(KERNEL_DIR)/crashlog.o $(KERNEL_DIR)/lpack.o $(KERNEL_DIR)/rxr.o $(KERNEL_DIR)/fstwt.o $(KERNEL_DIR)/screencheck.o $(KERNEL_DIR)/screencap.o $(KERNEL_DIR)/lsound.o $(KERNEL_DIR)/lardkit.o $(KERNEL_DIR)/lguilib.o $(KERNEL_DIR)/guioverlay.o $(KERNEL_DIR)/lassist.o $(KERNEL_DIR)/sysrxe.o $(KERNEL_DIR)/kmodtalk.o $(KERNEL_DIR)/kmo.o $(KERNEL_DIR)/lard_tls.o $(KERNEL_DIR)/rtc.o $(KERNEL_DIR)/lardtime.o $(KERNEL_DIR)/vmmon.o $(KERNEL_DIR)/storage.o $(KERNEL_DIR)/lardsec.o $(KERNEL_DIR)/megaclip.o $(KERNEL_DIR)/mediafs.o $(KERNEL_DIR)/installer.o $(KERNEL_DIR)/string.o $(KERNEL_DIR)/stdlib_min.o $(KERNEL_DIR)/lard_stdio.o $(KERNEL_DIR)/lard_printf.o $(KERNEL_DIR)/fs.o $(KERNEL_DIR)/bmp.o $(KERNEL_DIR)/lard_inflate.o $(KERNEL_DIR)/lafillo.o $(KERNEL_DIR)/lard_doc.o $(KERNEL_DIR)/ldi.o $(KERNEL_DIR)/lda.o $(KERNEL_DIR)/lar.o $(KERNEL_DIR)/lvcs.o $(KERNEL_DIR)/lcontainer.o $(KERNEL_DIR)/ldll.o $(KERNEL_DIR)/img_glyph.o $(KERNEL_DIR)/drfl.o $(KERNEL_DIR)/post.o $(KERNEL_DIR)/ssav.o $(KERNEL_DIR)/lss.o $(KERNEL_DIR)/lfs.o $(KERNEL_DIR)/lsh.o $(KERNEL_DIR)/larsh.o $(KERNEL_DIR)/kr_basic.o $(KERNEL_LIB_OBJS) $(KERNEL_DIR)/lardx_load.o $(KERNEL_DIR)/gui.o $(KERNEL_DIR)/ps2.o $(KERNEL_DIR)/idt64.o $(KERNEL_DIR)/panic.o $(KERNEL_DIR)/mmu.o $(KERNEL_DIR)/cpumode.o $(KERNEL_DIR)/mode_switch.o $(KERNEL_DIR)/mem.o $(KERNEL_DIR)/gc.o $(KERNEL_DIR)/gc_demo.o $(KERNEL_DIR)/lib3d.o $(KERNEL_DIR)/lib3d_demo.o $(KERNEL_DIR)/unicode.o $(KERNEL_DIR)/console.o $(KERNEL_DIR)/bosl_vm.o $(KERNEL_DIR)/bosl_jit.o $(KERNEL_DIR)/bosl_demo.o $(KERNEL_DIR)/bosl_asm.o $(KERNEL_DIR)/lil.o $(KERNEL_DIR)/lil_demo.o $(KERNEL_DIR)/lml.o $(KERNEL_DIR)/lml_demo.o $(KERNEL_DIR)/gasm_vm.o $(KERNEL_DIR)/gasm_demo.o $(KERNEL_DIR)/lafillo_vm.o $(KERNEL_DIR)/lafillo_demo.o $(KERNEL_DIR)/os_vm.o $(KERNEL_DIR)/os_demo.o $(KERNEL_DIR)/gdt64.o $(KERNEL_DIR)/gdt64_asm.o $(KERNEL_DIR)/lipc.o $(KERNEL_DIR)/syscall.o $(KERNEL_DIR)/usermode.o $(KERNEL_DIR)/usermode_asm.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 $(KERNEL_DIR)/lard_tls.o: $(KERNEL_DIR)/lard_tls.c $(KERNEL_DIR)/lard_tls_roots.inc $(INCLUDE)/lard_tls.h $(INCLUDE)/rtc.h
@@ -135,6 +136,9 @@ $(KERNEL_DIR)/lardkit.o: $(KERNEL_DIR)/lardkit.c $(INCLUDE)/lardkit.h $(INCLUDE)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/lconnect.o: $(KERNEL_DIR)/lconnect.c $(INCLUDE)/lconnect.h $(INCLUDE)/net.h $(INCLUDE)/megaclip.h $(INCLUDE)/lardkit.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(KERNEL_DIR)/bluetooth.o: $(KERNEL_DIR)/bluetooth.c $(INCLUDE)/bluetooth.h $(INCLUDE)/fs.h $(INCLUDE)/lardkit.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/vmmon.o: $(KERNEL_DIR)/vmmon.c $(INCLUDE)/vmmon.h
@@ -176,7 +180,7 @@ $(KERNEL_DIR)/lss.o: $(KERNEL_DIR)/lss.c
 $(KERNEL_DIR)/lfs.o: $(KERNEL_DIR)/lfs.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/lsh.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/lardsec.h $(INCLUDE)/auxkernel.h $(INCLUDE)/megaclip.h $(INCLUDE)/lconnect.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/lard_tls.h $(INCLUDE)/lsound.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
+$(KERNEL_DIR)/lsh.o: $(KERNEL_DIR)/lsh.c $(INCLUDE)/lsh.h $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/lardsec.h $(INCLUDE)/auxkernel.h $(INCLUDE)/megaclip.h $(INCLUDE)/lconnect.h $(INCLUDE)/bluetooth.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/lard_tls.h $(INCLUDE)/lsound.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/mediafs.o: $(KERNEL_DIR)/mediafs.c $(INCLUDE)/mediafs.h $(INCLUDE)/installer.h $(INCLUDE)/lardsec.h $(INCLUDE)/storage.h
@@ -188,7 +192,7 @@ $(KERNEL_DIR)/installer.o: $(KERNEL_DIR)/installer.c $(BOOT_STAGE1_INC) $(BOOT_S
 $(KERNEL_DIR)/larsh.o: $(KERNEL_DIR)/larsh.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/lardsec.h $(INCLUDE)/auxkernel.h $(INCLUDE)/megaclip.h $(INCLUDE)/lconnect.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/lard_tls.h $(INCLUDE)/lsound.h $(INCLUDE)/ldi.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
+$(KERNEL_DIR)/post.o: $(KERNEL_DIR)/post.c $(INCLUDE)/fs.h $(INCLUDE)/fstwt.h $(INCLUDE)/gui.h $(INCLUDE)/installer.h $(INCLUDE)/mediafs.h $(INCLUDE)/lardsec.h $(INCLUDE)/auxkernel.h $(INCLUDE)/megaclip.h $(INCLUDE)/lconnect.h $(INCLUDE)/bluetooth.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/kmo.h $(INCLUDE)/liveupdate.h $(INCLUDE)/lardtime.h $(INCLUDE)/rxr.h $(INCLUDE)/lard_tls.h $(INCLUDE)/lsound.h $(INCLUDE)/ldi.h $(INCLUDE)/version.h $(VERSION_GEN) $(INCLUDE)/bootmeta.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(KERNEL_DIR)/kmo.o: $(KERNEL_DIR)/kmo.c $(INCLUDE)/kmo.h $(INCLUDE)/fs.h $(INCLUDE)/kmodtalk.h $(INCLUDE)/lardkit.h
@@ -207,13 +211,13 @@ $(HOST_TOOL_DIR):
 	mkdir -p $@
 
 $(MKLDLL): $(SCRIPTS_DIR)/mkldll.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKARDX): $(SCRIPTS_DIR)/mkardx.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(BIN2INC): $(SCRIPTS_DIR)/bin2inc.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(LAFILLO_ELF): $(LANG_EX)/lafillo_demo.s $(LANG_EX)/user.ld
 	$(NASM) -f elf64 $(LANG_EX)/lafillo_demo.s -o $(LANG_EX)/lafillo_demo.o
@@ -258,31 +262,31 @@ $(BOOT_STAGE2_INC): $(STAGE2_BIN) $(BIN2INC)
 	$(BIN2INC) $(STAGE2_BIN) $@ lardos_boot_stage2
 
 $(EMBED_CA): $(SCRIPTS_DIR)/embed_ca_pem.c
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKLFS): $(SCRIPTS_DIR)/mklfs.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MK_SSAV): $(SCRIPTS_DIR)/mk_default_ssav.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKEXE): $(SCRIPTS_DIR)/mkexe.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKIMG): $(SCRIPTS_DIR)/mkimg.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(MKISO): $(SCRIPTS_DIR)/mkiso.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(BOSLA): lang/bosla.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(SEEDC): lang/seed/seedc.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 $(LIL): tools/lil.c | $(HOST_TOOL_DIR)
-	$(CC) $(HOST_CFLAGS) -o $@ $<
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 
 define ldll_rule
 $(KERNEL_DIR)/ldll_lib$(1).inc: $(MKLDLL)

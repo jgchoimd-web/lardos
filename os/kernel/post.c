@@ -23,6 +23,7 @@
 #include "lardtime.h"
 #include "lsound.h"
 #include "lconnect.h"
+#include "bluetooth.h"
 #include "lcontainer.h"
 #include "lil.h"
 #include "lfs.h"
@@ -159,6 +160,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: media guide", fs_open("media_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: webstack guide", fs_open("webstack_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: webdemo lars", fs_open("webdemo.lars") != NULL, emit, user, &pass, &fail);
+    post_check("fs: bluetooth guide", fs_open("bt_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: fstwt guide", fs_open("fstwt_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: liveupdate guide", fs_open("liveupdate_guide.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: statepack guide", fs_open("statepack_guide.lardd") != NULL, emit, user, &pass, &fail);
@@ -185,6 +187,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: security policy writable", fs_open_writable("security.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: megaclip guide writable", fs_open_writable("megaclip.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: lconnect guide writable", fs_open_writable("lconnect.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: bluetooth writable", fs_open_writable("bt.lardd") != NULL, emit, user, &pass, &fail);
     post_check("fs: office docs writable", fs_open_writable("office_doc.lardd") != NULL &&
                fs_open_writable("office_sheet.lsheet") != NULL &&
                fs_open_writable("office_deck.lshow") != NULL, emit, user, &pass, &fail);
@@ -228,6 +231,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("security: auxkernel REAL16 microkernel", auxkernel_selftest() == 0, emit, user, &pass, &fail);
     post_check("ui: megaclip and pinclip slots", megaclip_selftest() == 0, emit, user, &pass, &fail);
     post_check("net: lardos connect control", lconnect_selftest() == 0, emit, user, &pass, &fail);
+    post_check("wireless: bluetooth host control", lbt_selftest() == 0, emit, user, &pass, &fail);
     post_check("lpack: package parser", lpack_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: app bundle parser", rxr_selftest() == 0, emit, user, &pass, &fail);
     post_check("rxr: bundle-internal paths", rxr_path_selftest() == 0, emit, user, &pass, &fail);

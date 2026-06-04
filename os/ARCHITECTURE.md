@@ -224,6 +224,13 @@ inbox shape without touching the network. EXEC packets carry
 remote command requests; receivers filter them to safe read/diagnostic commands
 and queue accepted work through TaskPrio under the `remote` task name.
 
+`bluetooth.c` owns LBT, the local Bluetooth host-control layer. It starts as
+policy and controller plumbing rather than pretending every radio is already
+driven: `bt on`, `bt scan`, `bt add`, `bt pair`, `bt trust`, `bt hid`, and
+`bt send` keep state in `bt.lardd`, log visible actions, and expose a future
+HCI/USB/UART controller attach point for DRFL drivers. Bluetooth HID input is
+blocked until the user explicitly enables it with `bt hid on`.
+
 ## Important Files
 
 | Area | Files |
@@ -252,6 +259,7 @@ and queue accepted work through TaskPrio under the `remote` task name.
 | VM monitor | `os/kernel/vmmon.c`, `os/include/vmmon.h` |
 | Network | `os/kernel/net.c`, `os/kernel/rtl8139.c` |
 | OS-to-OS link | `os/kernel/oslink.c`, `os/include/oslink.h` |
+| Bluetooth host control | `os/kernel/bluetooth.c`, `os/include/bluetooth.h` |
 | Task priority queue | `os/kernel/taskprio.c`, `os/include/taskprio.h` |
 | Native TLS | `os/kernel/lard_tls.c`, `os/include/lard_tls.h` |
 | GUI and shell | `os/kernel/gui.c`, `os/kernel/lsh.c`, `os/kernel/lafillo.c` |

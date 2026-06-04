@@ -205,6 +205,7 @@ static const uint8_t userlaw_init[] =
     "ITEM screencap -> screenshots and recordings are native, local, inspectable user files, never hidden uploads.\n"
     "ITEM sound -> boot sounds and effects are native LSND vector files with visible sound.lardd toggles.\n"
     "ITEM lconnect -> LardOS computers may share resources over a visible LAN protocol; input sharing and quiet grants live only behind deprecated confirm commands and must remain logged.\n"
+    "ITEM bluetooth -> local wireless radios default off, pairing/trust/HID input are explicit, and bt.lardd keeps visible logs.\n"
     "ITEM trust history, priority history, magic explain, bootreplay show, panic capsule -> audit power after it is used.\n"
     "END\n";
 static uint8_t ram_userlaw_buf[USERLAW_CAP];
@@ -327,6 +328,26 @@ static const uint8_t lconnect_init_doc[] =
     "END\n";
 static uint8_t ram_lconnect_buf[LCONNECT_CAP];
 static FsWritableFile ram_lconnect = { "lconnect.lardd", ram_lconnect_buf, 0, LCONNECT_CAP };
+
+#define BT_CAP 4096u
+static const uint8_t bt_init_doc[] =
+    "LARDD 1\n"
+    "TITLE LardOS Bluetooth\n"
+    "TEXT Bluetooth is off by default. Use bt on, then pair/trust devices explicitly.\n"
+    "TEXT Controller drivers can attach later through the native LBT/HCI hook; no external stack is linked.\n"
+    "TEXT HID input is blocked until the user runs bt hid on.\n"
+    "SECTION Commands\n"
+    "ITEM bt status\n"
+    "ITEM bt on | bt off\n"
+    "ITEM bt scan\n"
+    "ITEM bt add 01:23:45:67:89:ab name hid|audio|serial|file\n"
+    "ITEM bt pair addr [pin]\n"
+    "ITEM bt trust addr on|off\n"
+    "ITEM bt hid on|off\n"
+    "ITEM bt send [-f] addr text\n"
+    "END\n";
+static uint8_t ram_bt_buf[BT_CAP];
+static FsWritableFile ram_bt = { "bt.lardd", ram_bt_buf, 0, BT_CAP };
 
 #define OFFICE_DOC_CAP 4096u
 static const uint8_t office_doc_init[] =
@@ -580,6 +601,7 @@ static const uint8_t file_lardos_lars[] =
     "li Use Ctrl+Y, Ctrl+P, Ctrl+Space then 1..9/0, or megaclip status/list/mode/push/file/pull/write for the 10-slot MegaClipboard.\n"
     "li Use pinclip set/list/from/pull/write/clear and Ctrl+Space then P then 1..9/0 for fixed clipboard shortcuts.\n"
     "li Use lconnect on, lconnect direct, lconnect discover, and lconnect share all on to share non-input resources with another LardOS machine over LAN.\n"
+    "li Use bt status, bt on, bt scan, bt add addr name kind, bt pair addr, bt trust addr on, and bt hid on for visible user-owned Bluetooth control.\n"
     "li Use secure key, secure seal, secure lock, secure ecc ram on, secure ecc storage on, and secure unlock KEY for optional user-owned encrypted-at-rest media stores with software ECC.\n"
     "li Use oslink status, ping, send, exec, recv, and peers for OS-to-OS messages and safe remote commands.\n"
     "li Use oslink emit channel text for LardOS-internal module messages.\n"
@@ -1226,6 +1248,29 @@ static const uint8_t file_webdemo_lars[] =
     "input query lardos\n"
     "end\n";
 
+static const uint8_t file_bt_guide[] =
+    "LARDD 1\n"
+    "TITLE LardOS Bluetooth Guide\n"
+    "TEXT LBT is the native LardOS Bluetooth host-control layer.\n"
+    "TEXT It is not a hidden external Bluetooth stack. State is visible in writable bt.lardd.\n"
+    "TEXT The first implementation owns policy, pairing records, logs, and a controller hook for future HCI/USB/UART DRFL drivers.\n"
+    "SECTION Values\n"
+    "ITEM Default off: radios do not become active without a user command.\n"
+    "ITEM Pair then trust: normal sends require both. bt send -f exists for explicit override and is logged.\n"
+    "ITEM HID input: Bluetooth keyboard/mouse control is blocked unless the user runs bt hid on.\n"
+    "ITEM Honesty: without a controller driver, bt scan records the request instead of pretending devices were found.\n"
+    "SECTION Commands\n"
+    "ITEM bt status | bt show\n"
+    "ITEM bt on | bt off\n"
+    "ITEM bt scan | bt devices\n"
+    "ITEM bt add 01:23:45:67:89:ab name hid|audio|serial|file\n"
+    "ITEM bt pair addr [pin]\n"
+    "ITEM bt trust addr on|off\n"
+    "ITEM bt hid on|off\n"
+    "ITEM bt send [-f] addr text\n"
+    "ITEM bt log | bt test\n"
+    "END\n";
+
 static const uint8_t file_default_fstwts[] =
     "FSTWTS 1\n"
     "MODE HYBRID\n"
@@ -1639,6 +1684,8 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command trace\n"
     "CHECK command netwatch\n"
     "CHECK command lconnect\n"
+    "CHECK command bluetooth\n"
+    "CHECK command bt\n"
     "CHECK command glyph\n"
     "CHECK command wallpaper\n"
     "CHECK command sound\n"
@@ -1657,6 +1704,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command webstack\n"
     "CHECK file webstack_guide.lardd\n"
     "CHECK file webdemo.lars\n"
+    "CHECK file bt_guide.lardd\n"
     "CHECK file fstwt_guide.lardd\n"
     "CHECK file liveupdate_guide.lardd\n"
     "CHECK file statepack_guide.lardd\n"
@@ -1738,6 +1786,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK writable displayfix.spfx\n"
     "CHECK writable security.lardd\n"
     "CHECK writable lconnect.lardd\n"
+    "CHECK writable bt.lardd\n"
     "CHECK writable office_doc.lardd\n"
     "CHECK writable office_sheet.lsheet\n"
     "CHECK writable office_deck.lshow\n"
@@ -1935,6 +1984,7 @@ static const FsFile FS_FILES[] = {
     { "media_guide.lardd", file_media_guide, sizeof(file_media_guide) - 1 },
     { "webstack_guide.lardd", file_webstack_guide, sizeof(file_webstack_guide) - 1 },
     { "webdemo.lars", file_webdemo_lars, sizeof(file_webdemo_lars) - 1 },
+    { "bt_guide.lardd", file_bt_guide, sizeof(file_bt_guide) - 1 },
     { "fstwt_guide.lardd", file_fstwt_guide, sizeof(file_fstwt_guide) - 1 },
     { "liveupdate_guide.lardd", file_liveupdate_guide, sizeof(file_liveupdate_guide) - 1 },
     { "statepack_guide.lardd", file_statepack_guide, sizeof(file_statepack_guide) - 1 },
@@ -2551,7 +2601,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 50u;
+    return 51u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2606,6 +2656,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 47) return &ram_lemamd;
     if (idx == 48) return &ram_statepack;
     if (idx == 49) return &ram_stateiso;
+    if (idx == 50) return &ram_bt;
     return NULL;
 }
 
@@ -2708,6 +2759,10 @@ void fs_init(void)
         ram_lconnect_buf[i] = lconnect_init_doc[i];
     }
     ram_lconnect.size = sizeof(lconnect_init_doc) - 1;
+    for (uint32_t i = 0; i < sizeof(bt_init_doc) - 1 && i < BT_CAP; i++) {
+        ram_bt_buf[i] = bt_init_doc[i];
+    }
+    ram_bt.size = sizeof(bt_init_doc) - 1;
     for (uint32_t i = 0; i < sizeof(office_doc_init) - 1 && i < OFFICE_DOC_CAP; i++) {
         ram_office_doc_buf[i] = office_doc_init[i];
     }

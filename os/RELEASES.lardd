@@ -6,6 +6,14 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.12.0b-mirage
+ITEM Adds LBT, a native Bluetooth host-control layer with bt/bluetooth/lbt shell commands.
+ITEM Adds visible user-owned Bluetooth state in writable bt.lardd plus bt_guide.lardd documentation.
+ITEM Bluetooth defaults off; scanning, discoverable mode, pairing, trust, HID input, and sends all require explicit user commands.
+ITEM Adds manual device records, pair/unpair/trust policy, HID on/off, force-send logging, and a controller attach hook for future HCI/USB/UART DRFL drivers.
+ITEM Adds POST/LUNIT coverage and Device Map reporting while preserving LardOS Connect, network, GUI, RXE/SYSRXE, state export, and user-control values without feature loss.
+ITEM Ships as beta because this opens a new wireless device surface and the first release is a controller-ready host layer, not a claimed universal Bluetooth hardware driver.
+
 SECTION v2.11.0b-mirage
 ITEM Adds LEMAMD, a LardOS-native Vim/Emacs-style modal editor command set that works from the shell without external editor code.
 ITEM Adds lemamd file/open/view/goto/i/a/dd/yy/p/r/s/macro/runmacro/w/help commands with current file, cursor, and mode state.

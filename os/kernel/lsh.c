@@ -34,6 +34,7 @@
 #include "lardtime.h"
 #include "oslink.h"
 #include "lconnect.h"
+#include "bluetooth.h"
 #include "taskprio.h"
 #include "awake.h"
 #include "bootprof.h"
@@ -390,6 +391,7 @@ static const lsh_command_alias_t s_lsh_command_aliases[] = {
     { "배경화면", "wallpaper" }, { "벽지", "wallpaper" }, { "모니터", "monitor" },
     { "렌더", "renderfx" }, { "커서", "cursor" }, { "글리프", "glyph" },
     { "클립보드", "megaclip" }, { "고정클립", "pinclip" }, { "연결", "lconnect" },
+    { "블루투스", "bluetooth" }, { "블투", "bluetooth" },
     { "마법", "magic" }, { "매직", "magic" },
 };
 
@@ -418,7 +420,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "help", 1 }, { "control", 1 }, { "values", 1 }, { "philosophy", 1 }, { "status", 1 }, { "install", 0 }, { "installer", 0 }, { "secure", 0 }, { "lardsec", 0 }, { "locker", 0 }, { "bitlocker", 0 }, { "auxkernel", 0 }, { "aux", 0 }, { "emergency", 0 }, { "selfdestruct", 0 }, { "time", 1 }, { "date", 1 }, { "lardtime", 1 }, { "ltime", 1 }, { "lunar", 1 }, { "dangun", 1 }, { "release", 1 }, { "releases", 1 },
     { "ver", 1 }, { "post", 1 }, { "selftest", 1 }, { "deprecated", 0 }, { "dos", 1 }, { "mode", 1 }, { "hangul", 1 }, { "korean", 1 }, { "ime", 1 }, { "cfgsh", 1 }, { "cfg", 1 }, { "settings", 1 }, { "exitcfg", 1 },
     { "buddy", 1 }, { "assistant", 1 }, { "lardbuddy", 1 }, { "lword", 1 }, { "lwrite", 1 }, { "lsheet", 1 }, { "lshow", 1 }, { "lemamd", 1 }, { "lem", 1 }, { "lemand", 1 }, { "lvim", 1 }, { "lemacs", 1 }, { "vi", 1 }, { "vim", 1 }, { "emacs", 1 }, { "sysrxe", 1 }, { "rxe", 1 }, { "hc", 1 }, { "holyc", 1 }, { "lardhc", 1 }, { "kmod", 1 }, { "kmodtalk", 1 }, { "kmo", 1 }, { "liveupdate", 0 }, { "live", 0 },
-    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "monitor", 1 }, { "monitors", 1 }, { "display", 1 }, { "multimon", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "state", 0 }, { "statepack", 0 }, { "cfgio", 0 }, { "configio", 0 }, { "settingsio", 0 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
+    { "oslink", 1 }, { "oschat", 1 }, { "lconnect", 1 }, { "connect", 1 }, { "lardconnect", 1 }, { "bluetooth", 1 }, { "bt", 1 }, { "lbt", 1 }, { "lguilib", 1 }, { "ltheme", 1 }, { "wallpaper", 1 }, { "wall", 1 }, { "monitor", 1 }, { "monitors", 1 }, { "display", 1 }, { "multimon", 1 }, { "sound", 1 }, { "lsound", 1 }, { "sfx", 1 }, { "audio", 1 }, { "glyph", 1 }, { "glyphs", 1 }, { "uglyph", 1 }, { "picglyph", 1 }, { "cursor", 1 }, { "ucursor", 1 }, { "awake", 1 }, { "awakening", 1 }, { "awakemon", 1 }, { "task", 1 }, { "tasks", 1 }, { "tasktop", 1 }, { "bootprof", 1 }, { "bootmap", 1 }, { "bootreplay", 1 }, { "postbaseline", 1 }, { "trace", 1 }, { "lardtrace", 1 }, { "netwatch", 1 }, { "devmap", 1 }, { "crashlog", 1 }, { "crash", 0 }, { "panicroom", 1 }, { "panic", 1 }, { "paniccapsule", 1 }, { "nice", 1 }, { "prio", 1 }, { "priority", 1 }, { "rollback", 1 }, { "trust", 1 }, { "bugeye", 1 }, { "bugreplay", 1 }, { "oldcheck", 1 }, { "lfsdoctor", 1 }, { "cfgprof", 1 }, { "state", 0 }, { "statepack", 0 }, { "cfgio", 0 }, { "configio", 0 }, { "settingsio", 0 }, { "userlaw", 1 }, { "journal", 1 }, { "webstack", 1 }, { "larsview", 1 }, { "larsapp", 1 }, { "lunit", 1 }, { "larddnotes", 1 }, { "notes", 1 }, { "cls", 1 },
     { "megaclip", 1 }, { "mclip", 1 }, { "clip", 1 }, { "clipboard", 1 },
     { "pinclip", 1 }, { "fixedclip", 1 }, { "pclip", 1 },
     { "dir", 1 }, { "type", 1 }, { "more", 1 }, { "lars", 1 }, { "lardd", 1 }, { "doc", 1 }, { "larsform", 1 }, { "larsact", 1 },
@@ -3010,7 +3012,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect bluetooth bt buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -3054,6 +3056,7 @@ static void cmd_help(const char* args)
     out_append("  megaclip status|list|mode|push|file|pull|write  10-slot keyboard-first clipboard\n");
     out_append("  pinclip list|set slot text|from fixed [slot]|pull|write|clear  fixed shortcut clipboard slots\n");
     out_append("  lconnect on|direct|discover|share|syncclip|request|grant|deny  LAN resource sharing except keyboard/mouse\n");
+    out_append("  bluetooth/bt status|on|off|scan|devices|add|pair|trust|hid|send|log|show  local Bluetooth host control\n");
     out_append("  time|lardtime [raw|solar|dangun|lunar|explain]  LardOS Time, 5-digit years\n");
     out_append("  glyph demo|list|load|auto|show|move|copy|rename|pixel|live|click|insert|write  editable live PUA pictures\n");
     out_append("  cursor mouse|set U+E000|off     use a picture Unicode slot as the GUI cursor\n");
@@ -3135,6 +3138,7 @@ static void cmd_control(const char* args)
     out_append("  Device media uses visible MDFS stores on Y:/Z:/A: with RAM fallback when no backing sectors exist.\n");
     out_append("  _: merges R:/X:/Y:/Z:/A:; writes go visibly to R:.\n");
     out_append("  LardOS Connect can share MegaClipboard, CPU, GPU, storage, and peripherals over LAN; keyboard/mouse stay local.\n");
+    out_append("  Bluetooth is off by default, visible in bt.lardd, and HID input requires bt hid on.\n");
     out_append("  Local docs use LARS; LARDD replaces Markdown for LardOS docs.\n");
     out_append("  Code runs through LSH, HC, BOSL, LIL, GASM, LML, Lafillo VM, OSVM, and LARDX.\n");
     out_append("  Monitor layout lives in editable monitors.lardd; extra outputs are virtualized visibly when hardware only exposes one framebuffer.\n");
@@ -7003,6 +7007,286 @@ static void cmd_netwatch(const char* args)
     out_append("Usage: netwatch on|off|status|show|clear\n");
 }
 
+static int bt_word_onoff(const char* word, int* out)
+{
+    if (!word || !out) return -1;
+    if (ascii_streq_ci(word, "on") || strcmp(word, "1") == 0 ||
+        ascii_streq_ci(word, "yes") || ascii_streq_ci(word, "enable")) {
+        *out = 1;
+        return 0;
+    }
+    if (ascii_streq_ci(word, "off") || strcmp(word, "0") == 0 ||
+        ascii_streq_ci(word, "no") || ascii_streq_ci(word, "disable")) {
+        *out = 0;
+        return 0;
+    }
+    return -1;
+}
+
+static void out_append_bt_flags(uint32_t flags)
+{
+    char list[64];
+    lbt_flags_list(flags, list, sizeof(list));
+    out_append(list);
+}
+
+static void cmd_bt_status(void)
+{
+    lbt_info_t info;
+    lbt_info(&info);
+    out_append("Bluetooth ");
+    out_append(info.enabled ? "on" : "off");
+    out_append(" controller=");
+    out_append(info.controller_present ? info.controller : "none");
+    out_append(" discoverable=");
+    out_append(info.discoverable ? "on" : "off");
+    out_append(" hid=");
+    out_append(info.hid_enabled ? "on" : "off");
+    out_append("\ndevices=");
+    out_append_u32(info.device_count);
+    out_append(" paired=");
+    out_append_u32(info.paired_count);
+    out_append(" trusted=");
+    out_append_u32(info.trusted_count);
+    out_append(" scans=");
+    out_append_u32(info.scan_count);
+    out_append(" sent=");
+    out_append_u32(info.sent);
+    out_append(" recv=");
+    out_append_u32(info.received);
+    out_append(" err=");
+    out_append_u32(info.last_error);
+    out_append("\n");
+    if (!info.controller_present) {
+        out_append("No Bluetooth controller driver is attached yet. Use bt add for manual records or install a future HCI .drfl.\n");
+    }
+}
+
+static void cmd_bt_devices(void)
+{
+    uint32_t count = lbt_device_count();
+    if (count == 0) {
+        out_append("bt: no devices. Try bt scan, or bt add 01:23:45:67:89:ab name serial.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lbt_device_t d;
+        if (lbt_device_at(i, &d) != 0) continue;
+        out_append_u32(i);
+        out_append(" ");
+        out_append(d.addr);
+        out_append(" ");
+        out_append(d.name);
+        out_append(" flags=");
+        out_append_bt_flags(d.flags);
+        out_append(" paired=");
+        out_append(d.paired ? "yes" : "no");
+        out_append(" trusted=");
+        out_append(d.trusted ? "yes" : "no");
+        out_append(" seen=");
+        out_append_u32(d.seen);
+        out_append(" rssi=");
+        out_append_i32(d.rssi);
+        out_append("\n");
+    }
+}
+
+static void cmd_bt_log(void)
+{
+    uint32_t count = lbt_log_count();
+    if (count == 0) {
+        out_append("bt: log empty.\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        lbt_event_t e;
+        if (lbt_log_at(i, &e) != 0) continue;
+        out_append("#");
+        out_append_u32(e.seq);
+        out_append(" ");
+        out_append(e.action);
+        if (e.addr[0]) {
+            out_append(" ");
+            out_append(e.addr);
+        }
+        if (e.detail[0]) {
+            out_append(" ");
+            out_append(e.detail);
+        }
+        out_append("\n");
+    }
+}
+
+static void cmd_bt_add(const char* args)
+{
+    char addr[24];
+    char name[32];
+    char kind[24];
+    uint32_t flags = LBT_FLAG_UNKNOWN;
+    if (vcs_read_word(&args, addr, sizeof(addr)) != 0 ||
+        vcs_read_word(&args, name, sizeof(name)) != 0) {
+        out_append("Usage: bt add 01:23:45:67:89:ab name [hid|audio|serial|file]\n");
+        return;
+    }
+    if (vcs_read_word(&args, kind, sizeof(kind)) == 0) flags = lbt_flags_from_name(kind);
+    if (lbt_add_manual(addr, name, flags) == 0) out_append("bt: device record added.\n");
+    else out_append("bt: add failed; address must look like 01:23:45:67:89:ab and slots are limited.\n");
+}
+
+static void cmd_bt_pair_like(const char* args, int trust_only, int unpair)
+{
+    char addr[24];
+    char pin[32];
+    int r;
+    if (vcs_read_word(&args, addr, sizeof(addr)) != 0) {
+        out_append(unpair ? "Usage: bt unpair addr\n" :
+                   trust_only ? "Usage: bt trust addr on|off\n" :
+                                "Usage: bt pair addr [pin]\n");
+        return;
+    }
+    if (unpair) {
+        out_append(lbt_unpair(addr) == 0 ? "bt: unpaired.\n" : "bt: device not found.\n");
+        return;
+    }
+    if (trust_only) {
+        char state[16];
+        int on = 1;
+        if (vcs_read_word(&args, state, sizeof(state)) == 0 && bt_word_onoff(state, &on) != 0) {
+            out_append("Usage: bt trust addr on|off\n");
+            return;
+        }
+        r = lbt_trust(addr, on);
+        out_append(r == 0 ? (on ? "bt: trusted.\n" : "bt: trust removed.\n") :
+                            "bt: trust failed; pair the device first.\n");
+        return;
+    }
+    pin[0] = '\0';
+    (void)vcs_read_word(&args, pin, sizeof(pin));
+    out_append(lbt_pair(addr, pin) == 0 ? "bt: paired. Use bt trust addr on before normal sends.\n" :
+                                          "bt: pair failed; add/scan the device first.\n");
+}
+
+static void cmd_bt_send(const char* args)
+{
+    char addr[24];
+    int force = 0;
+    if (vcs_read_word(&args, addr, sizeof(addr)) != 0) {
+        out_append("Usage: bt send [-f] addr text\n");
+        return;
+    }
+    if (strcmp(addr, "-f") == 0 || strcmp(addr, "force") == 0) {
+        force = 1;
+        if (vcs_read_word(&args, addr, sizeof(addr)) != 0) {
+            out_append("Usage: bt send -f addr text\n");
+            return;
+        }
+    }
+    while (*args == ' ' || *args == '\t') args++;
+    int r = lbt_send(addr, args, force);
+    if (r == 0) out_append("bt: sent through controller.\n");
+    else if (r == -4) out_append("bt: queued in visible Bluetooth log; no controller driver attached.\n");
+    else if (r == -3) out_append("bt: blocked until paired+trusted. Use bt send -f addr text to force visibly.\n");
+    else if (r == -1) out_append("bt: off. Use bt on.\n");
+    else out_append("bt: send failed.\n");
+}
+
+static void cmd_bt(const char* args)
+{
+    char sub[24];
+    if (!args) args = "";
+    if (vcs_read_word(&args, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "info")) {
+        cmd_bt_status();
+        return;
+    }
+    if (ascii_streq_ci(sub, "on") || ascii_streq_ci(sub, "enable")) {
+        lbt_enable(1);
+        out_append("bt: on. Pair/trust still require explicit user action.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "off") || ascii_streq_ci(sub, "disable")) {
+        lbt_enable(0);
+        out_append("bt: off.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "scan") || ascii_streq_ci(sub, "discover") || ascii_streq_ci(sub, "inquiry")) {
+        int r = lbt_scan();
+        if (r == 0) out_append("bt: scan requested.\n");
+        else if (r == -1) out_append("bt: scan blocked; bluetooth is off.\n");
+        else out_append("bt: no controller driver attached; scan request logged in bt.lardd.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "devices") || ascii_streq_ci(sub, "list") || ascii_streq_ci(sub, "ls")) {
+        cmd_bt_devices();
+        return;
+    }
+    if (ascii_streq_ci(sub, "add") || ascii_streq_ci(sub, "manual")) {
+        cmd_bt_add(args);
+        return;
+    }
+    if (ascii_streq_ci(sub, "pair")) {
+        cmd_bt_pair_like(args, 0, 0);
+        return;
+    }
+    if (ascii_streq_ci(sub, "unpair") || ascii_streq_ci(sub, "forget")) {
+        cmd_bt_pair_like(args, 0, 1);
+        return;
+    }
+    if (ascii_streq_ci(sub, "trust")) {
+        cmd_bt_pair_like(args, 1, 0);
+        return;
+    }
+    if (ascii_streq_ci(sub, "hid") || ascii_streq_ci(sub, "input")) {
+        char state[16];
+        int on;
+        if (vcs_read_word(&args, state, sizeof(state)) != 0 || bt_word_onoff(state, &on) != 0) {
+            out_append("Usage: bt hid on|off\n");
+            return;
+        }
+        lbt_set_hid(on);
+        out_append(on ? "bt: HID input enabled for paired/trusted devices.\n" :
+                        "bt: HID input blocked.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "discoverable") || ascii_streq_ci(sub, "visible")) {
+        char state[16];
+        int on;
+        if (vcs_read_word(&args, state, sizeof(state)) != 0 || bt_word_onoff(state, &on) != 0) {
+            out_append("Usage: bt discoverable on|off\n");
+            return;
+        }
+        out_append(lbt_set_discoverable(on) == 0 ? (on ? "bt: discoverable on.\n" : "bt: discoverable off.\n") :
+                                                    "bt: turn bluetooth on first.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "send") || ascii_streq_ci(sub, "tx")) {
+        cmd_bt_send(args);
+        return;
+    }
+    if (ascii_streq_ci(sub, "recv") || ascii_streq_ci(sub, "receive")) {
+        out_append("bt: no live inbox yet; controller drivers will feed this through lbt_receive_note().\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "log") || ascii_streq_ci(sub, "history")) {
+        cmd_bt_log();
+        return;
+    }
+    if (ascii_streq_ci(sub, "show") || ascii_streq_ci(sub, "report")) {
+        (void)lbt_write_report();
+        cmd_larddoc("bt.lardd", "Usage: bt show");
+        return;
+    }
+    if (ascii_streq_ci(sub, "guide") || ascii_streq_ci(sub, "help")) {
+        cmd_larddoc("bt_guide.lardd", "Usage: bt help");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(lbt_selftest() == 0 ? "bt: selftest OK\n" : "bt: selftest failed\n");
+        return;
+    }
+    out_append("Usage: bt status|on|off|scan|devices|add|pair|unpair|trust|hid|discoverable|send|log|show|test\n");
+}
+
 static void cmd_journal(const char* args)
 {
     char sub[16];
@@ -7064,7 +7348,9 @@ static void devmap_draw(void)
     gui_syscall_draw_text(150, 122, "STORAGE", 0xFF081018u, 0xFFFFD84Au);
     gui_syscall_fill_rect(270, 112, 150, 28, 0xFF72D6FFu);
     gui_syscall_draw_text(276, 122, "NETWORK", 0xFF081018u, 0xFF72D6FFu);
-    gui_syscall_draw_text(44, 158, "rtl8139 / piix3 / LPST / OSLink", 0xFFFFFFFFu, 0xFF081018u);
+    gui_syscall_fill_rect(44, 154, 126, 28, 0xFF7BD88Fu);
+    gui_syscall_draw_text(50, 164, "BLUETOOTH", 0xFF081018u, 0xFF7BD88Fu);
+    gui_syscall_draw_text(44, 202, "rtl8139 / piix3 / LPST / OSLink / LBT host", 0xFFFFFFFFu, 0xFF081018u);
 }
 
 static void cmd_devmap(const char* args)
@@ -7074,9 +7360,11 @@ static void cmd_devmap(const char* args)
     int last = 0;
     const char* driver = NULL;
     oslink_info_t oi;
+    lbt_info_t bt;
     if (args_word_is(args, "draw")) devmap_draw();
     fs_persist_info(&available, &dirty, &last, &driver, &lba, &sectors);
     oslink_info(&oi);
+    lbt_info(&bt);
     out_append("Device Map\n");
     out_append("pci rtl8139=");
     out_append(pci_find_device(0x10ECu, 0x8139u, &a) == 0 ? "present" : "missing");
@@ -7096,6 +7384,14 @@ static void cmd_devmap(const char* args)
     out_append_u32(oi.peer_count);
     out_append(" inbox=");
     out_append_u32(oi.inbox_count);
+    out_append("\nbluetooth=");
+    out_append(bt.enabled ? "on" : "off");
+    out_append(" controller=");
+    out_append(bt.controller_present ? bt.controller : "none");
+    out_append(" devices=");
+    out_append_u32(bt.device_count);
+    out_append(" hid=");
+    out_append(bt.hid_enabled ? "on" : "off");
     out_append("\n");
 }
 
@@ -12836,6 +13132,7 @@ static void cfgsh_help(void)
     out_append("  megaclip stack|single|order  clipboard slot mode\n");
     out_append("  pinclip list|set 1 text|from 1 [2]  fixed clipboard shortcut slots\n");
     out_append("  lconnect on|off|auto|manual  LAN resource sharing control\n");
+    out_append("  bluetooth on|off, bluetooth hid on|off  local wireless device control\n");
     out_append("  state export|import|iso  full OS user-state input/output\n");
     out_append("  sync               persist writable settings/files\n");
 }
@@ -12855,6 +13152,7 @@ static void cfgsh_status(void)
     lardsec_info_t sec;
     megaclip_status_t clip;
     lconnect_info_t lc;
+    lbt_info_t bt;
     lardkit_rollback_info_t rb;
     bootprof_info(&bp);
     awake_info(&aw);
@@ -12869,6 +13167,7 @@ static void cfgsh_status(void)
     lardsec_info(&sec);
     megaclip_status(&clip);
     lconnect_info(&lc);
+    lbt_info(&bt);
     lardkit_rollback_info(&rb);
     out_append("CFGSH status\n");
     out_append("  boot=");
@@ -12918,6 +13217,10 @@ static void cfgsh_status(void)
     out_append("pins");
     out_append(" connect=");
     out_append(lc.enabled ? "on" : "off");
+    out_append(" bt=");
+    out_append(bt.enabled ? "on" : "off");
+    out_append("/");
+    out_append(bt.controller_present ? bt.controller : "none");
     out_append(" http=");
     out_append(lsh_http_method_name());
     out_append(" priority=");
@@ -13241,6 +13544,25 @@ static int cfgsh_apply(const char* setting, const char* args)
         }
         return 1;
     }
+    if (strcmp(setting, "bluetooth") == 0 || strcmp(setting, "bt") == 0 ||
+        strcmp(setting, "lbt") == 0) {
+        if (!have_value || cfgsh_is_status_word(value)) {
+            cmd_bt_status();
+        } else if (cfgsh_bool_value(value, &on) == 0) {
+            lbt_enable(on);
+            out_append(on ? "cfgsh: bluetooth on\n" : "cfgsh: bluetooth off\n");
+        } else if (strcmp(value, "hid") == 0 || strcmp(value, "input") == 0) {
+            char cmdline[48];
+            snprintf(cmdline, sizeof(cmdline), "hid %s", rest);
+            cmd_bt(cmdline);
+        } else if (strcmp(value, "scan") == 0 || strcmp(value, "devices") == 0 ||
+                   strcmp(value, "show") == 0 || strcmp(value, "log") == 0) {
+            cmd_bt(args);
+        } else {
+            out_append("Usage: bluetooth on|off|scan|devices|hid on|off\n");
+        }
+        return 1;
+    }
     if (strcmp(setting, "http") == 0 || strcmp(setting, "method") == 0) {
         if (!have_value || cfgsh_is_status_word(value)) {
             out_append("cfgsh: http=");
@@ -13469,6 +13791,7 @@ static void parse_and_run(const char* cmd, const char* args)
     cmd = lsh_canonical_command(raw_cmd, canon_cmd, sizeof(canon_cmd));
     lardkit_trace_event("shell", cmd, 0);
     if (strcmp(cmd, "oslink") == 0 || strcmp(cmd, "oschat") == 0) lardkit_trace_event("oslink", cmd, 0);
+    if (strcmp(cmd, "bluetooth") == 0 || strcmp(cmd, "bt") == 0 || strcmp(cmd, "lbt") == 0) lardkit_trace_event("bluetooth", cmd, 0);
     if (strcmp(cmd, "kmod") == 0 || strcmp(cmd, "kmodtalk") == 0) lardkit_trace_event("kmodtalk", cmd, 0);
     if (strcmp(cmd, "kmo") == 0) lardkit_trace_event("kmo", cmd, 0);
     if (strcmp(cmd, "liveupdate") == 0 || strcmp(cmd, "live") == 0) lardkit_trace_event("liveupdate", cmd, 0);
@@ -13577,6 +13900,8 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "oschat") == 0) { cmd_oschat(args); return; }
     if (strcmp(cmd, "lconnect") == 0 || strcmp(cmd, "connect") == 0 ||
         strcmp(cmd, "lardconnect") == 0) { cmd_lconnect(args); return; }
+    if (strcmp(cmd, "bluetooth") == 0 || strcmp(cmd, "bt") == 0 ||
+        strcmp(cmd, "lbt") == 0) { cmd_bt(args); return; }
     if (strcmp(cmd, "lguilib") == 0) { cmd_lguilib(args); return; }
     if (strcmp(cmd, "ltheme") == 0) { cmd_ltheme(args); return; }
     if (strcmp(cmd, "wallpaper") == 0 || strcmp(cmd, "wall") == 0) { cmd_wallpaper(args); return; }
@@ -13787,6 +14112,7 @@ void lsh_init(void)
     lardkit_init();
     kmodtalk_init();
     liveupdate_init();
+    lbt_init();
     (void)kmo_reload();
     out_append("Lard Shell ready. Type help for commands.\n");
 }

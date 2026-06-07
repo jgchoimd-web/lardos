@@ -8,7 +8,8 @@ enum {
     VMMON_GASM = 2,
     VMMON_LAFILLO = 3,
     VMMON_OSVM = 4,
-    VMMON_COUNT = 5
+    VMMON_LHA = 5,
+    VMMON_COUNT = 6
 };
 
 typedef struct {

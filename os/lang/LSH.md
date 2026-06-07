@@ -29,7 +29,9 @@
 - `tomb list|show|hide file|drop file|clear` - inspect, create soft hides, or delete user-owned `DEL -F` hard-delete records from `fsdelete.lardd`.
 - `mode [status|probe|real|guard]` - inspect or run the controlled real16/long64 bridge.
 - `vm status|limits|selftest|clear` - inspect VM Monitor counters and budgets
-  for BOSL, LIL, GASM, Lafillo VM, and OSVM.
+  for BOSL, LIL, GASM, Lafillo VM, OSVM, and LHA.
+- `lha status|demo|run file.lhvm|create name code|sample file|show|clear|test`
+  - use the LardOS Hypervisor API to create and run visible `.lhvm` VM files.
 - `shrine status|list|info|verify|run|test [file.shrine]` / `lss ...` -
   inspect and run LSS Shrine subsystem wrappers, including BOSL payload
   magic/version verification. `srine` is accepted too.

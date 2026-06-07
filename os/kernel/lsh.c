@@ -44,6 +44,7 @@
 #include "lardsec.h"
 #include "auxkernel.h"
 #include "megaclip.h"
+#include "lha.h"
 #include "mediafs.h"
 #include "panic.h"
 #include "version.h"
@@ -429,7 +430,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 }, { "fstwt", 1 }, { "fstwts", 1 }, { "vpath", 1 }, { "pathmap", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "lar", 1 }, { "extract", 1 }, { "larpass", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
-    { "vm", 1 }, { "vms", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
+    { "vm", 1 }, { "vms", 1 }, { "lha", 1 }, { "lhapi", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
     { "lcnt", 1 }, { "container", 1 },
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
     { "vcslog", 1 }, { "vcsshow", 1 },
@@ -3190,7 +3191,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time timecfg date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect bluetooth bt buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time timecfg date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm lha shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect bluetooth bt buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -3251,7 +3252,8 @@ static void cmd_help(const char* args)
     out_append("  set NAME=value  echo text  cd drive:  X: Y: Z: A: R: _:\n");
     out_append("  shrine status|list|info|verify|run|test [file.shrine]\n");
     out_append("  lafillo file  lar list archive  extract archive member [password]  lar pass out.lar member source password  larsh file\n");
-    out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM\n");
+    out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM/LHA\n");
+    out_append("  lha status|demo|run file.lhvm|create name code|sample file|clear|test  LardOS Hypervisor API\n");
     out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
@@ -12656,6 +12658,214 @@ static void lsh_vm_nop_putc(char c, void* user)
     (void)user;
 }
 
+static void lha_lsh_putc(char c, void* user)
+{
+    (void)user;
+    out_append_char(c);
+}
+
+static void lha_make_inline_source(const char* src, char* out, uint32_t cap)
+{
+    uint32_t i = 0;
+    uint32_t o = 0;
+    if (!src || cap == 0) return;
+    while (src[i] && (src[i] == ' ' || src[i] == '\t')) i++;
+    while (src[i] && o + 1u < cap) {
+        char c = src[i++];
+        if (c == ';' || c == '|') c = '\n';
+        out[o++] = c;
+    }
+    if (o == 0 || out[o - 1u] != '\n') {
+        if (o + 1u < cap) out[o++] = '\n';
+    }
+    out[o] = '\0';
+}
+
+static void cmd_lha_list(void)
+{
+    uint32_t used = lha_count();
+    out_append("LHA slots used=");
+    out_append_u32(used);
+    out_append("/");
+    out_append_u32(LHA_VM_MAX);
+    out_append(" last=");
+    out_append(lha_last_error());
+    out_append("\n");
+    for (uint32_t i = 0; i < LHA_VM_MAX; i++) {
+        lha_info_t info;
+        if (lha_info(i, &info) != 0) continue;
+        out_append("  [");
+        out_append_u32(i);
+        out_append("] ");
+        out_append(info.name);
+        out_append(" runs=");
+        out_append_u32(info.runs);
+        out_append(" fail=");
+        out_append_u32(info.failures);
+        out_append(" bytes=");
+        out_append_u32(info.source_size);
+        out_append(" rc=");
+        out_append_i32(info.last_rc);
+        out_append("\n");
+    }
+}
+
+static void cmd_lha_run_path(const char* file_arg)
+{
+    char drv;
+    char name[64];
+    char found = 0;
+    const uint8_t* data;
+    uint32_t size;
+    uint32_t slot = 0;
+    int r;
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    if (!name[0] || lsh_read_drive_data_ex(drv, name, &data, &size, &found, 1) != 0) {
+        out_append("lha: VM file not found.\n");
+        return;
+    }
+    r = lha_create_from_text(name, data, size, &slot);
+    if (r != 0) {
+        out_append("lha: create failed: ");
+        out_append(lha_last_error());
+        out_append("\n");
+        return;
+    }
+    out_append("lha: running ");
+    out_append(name);
+    out_append(" from ");
+    out_append_char(found ? found : drv);
+    out_append(": slot ");
+    out_append_u32(slot);
+    out_append("\n");
+    r = lha_run(slot, lha_lsh_putc, NULL);
+    out_append(r == 0 ? "lha: done\n" : "lha: execution failed\n");
+}
+
+static void cmd_lha_sample(const char* file_arg)
+{
+    static const char sample[] =
+        "LHA 1\n"
+        "NAME user-lha-vm\n"
+        "ENGINE osvm\n"
+        "MEMORY 64\n"
+        "CODE\n"
+        "push 21\n"
+        "push 2\n"
+        "mul\n"
+        "print\n"
+        "halt\n"
+        "END\n";
+    char drv;
+    char name[64];
+    FsWritableFile* w;
+    resolve_path(file_arg && file_arg[0] ? file_arg : "user_vm.lhvm", &drv, name, sizeof(name));
+    if (drive_to_fs(drv) == 2) {
+        if (mediafs_write(drv, name, (const uint8_t*)sample, sizeof(sample) - 1u, 0) < 0) {
+            out_append("lha sample: media write failed.\n");
+            return;
+        }
+        out_append("lha sample: wrote media VM ");
+        out_append_char(drv);
+        out_append(":");
+        out_append(name);
+        out_append("\n");
+        return;
+    }
+    w = fs_open_or_create_writable(name);
+    if (!w || w->cap < sizeof(sample) - 1u) {
+        out_append("lha sample: no writable slot or slot too small.\n");
+        return;
+    }
+    (void)fs_write(w, 0, (const uint8_t*)sample, sizeof(sample) - 1u);
+    out_append("lha sample: wrote ");
+    out_append(name);
+    out_append("\n");
+}
+
+static void cmd_lha(const char* args)
+{
+    char sub[20];
+    const char* p = args ? args : "";
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "list")) {
+        cmd_lha_list();
+        return;
+    }
+    if (ascii_streq_ci(sub, "demo")) {
+        int r;
+        out_append("lha: demo VM -> expected output 42\n");
+        r = lha_demo(lha_lsh_putc, NULL);
+        out_append(r == 0 ? "lha: demo done\n" : "lha: demo failed\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "run") || ascii_streq_ci(sub, "load")) {
+        char file_arg[64];
+        int r;
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) {
+            out_append("lha: running bundled demo VM\n");
+            r = lha_demo(lha_lsh_putc, NULL);
+            out_append(r == 0 ? "lha: demo done\n" : "lha: demo failed\n");
+        } else {
+            cmd_lha_run_path(file_arg);
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "create") || ascii_streq_ci(sub, "new")) {
+        char name[32];
+        char source[LHA_PROGRAM_MAX];
+        uint32_t slot = 0;
+        int r;
+        if (vcs_read_word(&p, name, sizeof(name)) != 0) {
+            out_append("Usage: lha create name \"push 40; push 2; add; print; halt\"\n");
+            return;
+        }
+        while (*p == ' ' || *p == '\t') p++;
+        if (!p[0]) {
+            out_append("Usage: lha create name \"push 40; push 2; add; print; halt\"\n");
+            return;
+        }
+        lha_make_inline_source(p, source, sizeof(source));
+        r = lha_create(name, source, &slot);
+        if (r != 0) {
+            out_append("lha create: ");
+            out_append(lha_last_error());
+            out_append("\n");
+            return;
+        }
+        out_append("lha create: slot ");
+        out_append_u32(slot);
+        out_append(" ");
+        out_append(name);
+        out_append("\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "sample") || ascii_streq_ci(sub, "template")) {
+        char file_arg[64];
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) file_arg[0] = '\0';
+        cmd_lha_sample(file_arg);
+        return;
+    }
+    if (ascii_streq_ci(sub, "show") || ascii_streq_ci(sub, "report")) {
+        cmd_larddoc("lha.lardd", "Usage: lha show");
+        return;
+    }
+    if (ascii_streq_ci(sub, "guide") || ascii_streq_ci(sub, "help")) {
+        cmd_larddoc("lha_guide.lardd", "Usage: lha guide");
+        return;
+    }
+    if (ascii_streq_ci(sub, "clear") || ascii_streq_ci(sub, "reset")) {
+        lha_clear();
+        out_append("lha: VM slots cleared. User .lhvm files were not deleted.\n");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(lha_selftest() == 0 ? "lha: selftest OK\n" : "lha: selftest failed\n");
+        return;
+    }
+    out_append("Usage: lha status|demo|run file.lhvm|create name code|sample file|show|clear|test\n");
+}
+
 static void cmd_vm_status(void)
 {
     out_append("VM Monitor\n");
@@ -12717,6 +12927,7 @@ static void cmd_vm_selftest(void)
     vm_selftest_line("gasm accumulator", gasm_asm_eval("load 40\nadd 2\nhalt\n", lsh_vm_nop_putc, NULL) == 0, &pass, &fail);
     vm_selftest_line("lafillo vm", lafillo_vm_asm_eval("push \"<b>ok</b>\"\nlafillo\nhalt\n", lsh_vm_nop_putc, NULL) == 0, &pass, &fail);
     vm_selftest_line("osvm stack", os_vm_asm_eval("push 40\npush 2\nadd\nhalt\n", lsh_vm_nop_putc, NULL) == 0, &pass, &fail);
+    vm_selftest_line("lha api", lha_selftest() == 0, &pass, &fail);
 
     out_append("VM selftest: pass=");
     out_append_u32(pass);
@@ -12747,7 +12958,7 @@ static void cmd_vm(const char* args)
         out_append("VM Monitor counters cleared.\n");
         return;
     }
-    out_append("Usage: vm status|limits|selftest|clear\n");
+    out_append("Usage: vm status|limits|selftest|clear  (use lha for VM creation API)\n");
 }
 
 static int lss_has_shrine_suffix(const char* name)
@@ -14130,6 +14341,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "mode") == 0) { cmd_mode(args); return; }
     if (strcmp(cmd, "hangul") == 0 || strcmp(cmd, "korean") == 0 || strcmp(cmd, "ime") == 0) { cmd_hangul(args); return; }
     if (strcmp(cmd, "vm") == 0 || strcmp(cmd, "vms") == 0) { cmd_vm(args); return; }
+    if (strcmp(cmd, "lha") == 0 || strcmp(cmd, "lhapi") == 0) { cmd_lha(args); return; }
     if (strcmp(cmd, "lss") == 0 || strcmp(cmd, "shrine") == 0 || strcmp(cmd, "srine") == 0) { cmd_lss(args); return; }
     if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
     if (strcmp(cmd, "netwatch") == 0) { cmd_netwatch(args); return; }
@@ -14284,6 +14496,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'l' && cmd[1] == 'a' && cmd[2] == 'r' && cmd[3] == 's' && cmd[4] == 'h' && cmd[5] == '\0') { cmd_larsh(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == '\0') { cmd_lss(args); return; }
     if (cmd[0] == 'v' && cmd[1] == 'm' && cmd[2] == '\0') { cmd_vm(args); return; }
+    if (cmd[0] == 'l' && cmd[1] == 'h' && cmd[2] == 'a' && cmd[3] == '\0') { cmd_lha(args); return; }
     if (cmd[0] == 'b' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 'l' && cmd[4] == '\0') { cmd_bosl(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == '\0') { cmd_lil(args); return; }
     if (cmd[0] == 'g' && cmd[1] == 'a' && cmd[2] == 's' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_gasm(args); return; }

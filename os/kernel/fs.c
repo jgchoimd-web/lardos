@@ -372,6 +372,18 @@ static const uint8_t timecfg_init_doc[] =
 static uint8_t ram_timecfg_buf[TIMECFG_CAP];
 static FsWritableFile ram_timecfg = { "timecfg.lardd", ram_timecfg_buf, 0, TIMECFG_CAP };
 
+#define LHA_CAP 2048u
+static const uint8_t lha_init_doc[] =
+    "LARDD 1\n"
+    "TITLE LardOS Hypervisor API\n"
+    "TEXT LHA is ready. Use lha demo or lha run lha_demo.lhvm.\n"
+    "TEXT LHA VM files remain normal user-visible files, not hidden baked-in app logic.\n"
+    "SECTION Last Run\n"
+    "ITEM none\n"
+    "END\n";
+static uint8_t ram_lha_buf[LHA_CAP];
+static FsWritableFile ram_lha = { "lha.lardd", ram_lha_buf, 0, LHA_CAP };
+
 #define OFFICE_DOC_CAP 4096u
 static const uint8_t office_doc_init[] =
     "LARDD 1\n"
@@ -1121,16 +1133,50 @@ static const uint8_t file_vm_guide[] =
     "LARDD 1\n"
     "TITLE VM Monitor\n"
     "TEXT VM Monitor keeps LardOS language runtimes visible and bounded without external libraries.\n"
-    "TEXT BOSL, LIL, GASM, Lafillo VM, and OSVM report runs, failures, budget hits, last steps, max steps, and return code.\n"
+    "TEXT BOSL, LIL, GASM, Lafillo VM, OSVM, and LHA report runs, failures, budget hits, last steps, max steps, and return code.\n"
     "SECTION Commands\n"
     "ITEM vm status -> show per-VM counters and the active step budget.\n"
     "ITEM vm limits -> list the current step budgets.\n"
-    "ITEM vm selftest -> smoke-test BOSL, LIL, GASM, Lafillo VM, OSVM, and the monitor itself.\n"
+    "ITEM vm selftest -> smoke-test BOSL, LIL, GASM, Lafillo VM, OSVM, LHA, and the monitor itself.\n"
     "ITEM vm clear -> reset counters without changing user files.\n"
+    "ITEM lha status|demo|run file.lhvm|sample file.lhvm -> create and run VMs through the LardOS Hypervisor API.\n"
     "ITEM gasm file.gasm -> run an in-tree GASM source file from LSH.\n"
     "SECTION Safety\n"
     "ITEM GASM and Lafillo VM now stop runaway programs through VM Monitor budgets.\n"
     "ITEM BOSL JIT falls back to the budgeted interpreter for branchy programs so loops stay interruptible.\n"
+    "END\n";
+
+static const uint8_t file_lha_guide[] =
+    "LARDD 1\n"
+    "TITLE LardOS Hypervisor API\n"
+    "TEXT LHA means LardOS Hypervisor API: a small in-tree C library that makes VM creation simple.\n"
+    "TEXT It currently targets the native OSVM engine and keeps VM definitions as visible .lhvm files.\n"
+    "SECTION Commands\n"
+    "ITEM lha status -> show API slots, last errors, and vmmon counters.\n"
+    "ITEM lha demo -> create and run the bundled lha_demo.lhvm VM.\n"
+    "ITEM lha run file.lhvm -> load a user VM file and run it.\n"
+    "ITEM lha create name code -> create a VM slot from inline OSVM code using semicolons as line breaks.\n"
+    "ITEM lha sample file.lhvm -> write an editable sample VM into a writable file slot.\n"
+    "ITEM lha clear -> clear LHA slots without deleting user VM files.\n"
+    "SECTION Format\n"
+    "ITEM LHA 1\n"
+    "ITEM NAME demo\n"
+    "ITEM ENGINE osvm\n"
+    "ITEM CODE ... END carries push/add/sub/mul/div/print/halt source.\n"
+    "ITEM lha.lardd records the last run so the API stays inspectable.\n"
+    "END\n";
+
+static const uint8_t file_lha_demo_lhvm[] =
+    "LHA 1\n"
+    "NAME lha-demo\n"
+    "ENGINE osvm\n"
+    "MEMORY 64\n"
+    "CODE\n"
+    "push 40\n"
+    "push 2\n"
+    "add\n"
+    "print\n"
+    "halt\n"
     "END\n";
 
 static const uint8_t file_shrine_guide[] =
@@ -1698,6 +1744,9 @@ static const uint8_t file_tests_lunit[] =
     "LUNIT 1\n"
     "CHECK file lardos.lars\n"
     "CHECK file lardtime_guide.lardd\n"
+    "CHECK file lha_guide.lardd\n"
+    "CHECK file lha_demo.lhvm\n"
+    "CHECK writable lha.lardd\n"
     "CHECK writable timecfg.lardd\n"
     "CHECK file ldi_guide.lardd\n"
     "CHECK file icon_doc.ldi\n"
@@ -1724,6 +1773,7 @@ static const uint8_t file_tests_lunit[] =
     "CHECK command monitor\n"
     "CHECK command cursor\n"
     "CHECK command vm\n"
+    "CHECK command lha\n"
     "CHECK command hc\n"
     "CHECK command gasm\n"
     "CHECK command shrine\n"
@@ -2010,6 +2060,8 @@ static const FsFile FS_FILES[] = {
     { "glyph_guide.lardd", file_glyph_guide, sizeof(file_glyph_guide) - 1 },
     { "lardtime_guide.lardd", file_lardtime_guide, sizeof(file_lardtime_guide) - 1 },
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
+    { "lha_guide.lardd", file_lha_guide, sizeof(file_lha_guide) - 1 },
+    { "lha_demo.lhvm", file_lha_demo_lhvm, sizeof(file_lha_demo_lhvm) - 1 },
     { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
     { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
     { "installer_guide.lardd", file_installer_guide, sizeof(file_installer_guide) - 1 },
@@ -2633,7 +2685,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 52u;
+    return 53u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2690,6 +2742,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 49) return &ram_stateiso;
     if (idx == 50) return &ram_bt;
     if (idx == 51) return &ram_timecfg;
+    if (idx == 52) return &ram_lha;
     return NULL;
 }
 
@@ -2800,6 +2853,10 @@ void fs_init(void)
         ram_timecfg_buf[i] = timecfg_init_doc[i];
     }
     ram_timecfg.size = sizeof(timecfg_init_doc) - 1;
+    for (uint32_t i = 0; i < sizeof(lha_init_doc) - 1 && i < LHA_CAP; i++) {
+        ram_lha_buf[i] = lha_init_doc[i];
+    }
+    ram_lha.size = sizeof(lha_init_doc) - 1;
     for (uint32_t i = 0; i < sizeof(office_doc_init) - 1 && i < OFFICE_DOC_CAP; i++) {
         ram_office_doc_buf[i] = office_doc_init[i];
     }

@@ -6,6 +6,14 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.14.0b-mirage
+ITEM Adds LHA, the LardOS Hypervisor API, as an in-tree C library for creating and running visible VM definitions.
+ITEM Adds the editable LHA 1 .lhvm format with CODE blocks targeting the native OSVM engine.
+ITEM Adds lha status, demo, run, create, sample, show, clear, and test commands.
+ITEM Bundles lha_demo.lhvm and lha_guide.lardd, plus writable lha.lardd for last-run reports.
+ITEM Extends VM Monitor with an LHA runtime row and adds POST/LUNIT checks for the API and sample VM.
+ITEM Ships as beta because LHA opens a new VM creation API surface while preserving existing BOSL/LIL/GASM/Lafillo/OSVM behavior.
+
 SECTION v2.13.0b-mirage
 ITEM Adds user-owned timecfg.lardd for timezone, DST, default calendar view, topbar clock visibility, and battery field visibility.
 ITEM Makes Dangun local time the OS-wide default display while keeping explicit solar date, lunar, raw ticks, and Dangun commands.

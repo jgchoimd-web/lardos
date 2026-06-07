@@ -643,9 +643,11 @@ commands:
   real-mode window that returns to 64-bit long mode.
 - `mode guard` performs the real-mode roundtrip with a before/after guard and
   reports restoration state.
-- `vm status|limits|selftest|clear` monitors BOSL, LIL, GASM, Lafillo VM, and
-  OSVM runs under common step budgets; `gasm file.gasm` runs GASM source and
-  `hc file.hc [input]` runs HC source from the shell.
+- `vm status|limits|selftest|clear` monitors BOSL, LIL, GASM, Lafillo VM,
+  OSVM, and LHA runs under common step budgets; `lha status|demo|run|sample`
+  exposes the LardOS Hypervisor API for file-defined VM creation, `gasm
+  file.gasm` runs GASM source, and `hc file.hc [input]` runs HC source from the
+  shell.
 - `shrine status|list|verify|run|test` exposes LSS, the Lard Subsystem for
   Shrine. `srine` is accepted as a typo-friendly alias.
 - `sram` / `screenram` turns a quiet framebuffer/backbuffer rectangle into

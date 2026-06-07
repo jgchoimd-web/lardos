@@ -5,7 +5,8 @@ static const uint32_t s_budgets[VMMON_COUNT] = {
     500000u,   /* LIL */
     1000000u,  /* GASM */
     100000u,   /* Lafillo VM */
-    1000000u   /* OSVM */
+    1000000u,  /* OSVM */
+    100000u    /* LHA API layer */
 };
 
 static vmmon_entry_t s_entries[VMMON_COUNT] = {
@@ -13,7 +14,8 @@ static vmmon_entry_t s_entries[VMMON_COUNT] = {
     { "lil", 0, 0, 0, 0, 0, 0 },
     { "gasm", 0, 0, 0, 0, 0, 0 },
     { "lafillo", 0, 0, 0, 0, 0, 0 },
-    { "osvm", 0, 0, 0, 0, 0, 0 }
+    { "osvm", 0, 0, 0, 0, 0, 0 },
+    { "lha", 0, 0, 0, 0, 0, 0 }
 };
 
 static int valid_id(uint32_t id)
@@ -74,7 +76,7 @@ int vmmon_info(uint32_t id, vmmon_entry_t* out)
 
 int vmmon_selftest(void)
 {
-    if (VMMON_COUNT != 5) {
+    if (VMMON_COUNT != 6) {
         return -1;
     }
     for (uint32_t i = 0; i < VMMON_COUNT; i++) {

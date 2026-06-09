@@ -52,6 +52,14 @@ set in one pass:
 make release-all-hardware
 ```
 
+`v2.15.0b-mirage` adds OSMOD, a native `.osmod` operating-system mode file
+reader. `osmod preview [file.osmod]` parses a visible mode file and writes
+`osmod.lardd`; `osmod apply [file.osmod]` takes a rollback snapshot and applies
+recognized boot profile, Awakening, RenderFX, sound, Bluetooth, and LardOS
+Connect settings through the same public control paths users already have.
+`default.osmod` and `osmod_guide.lardd` are bundled, while `osmod sample
+user.osmod` creates an editable user copy.
+
 `v2.11.0b-mirage` adds LEMAMD, a native keyboard-first modal editor command set
 inspired by Vim and Emacs without embedding either editor or depending on an
 external library. `lemamd file` opens a text target, keeps a current file/cursor

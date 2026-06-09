@@ -6,6 +6,14 @@ TEXT Hardware profiles extend releases by target: universal, seabios, ami, vbox,
 TEXT New or risky feature bundles should use b first; a is for promoted stable builds only.
 TEXT Codenames append after the channel as OS-era subnames, for example v2.0.6b-mirage. LTS lines are retired.
 
+SECTION v2.15.0b-mirage
+ITEM Adds OSMOD, a native .osmod operating-system mode file reader for visible user-owned OS mode profiles.
+ITEM Adds osmod preview, apply, sample, show, guide, and test commands.
+ITEM Bundles default.osmod and osmod_guide.lardd, plus writable osmod.lardd for parse/apply reports.
+ITEM OSMOD v1 can apply boot profile, Awakening, RenderFX AA/brightness/resize/LSB/VBlank, LSND sound, Bluetooth, and LardOS Connect through existing visible controls.
+ITEM osmod apply takes a rollback snapshot first and leaves journal/trace/report evidence instead of hiding mode changes.
+ITEM Ships as beta because .osmod opens a new OS-wide settings file surface while preserving cfgsh, bootprof, renderfx, sound, bt, lconnect, and explicit raw-control commands.
+
 SECTION v2.14.0b-mirage
 ITEM Adds LHA, the LardOS Hypervisor API, as an in-tree C library for creating and running visible VM definitions.
 ITEM Adds the editable LHA 1 .lhvm format with CODE blocks targeting the native OSVM engine.

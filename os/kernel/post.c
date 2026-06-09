@@ -40,6 +40,7 @@
 #include "mem.h"
 #include "megaclip.h"
 #include "net.h"
+#include "osmod.h"
 #include "oslink.h"
 #include "pci.h"
 #include "rxe.h"
@@ -225,6 +226,9 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("fs: lha guide and demo", fs_open("lha_guide.lardd") != NULL &&
                fs_open("lha_demo.lhvm") != NULL, emit, user, &pass, &fail);
     post_check("fs: lha report writable", fs_open_writable("lha.lardd") != NULL, emit, user, &pass, &fail);
+    post_check("fs: osmod guide and default", fs_open("osmod_guide.lardd") != NULL &&
+               fs_open("default.osmod") != NULL, emit, user, &pass, &fail);
+    post_check("fs: osmod report writable", fs_open_writable("osmod.lardd") != NULL, emit, user, &pass, &fail);
 
     post_check("doc: LARS renderer", post_doc_parse("lardos.lars"), emit, user, &pass, &fail);
     post_check("doc: LARS web demo", post_doc_parse("webdemo.lars"), emit, user, &pass, &fail);
@@ -261,6 +265,7 @@ void lard_post_run(lard_post_emit_fn emit, void* user, lard_post_result_t* out)
     post_check("time: lardos time calendar", lardtime_selftest() == 0, emit, user, &pass, &fail);
     post_check("vm: monitor budgets", vmmon_selftest() == 0, emit, user, &pass, &fail);
     post_check("vm: lha hypervisor api", lha_selftest() == 0, emit, user, &pass, &fail);
+    post_check("osmod: mode file parser", osmod_selftest() == 0, emit, user, &pass, &fail);
     post_check("shrine: subsystem wrapper", lss_selftest() == 0, emit, user, &pass, &fail);
     post_check("installer: boot stages embedded", lard_install_selftest() == 0, emit, user, &pass, &fail);
     post_check("pci: rtl8139 option", pci_find_device(0x10ECu, 0x8139u, &pci_addr) == 0, emit, user, &pass, &fail);

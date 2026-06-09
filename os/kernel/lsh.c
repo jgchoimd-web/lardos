@@ -45,6 +45,7 @@
 #include "auxkernel.h"
 #include "megaclip.h"
 #include "lha.h"
+#include "osmod.h"
 #include "mediafs.h"
 #include "panic.h"
 #include "version.h"
@@ -430,7 +431,7 @@ static const magic_cmd_entry_t s_magic_cmds[] = {
     { "rxr", 1 }, { "rxrpath", 1 }, { "rxrmap", 1 }, { "rxrls", 1 }, { "rxrinstall", 1 }, { "rxrverify", 1 }, { "rxrchecksum", 1 }, { "rxrundo", 1 }, { "fstwt", 1 }, { "fstwts", 1 }, { "vpath", 1 }, { "pathmap", 1 },
     { "copy", 1 }, { "cp", 1 }, { "write", 1 }, { "append", 1 }, { "set", 1 }, { "echo", 1 }, { "cd", 1 },
     { "lafillo", 1 }, { "lar", 1 }, { "extract", 1 }, { "larpass", 1 }, { "larls", 1 }, { "larx", 1 }, { "larsh", 1 }, { "lss", 1 }, { "shrine", 1 }, { "srine", 1 },
-    { "vm", 1 }, { "vms", 1 }, { "lha", 1 }, { "lhapi", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
+    { "vm", 1 }, { "vms", 1 }, { "lha", 1 }, { "lhapi", 1 }, { "osmod", 1 }, { "modefile", 1 }, { "bosl", 1 }, { "lil", 1 }, { "gasm", 1 }, { "lafvm", 1 }, { "osvm", 1 }, { "run", 1 },
     { "lcnt", 1 }, { "container", 1 },
     { "vcs", 1 }, { "vcsinit", 1 }, { "vcsstatus", 1 }, { "vcsadd", 1 }, { "vcscommit", 1 },
     { "vcslog", 1 }, { "vcsshow", 1 },
@@ -3191,7 +3192,7 @@ static void cmd_help(const char* args)
 {
     (void)args;
     out_append("Lard Shell commands\n");
-    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time timecfg date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode hangul vm lha shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect bluetooth bt buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
+    out_append("  help control values status install media secure bitlocker auxkernel emergency dos tomb bleed time timecfg date lunar dangun release [policy|codename|lts] ver bye byebye restart post baseline selftest magic mode osmod hangul vm lha shrine lword lsheet lshow lemamd vim emacs sysrxe rxe hc kmod kmo liveupdate cfgsh cfgprof state cfgio megaclip pinclip lconnect bluetooth bt buddy bugeye bugreplay screenshot screenrec sound rollback trust lardtrace trace netwatch journal webstack oslink oschat lguilib ltheme wallpaper monitor renderfx glyph awake task bootprof bootmap bootreplay devmap crashlog crash panicroom fstwt lar extract cls\n");
     out_append("  dir [drive:]  type file  more  lars file  lardd file  larsform file\n");
     out_append("  lpack info|list|verify|checksum|install file.lpack; lpack undo last\n");
     out_append("  lar list archive.lar; extract archive.lar member [password]; lar pass out.lar member source password\n");
@@ -3254,6 +3255,7 @@ static void cmd_help(const char* args)
     out_append("  lafillo file  lar list archive  extract archive member [password]  lar pass out.lar member source password  larsh file\n");
     out_append("  vm status|limits|selftest|clear  monitor BOSL/LIL/GASM/Lafillo/OSVM/LHA\n");
     out_append("  lha status|demo|run file.lhvm|create name code|sample file|clear|test  LardOS Hypervisor API\n");
+    out_append("  osmod preview|apply|sample|show|guide|test [file.osmod]  operating-system mode files\n");
     out_append("  bosl file  lil file  gasm file  lafvm file  osvm file  run file.bosx [args]\n");
     out_append("  lcnt list|create|rm|use|exit|run|info\n");
     out_append("  vcs init|status|add|commit|log|show\n");
@@ -12866,6 +12868,172 @@ static void cmd_lha(const char* args)
     out_append("Usage: lha status|demo|run file.lhvm|create name code|sample file|show|clear|test\n");
 }
 
+static void cmd_osmod_print_profile(const osmod_profile_t* p)
+{
+    if (!p) return;
+    out_append("OSMOD profile ");
+    out_append(p->name);
+    out_append("\n  directives=");
+    out_append_u32(p->directives);
+    out_append(" warnings=");
+    out_append_u32(p->warnings);
+    out_append(" lines=");
+    out_append_u32(p->lines);
+    out_append("\n  boot=");
+    out_append(p->have_boot ? p->boot : "unset");
+    out_append(" awake=");
+    out_append(p->awake == OSMOD_UNSET ? "unset" : (p->awake ? "on" : "off"));
+    out_append(" aa=");
+    out_append(osmod_aa_name(p->aa));
+    out_append(" brightness=");
+    if (p->brightness == OSMOD_UNSET) out_append("unset");
+    else out_append_i32(p->brightness);
+    out_append("\n  resize=");
+    out_append(osmod_resize_name(p->resize));
+    out_append(" lsb=");
+    out_append(p->lsb == OSMOD_UNSET ? "unset" : (p->lsb ? "on" : "off"));
+    out_append(" vblank=");
+    out_append(p->vblank == OSMOD_UNSET ? "unset" : (p->vblank ? "on" : "off"));
+    out_append("\n  sound=");
+    out_append(p->sound == OSMOD_UNSET ? "unset" : (p->sound ? "on" : "off"));
+    out_append(" bluetooth=");
+    out_append(p->bluetooth == OSMOD_UNSET ? "unset" : (p->bluetooth ? "on" : "off"));
+    out_append(" lconnect=");
+    out_append(p->lconnect == OSMOD_UNSET ? "unset" : (p->lconnect ? "on" : "off"));
+    out_append("\n");
+    if (p->note[0]) {
+        out_append("  note=");
+        out_append(p->note);
+        out_append("\n");
+    }
+}
+
+static int cmd_osmod_load_arg(const char* file_arg, osmod_profile_t* out)
+{
+    char drv;
+    char name[64];
+    char found = 0;
+    const uint8_t* data = NULL;
+    uint32_t size = 0;
+    if (!file_arg || !file_arg[0]) return osmod_load_file("default.osmod", out);
+    resolve_path(file_arg, &drv, name, sizeof(name));
+    if (!name[0]) return osmod_load_file("default.osmod", out);
+    if (lsh_read_drive_data_ex(drv, name, &data, &size, &found, 1) != 0) {
+        (void)found;
+        return -1;
+    }
+    return osmod_parse(data, size, out);
+}
+
+static void cmd_osmod_sample(const char* file_arg)
+{
+    char drv;
+    char name[64];
+    const char* sample = osmod_default_sample();
+    uint32_t size = osmod_default_sample_size();
+    FsWritableFile* w;
+    resolve_path(file_arg && file_arg[0] ? file_arg : "user.osmod", &drv, name, sizeof(name));
+    if (drive_to_fs(drv) == 2) {
+        if (mediafs_write(drv, name, (const uint8_t*)sample, size, 0) < 0) {
+            out_append("osmod sample: media write failed.\n");
+            return;
+        }
+        out_append("osmod sample: wrote ");
+        out_append_char(drv);
+        out_append(":");
+        out_append(name);
+        out_append("\n");
+        return;
+    }
+    w = fs_open_or_create_writable(name);
+    if (!w || w->cap < size) {
+        out_append("osmod sample: no writable slot or slot too small.\n");
+        return;
+    }
+    (void)fs_write(w, 0, (const uint8_t*)sample, size);
+    out_append("osmod sample: wrote ");
+    out_append(name);
+    out_append("\n");
+}
+
+static void cmd_osmod_show_report(void)
+{
+    const FsFile* f = fs_open("osmod.lardd");
+    if (!f || !f->data || f->size == 0) {
+        out_append("osmod: no report yet. Try osmod preview default.osmod\n");
+        return;
+    }
+    for (uint32_t i = 0; i < f->size && i < 1536u; i++) out_append_char((char)f->data[i]);
+    if (f->size > 1536u) out_append("\n-- truncated --\n");
+}
+
+static void cmd_osmod(const char* args)
+{
+    char sub[20];
+    const char* p = args ? args : "";
+    osmod_profile_t profile;
+    sub[0] = '\0';
+    if (vcs_read_word(&p, sub, sizeof(sub)) != 0 ||
+        ascii_streq_ci(sub, "status") || ascii_streq_ci(sub, "preview") ||
+        ascii_streq_ci(sub, "check")) {
+        char file_arg[64];
+        if (ascii_streq_ci(sub, "status")) {
+            cmd_osmod_show_report();
+            out_append("Commands: osmod preview|apply|sample|show|guide|test [file.osmod]\n");
+            return;
+        }
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) file_arg[0] = '\0';
+        if (cmd_osmod_load_arg(file_arg, &profile) != 0) {
+            out_append("osmod: parse failed: ");
+            out_append(osmod_last_error());
+            out_append("\n");
+            return;
+        }
+        cmd_osmod_print_profile(&profile);
+        (void)osmod_write_report(&profile, 0);
+        return;
+    }
+    if (ascii_streq_ci(sub, "apply") || ascii_streq_ci(sub, "use") || ascii_streq_ci(sub, "load")) {
+        char file_arg[64];
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) file_arg[0] = '\0';
+        if (cmd_osmod_load_arg(file_arg, &profile) != 0) {
+            out_append("osmod apply: parse failed: ");
+            out_append(osmod_last_error());
+            out_append("\n");
+            return;
+        }
+        if (osmod_apply(&profile) == 0) {
+            out_append("osmod: applied ");
+            out_append(profile.name);
+            out_append(". rollback last can restore the previous settings snapshot.\n");
+        } else {
+            out_append("osmod apply: ");
+            out_append(osmod_last_error());
+            out_append("\n");
+        }
+        return;
+    }
+    if (ascii_streq_ci(sub, "sample") || ascii_streq_ci(sub, "new")) {
+        char file_arg[64];
+        if (vcs_read_word(&p, file_arg, sizeof(file_arg)) != 0) file_arg[0] = '\0';
+        cmd_osmod_sample(file_arg);
+        return;
+    }
+    if (ascii_streq_ci(sub, "show") || ascii_streq_ci(sub, "report")) {
+        cmd_osmod_show_report();
+        return;
+    }
+    if (ascii_streq_ci(sub, "guide") || ascii_streq_ci(sub, "help")) {
+        cmd_larddoc("osmod_guide.lardd", "Usage: osmod guide");
+        return;
+    }
+    if (ascii_streq_ci(sub, "test") || ascii_streq_ci(sub, "selftest")) {
+        out_append(osmod_selftest() == 0 ? "osmod: selftest OK\n" : "osmod: selftest failed\n");
+        return;
+    }
+    out_append("Usage: osmod preview|apply|sample|show|guide|test [file.osmod]\n");
+}
+
 static void cmd_vm_status(void)
 {
     out_append("VM Monitor\n");
@@ -14342,6 +14510,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (strcmp(cmd, "hangul") == 0 || strcmp(cmd, "korean") == 0 || strcmp(cmd, "ime") == 0) { cmd_hangul(args); return; }
     if (strcmp(cmd, "vm") == 0 || strcmp(cmd, "vms") == 0) { cmd_vm(args); return; }
     if (strcmp(cmd, "lha") == 0 || strcmp(cmd, "lhapi") == 0) { cmd_lha(args); return; }
+    if (strcmp(cmd, "osmod") == 0 || strcmp(cmd, "modefile") == 0) { cmd_osmod(args); return; }
     if (strcmp(cmd, "lss") == 0 || strcmp(cmd, "shrine") == 0 || strcmp(cmd, "srine") == 0) { cmd_lss(args); return; }
     if (strcmp(cmd, "trace") == 0 || strcmp(cmd, "lardtrace") == 0) { cmd_trace(args); return; }
     if (strcmp(cmd, "netwatch") == 0) { cmd_netwatch(args); return; }
@@ -14497,6 +14666,7 @@ static void parse_and_run(const char* cmd, const char* args)
     if (cmd[0] == 'l' && cmd[1] == 's' && cmd[2] == 's' && cmd[3] == '\0') { cmd_lss(args); return; }
     if (cmd[0] == 'v' && cmd[1] == 'm' && cmd[2] == '\0') { cmd_vm(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'h' && cmd[2] == 'a' && cmd[3] == '\0') { cmd_lha(args); return; }
+    if (strcmp(cmd, "osmod") == 0 || strcmp(cmd, "modefile") == 0) { cmd_osmod(args); return; }
     if (cmd[0] == 'b' && cmd[1] == 'o' && cmd[2] == 's' && cmd[3] == 'l' && cmd[4] == '\0') { cmd_bosl(args); return; }
     if (cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == '\0') { cmd_lil(args); return; }
     if (cmd[0] == 'g' && cmd[1] == 'a' && cmd[2] == 's' && cmd[3] == 'm' && cmd[4] == '\0') { cmd_gasm(args); return; }

@@ -384,6 +384,14 @@ static const uint8_t lha_init_doc[] =
 static uint8_t ram_lha_buf[LHA_CAP];
 static FsWritableFile ram_lha = { "lha.lardd", ram_lha_buf, 0, LHA_CAP };
 
+#define OSMOD_CAP 2048u
+static const uint8_t osmod_init_doc[] =
+    "LARDD 1\n"
+    "TITLE OSMOD Report\n"
+    "TEXT No .osmod file has been previewed or applied yet.\n";
+static uint8_t ram_osmod_buf[OSMOD_CAP];
+static FsWritableFile ram_osmod = { "osmod.lardd", ram_osmod_buf, 0, OSMOD_CAP };
+
 #define OFFICE_DOC_CAP 4096u
 static const uint8_t office_doc_init[] =
     "LARDD 1\n"
@@ -1166,6 +1174,47 @@ static const uint8_t file_lha_guide[] =
     "ITEM lha.lardd records the last run so the API stays inspectable.\n"
     "END\n";
 
+static const uint8_t file_osmod_guide[] =
+    "LARDD 1\n"
+    "TITLE OSMOD Mode Files\n"
+    "TEXT OSMOD is the LardOS operating-system mode file format. It lets a user keep boot, render, sound, wireless, and connect policy in one editable .osmod file.\n"
+    "TEXT It does not hide a second settings engine; applying an OSMOD file routes through the same visible bootprof, renderfx, sound, bt, and lconnect controls.\n"
+    "SECTION Commands\n"
+    "ITEM osmod preview file.osmod -> parse a mode file and write osmod.lardd without changing settings.\n"
+    "ITEM osmod apply file.osmod -> take a rollback snapshot, apply recognized settings, and write osmod.lardd.\n"
+    "ITEM osmod sample user.osmod -> write an editable sample .osmod file.\n"
+    "ITEM osmod show -> read the last OSMOD report.\n"
+    "ITEM osmod test -> run parser selftest.\n"
+    "SECTION Format\n"
+    "ITEM OSMOD 1\n"
+    "ITEM NAME daily\n"
+    "ITEM BOOT normal|safe|netoff|dev|awakening\n"
+    "ITEM AWAKE on|off\n"
+    "ITEM RENDER_AA none|antianti|basic|nonlinear\n"
+    "ITEM BRIGHTNESS 50..150\n"
+    "ITEM RESIZE stretch|live\n"
+    "ITEM LSB on|off; VBLANK on|off; SOUND on|off; BLUETOOTH on|off; LCONNECT on|off\n"
+    "SECTION Values\n"
+    "ITEM Unknown keys are warned and ignored so future user keys do not brick the file.\n"
+    "ITEM Dangerous raw-control stays outside OSMOD v1; users can still use explicit raw commands when they choose.\n"
+    "ITEM rollback last restores the pre-apply settings snapshot.\n"
+    "END\n";
+
+static const uint8_t file_default_osmod[] =
+    "OSMOD 1\n"
+    "NAME default-user-mode\n"
+    "BOOT normal\n"
+    "AWAKE off\n"
+    "RENDER_AA none\n"
+    "BRIGHTNESS 100\n"
+    "RESIZE stretch\n"
+    "LSB off\n"
+    "VBLANK off\n"
+    "SOUND on\n"
+    "BLUETOOTH off\n"
+    "LCONNECT off\n"
+    "END\n";
+
 static const uint8_t file_lha_demo_lhvm[] =
     "LHA 1\n"
     "NAME lha-demo\n"
@@ -1747,6 +1796,10 @@ static const uint8_t file_tests_lunit[] =
     "CHECK file lha_guide.lardd\n"
     "CHECK file lha_demo.lhvm\n"
     "CHECK writable lha.lardd\n"
+    "CHECK file osmod_guide.lardd\n"
+    "CHECK file default.osmod\n"
+    "CHECK writable osmod.lardd\n"
+    "CHECK command osmod\n"
     "CHECK writable timecfg.lardd\n"
     "CHECK file ldi_guide.lardd\n"
     "CHECK file icon_doc.ldi\n"
@@ -2062,6 +2115,8 @@ static const FsFile FS_FILES[] = {
     { "vm_guide.lardd", file_vm_guide, sizeof(file_vm_guide) - 1 },
     { "lha_guide.lardd", file_lha_guide, sizeof(file_lha_guide) - 1 },
     { "lha_demo.lhvm", file_lha_demo_lhvm, sizeof(file_lha_demo_lhvm) - 1 },
+    { "osmod_guide.lardd", file_osmod_guide, sizeof(file_osmod_guide) - 1 },
+    { "default.osmod", file_default_osmod, sizeof(file_default_osmod) - 1 },
     { "shrine_guide.lardd", file_shrine_guide, sizeof(file_shrine_guide) - 1 },
     { "dosmode_guide.lardd", file_dosmode_guide, sizeof(file_dosmode_guide) - 1 },
     { "installer_guide.lardd", file_installer_guide, sizeof(file_installer_guide) - 1 },
@@ -2685,7 +2740,7 @@ int fs_rename_selftest(void)
 
 static uint32_t writable_count(void)
 {
-    return 53u;
+    return 54u;
 }
 
 static FsWritableFile* writable_at(uint32_t idx)
@@ -2743,6 +2798,7 @@ static FsWritableFile* writable_at(uint32_t idx)
     if (idx == 50) return &ram_bt;
     if (idx == 51) return &ram_timecfg;
     if (idx == 52) return &ram_lha;
+    if (idx == 53) return &ram_osmod;
     return NULL;
 }
 
@@ -2857,6 +2913,10 @@ void fs_init(void)
         ram_lha_buf[i] = lha_init_doc[i];
     }
     ram_lha.size = sizeof(lha_init_doc) - 1;
+    for (uint32_t i = 0; i < sizeof(osmod_init_doc) - 1 && i < OSMOD_CAP; i++) {
+        ram_osmod_buf[i] = osmod_init_doc[i];
+    }
+    ram_osmod.size = sizeof(osmod_init_doc) - 1;
     for (uint32_t i = 0; i < sizeof(office_doc_init) - 1 && i < OFFICE_DOC_CAP; i++) {
         ram_office_doc_buf[i] = office_doc_init[i];
     }

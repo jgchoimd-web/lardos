@@ -24,6 +24,13 @@ interpreter path.
 LardOS Hypervisor API. `.lhvm` files start with `LHA 1`, name an `ENGINE osvm`,
 and keep the guest program inside a visible `CODE` ... `END` block.
 
+`osmod preview default.osmod`, `osmod sample user.osmod`, and
+`osmod apply user.osmod` expose the OSMOD mode-file reader. `.osmod` files
+start with `OSMOD 1` and carry editable operating-system mode settings such as
+`BOOT`, `AWAKE`, `RENDER_AA`, `BRIGHTNESS`, `RESIZE`, `SOUND`, `BLUETOOTH`, and
+`LCONNECT`. Applying one uses existing public controls and records a rollback
+snapshot plus `osmod.lardd`.
+
 `shrine status`, `shrine verify hello.shrine`, and `shrine run hello.shrine`
 expose LSS, the Lard Subsystem for Shrine. Current `.shrine` files wrap a type
 0 BOSL payload after the `LSS\0` magic and one-byte type; verification checks
